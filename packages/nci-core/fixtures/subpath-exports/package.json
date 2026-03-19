@@ -1,0 +1,16 @@
+{
+  "name": "subpath-exports",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts"
+    },
+    "./package.json": "./package.json"
+  }
+}

@@ -36,3 +36,11 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# NCI Generated / Temp
+NCI_ROADMAP.md
+NCI_PROPOSAL.md
+poc-oracle.ts
+nco-react-index.json
+packages/nci-core/nci-report.json
+

@@ -1,0 +1,8 @@
+{
+  "name": "wildcard-subpath-exports",
+  "version": "1.0.0",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts" },
+    "./*": { "types": "./dist/*.d.ts" }
+  }
+}

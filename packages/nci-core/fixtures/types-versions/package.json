@@ -1,0 +1,10 @@
+{
+  "name": "types-versions-pkg",
+  "version": "3.0.0",
+  "types": "./legacy/index.d.ts",
+  "typesVersions": {
+    ">=5.0": {
+      "*": ["ts5/*"]
+    }
+  }
+}
