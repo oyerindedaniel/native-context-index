@@ -14,6 +14,7 @@ import ts from "typescript";
 import { parseFile, parseTripleSlashReferences, parseTypeReferenceDirectives } from "./parser.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
+import { DEFAULT_MAX_DEPTH } from "./constants.js";
 
 export interface CrawlOptions {
   /** Maximum depth for following re-exports (default: 10) */
@@ -31,7 +32,7 @@ export function crawl(
   entryFilePaths: string | string[],
   options: CrawlOptions = {}
 ): CrawlResult {
-  const maxDepth = options.maxDepth ?? 10;
+  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
   const visited = new Set<string>();
   const circularRefs: string[] = [];
   const resolvedSymbols: ResolvedSymbol[] = [];

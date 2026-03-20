@@ -146,10 +146,10 @@ function resolveAllExports(
     for (const item of exports) {
       const resolved = resolveAllExports(packageDir, item);
       for (const resolvedPath of resolved) {
-          if (!seen.has(resolvedPath)) {
-              seen.add(resolvedPath);
-              entries.push(resolvedPath);
-          }
+        if (!seen.has(resolvedPath)) {
+          seen.add(resolvedPath);
+          entries.push(resolvedPath);
+        }
       }
     }
   }
@@ -186,7 +186,7 @@ function resolveExportCondition(
 
   const obj = entry as Record<string, unknown>;
 
-  // Priority: "types" condition first (most specific for our use case)
+  // Priority order: types → import → require → default
   if (obj.types) {
     const resolved = resolveExportCondition(packageDir, obj.types);
     if (resolved) return resolved;
@@ -222,7 +222,7 @@ function resolveTypesVersions(
   packageDir: string,
   typesVersions: Record<string, Record<string, string[]>>
 ): string | null {
-  const currentVersion = ts.version; // e.g., "5.7.2"
+  const currentVersion = ts.version;
 
   for (const [versionRange, pathMap] of Object.entries(typesVersions)) {
     if (matchesVersionRange(currentVersion, versionRange)) {

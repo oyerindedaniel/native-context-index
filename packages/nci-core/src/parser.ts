@@ -4,7 +4,7 @@
  * Parses a single .d.ts file and classifies every export statement.
  * Uses the TypeScript Compiler API for AST generation.
  *
- * Handles all 16 export forms:
+ * Handles all 17 export forms:
  *  1.  export interface Foo {}
  *  2.  export type Bar = ...
  *  3.  export declare function fn()
@@ -31,6 +31,7 @@ import type {
   TypeReference,
   VisibilityLevel,
 } from "./types.js";
+import { BUILTIN_TYPES, VISIBILITY_TAGS, DECLARATION_KINDS } from "./constants.js";
 
 const sourceFileCache = new Map<string, ts.SourceFile>();
 
@@ -39,39 +40,6 @@ interface JSDocInfo {
   deprecated?: string | boolean;
   visibility?: VisibilityLevel;
 }
-
-/** Built-in type names that should NOT be treated as dependencies */
-const BUILTIN_TYPES = new Set([
-  "string", "number", "boolean", "void", "any", "unknown", "never",
-  "null", "undefined", "object", "Object", "symbol", "bigint",
-  "Array", "ReadonlyArray", "Promise", "Map", "Set", "WeakMap", "WeakSet",
-  "ReadonlyMap", "ReadonlySet",
-  "Record", "Partial", "Required", "Readonly", "Pick", "Omit",
-  "Exclude", "Extract", "NonNullable", "ReturnType", "Parameters",
-  "InstanceType", "ConstructorParameters", "ThisParameterType", "ThisType",
-  "Awaited", "NoInfer",
-  "Uppercase", "Lowercase", "Capitalize", "Uncapitalize",
-  "TemplateStringsArray",
-  "Iterator", "IterableIterator", "AsyncIterableIterator",
-  "Generator", "AsyncGenerator",
-  "Date", "RegExp", "Error", "Function",
-]);
-
-/** Visibility tag names */
-const VISIBILITY_TAGS = new Set(["public", "internal", "alpha", "beta"]);
-
-/**
- * The set of SyntaxKind values that represent direct declarations we extract.
- */
-const DECLARATION_KINDS = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.FunctionDeclaration,
-  ts.SyntaxKind.ClassDeclaration,
-  ts.SyntaxKind.InterfaceDeclaration,
-  ts.SyntaxKind.TypeAliasDeclaration,
-  ts.SyntaxKind.EnumDeclaration,
-  ts.SyntaxKind.ModuleDeclaration,
-  ts.SyntaxKind.VariableStatement,
-]);
 
 /**
  * Parse a .d.ts file and return all export statements, classified.
@@ -91,7 +59,7 @@ function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
   for (const statement of sourceFile.statements) {
-    // ─── Pattern 15: export import X = ... (CommonJS re-export) ─────
+    // ─── Pattern 17: export import X = ... (CommonJS re-export) ─────
     if (ts.isImportEqualsDeclaration(statement)) {
       if (isExportedDeclaration(statement)) {
         let source: string | undefined;
@@ -157,7 +125,7 @@ function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
         continue;
       }
 
-      // declare module "name" { ... } — ambient module
+      // ─── Pattern 15: declare module "name" { ... } (Ambient module) ──
       if (ts.isStringLiteral(statement.name)) {
         const jsdoc2 = extractJSDocInfo(statement);
         exports.push({
@@ -183,7 +151,7 @@ function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
       }
     }
 
-    // ─── Export declarations (re-exports) ──────────────────────
+    // ─── Patterns 7-12: Export declarations (named, wildcard, namespace re-exports)
     if (ts.isExportDeclaration(statement)) {
       const reExports = extractExportDeclaration(statement, sourceFile);
       for (const exp of reExports) {
@@ -193,7 +161,7 @@ function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
       continue;
     }
 
-    // ─── Export assignment ──────────────────────────────────────
+    // ─── Patterns 13-14: Export assignment / Default export ────────
     if (ts.isExportAssignment(statement)) {
       const exp = extractExportAssignment(statement, sourceFile);
       exp.isExplicitExport = true;
@@ -201,7 +169,7 @@ function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
       continue;
     }
 
-    // ─── Direct declarations (exported or not) ──────────────────
+    // ─── Patterns 1-6: Direct declarations (interface, type, function, class, const, enum)
     if (DECLARATION_KINDS.has(statement.kind)) {
       const isExported = isExportedDeclaration(statement);
       const directExports = extractDirectExport(statement, sourceFile, isExported);
@@ -224,7 +192,6 @@ function getOrCreateSourceFile(filePath: string): ts.SourceFile {
   return sourceFile;
 }
 
-/** Clear the SourceFile cache. */
 export function clearSourceFileCache(): void {
   sourceFileCache.clear();
 }
@@ -257,8 +224,10 @@ export function parseTypeReferenceDirectives(filePath: string): string[] {
   return sourceFile.typeReferenceDirectives.map((ref) => ref.fileName);
 }
 
-// ─── Direct Export Extraction ───────────────────────────────────
-
+/**
+ * Extract symbols from a direct declaration (Patterns 1–6).
+ * @returns Array of parsed symbols
+ */
 function extractDirectExport(
   statement: ts.Statement,
   sourceFile: ts.SourceFile,
@@ -267,7 +236,7 @@ function extractDirectExport(
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
-  // Pattern 5: VariableStatement → may contain multiple declarations
+  // ─── Pattern 5: VariableStatement (declare const/let/var) ──────
   if (ts.isVariableStatement(statement)) {
     for (const decl of statement.declarationList.declarations) {
       if (ts.isIdentifier(decl.name)) {
@@ -295,7 +264,7 @@ function extractDirectExport(
     return exports;
   }
 
-  // Patterns 1-4, 6: Named declarations
+  // ─── Patterns 1-4, 6: Named declarations (interface, type, class, enum)
   if (isNamedDeclaration(statement)) {
     const namedNode = statement as ts.DeclarationStatement & { name?: ts.Node };
     const rawName =
@@ -335,8 +304,10 @@ function extractDirectExport(
   return exports;
 }
 
-// ─── Type Literal Member Extraction ───────────────────────────
-
+/**
+ * Recursively extract members from a type literal.
+ * @returns Array of sub-symbols
+ */
 function extractTypeLiteralMembers(
   node: ts.TypeLiteralNode,
   sourceFile: ts.SourceFile,
@@ -380,8 +351,10 @@ function extractTypeLiteralMembers(
   return exports;
 }
 
-// ─── Export Declaration Extraction (Re-exports) ─────────────────
-
+/**
+ * Check if a node is explicitly exported via 'export' or index assignment.
+ * @returns boolean
+ */
 function isExportedDeclaration(node: ts.Node): boolean {
   if (ts.isExportAssignment(node) || ts.isExportDeclaration(node)) return true;
 
@@ -400,6 +373,10 @@ function isExportedDeclaration(node: ts.Node): boolean {
   return false;
 }
 
+/**
+ * Extract symbols from an export { ... } or export * declaration (Patterns 7–12).
+ * @returns Array of parsed symbols
+ */
 function extractExportDeclaration(
   node: ts.ExportDeclaration,
   sourceFile: ts.SourceFile
@@ -411,7 +388,7 @@ function extractExportDeclaration(
     : undefined;
   const signature = node.getText(sourceFile).trim();
 
-  // Pattern 10: export * from "..."
+  // ─── Pattern 10: export * from "..." (Wildcard re-export) ─────
   if (!node.exportClause) {
     exports.push({
       name: "*",
@@ -426,7 +403,7 @@ function extractExportDeclaration(
     return exports;
   }
 
-  // Pattern 11: export * as ns from "..."
+  // ─── Pattern 11: export * as ns from "..." (Namespace re-export)
   if (ts.isNamespaceExport(node.exportClause)) {
     exports.push({
       name: node.exportClause.name.text,
@@ -441,7 +418,7 @@ function extractExportDeclaration(
     return exports;
   }
 
-  // Patterns 7-9, 12: Named exports (with or without source)
+  // ─── Patterns 7, 8, 9, 12: Named / Aliased / Type-only re-exports
   if (ts.isNamedExports(node.exportClause)) {
     for (const specifier of node.exportClause.elements) {
       const exportedName = specifier.name.text;
@@ -473,12 +450,15 @@ function extractExportDeclaration(
   return exports;
 }
 
-// ─── Export Assignment Extraction ────────────────────────────────
-
+/**
+ * Extract symbols from an export = or export default assignment (Patterns 13–14).
+ * @returns Parsed symbol
+ */
 function extractExportAssignment(
   node: ts.ExportAssignment,
   sourceFile: ts.SourceFile
 ): ParsedExport {
+  // ─── Pattern 13 (Default) or 14 (CJS-style) ───────────────────
   const isDefault = !node.isExportEquals;
   const expression = node.expression;
 
@@ -501,8 +481,10 @@ function extractExportAssignment(
   };
 }
 
-// ─── Utilities ──────────────────────────────────────────────────
-
+/**
+ * Check if a node is a named declaration (function, class, etc.).
+ * @returns boolean
+ */
 function isNamedDeclaration(node: ts.Node): boolean {
   return (
     ts.isFunctionDeclaration(node) ||
@@ -514,6 +496,10 @@ function isNamedDeclaration(node: ts.Node): boolean {
   );
 }
 
+/**
+ * Check if a node is a type-only declaration (interface, type alias).
+ * @returns boolean
+ */
 function isTypeDeclaration(node: ts.Node): boolean {
   return (
     ts.isInterfaceDeclaration(node) ||
@@ -521,6 +507,9 @@ function isTypeDeclaration(node: ts.Node): boolean {
   );
 }
 
+/**
+ * Get the full text signature of a declaration.
+ */
 function getSignature(node: ts.Statement, sourceFile: ts.SourceFile): string {
   const text = node.getText(sourceFile);
 

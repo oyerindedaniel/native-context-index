@@ -77,7 +77,7 @@ export function buildPackageGraph(
     }
   }
 
-  // 2. Build lookup maps for dependency resolution
+  // Build lookup maps for dependency resolution
   const nameToId = new Map<string, string>(); // Global name lookup (public first)
   const fileLocalToId = new Map<string, string>(); // File-local lookup: "filePath::name"
 
@@ -90,7 +90,7 @@ export function buildPackageGraph(
     }
   }
 
-  // 3. Resolve dependencies using structured rawDependencies
+  // Resolve dependencies using structured rawDependencies
   for (const symbolNode of symbols) {
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();
@@ -108,11 +108,10 @@ export function buildPackageGraph(
             targetId = fileLocalToId.get(`${relPath}::${rawDep.name}`);
           }
         } else {
-          // Regular name lookup
-          // 1. First check current file (for internal private types)
+          // For internal private types
           targetId = fileLocalToId.get(`${symbolNode.filePath}::${rawDep.name}`);
 
-          // 2. Try to resolve via imports in the file where this symbol is defined
+          // Try to resolve via imports in the file where this symbol is defined
           if (!targetId) {
             const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
             const fileImports = allImportsPerFile[absPathForLookup] || [];
@@ -131,7 +130,7 @@ export function buildPackageGraph(
             }
           }
 
-          // 3. Finally check global public exports (public aliases)
+          // Finally check global public exports (public aliases)
           if (!targetId) {
             targetId = nameToId.get(rawDep.name);
           }
