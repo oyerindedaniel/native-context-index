@@ -1,0 +1,5 @@
+{
+  "name": "bare-array",
+  "version": "1.0.0",
+  "exports": ["./index.d.ts", "./index.d.ts"]
+}

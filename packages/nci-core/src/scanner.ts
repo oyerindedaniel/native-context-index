@@ -10,33 +10,6 @@ import path from "node:path";
 import type { PackageInfo } from "./types.js";
 
 /**
- * Directories/files in node_modules that are NOT packages.
- * Covers all major package managers:
- *   - npm:  .package-lock.json, .cache
- *   - pnpm: .pnpm, .modules.yaml
- *   - yarn: .yarn-integrity, .yarn-state.yml, .yarn-metadata.json
- *   - bun:  .bun
- *   - common: .bin, .DS_Store
- */
-const SKIP_ENTRIES = new Set([
-  // ─── npm ────────────────────────────────
-  ".package-lock.json",
-  ".cache",
-  // ─── pnpm ───────────────────────────────
-  ".pnpm",
-  ".modules.yaml",
-  // ─── yarn ───────────────────────────────
-  ".yarn-integrity",
-  ".yarn-state.yml",
-  ".yarn-metadata.json",
-  // ─── bun ────────────────────────────────
-  ".bun",
-  // ─── common ─────────────────────────────
-  ".bin",
-  ".DS_Store",
-]);
-
-/**
  * Check if a dirent is a directory or a symlink pointing to a directory.
  * pnpm uses symlinks in node_modules, so we need to follow them.
  */
@@ -56,6 +29,12 @@ function isDirectoryOrSymlink(entry: fs.Dirent, parentDir: string): boolean {
 /**
  * Scan a node_modules directory and discover all installed packages.
  *
+ * Skips any entry starting with "." — the npm registry forbids package names
+ * with a leading dot, so these are always package manager artifacts:
+ *   npm (.package-lock.json, .cache), pnpm (.pnpm, .modules.yaml),
+ *   yarn (.yarn-integrity, .yarn-state.yml, .yarn), bun (.bun, .bun-tag),
+ *   and common entries (.bin, .DS_Store).
+ *
  * @param nodeModulesPath - Absolute path to the node_modules directory
  * @returns Array of discovered packages with metadata
  */
@@ -68,12 +47,10 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
   const packages: PackageInfo[] = [];
 
   for (const entry of entries) {
-    // Skip known non-package entries
-    if (SKIP_ENTRIES.has(entry.name)) {
+    if (entry.name.startsWith(".")) {
       continue;
     }
 
-    // Skip non-directories (and non-symlinks-to-directories)
     if (!isDirectoryOrSymlink(entry, nodeModulesPath)) {
       continue;
     }
@@ -81,7 +58,6 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
     // Scoped packages: @scope/package-name
     if (entry.name.startsWith("@")) {
       const scopeDir = path.join(nodeModulesPath, entry.name);
-      // Resolve in case the scope dir itself is a symlink
       const realScopeDir = fs.realpathSync(scopeDir);
       const scopedEntries = fs.readdirSync(realScopeDir, {
         withFileTypes: true,
@@ -90,7 +66,6 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
       for (const scopedEntry of scopedEntries) {
         if (!isDirectoryOrSymlink(scopedEntry, realScopeDir)) continue;
 
-        // Resolve the actual package directory (follow symlinks)
         const symlinkPath = path.join(scopeDir, scopedEntry.name);
         const pkgDir = fs.realpathSync(symlinkPath);
         const info = readPackageInfo(
@@ -102,7 +77,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
         }
       }
     } else {
-      // Regular packages — resolve symlinks
+      // Regular packages
       const symlinkPath = path.join(nodeModulesPath, entry.name);
       const pkgDir = fs.realpathSync(symlinkPath);
       const info = readPackageInfo(pkgDir, entry.name);
@@ -141,7 +116,6 @@ function readPackageInfo(
       isScoped: name.startsWith("@"),
     };
   } catch {
-    // Malformed package.json — skip
     return null;
   }
 }

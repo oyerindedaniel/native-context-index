@@ -20,8 +20,6 @@ function makePackageInfo(
 }
 
 describe("buildPackageGraph", () => {
-  // ─── Simple package ─────────────────────────────────────────
-
   it("builds a graph for a simple package with direct exports", () => {
     const graph = buildPackageGraph(
       makePackageInfo("simple-export")
@@ -33,8 +31,7 @@ describe("buildPackageGraph", () => {
     expect(graph.totalFiles).toBe(1);
     expect(graph.crawlDurationMs).toBeGreaterThanOrEqual(0);
 
-    // Check symbol IDs
-    const ids = graph.symbols.map((s) => s.id);
+    const ids = graph.symbols.map((symbol) => symbol.id);
     expect(ids).toContain("simple-export@1.0.0::Config");
     expect(ids).toContain("simple-export@1.0.0::init");
   });
@@ -44,80 +41,79 @@ describe("buildPackageGraph", () => {
       makePackageInfo("simple-export")
     );
 
-    const configSymbol = graph.symbols.find((s) => s.name === "Config");
+    const configSymbol = graph.symbols.find((symbol) => symbol.name === "Config");
     expect(configSymbol).toBeDefined();
     expect(configSymbol!.kind).toBe(ts.SyntaxKind.InterfaceDeclaration);
     expect(configSymbol!.kindName).toBe("InterfaceDeclaration");
   });
-
-  // ─── Re-export chain ───────────────────────────────────────
 
   it("builds a graph with re-exported symbols resolved to their source", () => {
     const graph = buildPackageGraph(
       makePackageInfo("re-export-chain")
     );
 
-    const server = graph.symbols.find((s) => s.name === "Server");
+    const server = graph.symbols.find((symbol) => symbol.name === "Server");
     expect(server).toBeDefined();
-    expect(server!.filePath).toContain("core.d.ts");
+    expect(server!.filePath).toBe("lib/core.d.ts");
+    expect(server!.reExportedFrom).toBe("index.d.ts");
 
-    // Should have visited index.d.ts and lib/core.d.ts
     expect(graph.totalFiles).toBe(2);
   });
 
-  // ─── Wildcard re-export ─────────────────────────────────────
+  it("sets reExportedFrom to undefined if it matches filePath (local re-export)", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("local-reexport")
+    );
+
+    const external = graph.symbols.find((symbol) => symbol.name === "External");
+    expect(external).toBeDefined();
+    expect(external!.filePath).toBe("index.d.ts");
+    expect(external!.reExportedFrom).toBeUndefined();
+  });
+
+  it("merges visibility tags when merging nodes", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("visibility-merge")
+    );
+
+    const merged = graph.symbols.find((symbol) => symbol.name === "Merged");
+    expect(merged).toBeDefined();
+    expect(merged!.visibility).toBe("public");
+  });
 
   it("includes symbols from wildcard re-exports in the graph", () => {
     const graph = buildPackageGraph(
       makePackageInfo("wildcard-reexport")
     );
 
-    const names = graph.symbols.map((s) => s.name);
-    expect(names).toContain("LIB_VERSION"); // direct
-    expect(names).toContain("Config");      // from export *
-    expect(names).toContain("Callback");    // from export *
+    const names = graph.symbols.map((symbol) => symbol.name);
+    expect(names).toContain("LIB_VERSION");
+    expect(names).toContain("Config");
+    expect(names).toContain("Callback");
   });
-
-  // ─── Deep chain ────────────────────────────────────────────
 
   it("resolves symbols through deep re-export chains", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deep-chain")
     );
 
-    const handler = graph.symbols.find((s) => s.name === "Handler");
+    const handler = graph.symbols.find((symbol) => symbol.name === "Handler");
     expect(handler).toBeDefined();
     expect(handler!.filePath).toContain("handler.d.ts");
     expect(graph.totalFiles).toBe(3);
   });
 
-  // ─── No types ──────────────────────────────────────────────
-
   it("returns empty graph for a package with no types", () => {
-    const fs = require("node:fs");
-    const tmpDir = path.join(FIXTURES_DIR, "__no-types-graph-tmp");
-    fs.mkdirSync(tmpDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, "package.json"),
-      JSON.stringify({ name: "no-types", version: "1.0.0" })
-    );
+    const graph = buildPackageGraph({
+      name: "no-types-pkg",
+      version: "1.0.0",
+      dir: path.join(FIXTURES_DIR, "no-types-pkg"),
+      isScoped: false,
+    });
 
-    try {
-      const graph = buildPackageGraph({
-        name: "no-types",
-        version: "1.0.0",
-        dir: tmpDir,
-        isScoped: false,
-      });
-
-      expect(graph.totalSymbols).toBe(0);
-      expect(graph.symbols).toHaveLength(0);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true });
-    }
+    expect(graph.totalSymbols).toBe(0);
+    expect(graph.symbols).toHaveLength(0);
   });
-
-  // ─── Symbol structure ──────────────────────────────────────
 
   it("produces SymbolNodes with all required fields", () => {
     const graph = buildPackageGraph(
@@ -136,78 +132,63 @@ describe("buildPackageGraph", () => {
     expect(Array.isArray(symbol!.dependencies)).toBe(true);
   });
 
-  // ─── Dependencies ──────────────────────────────────────────
-
   it("populates dependencies with resolved symbol IDs", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deps-pkg")
     );
 
-    // Logger references Config and LogLevel — these should be symbol IDs
-    const logger = graph.symbols.find((s) => s.name === "Logger");
+    const logger = graph.symbols.find((symbol) => symbol.name === "Logger");
     expect(logger).toBeDefined();
     expect(logger!.dependencies.length).toBeGreaterThan(0);
 
-    // Dependencies should be resolved to "deps-pkg@1.0.0::Config" format
     expect(logger!.dependencies).toContain("deps-pkg@1.0.0::Config");
     expect(logger!.dependencies).toContain("deps-pkg@1.0.0::LogLevel");
 
-    // createLogger references Config and Logger
-    const createLogger = graph.symbols.find((s) => s.name === "createLogger");
+    const createLogger = graph.symbols.find((symbol) => symbol.name === "createLogger");
     expect(createLogger).toBeDefined();
     expect(createLogger!.dependencies).toContain("deps-pkg@1.0.0::Config");
     expect(createLogger!.dependencies).toContain("deps-pkg@1.0.0::Logger");
 
-    // Config uses only builtins — should have empty deps
-    const config = graph.symbols.find((s) => s.name === "Config");
+    const config = graph.symbols.find((symbol) => symbol.name === "Config");
     expect(config).toBeDefined();
     expect(config!.dependencies).toHaveLength(0);
   });
-
-  // ─── Triple-slash references in graph ──────────────────────
 
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(
       makePackageInfo("triple-slash-refs")
     );
 
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
 
-    // Direct + referenced file symbols
-    expect(names).toContain("APP_VERSION");    // direct
-    expect(names).toContain("GlobalConfig");   // from globals.d.ts
-    expect(names).toContain("setupGlobals");   // from globals.d.ts
-    expect(names).toContain("formatDate");     // from utils.d.ts
-    expect(names).toContain("DateFormat");     // from utils.d.ts
+    expect(names).toContain("APP_VERSION");
+    expect(names).toContain("GlobalConfig");
+    expect(names).toContain("setupGlobals");
+    expect(names).toContain("formatDate");
+    expect(names).toContain("DateFormat");
 
     expect(graph.totalFiles).toBe(3);
   });
-
-  // ─── typesVersions graph ────────────────────────────────────
 
   it("builds graph using typesVersions-resolved entry point", () => {
     const graph = buildPackageGraph(
       makePackageInfo("types-versions", "types-versions-pkg", "3.0.0")
     );
 
-    // Should find ModernConfig from ts5/index.d.ts, NOT LegacyConfig
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("ModernConfig");
     expect(names).not.toContain("LegacyConfig");
   });
-
-  // ─── Subpath exports + Declaration merging ─────────────────
 
   it("merges symbols from all subpath exports without duplicates", () => {
     const graph = buildPackageGraph(
       makePackageInfo("subpath-exports")
     );
 
-    // All 7 unique symbols from 3 entries
     expect(graph.totalSymbols).toBe(7);
     expect(graph.totalFiles).toBe(3);
 
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("AppConfig");
     expect(names).toContain("createApp");
     expect(names).toContain("formatDate");
@@ -216,28 +197,115 @@ describe("buildPackageGraph", () => {
     expect(names).toContain("createServer");
     expect(names).toContain("Server");
 
-    // No duplicates
     const uniqueNames = new Set(names);
     expect(uniqueNames.size).toBe(names.length);
   });
-
-  // ─── Deprecation passthrough ───────────────────────────────
 
   it("passes deprecated flag through to SymbolNode", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deprecated-exports")
     );
 
-    const oldInit = graph.symbols.find((s) => s.name === "oldInit");
+    const oldInit = graph.symbols.find((symbol) => symbol.name === "oldInit");
     expect(oldInit).toBeDefined();
     expect(oldInit!.deprecated).toBe("Use newInit instead");
 
-    const legacy = graph.symbols.find((s) => s.name === "LegacyConfig");
+    const legacy = graph.symbols.find((symbol) => symbol.name === "LegacyConfig");
     expect(legacy).toBeDefined();
     expect(legacy!.deprecated).toBe(true);
 
-    const newInit = graph.symbols.find((s) => s.name === "newInit");
+    const newInit = graph.symbols.find((symbol) => symbol.name === "newInit");
     expect(newInit).toBeDefined();
     expect(newInit!.deprecated).toBeUndefined();
+  });
+
+  it("filters out non-exported types and generic params from dependencies", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("deps-unresolved")
+    );
+
+    const service = graph.symbols.find((symbol) => symbol.name === "Service");
+    expect(service).toBeDefined();
+    expect(service!.dependencies).toContain("deps-unresolved@1.0.0::Config");
+    expect(service!.dependencies).not.toContain("InternalHelper");
+    expect(service!.dependencies).not.toContain("Base");
+
+    const create = graph.symbols.find((symbol) => symbol.name === "create");
+    expect(create).toBeDefined();
+    expect(create!.dependencies).toContain("deps-unresolved@1.0.0::Service");
+    expect(create!.dependencies).not.toContain("T");
+
+    for (const symbolNode of graph.symbols) {
+      for (const dependency of symbolNode.dependencies) {
+        expect(dependency).toContain("::");
+      }
+    }
+  });
+
+  it("expands members of a namespace exported via export =", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("cjs-namespace")
+    );
+
+    const names = graph.symbols.map((symbol) => symbol.name);
+
+    expect(names).toContain("ts");
+    expect(names).toContain("ts.Node");
+    expect(names).toContain("ts.createNode");
+    expect(names).toContain("ts.server");
+    expect(names).toContain("ts.server.Project");
+
+    const tsNode = graph.symbols.find((symbol) => symbol.name === "ts.Node");
+    expect(tsNode?.signature).toContain("interface Node");
+  });
+
+  it("resolves local re-exports to their definitions", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("local-reexport")
+    );
+
+    const names = graph.symbols.map((symbol) => symbol.name);
+    expect(names).toContain("External");
+    expect(names).toContain("x");
+
+    const external = graph.symbols.find((symbol) => symbol.name === "External");
+    expect(external?.signature).toContain("interface Internal");
+  });
+
+  it("keeps same-name symbols from different files separate", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("name-collision")
+    );
+
+    const identities = graph.symbols.filter((symbol) => symbol.name === "identity");
+    expect(identities.length).toBe(3);
+
+    const ids = identities.map((symbol) => symbol.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(3);
+
+    expect(ids).toContain("name-collision@1.0.0::identity");
+    expect(ids).toContain("name-collision@1.0.0::identity#2");
+    expect(ids).toContain("name-collision@1.0.0::identity#3");
+    const fromIndex = identities.find((symbol) =>
+      symbol.filePath.includes("index.d.ts")
+    );
+    expect(fromIndex).toBeDefined();
+    expect(fromIndex!.dependencies).not.toContain("name-collision@1.0.0::StreamConfig");
+    expect(fromIndex!.dependencies).not.toContain("name-collision@1.0.0::ChannelConfig");
+
+    const fromStream = identities.find((symbol) =>
+      symbol.filePath.includes("stream.d.ts")
+    );
+    expect(fromStream).toBeDefined();
+    expect(fromStream!.dependencies).toContain("name-collision@1.0.0::StreamConfig");
+    expect(fromStream!.dependencies).not.toContain("name-collision@1.0.0::ChannelConfig");
+
+    const fromChannel = identities.find((symbol) =>
+      symbol.filePath.includes("channel.d.ts")
+    );
+    expect(fromChannel).toBeDefined();
+    expect(fromChannel!.dependencies).toContain("name-collision@1.0.0::ChannelConfig");
+    expect(fromChannel!.dependencies).not.toContain("name-collision@1.0.0::StreamConfig");
   });
 });

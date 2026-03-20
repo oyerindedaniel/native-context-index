@@ -1,0 +1,17 @@
+{
+  "name": "complex-exports",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./feature/*": {
+      "types": "./types/feature/*.d.ts"
+    },
+    "./multi": [
+      { "types": "./types/multi.d.ts" },
+      "./dist/multi.js"
+    ]
+  }
+}

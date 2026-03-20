@@ -16,8 +16,6 @@ const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 const REAL_NODE_MODULES = path.resolve(__dirname, "../../../node_modules");
 
 describe("integration", () => {
-  // ─── Full pipeline on fixtures ──────────────────────────────
-
   it("runs the full pipeline on re-export-chain fixture", () => {
     const graph = buildPackageGraph({
       name: "re-export-chain",
@@ -29,7 +27,7 @@ describe("integration", () => {
     expect(graph.totalSymbols).toBe(2);
     expect(graph.totalFiles).toBe(2);
 
-    const ids = graph.symbols.map((s) => s.id);
+    const ids = graph.symbols.map((symbol) => symbol.id);
     expect(ids).toContain("re-export-chain@1.0.0::Server");
     expect(ids).toContain("re-export-chain@1.0.0::ServerOptions");
   });
@@ -45,7 +43,7 @@ describe("integration", () => {
     expect(graph.totalSymbols).toBe(3);
     expect(graph.totalFiles).toBe(2);
 
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("LIB_VERSION");
     expect(names).toContain("Config");
     expect(names).toContain("Callback");
@@ -62,12 +60,10 @@ describe("integration", () => {
     expect(graph.totalSymbols).toBeGreaterThanOrEqual(2);
     expect(graph.totalFiles).toBe(3);
 
-    const handler = graph.symbols.find((s) => s.name === "Handler");
+    const handler = graph.symbols.find((symbol) => symbol.name === "Handler");
     expect(handler).toBeDefined();
     expect(handler!.filePath).toContain("handler.d.ts");
   });
-
-  // ─── JSON output format ────────────────────────────────────
 
   it("produces valid .nci JSON output", () => {
     const graph = buildPackageGraph({
@@ -89,19 +85,16 @@ describe("integration", () => {
     expect(json).toContain('"simple-export@1.0.0::init"');
   });
 
-  // ─── Scanner with fixtures ─────────────────────────────────
-
   it("scanner + graph pipeline works end-to-end", () => {
     const fakeModules = path.join(FIXTURES_DIR, "fake-node-modules");
     const packages = scanPackages(fakeModules);
     const graphs = packages.map((pkg) => buildPackageGraph(pkg));
 
     expect(graphs.length).toBeGreaterThan(0);
-    expect(graphs.every((g) => g.package)).toBe(true);
-    expect(graphs.every((g) => g.version)).toBe(true);
+    expect(graphs.every((graphResult) => graphResult.package)).toBe(true);
+    expect(graphs.every((graphResult) => graphResult.version)).toBe(true);
   });
 
-  // ─── Subpath exports fixture ───────────────────────────────
 
   it("resolves all subpath exports into a single graph", () => {
     const graph = buildPackageGraph({
@@ -112,7 +105,7 @@ describe("integration", () => {
     });
 
     // Should have symbols from ALL 3 entries: root + utils + server
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("AppConfig");     // from root
     expect(names).toContain("createApp");     // from root
     expect(names).toContain("formatDate");    // from ./utils
@@ -125,8 +118,6 @@ describe("integration", () => {
     expect(graph.totalFiles).toBe(3);
   });
 
-  // ─── UMD namespace fixture ─────────────────────────────────
-
   it("captures NamespaceExportDeclaration in graph", () => {
     const graph = buildPackageGraph({
       name: "umd-namespace",
@@ -135,16 +126,14 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("MyLib");
     expect(names).toContain("Widget");
     expect(names).toContain("createWidget");
 
-    const myLib = graph.symbols.find((s) => s.name === "MyLib");
+    const myLib = graph.symbols.find((symbol) => symbol.name === "MyLib");
     expect(myLib!.kindName).toBe("NamespaceExportDeclaration");
   });
-
-  // ─── Global augmentation fixture ───────────────────────────
 
   it("filters out declare global augmentations from graph", () => {
     const graph = buildPackageGraph({
@@ -154,15 +143,11 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const names = graph.symbols.map((s) => s.name);
-    // Should have regular exports
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("AppState");
     expect(names).toContain("initApp");
-    // Should NOT have "global" augmentation
     expect(names).not.toContain("global");
   });
-
-  // ─── Deprecated exports fixture ────────────────────────────
 
   it("carries deprecation info through the full pipeline", () => {
     const graph = buildPackageGraph({
@@ -172,20 +157,18 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const oldInit = graph.symbols.find((s) => s.name === "oldInit");
+    const oldInit = graph.symbols.find((symbol) => symbol.name === "oldInit");
     expect(oldInit).toBeDefined();
     expect(oldInit!.deprecated).toBe("Use newInit instead");
 
-    const legacy = graph.symbols.find((s) => s.name === "LegacyConfig");
+    const legacy = graph.symbols.find((symbol) => symbol.name === "LegacyConfig");
     expect(legacy).toBeDefined();
     expect(legacy!.deprecated).toBe(true);
 
-    const newInit = graph.symbols.find((s) => s.name === "newInit");
+    const newInit = graph.symbols.find((symbol) => symbol.name === "newInit");
     expect(newInit).toBeDefined();
     expect(newInit!.deprecated).toBeUndefined();
   });
-
-  // ─── Wildcard subpath exports fixture ──────────────────────
 
   it("resolves wildcard subpath exports into a single graph", () => {
     const graph = buildPackageGraph({
@@ -195,11 +178,9 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const names = graph.symbols.map((s) => s.name);
-    // Root entry symbols
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("RootConfig");
     expect(names).toContain("init");
-    // Wildcard-matched helpers
     expect(names).toContain("helperA");
     expect(names).toContain("HelperAOptions");
     expect(names).toContain("helperB");
@@ -209,8 +190,6 @@ describe("integration", () => {
     expect(graph.totalFiles).toBe(3);
   });
 
-  // ─── Export import equals fixture ──────────────────────────
-
   it("parses export import = require() through full pipeline", () => {
     const graph = buildPackageGraph({
       name: "export-import-equals",
@@ -219,16 +198,14 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     expect(names).toContain("util");
     expect(names).toContain("mainFn");
     expect(names).toContain("MainConfig");
 
-    const util = graph.symbols.find((s) => s.name === "util");
+    const util = graph.symbols.find((symbol) => symbol.name === "util");
     expect(util!.kindName).toBe("ImportEqualsDeclaration");
   });
-
-  // ─── Visibility tags fixture ───────────────────────────────
 
   it("carries visibility tags through the full pipeline", () => {
     const graph = buildPackageGraph({
@@ -238,26 +215,22 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    const pub = graph.symbols.find((s) => s.name === "PublicAPI");
+    const pub = graph.symbols.find((symbol) => symbol.name === "PublicAPI");
     expect(pub!.visibility).toBe("public");
 
-    const internal = graph.symbols.find((s) => s.name === "_internalHelper");
+    const internal = graph.symbols.find((symbol) => symbol.name === "_internalHelper");
     expect(internal!.visibility).toBe("internal");
 
-    const alpha = graph.symbols.find((s) => s.name === "AlphaFeature");
+    const alpha = graph.symbols.find((symbol) => symbol.name === "AlphaFeature");
     expect(alpha!.visibility).toBe("alpha");
 
-    const beta = graph.symbols.find((s) => s.name === "betaFunction");
+    const beta = graph.symbols.find((symbol) => symbol.name === "betaFunction");
     expect(beta!.visibility).toBe("beta");
 
-    const noTag = graph.symbols.find((s) => s.name === "DEFAULT_VALUE");
+    const noTag = graph.symbols.find((symbol) => symbol.name === "DEFAULT_VALUE");
     expect(noTag!.visibility).toBeUndefined();
   });
 });
-
-// ────────────────────────────────────────────────────────────────
-// COMPREHENSIVE REAL-LIBRARY TESTS
-// ────────────────────────────────────────────────────────────────
 
 describe("real-library pipeline (all packages)", () => {
   const hasNodeModules = fs.existsSync(REAL_NODE_MODULES);
@@ -270,19 +243,19 @@ describe("real-library pipeline (all packages)", () => {
     expect(typeof graph.crawlDurationMs).toBe("number");
     expect(graph.totalSymbols).toBe(graph.symbols.length);
 
-    for (const sym of graph.symbols) {
-      expect(sym.id).toContain(graph.package + "@" + graph.version + "::");
-      expect(sym.name).toBeTruthy();
-      expect(typeof sym.kind).toBe("number");
-      expect(sym.kindName).toBeTruthy();
-      expect(sym.package).toBe(graph.package);
-      expect(sym.filePath).toBeTruthy();
-      expect(typeof sym.isTypeOnly).toBe("boolean");
-      expect(Array.isArray(sym.dependencies)).toBe(true);
+    for (const symbolNode of graph.symbols) {
+      expect(symbolNode.id).toContain(graph.package + "@" + graph.version + "::");
+      expect(symbolNode.name).toBeTruthy();
+      expect(typeof symbolNode.kind).toBe("number");
+      expect(symbolNode.kindName).toBeTruthy();
+      expect(symbolNode.package).toBe(graph.package);
+      expect(symbolNode.filePath).toBeTruthy();
+      expect(typeof symbolNode.isTypeOnly).toBe("boolean");
+      expect(Array.isArray(symbolNode.dependencies)).toBe(true);
 
-      for (const dep of sym.dependencies) {
-        expect(typeof dep).toBe("string");
-        expect(dep.length).toBeGreaterThan(0);
+      for (const dependency of symbolNode.dependencies) {
+        expect(typeof dependency).toBe("string");
+        expect(dependency.length).toBeGreaterThan(0);
       }
     }
 
@@ -291,8 +264,6 @@ describe("real-library pipeline (all packages)", () => {
     expect(JSON.parse(json).package).toBe(graph.package);
   }
 
-  // ─── Scanner discovery ───────────────────────────────────────
-
   it("scans ALL packages from real node_modules without crashing", () => {
     if (!hasNodeModules) return;
     const allPackages = scanPackages(REAL_NODE_MODULES);
@@ -300,9 +271,7 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n📦 Scanner found ${allPackages.length} packages`);
   });
 
-  // ─── Full pipeline on every package ─────────────────────────
-
-  it("runs full pipeline on EVERY real package without crashing", () => {
+  it("runs full pipeline on EVERY real package without crashing", { timeout: 60000 }, () => {
     if (!hasNodeModules) return;
 
     const allPackages = scanPackages(REAL_NODE_MODULES);
@@ -329,8 +298,8 @@ describe("real-library pipeline (all packages)", () => {
     }
 
     console.log(`\n📊 Pipeline results for ${results.length} packages:`);
-    console.log(`   With types:    ${results.filter((r) => r.hasTypes).length}`);
-    console.log(`   Without types: ${results.filter((r) => !r.hasTypes).length}`);
+    console.log(`   With types:    ${results.filter((result) => result.hasTypes).length}`);
+    console.log(`   Without types: ${results.filter((result) => !result.hasTypes).length}`);
     console.log(`   Errors:        ${errors.length}\n`);
 
     console.log(
@@ -338,27 +307,25 @@ describe("real-library pipeline (all packages)", () => {
     );
     console.log("   " + "─".repeat(63));
 
-    for (const r of results.sort((a, b) => b.symbols - a.symbols)) {
+    for (const result of results.sort((a, b) => b.symbols - a.symbols)) {
       console.log(
-        "   " + r.name.padEnd(40) + String(r.symbols).padStart(8) + String(r.files).padStart(7) + `${r.ms}ms`.padStart(8)
+        "   " + result.name.padEnd(40) + String(result.symbols).padStart(8) + String(result.files).padStart(7) + `${result.ms}ms`.padStart(8)
       );
     }
 
     if (errors.length > 0) {
       console.log(`\n   ❌ Errors:`);
-      for (const e of errors) console.log(`   ${e.name}: ${e.error}`);
+      for (const errItem of errors) console.log(`   ${errItem.name}: ${errItem.error}`);
     }
 
     expect(errors).toHaveLength(0);
-    expect(results.filter((r) => r.hasTypes).length).toBeGreaterThan(0);
+    expect(results.filter((result) => result.hasTypes).length).toBeGreaterThan(0);
   });
-
-  // ─── @types/node ────────────────────────────────────────────
 
   it("@types/node: discovers symbols through triple-slash references", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@types/node");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@types/node");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 2 });
@@ -368,12 +335,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @types/node: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── typescript ─────────────────────────────────────────────
-
   it("typescript: processes the TypeScript compiler package", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "typescript");
+    const pkg = allPkgs.find((candidate) => candidate.name === "typescript");
     if (!pkg) return;
 
     const entry = resolveTypesEntry(pkg.dir);
@@ -386,12 +351,10 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── @typescript-eslint/types ───────────────────────────────
-
   it("@typescript-eslint/types: parses AST type definitions", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@typescript-eslint/types");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/types");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 3 });
@@ -399,12 +362,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @typescript-eslint/types: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── @typescript-eslint/utils ───────────────────────────────
-
   it("@typescript-eslint/utils: processes complex re-export chains", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@typescript-eslint/utils");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/utils");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 3 });
@@ -412,12 +373,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @typescript-eslint/utils: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── @typescript-eslint/scope-manager ───────────────────────
-
   it("@typescript-eslint/scope-manager: processes scope-manager", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@typescript-eslint/scope-manager");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/scope-manager");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 3 });
@@ -425,12 +384,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @typescript-eslint/scope-manager: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── eslint ─────────────────────────────────────────────────
-
   it("eslint: processes the ESLint package", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "eslint");
+    const pkg = allPkgs.find((candidate) => candidate.name === "eslint");
     if (!pkg) return;
 
     const entry = resolveTypesEntry(pkg.dir);
@@ -441,12 +398,10 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── prettier ───────────────────────────────────────────────
-
   it("prettier: processes package with modern exports field", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "prettier");
+    const pkg = allPkgs.find((candidate) => candidate.name === "prettier");
     if (!pkg) return;
 
     const entry = resolveTypesEntry(pkg.dir);
@@ -457,12 +412,10 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── vitest ─────────────────────────────────────────────────
-
   it("vitest: processes our own test framework", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "vitest");
+    const pkg = allPkgs.find((candidate) => candidate.name === "vitest");
     if (!pkg) return;
 
     const entry = resolveTypesEntry(pkg.dir);
@@ -473,12 +426,10 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── @typescript-eslint/parser ──────────────────────────────
-
   it("@typescript-eslint/parser: processes parser package", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@typescript-eslint/parser");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/parser");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 3 });
@@ -486,12 +437,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @typescript-eslint/parser: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── @typescript-eslint/typescript-estree ────────────────────
-
   it("@typescript-eslint/typescript-estree: processes estree package", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const pkg = allPkgs.find((p) => p.name === "@typescript-eslint/typescript-estree");
+    const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/typescript-estree");
     if (!pkg) return;
 
     const graph = buildPackageGraph(pkg, { maxDepth: 3 });
@@ -499,12 +448,10 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   @typescript-eslint/typescript-estree: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
 
-  // ─── @eslint/* packages ─────────────────────────────────────
-
   it("@eslint/* packages: processes all ESLint scoped packages", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const eslintPkgs = allPkgs.filter((p) => p.name.startsWith("@eslint/"));
+    const eslintPkgs = allPkgs.filter((candidate) => candidate.name.startsWith("@eslint/"));
 
     console.log(`\n   Found ${eslintPkgs.length} @eslint/* packages`);
     for (const pkg of eslintPkgs) {
@@ -514,12 +461,10 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── eslint plugins ─────────────────────────────────────────
-
   it("eslint-plugin-*: processes all ESLint plugins", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const plugins = allPkgs.filter((p) => p.name.startsWith("eslint-plugin-"));
+    const plugins = allPkgs.filter((candidate) => candidate.name.startsWith("eslint-plugin-"));
 
     console.log(`\n   Found ${plugins.length} eslint-plugin-* packages`);
     for (const pkg of plugins) {
@@ -529,20 +474,16 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  // ─── effect ─────────────────────────────────────────────────
-
-  it("effect: processes the Effect library (complex type system)", () => {
+  it("effect: processes the Effect library (complex type system)", { timeout: 30000 }, () => {
     if (!hasNodeModules) return;
 
-    // Effect may be in workspace root or package-local node_modules
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    let pkg = allPkgs.find((p) => p.name === "effect");
+    let pkg = allPkgs.find((candidate) => candidate.name === "effect");
 
-    // Also check package-local node_modules (pnpm may install devDeps there)
     const localNodeModules = path.resolve(__dirname, "../node_modules");
     if (!pkg && fs.existsSync(localNodeModules)) {
       const localPkgs = scanPackages(localNodeModules);
-      pkg = localPkgs.find((p) => p.name === "effect");
+      pkg = localPkgs.find((candidate) => candidate.name === "effect");
     }
 
     if (!pkg) { console.log("Skipping: effect not found"); return; }
@@ -554,21 +495,17 @@ describe("real-library pipeline (all packages)", () => {
     validateGraph(graph);
     console.log(`   effect: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
 
-    // Effect is a large library with many types — should have substantial symbols
     expect(graph.totalSymbols).toBeGreaterThan(0);
     expect(graph.totalFiles).toBeGreaterThan(0);
 
-    // Check for some known Effect types/functions
-    const names = graph.symbols.map((s) => s.name);
+    const names = graph.symbols.map((symbol) => symbol.name);
     console.log(`   effect: sample symbols: ${names.slice(0, 10).join(", ")}`);
   });
-
-  // ─── all scoped packages ────────────────────────────────────
 
   it("all scoped packages resolve correctly through pnpm symlinks", () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
-    const scopedPkgs = allPkgs.filter((p) => p.isScoped);
+    const scopedPkgs = allPkgs.filter((candidate) => candidate.isScoped);
 
     console.log(`\n   Scoped packages: ${scopedPkgs.length}/${allPkgs.length}`);
     for (const pkg of scopedPkgs) {

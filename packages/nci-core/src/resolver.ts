@@ -106,7 +106,7 @@ function resolveAllExports(
     const obj = exports as Record<string, unknown>;
 
     // Check if keys are subpaths (start with ".") or conditions
-    const hasSubpaths = Object.keys(obj).some((k) => k.startsWith("."));
+    const hasSubpaths = Object.keys(obj).some((key) => key.startsWith("."));
 
     if (hasSubpaths) {
       // Iterate ALL subpath entries: ".", "./utils", "./server", etc.
@@ -141,6 +141,19 @@ function resolveAllExports(
     }
   }
 
+  // Case 3: exports is an array
+  if (Array.isArray(exports)) {
+    for (const item of exports) {
+      const resolved = resolveAllExports(packageDir, item);
+      for (const resolvedPath of resolved) {
+          if (!seen.has(resolvedPath)) {
+              seen.add(resolvedPath);
+              entries.push(resolvedPath);
+          }
+      }
+    }
+  }
+
   return entries;
 }
 
@@ -152,10 +165,17 @@ function resolveExportCondition(
   packageDir: string,
   entry: unknown
 ): string | null {
-  // Direct string value
   if (typeof entry === "string") {
     if (entry.endsWith(".d.ts") || entry.endsWith(".d.mts") || entry.endsWith(".d.cts")) {
       return resolveFile(packageDir, entry);
+    }
+    return null;
+  }
+
+  if (Array.isArray(entry)) {
+    for (const item of entry) {
+      const resolved = resolveExportCondition(packageDir, item);
+      if (resolved) return resolved;
     }
     return null;
   }
@@ -172,19 +192,16 @@ function resolveExportCondition(
     if (resolved) return resolved;
   }
 
-  // Then check "import" condition (may contain nested "types")
   if (obj.import) {
     const resolved = resolveExportCondition(packageDir, obj.import);
     if (resolved) return resolved;
   }
 
-  // Then check "require" condition
   if (obj.require) {
     const resolved = resolveExportCondition(packageDir, obj.require);
     if (resolved) return resolved;
   }
 
-  // Then check "default"
   if (obj.default) {
     const resolved = resolveExportCondition(packageDir, obj.default);
     if (resolved) return resolved;
@@ -209,19 +226,14 @@ function resolveTypesVersions(
 
   for (const [versionRange, pathMap] of Object.entries(typesVersions)) {
     if (matchesVersionRange(currentVersion, versionRange)) {
-      // Look for the wildcard "*" entry which maps the root
       const wildcardPaths = pathMap["*"];
       if (wildcardPaths && wildcardPaths.length > 0) {
-        // The first path is the primary redirect target
-        // e.g., ["ts5/*"] means look in ts5/ subdirectory
         const redirectPattern = wildcardPaths[0]!;
-        // Replace the wildcard with "index.d.ts"
         const redirectPath = redirectPattern.replace("*", "index.d.ts");
         const resolved = resolveFile(packageDir, redirectPath);
         if (resolved) return resolved;
       }
 
-      // Also check for "." entry which maps the main entry
       const dotPaths = pathMap["."];
       if (dotPaths && dotPaths.length > 0) {
         const resolved = resolveFile(packageDir, dotPaths[0]!);
@@ -237,7 +249,6 @@ function resolveTypesVersions(
  * Check if a version string matches a range like ">=5.0", ">=4.7", etc.
  */
 function matchesVersionRange(version: string, range: string): boolean {
-  // Parse the range: >=X.Y or >=X.Y.Z
   const match = range.match(/^>=\s*(\d+)\.(\d+)(?:\.(\d+))?$/);
   if (!match) return false;
 
@@ -262,14 +273,6 @@ function resolveFile(packageDir: string, relativePath: string): string | null {
   return isFileSafe(absPath) ? absPath : null;
 }
 
-/** Check if a path exists and is a file. */
-function isFileSafe(filePath: string): boolean {
-  try {
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Expand wildcard subpath exports by scanning the filesystem.
@@ -287,7 +290,6 @@ function expandWildcardSubpath(
 ): string[] {
   const entries: string[] = [];
 
-  // Extract the concrete path pattern (resolve through conditions)
   const pattern = extractWildcardPattern(value);
   if (!pattern || !pattern.includes("*")) return entries;
 
@@ -312,16 +314,13 @@ function expandWildcardSubpath(
     const dirents = fs.readdirSync(scanDir, { withFileTypes: true });
     for (const dirent of dirents) {
       const file = dirent.name;
-      // Match files that start with prefix and end with suffix
       if (dirent.isFile() && file.startsWith(filePrefix) && file.endsWith(fileSuffix)) {
-        // Only include .d.ts / .d.mts / .d.cts files
         if (file.endsWith(".d.ts") || file.endsWith(".d.mts") || file.endsWith(".d.cts")) {
           entries.push(path.join(scanDir, file));
         }
       }
     }
   } catch {
-    // Directory read failed — skip silently
   }
 
   return entries;
@@ -345,4 +344,67 @@ function extractWildcardPattern(value: unknown): string | null {
     }
   }
   return null;
+}
+/**
+ * Resolve a module specifier relative to the current file.
+ */
+export function resolveModuleSpecifier(
+  specifier: string,
+  currentFile: string
+): string | null {
+  if (!specifier.startsWith(".")) return null;
+
+  const dir = path.dirname(currentFile);
+  let resolved: string;
+
+  const JS_EXT_RE = /\.(js|mjs|cjs)$/;
+
+  // Strip .js/.mjs/.cjs extension and try .d.ts (single regex match)
+  const extMatch = specifier.match(JS_EXT_RE);
+  if (extMatch) {
+    const base = specifier.slice(0, -extMatch[0].length);
+    resolved = path.resolve(dir, base + ".d.ts");
+    if (isFileSafe(resolved)) return normalizePath(resolved);
+
+    if (extMatch[1] === "mjs") {
+      resolved = path.resolve(dir, base + ".d.mts");
+      if (isFileSafe(resolved)) return normalizePath(resolved);
+    }
+    if (extMatch[1] === "cjs") {
+      resolved = path.resolve(dir, base + ".d.cts");
+      if (isFileSafe(resolved)) return normalizePath(resolved);
+    }
+
+    // Try as directory with index.d.ts (e.g., "./scope.js" → "./scope/index.d.ts")
+    resolved = path.resolve(dir, base, "index.d.ts");
+    if (isFileSafe(resolved)) return normalizePath(resolved);
+  }
+
+  // Try adding .d.ts directly
+  resolved = path.resolve(dir, specifier + ".d.ts");
+  if (isFileSafe(resolved)) return normalizePath(resolved);
+
+  // Try as-is (already ends in .d.ts) — MUST be a file, not a directory
+  resolved = path.resolve(dir, specifier);
+  if (isFileSafe(resolved)) return normalizePath(resolved);
+
+  // Try as a directory with index.d.ts (e.g., "./scope" → "./scope/index.d.ts")
+  resolved = path.resolve(dir, specifier, "index.d.ts");
+  if (isFileSafe(resolved)) return normalizePath(resolved);
+
+  return null;
+}
+
+/** Check if a path exists and is a file. */
+export function isFileSafe(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Normalize a path to use forward slashes. */
+export function normalizePath(filePath: string): string {
+  return path.resolve(filePath).replace(/\\/g, "/");
 }

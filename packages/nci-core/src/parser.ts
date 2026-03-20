@@ -25,42 +25,39 @@
  */
 import ts from "typescript";
 import fs from "node:fs";
-import type { ParsedExport } from "./types.js";
+import type {
+  ParsedExport,
+  ParsedImport,
+  TypeReference,
+  VisibilityLevel,
+} from "./types.js";
 
 const sourceFileCache = new Map<string, ts.SourceFile>();
-
-function getOrCreateSourceFile(filePath: string): ts.SourceFile {
-  const cached = sourceFileCache.get(filePath);
-  if (cached) return cached;
-  const sourceCode = fs.readFileSync(filePath, "utf-8");
-  const sf = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
-  sourceFileCache.set(filePath, sf);
-  return sf;
-}
-
-/** Clear the SourceFile cache. */
-export function clearSourceFileCache(): void {
-  sourceFileCache.clear();
-}
 
 interface JSDocInfo {
   jsDoc?: string;
   deprecated?: string | boolean;
-  visibility?: "public" | "internal" | "alpha" | "beta";
+  visibility?: VisibilityLevel;
 }
 
 /** Built-in type names that should NOT be treated as dependencies */
 const BUILTIN_TYPES = new Set([
   "string", "number", "boolean", "void", "any", "unknown", "never",
-  "null", "undefined", "object", "symbol", "bigint",
-  "Array", "Promise", "Map", "Set", "WeakMap", "WeakSet",
+  "null", "undefined", "object", "Object", "symbol", "bigint",
+  "Array", "ReadonlyArray", "Promise", "Map", "Set", "WeakMap", "WeakSet",
+  "ReadonlyMap", "ReadonlySet",
   "Record", "Partial", "Required", "Readonly", "Pick", "Omit",
   "Exclude", "Extract", "NonNullable", "ReturnType", "Parameters",
-  "InstanceType", "ConstructorParameters", "ThisParameterType",
+  "InstanceType", "ConstructorParameters", "ThisParameterType", "ThisType",
+  "Awaited", "NoInfer",
+  "Uppercase", "Lowercase", "Capitalize", "Uncapitalize",
+  "TemplateStringsArray",
+  "Iterator", "IterableIterator", "AsyncIterableIterator",
+  "Generator", "AsyncGenerator",
   "Date", "RegExp", "Error", "Function",
 ]);
 
-/** Visibility tag names — hoisted to module level to avoid per-call allocation */
+/** Visibility tag names */
 const VISIBILITY_TAGS = new Set(["public", "internal", "alpha", "beta"]);
 
 /**
@@ -84,17 +81,19 @@ const DECLARATION_KINDS = new Set<ts.SyntaxKind>([
  */
 export function parseExports(filePath: string): ParsedExport[] {
   const sourceFile = getOrCreateSourceFile(filePath);
+  return parseExportsFromSource(sourceFile);
+}
 
+/**
+ * Internal helper to parse exports from a SourceFile.
+ */
+function parseExportsFromSource(sourceFile: ts.SourceFile): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
   for (const statement of sourceFile.statements) {
-    // ─── Pattern 17: export import X = require(...) ────────────
-    // Must be checked BEFORE isExportedDeclaration — the export keyword
-    // on ImportEqualsDeclaration would otherwise route it through
-    // extractDirectExport where it'd be silently dropped.
+    // ─── Pattern 15: export import X = ... (CommonJS re-export) ─────
     if (ts.isImportEqualsDeclaration(statement)) {
       if (isExportedDeclaration(statement)) {
-        const importName = statement.name.text;
         let source: string | undefined;
         if (
           ts.isExternalModuleReference(statement.moduleReference) &&
@@ -102,16 +101,20 @@ export function parseExports(filePath: string): ParsedExport[] {
         ) {
           source = statement.moduleReference.expression.text;
         }
+
         const jsdoc = extractJSDocInfo(statement);
-        exports.push({
-          name: importName,
+        const exp: ParsedExport = {
+          name: statement.name.text,
           kind: ts.SyntaxKind.ImportEqualsDeclaration,
           kindName: "ImportEqualsDeclaration",
           isTypeOnly: false,
+          isExplicitExport: true,
+          isNamespaceExport: true,
           source,
-          signature: statement.getText(sourceFile),
+          signature: statement.getText(sourceFile).trim(),
           ...jsdoc,
-        });
+        };
+        exports.push(exp);
       }
       continue;
     }
@@ -124,37 +127,17 @@ export function parseExports(filePath: string): ParsedExport[] {
         kind: ts.SyntaxKind.NamespaceExportDeclaration,
         kindName: "NamespaceExportDeclaration",
         isTypeOnly: false,
+        isExplicitExport: true,
         signature: `export as namespace ${statement.name.text}`,
         ...jsdoc,
       });
       continue;
     }
 
-    // ─── Patterns 1-6: Direct exported declarations ────────────
-    if (isExportedDeclaration(statement)) {
-      const directExports = extractDirectExport(statement, sourceFile);
-      exports.push(...directExports);
-      continue;
-    }
-
-    // ─── Patterns 7-12: Export declarations (re-exports) ───────
-    if (ts.isExportDeclaration(statement)) {
-      const reExports = extractExportDeclaration(statement, sourceFile);
-      exports.push(...reExports);
-      continue;
-    }
-
-    // ─── Patterns 13-14: Export assignment ──────────────────────
-    if (ts.isExportAssignment(statement)) {
-      exports.push(extractExportAssignment(statement, sourceFile));
-      continue;
-    }
-
-    // ─── Pattern 15: Ambient module / declare global ──────────
-    if (
-      ts.isModuleDeclaration(statement) &&
-      !isExportedDeclaration(statement)
-    ) {
+    // ─── Ambient module / declare global ────────────────────────
+    // Must come BEFORE generic ModuleDeclaration handling because
+    // these are special forms that require specific metadata.
+    if (ts.isModuleDeclaration(statement)) {
       // declare global { ... } — global augmentation
       if (
         statement.name.kind === ts.SyntaxKind.Identifier &&
@@ -167,6 +150,7 @@ export function parseExports(filePath: string): ParsedExport[] {
           kindName: "ModuleDeclaration",
           isTypeOnly: false,
           isGlobalAugmentation: true,
+          isExplicitExport: false,
           signature: statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
           ...jsdoc,
         });
@@ -181,15 +165,68 @@ export function parseExports(filePath: string): ParsedExport[] {
           kind: ts.SyntaxKind.ModuleDeclaration,
           kindName: "ModuleDeclaration",
           isTypeOnly: false,
+          isExplicitExport: false,
           signature: statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
           ...jsdoc2,
         });
+
+        if (statement.body && ts.isModuleBlock(statement.body)) {
+          for (const sub of statement.body.statements) {
+            const isSubExported = isExportedDeclaration(sub);
+            const subExports = extractDirectExport(sub, sourceFile, isSubExported);
+            for (const subExp of subExports) {
+              exports.push(subExp);
+            }
+          }
+        }
         continue;
       }
+    }
+
+    // ─── Export declarations (re-exports) ──────────────────────
+    if (ts.isExportDeclaration(statement)) {
+      const reExports = extractExportDeclaration(statement, sourceFile);
+      for (const exp of reExports) {
+        exp.isExplicitExport = true;
+        exports.push(exp);
+      }
+      continue;
+    }
+
+    // ─── Export assignment ──────────────────────────────────────
+    if (ts.isExportAssignment(statement)) {
+      const exp = extractExportAssignment(statement, sourceFile);
+      exp.isExplicitExport = true;
+      exports.push(exp);
+      continue;
+    }
+
+    // ─── Direct declarations (exported or not) ──────────────────
+    if (DECLARATION_KINDS.has(statement.kind)) {
+      const isExported = isExportedDeclaration(statement);
+      const directExports = extractDirectExport(statement, sourceFile, isExported);
+      for (const exp of directExports) {
+        exports.push(exp);
+      }
+      continue;
     }
   }
 
   return exports;
+}
+
+function getOrCreateSourceFile(filePath: string): ts.SourceFile {
+  const cached = sourceFileCache.get(filePath);
+  if (cached) return cached;
+  const sourceCode = fs.readFileSync(filePath, "utf-8");
+  const sourceFile = ts.createSourceFile(filePath, sourceCode, ts.ScriptTarget.Latest, true);
+  sourceFileCache.set(filePath, sourceFile);
+  return sourceFile;
+}
+
+/** Clear the SourceFile cache. */
+export function clearSourceFileCache(): void {
+  sourceFileCache.clear();
 }
 
 /**
@@ -222,15 +259,11 @@ export function parseTypeReferenceDirectives(filePath: string): string[] {
 
 // ─── Direct Export Extraction ───────────────────────────────────
 
-function isExportedDeclaration(node: ts.Node): boolean {
-  if (!ts.canHaveModifiers(node)) return false;
-  const modifiers = ts.getModifiers(node);
-  return modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false;
-}
-
 function extractDirectExport(
   statement: ts.Statement,
-  sourceFile: ts.SourceFile
+  sourceFile: ts.SourceFile,
+  isExplicitExport: boolean,
+  parentName?: string
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
@@ -238,17 +271,25 @@ function extractDirectExport(
   if (ts.isVariableStatement(statement)) {
     for (const decl of statement.declarationList.declarations) {
       if (ts.isIdentifier(decl.name)) {
-        const deps = decl.type ? extractTypeReferences(decl.type) : [];
+        const dependencies = decl.type ? extractTypeReferences(decl.type) : [];
         const jsdoc = extractJSDocInfo(statement);
+        const name = parentName ? `${parentName}.${decl.name.text}` : decl.name.text;
+
         exports.push({
-          name: decl.name.text,
+          name,
           kind: ts.SyntaxKind.VariableStatement,
           kindName: "VariableStatement",
           isTypeOnly: false,
+          isExplicitExport,
           signature: `declare const ${decl.name.text}: ${decl.type?.getText(sourceFile) ?? "any"}`,
-          dependencies: deps.length > 0 ? deps : undefined,
+          dependencies: dependencies.length > 0 ? dependencies : undefined,
           ...jsdoc,
         });
+
+        // If the variable has a type literal, extract its members as sub-symbols
+        if (decl.type && ts.isTypeLiteralNode(decl.type)) {
+          exports.push(...extractTypeLiteralMembers(decl.type, sourceFile, name, isExplicitExport));
+        }
       }
     }
     return exports;
@@ -257,28 +298,107 @@ function extractDirectExport(
   // Patterns 1-4, 6: Named declarations
   if (isNamedDeclaration(statement)) {
     const namedNode = statement as ts.DeclarationStatement & { name?: ts.Node };
-    const name =
+    const rawName =
       namedNode.name && ts.isIdentifier(namedNode.name)
         ? namedNode.name.text
         : "<unnamed>";
 
+    const name = parentName && rawName !== "<unnamed>" ? `${parentName}.${rawName}` : rawName;
+
     const deps = extractTypeReferences(statement);
     const jsdoc = extractJSDocInfo(statement);
+
     exports.push({
       name,
       kind: statement.kind,
       kindName: ts.SyntaxKind[statement.kind]!,
       isTypeOnly: isTypeDeclaration(statement),
+      isExplicitExport,
       signature: getSignature(statement, sourceFile),
-      dependencies: deps.length > 0 ? deps : undefined,
+      dependencies: deps,
       ...jsdoc,
     });
+
+    // If it's a namespace, recursively extract its members
+    if (ts.isModuleDeclaration(statement) && statement.body && ts.isModuleBlock(statement.body)) {
+      for (const subStatement of statement.body.statements) {
+        // In a namespace, members are exported if they have the 'export' keyword
+        const isSubExported = isExportedDeclaration(subStatement);
+        const subExports = extractDirectExport(subStatement, sourceFile, isSubExported, name);
+        for (const subExp of subExports) {
+          exports.push(subExp);
+        }
+      }
+    }
+  }
+
+  return exports;
+}
+
+// ─── Type Literal Member Extraction ───────────────────────────
+
+function extractTypeLiteralMembers(
+  node: ts.TypeLiteralNode,
+  sourceFile: ts.SourceFile,
+  parentName: string,
+  isExplicitExport: boolean
+): ParsedExport[] {
+  const exports: ParsedExport[] = [];
+
+  for (const member of node.members) {
+    if (
+      (ts.isPropertySignature(member) || ts.isMethodSignature(member)) &&
+      member.name &&
+      ts.isIdentifier(member.name)
+    ) {
+      const name = `${parentName}.${member.name.text}`;
+      const deps = extractTypeReferences(member);
+      const jsdoc = extractJSDocInfo(member);
+
+      exports.push({
+        name,
+        kind: member.kind,
+        kindName: ts.SyntaxKind[member.kind]!,
+        isTypeOnly: false,
+        isExplicitExport,
+        signature: member.getText(sourceFile).trim(),
+        dependencies: deps,
+        ...jsdoc,
+      });
+
+      // Recurse if the property type is also a TypeLiteral
+      if (
+        ts.isPropertySignature(member) &&
+        member.type &&
+        ts.isTypeLiteralNode(member.type)
+      ) {
+        exports.push(...extractTypeLiteralMembers(member.type, sourceFile, name, isExplicitExport));
+      }
+    }
   }
 
   return exports;
 }
 
 // ─── Export Declaration Extraction (Re-exports) ─────────────────
+
+function isExportedDeclaration(node: ts.Node): boolean {
+  if (ts.isExportAssignment(node) || ts.isExportDeclaration(node)) return true;
+
+  // Check for 'export' keyword in modifiers
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  const hasExport = modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+
+  if (hasExport) return true;
+
+  // For VariableStatement, we also need to check its declarationList for modifiers
+  if (ts.isVariableStatement(node)) {
+    const listModifiers = ts.canHaveModifiers(node.declarationList) ? ts.getModifiers(node.declarationList) : undefined;
+    if (listModifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) return true;
+  }
+
+  return false;
+}
 
 function extractExportDeclaration(
   node: ts.ExportDeclaration,
@@ -289,6 +409,7 @@ function extractExportDeclaration(
   const source = node.moduleSpecifier
     ? (node.moduleSpecifier as ts.StringLiteral).text
     : undefined;
+  const signature = node.getText(sourceFile).trim();
 
   // Pattern 10: export * from "..."
   if (!node.exportClause) {
@@ -299,6 +420,8 @@ function extractExportDeclaration(
       isTypeOnly,
       source,
       isWildcard: true,
+      isExplicitExport: true,
+      signature,
     });
     return exports;
   }
@@ -312,6 +435,8 @@ function extractExportDeclaration(
       isTypeOnly,
       source,
       isNamespaceExport: true,
+      isExplicitExport: true,
+      signature,
     });
     return exports;
   }
@@ -324,13 +449,23 @@ function extractExportDeclaration(
         ? specifier.propertyName.text
         : undefined;
 
+      const specifierIsTypeOnly = isTypeOnly || specifier.isTypeOnly;
+      const specifierText = originalName
+        ? `${originalName} as ${exportedName}`
+        : exportedName;
+      const typePrefix = specifierIsTypeOnly ? "export type" : "export";
+      const sourceClause = source ? ` from '${source}'` : "";
+      const perSpecifierSignature = `${typePrefix} { ${specifierText} }${sourceClause}`;
+
       exports.push({
         name: exportedName,
         kind: ts.SyntaxKind.ExportDeclaration,
         kindName: "ExportDeclaration",
-        isTypeOnly: isTypeOnly || specifier.isTypeOnly,
+        isTypeOnly: specifierIsTypeOnly,
         source,
         originalName: originalName !== exportedName ? originalName : undefined,
+        isExplicitExport: true,
+        signature: perSpecifierSignature,
       });
     }
   }
@@ -361,6 +496,7 @@ function extractExportAssignment(
     kindName: "ExportAssignment",
     isTypeOnly: false,
     signature: node.getText(sourceFile).trim(),
+    isExplicitExport: true,
     ...jsdoc,
   };
 }
@@ -388,22 +524,6 @@ function isTypeDeclaration(node: ts.Node): boolean {
 function getSignature(node: ts.Statement, sourceFile: ts.SourceFile): string {
   const text = node.getText(sourceFile);
 
-  // For classes and interfaces, truncate at the first '{'
-  if (ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) {
-    const braceIndex = text.indexOf("{");
-    if (braceIndex !== -1) {
-      return text.substring(0, braceIndex).trim() + " { ... }";
-    }
-  }
-
-  // For functions, truncate at the first '{'
-  if (ts.isFunctionDeclaration(node)) {
-    const braceIndex = text.indexOf("{");
-    if (braceIndex !== -1) {
-      return text.substring(0, braceIndex).trim();
-    }
-  }
-
   return text.trim();
 }
 
@@ -417,14 +537,12 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
   for (const doc of jsDocs) {
     if (!ts.isJSDoc(doc)) continue;
 
-    // Extract comment text (first JSDoc block only)
     if (!result.jsDoc && doc.comment) {
       result.jsDoc = typeof doc.comment === "string"
         ? doc.comment
         : ts.getTextOfJSDocComment(doc.comment);
     }
 
-    // Extract tags in the same pass
     if (doc.tags) {
       for (const tag of doc.tags) {
         const tagName = tag.tagName.text;
@@ -447,7 +565,7 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
         }
 
         if (!result.visibility && VISIBILITY_TAGS.has(tagName)) {
-          result.visibility = tagName as "public" | "internal" | "alpha" | "beta";
+          result.visibility = tagName as VisibilityLevel;
         }
       }
     }
@@ -458,32 +576,154 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
 
 /**
  * Extract type references from a declaration node.
- * Walks the AST to find all TypeReference nodes and returns unique type names
+ * Walks the AST to find all TypeReference nodes and returns unique type references
  * that are not built-in types.
  */
-export function extractTypeReferences(node: ts.Node): string[] {
-  const refs = new Set<string>();
+export function extractTypeReferences(node: ts.Node): TypeReference[] {
+  const refs = new Map<string, TypeReference>();
 
-  function walk(node: ts.Node): void {
-    if (ts.isTypeReferenceNode(node)) {
-      const typeName = node.typeName;
-      let name: string;
+  function visit(child: ts.Node): void {
+    if (ts.isTypeParameterDeclaration(child)) {
+      // Skip type parameters to avoid treating them as package dependencies
+      return;
+    }
+
+    if (ts.isTypeReferenceNode(child)) {
+      const typeName = child.typeName;
+      let referenceName: string;
       if (ts.isIdentifier(typeName)) {
-        name = typeName.text;
+        referenceName = typeName.text;
       } else if (ts.isQualifiedName(typeName)) {
-        // e.g., Namespace.Type
-        name = typeName.right.text;
+        referenceName = typeName.right.text;
       } else {
         return;
       }
 
-      if (!BUILTIN_TYPES.has(name)) {
-        refs.add(name);
+      if (!BUILTIN_TYPES.has(referenceName)) {
+        refs.set(referenceName, { name: referenceName });
+      }
+    } else if (ts.isImportTypeNode(child) && child.qualifier) {
+      const qualifier = child.qualifier;
+      let referenceName: string;
+      if (ts.isIdentifier(qualifier)) {
+        referenceName = qualifier.text;
+      } else if (ts.isQualifiedName(qualifier)) {
+        referenceName = qualifier.right.text;
+      } else {
+        return;
+      }
+
+      const argument = child.argument;
+      let importPath: string | undefined;
+      if (ts.isLiteralTypeNode(argument) && ts.isStringLiteral(argument.literal)) {
+        importPath = argument.literal.text;
+      }
+
+      if (!BUILTIN_TYPES.has(referenceName)) {
+        refs.set(referenceName, { name: referenceName, importPath });
+      }
+    } else if (ts.isExpressionWithTypeArguments(child)) {
+      const expression = child.expression;
+      let referenceName: string;
+      if (ts.isIdentifier(expression)) {
+        referenceName = expression.text;
+      } else if (ts.isPropertyAccessExpression(expression)) {
+        referenceName = expression.name.text;
+      } else {
+        ts.forEachChild(child, visit);
+        return;
+      }
+
+      if (!BUILTIN_TYPES.has(referenceName)) {
+        refs.set(referenceName, { name: referenceName });
       }
     }
-    ts.forEachChild(node, walk);
+    ts.forEachChild(child, visit);
   }
 
-  walk(node);
-  return Array.from(refs);
+  visit(node);
+  return Array.from(refs.values());
+}
+
+/**
+ * Parse a .d.ts file and return all import statements.
+ *
+ * @param filePath - Absolute path to the .d.ts file
+ * @returns Array of parsed imports
+ */
+export function parseImports(filePath: string): ParsedImport[] {
+  const sourceFile = getOrCreateSourceFile(filePath);
+  return parseImportsFromSource(sourceFile);
+}
+
+/**
+ * Internal helper to parse imports from a SourceFile.
+ */
+function parseImportsFromSource(sourceFile: ts.SourceFile): ParsedImport[] {
+  const imports: ParsedImport[] = [];
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+        const source = statement.moduleSpecifier.text;
+        const importClause = statement.importClause;
+
+        if (importClause) {
+          if (importClause.name) {
+            imports.push({
+              name: importClause.name.text,
+              source,
+              isDefault: true,
+            });
+          }
+
+          if (importClause.namedBindings) {
+            if (ts.isNamespaceImport(importClause.namedBindings)) {
+              imports.push({
+                name: importClause.namedBindings.name.text,
+                source,
+                isNamespace: true,
+              });
+            } else if (ts.isNamedImports(importClause.namedBindings)) {
+              for (const element of importClause.namedBindings.elements) {
+                imports.push({
+                  name: element.name.text,
+                  source,
+                  originalName: element.propertyName ? element.propertyName.text : undefined,
+                });
+              }
+            }
+          }
+        }
+      }
+    } else if (ts.isImportEqualsDeclaration(statement)) {
+      if (
+        ts.isExternalModuleReference(statement.moduleReference) &&
+        ts.isStringLiteral(statement.moduleReference.expression)
+      ) {
+        imports.push({
+          name: statement.name.text,
+          source: statement.moduleReference.expression.text,
+        });
+      }
+    }
+  }
+
+  return imports;
+}
+
+/**
+ * Combined parser that returns both exports and imports.
+ */
+export function parseFile(filePath: string): { exports: ParsedExport[]; imports: ParsedImport[] } {
+  const sourceFile = getOrCreateSourceFile(filePath);
+  return {
+    exports: parseExportsFromSource(sourceFile),
+    imports: parseImportsFromSource(sourceFile),
+  };
+}
+
+/** Helper to expose source file retrieval for crawler/graph */
+export function getFileSource(filePath: string): ts.SourceFile {
+  return getOrCreateSourceFile(filePath);
 }

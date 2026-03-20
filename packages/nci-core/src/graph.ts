@@ -6,7 +6,8 @@
  *
  * Handles:
  * - Multiple entry points (subpath exports)
- * - Declaration merging (deduplication by name)
+ * - Declaration merging (deduplication by name + source file)
+ * - ID disambiguation for same-name symbols from different files
  * - Dependency resolution to symbol IDs
  */
 import path from "node:path";
@@ -16,8 +17,9 @@ import type {
   ResolvedSymbol,
   SymbolNode,
 } from "./types.js";
-import { resolveTypesEntry } from "./resolver.js";
+import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
+import { clearSourceFileCache } from "./parser.js";
 
 /**
  * Build a symbol graph for a single package.
@@ -34,7 +36,6 @@ export function buildPackageGraph(
 ): PackageGraph {
   const startTime = performance.now();
 
-  // Step 1: Resolve ALL types entry points (root + subpaths)
   const entry = resolveTypesEntry(packageInfo.dir);
 
   if (entry.typesEntries.length === 0) {
@@ -48,89 +49,152 @@ export function buildPackageGraph(
     };
   }
 
-  // Step 2: Crawl ALL entry points and merge results
-  const allSymbols: ResolvedSymbol[] = [];
-  const allVisitedFiles = new Set<string>();
+  const crawlResult = crawl(entry.typesEntries, crawlOptions);
+  const allSymbols = crawlResult.exports;
+  const allImportsPerFile = crawlResult.imports;
+  const visited = new Set(crawlResult.visitedFiles);
 
-  for (const entryPath of entry.typesEntries) {
-    const crawlResult = crawl(entryPath, crawlOptions);
-    allSymbols.push(...crawlResult.exports);
-    for (const f of crawlResult.visitedFiles) {
-      allVisitedFiles.add(typeof f === "string" ? f : f);
-    }
-  }
-
-  // Step 3: Transform resolved symbols into SymbolNodes
-  const rawNodes = allSymbols.map((sym) =>
-    toSymbolNode(sym, packageInfo)
+  const rawNodes = allSymbols.map((resolvedSymbol) =>
+    toSymbolNode(resolvedSymbol, packageInfo)
   );
 
-  // Step 4: Declaration merging — deduplicate by name
   const symbols = mergeDeclarations(rawNodes);
 
-  // Step 5: Resolve dependency references to symbol IDs
-  const nameToId = new Map<string, string>();
-  for (const sym of symbols) {
-    nameToId.set(sym.name, sym.id);
-  }
-  // Replace raw type names with actual symbol IDs where possible
-  for (const sym of symbols) {
-    if (sym.dependencies.length > 0) {
-      sym.dependencies = sym.dependencies
-        .map((dep) => nameToId.get(dep) ?? dep)
-        .filter((dep) => dep !== sym.id); // Remove self-references
+  const nameCount = new Map<string, number>();
+  for (const symbolNode of symbols) {
+    const count = (nameCount.get(symbolNode.name) ?? 0) + 1;
+    nameCount.set(symbolNode.name, count);
+    
+    const baseId = `${packageInfo.name}@${packageInfo.version}::${symbolNode.name}`;
+    
+    if (symbolNode.isInternal) {
+      // Internal symbols are ALWAYS file-qualified to avoid collisions
+      symbolNode.id = `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}`;
+    } else if (count === 1) {
+      symbolNode.id = baseId;
+    } else {
+      symbolNode.id = `${baseId}#${count}`;
     }
   }
 
-  return {
+  // 2. Build lookup maps for dependency resolution
+  const nameToId = new Map<string, string>(); // Global name lookup (public first)
+  const fileLocalToId = new Map<string, string>(); // File-local lookup: "filePath::name"
+
+  for (const symbolNode of symbols) {
+    fileLocalToId.set(`${symbolNode.filePath}::${symbolNode.name}`, symbolNode.id);
+
+    // Public exports take precedence in global name lookup
+    if (!symbolNode.isInternal || !nameToId.has(symbolNode.name)) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+
+  // 3. Resolve dependencies using structured rawDependencies
+  for (const symbolNode of symbols) {
+    if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
+      const resolvedIds = new Set<string>();
+      for (const rawDep of symbolNode.rawDependencies) {
+        let targetId: string | undefined;
+
+        if (rawDep.importPath) {
+          // Inline import() resolution
+          const absPath = resolveModuleSpecifier(
+            rawDep.importPath,
+            path.join(packageInfo.dir, symbolNode.filePath)
+          );
+          if (absPath) {
+            const relPath = makeRelative(absPath, packageInfo.dir);
+            targetId = fileLocalToId.get(`${relPath}::${rawDep.name}`);
+          }
+        } else {
+          // Regular name lookup
+          // 1. First check current file (for internal private types)
+          targetId = fileLocalToId.get(`${symbolNode.filePath}::${rawDep.name}`);
+
+          // 2. Try to resolve via imports in the file where this symbol is defined
+          if (!targetId) {
+            const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
+            const fileImports = allImportsPerFile[absPathForLookup] || [];
+            const matchingImport = fileImports.find(imp => imp.name === rawDep.name);
+
+            if (matchingImport) {
+              const absSourcePath = resolveModuleSpecifier(
+                matchingImport.source,
+                path.join(packageInfo.dir, symbolNode.filePath)
+              );
+              if (absSourcePath) {
+                const relSourcePath = makeRelative(absSourcePath, packageInfo.dir);
+                const originalName = matchingImport.originalName || matchingImport.name;
+                targetId = fileLocalToId.get(`${relSourcePath}::${originalName}`);
+              }
+            }
+          }
+
+          // 3. Finally check global public exports (public aliases)
+          if (!targetId) {
+            targetId = nameToId.get(rawDep.name);
+          }
+        }
+
+        if (targetId) {
+          resolvedIds.add(targetId);
+        }
+      }
+      symbolNode.dependencies = Array.from(resolvedIds);
+    }
+    delete symbolNode.rawDependencies;
+  }
+
+  const result: PackageGraph = {
     package: packageInfo.name,
     version: packageInfo.version,
     symbols,
     totalSymbols: symbols.length,
-    totalFiles: allVisitedFiles.size,
+    totalFiles: visited.size,
     crawlDurationMs: performance.now() - startTime,
   };
+
+  clearSourceFileCache();
+
+  return result;
 }
 
 /**
- * Merge declarations with the same name.
+ * Merge declarations with the same name AND same source file.
  *
- * TypeScript supports declaration merging — the same name can appear in
- * multiple files (e.g., interface Config in a.d.ts and b.d.ts).
- * We keep the first occurrence's metadata and note additional file paths.
+ * Symbols with the same name from different source files (e.g., multiple
+ * subpath exports each defining their own `create` function) are kept
+ * as distinct nodes.
  */
 function mergeDeclarations(nodes: SymbolNode[]): SymbolNode[] {
   const merged = new Map<string, SymbolNode>();
 
   for (const node of nodes) {
-    const existing = merged.get(node.name);
+    const mergeKey = `${node.name}::${node.filePath}`;
+    const existing = merged.get(mergeKey);
     if (existing) {
-      // Merge: union dependencies, track additional declaration file
-      const additionalFile = node.filePath;
-      if (additionalFile !== existing.filePath) {
-        existing.additionalDeclarations = existing.additionalDeclarations ?? [];
-        if (!existing.additionalDeclarations.includes(additionalFile)) {
-          existing.additionalDeclarations.push(additionalFile);
+      if (node.rawDependencies && node.rawDependencies.length > 0) {
+        existing.rawDependencies = existing.rawDependencies || [];
+        const existingDeps = new Set(existing.rawDependencies.map(dep => `${dep.name}::${dep.importPath || ""}`));
+        for (const rawDep of node.rawDependencies) {
+          const depKey = `${rawDep.name}::${rawDep.importPath || ""}`;
+          if (!existingDeps.has(depKey)) {
+            existingDeps.add(depKey);
+            existing.rawDependencies.push(rawDep);
+          }
         }
       }
-      // Merge dependencies
-      const depSet = new Set(existing.dependencies);
-      for (const dep of node.dependencies) {
-        if (!depSet.has(dep)) {
-          depSet.add(dep);
-          existing.dependencies.push(dep);
-        }
-      }
-      // If either is deprecated, keep the deprecation info
+
       if (node.deprecated && !existing.deprecated) {
         existing.deprecated = node.deprecated;
       }
-      // If either has visibility, keep the most restrictive
+
       if (node.visibility && !existing.visibility) {
         existing.visibility = node.visibility;
       }
     } else {
-      merged.set(node.name, { ...node });
+      merged.set(mergeKey, { ...node });
     }
   }
 
@@ -141,25 +205,30 @@ function mergeDeclarations(nodes: SymbolNode[]): SymbolNode[] {
  * Convert a ResolvedSymbol into a SymbolNode with a unique ID.
  */
 function toSymbolNode(
-  sym: ResolvedSymbol,
-  pkg: PackageInfo
+  resolved: ResolvedSymbol,
+  packageInfo: PackageInfo
 ): SymbolNode {
-  return {
-    id: `${pkg.name}@${pkg.version}::${sym.name}`,
-    name: sym.name,
-    kind: sym.kind,
-    kindName: sym.kindName,
-    package: pkg.name,
-    filePath: makeRelative(sym.definedIn, pkg.dir),
-    signature: sym.signature,
-    jsDoc: sym.jsDoc,
-    isTypeOnly: sym.isTypeOnly,
-    dependencies: sym.dependencies ?? [],
-    reExportedFrom: sym.reExportChain?.[0]
-      ? makeRelative(sym.reExportChain[0], pkg.dir)
-      : undefined,
-    deprecated: sym.deprecated,
-    visibility: sym.visibility,
+    const reExportSource = resolved.reExportChain?.[0]
+      ? makeRelative(resolved.reExportChain[0], packageInfo.dir)
+      : undefined;
+    const symbolFilePath = makeRelative(resolved.definedIn, packageInfo.dir);
+
+    return {
+    id: "",
+    name: resolved.name,
+    kind: resolved.kind,
+    kindName: resolved.kindName,
+    package: packageInfo.name,
+    filePath: symbolFilePath,
+    signature: resolved.signature,
+    jsDoc: resolved.jsDoc,
+    isTypeOnly: resolved.isTypeOnly,
+    dependencies: [],
+    rawDependencies: resolved.dependencies,
+    isInternal: resolved.isInternal,
+    reExportedFrom: reExportSource !== symbolFilePath ? reExportSource : undefined,
+    deprecated: resolved.deprecated,
+    visibility: resolved.visibility,
   };
 }
 
@@ -167,11 +236,11 @@ function toSymbolNode(
  * Make a path relative to the package directory.
  */
 function makeRelative(absPath: string, packageDir: string): string {
-  const normalized = absPath.replace(/\\\\/g, "/");
-  const normalizedDir = packageDir.replace(/\\\\/g, "/");
+  const normalized = absPath.replace(/\\/g, "/");
+  const normalizedDir = packageDir.replace(/\\/g, "/");
 
   if (normalized.startsWith(normalizedDir)) {
     return normalized.slice(normalizedDir.length + 1);
   }
-  return path.relative(packageDir, absPath).replace(/\\\\/g, "/");
+  return path.relative(packageDir, absPath).replace(/\\/g, "/");
 }

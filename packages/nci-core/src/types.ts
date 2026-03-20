@@ -6,6 +6,9 @@
  */
 import type ts from "typescript";
 
+/** API visibility level from JSDoc tags: @public, @internal, @alpha, @beta */
+export type VisibilityLevel = "public" | "internal" | "alpha" | "beta";
+
 // ─── Scanner Output ────────────────────────────────────────────
 
 /** Metadata for a discovered package in node_modules */
@@ -32,6 +35,14 @@ export interface PackageEntry {
 
 // ─── Parser Output ─────────────────────────────────────────────
 
+/** A reference to another type, potentially involving an inline import */
+export interface TypeReference {
+  /** The name of the referenced type */
+  name: string;
+  /** The module specifier if it's an inline import() */
+  importPath?: string;
+}
+
 /** A single export statement parsed from a .d.ts file */
 export interface ParsedExport {
   /** Symbol name */
@@ -54,14 +65,30 @@ export interface ParsedExport {
   signature?: string;
   /** JSDoc comment text */
   jsDoc?: string;
-  /** Type references found in the declaration (non-builtin type names) */
-  dependencies?: string[];
+  /** Type references found in the declaration (structured) */
+  dependencies?: TypeReference[];
   /** Whether this is a global augmentation (declare global { }) */
   isGlobalAugmentation?: boolean;
   /** Deprecation info: true if @deprecated with no message, or the message string */
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
-  visibility?: "public" | "internal" | "alpha" | "beta";
+  visibility?: VisibilityLevel;
+  /** Whether the 'export' keyword was explicitly used on the declaration */
+  isExplicitExport?: boolean;
+}
+
+/** Documentation for an import in a file */
+export interface ParsedImport {
+  /** The name as used in the file */
+  name: string;
+  /** The module specifier (e.g., "./lib/core") */
+  source: string;
+  /** The original name if aliased (import { X as Y } → originalName = "X") */
+  originalName?: string;
+  /** Whether this is a default import */
+  isDefault?: boolean;
+  /** Whether this is a namespace import (import * as ns) */
+  isNamespace?: boolean;
 }
 
 // ─── Crawler Output ────────────────────────────────────────────
@@ -72,6 +99,8 @@ export interface CrawlResult {
   filePath: string;
   /** All resolved exports from this file (including jumped re-exports) */
   exports: ResolvedSymbol[];
+  /** Imports found in this file (used for internal dependency resolution) */
+  imports: Record<string, ParsedImport[]>;
   /** Files that were visited during this crawl */
   visitedFiles: string[];
   /** Package names referenced via /// <reference types="..." /> directives */
@@ -99,11 +128,15 @@ export interface ResolvedSymbol {
   /** If re-exported, the chain of files it passed through */
   reExportChain?: string[];
   /** Type references found in the declaration */
-  dependencies?: string[];
+  dependencies?: TypeReference[];
   /** Deprecation info */
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
-  visibility?: "public" | "internal" | "alpha" | "beta";
+  visibility?: VisibilityLevel;
+  /** Whether this is an internal (non-exported) symbol */
+  isInternal?: boolean;
+  /** Temporary storage for raw dependencies during graph building (not in final report) */
+  rawDependencies?: TypeReference[];
 }
 
 // ─── Graph Output ──────────────────────────────────────────────
@@ -134,10 +167,12 @@ export interface SymbolNode {
   reExportedFrom?: string;
   /** Deprecation info: true if @deprecated with no message, or the message string */
   deprecated?: string | boolean;
-  /** Additional file paths if the declaration is merged across files */
-  additionalDeclarations?: string[];
   /** API visibility: @public, @internal, @alpha, @beta */
-  visibility?: "public" | "internal" | "alpha" | "beta";
+  visibility?: VisibilityLevel;
+  /** Whether this is an internal (non-exported) symbol */
+  isInternal?: boolean;
+  /** Original type references for resolution */
+  rawDependencies?: TypeReference[];
 }
 
 /** The complete graph for a single package */

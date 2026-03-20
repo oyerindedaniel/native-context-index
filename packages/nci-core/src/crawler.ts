@@ -11,10 +11,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import { parseExports, parseTripleSlashReferences, parseTypeReferenceDirectives } from "./parser.js";
-import type { CrawlResult, ParsedExport, ResolvedSymbol } from "./types.js";
-
-const JS_EXT_RE = /\.(js|mjs|cjs)$/;
+import { parseFile, parseTripleSlashReferences, parseTypeReferenceDirectives } from "./parser.js";
+import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
+import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
 
 export interface CrawlOptions {
   /** Maximum depth for following re-exports (default: 10) */
@@ -22,14 +21,14 @@ export interface CrawlOptions {
 }
 
 /**
- * Crawl a .d.ts file, following all re-exports recursively.
+ * Crawl one or more .d.ts files, following all re-exports recursively.
  *
- * @param entryFilePath - Absolute path to the starting .d.ts file
+ * @param entryFilePaths - Absolute path(s) to the starting .d.ts file(s)
  * @param options - Crawl configuration
  * @returns CrawlResult with all resolved symbols
  */
 export function crawl(
-  entryFilePath: string,
+  entryFilePaths: string | string[],
   options: CrawlOptions = {}
 ): CrawlResult {
   const maxDepth = options.maxDepth ?? 10;
@@ -38,294 +37,327 @@ export function crawl(
   const resolvedSymbols: ResolvedSymbol[] = [];
   const typeRefPackages = new Set<string>();
 
-  const nestedCache = new Map<string, ResolvedSymbol[]>();
-  const nestedIndexCache = new Map<string, Map<string, ResolvedSymbol>>();
+  const allRawExports = new Map<string, ParsedExport[]>();
+  const allRawImports = new Map<string, ParsedImport[]>();
+  const discoveryPathSet = new Set<string>();
+  const discoveryPathStack: string[] = [];
+  const resolutionPath = new Set<string>();
+  const resolutionCache = new Map<string, ResolvedSymbol[]>();
 
-  crawlFile(entryFilePath, 0);
+  const entries = Array.isArray(entryFilePaths) ? entryFilePaths : [entryFilePaths];
+  const primaryEntry = entries[0] || "";
+
+  for (const entryPath of entries) {
+    discoverFiles(entryPath, 0);
+  }
+
+  const publicSymbols = new Set<string>();
+  for (const entryPath of entries) {
+    const resolved = resolveFile(entryPath, 0);
+    for (const resolvedSymbol of resolved) {
+      resolvedSymbol.isInternal = false;
+      resolvedSymbols.push(resolvedSymbol);
+      publicSymbols.add(`${resolvedSymbol.definedIn}::${resolvedSymbol.name}`);
+    }
+  }
+
+  for (const file of visited) {
+    const exports = allRawExports.get(file) || [];
+    for (const entry of exports) {
+      if (entry.isGlobalAugmentation || entry.isWildcard || !entry.name) continue;
+      // Skip ExportDeclarations — they're forwarding statements, not definitions.
+      if (entry.kind === ts.SyntaxKind.ExportDeclaration) continue;
+
+      if (!publicSymbols.has(`${file}::${entry.name}`)) {
+        resolvedSymbols.push({
+          name: entry.name,
+          kind: entry.kind,
+          kindName: entry.kindName,
+          isTypeOnly: entry.isTypeOnly,
+          signature: entry.signature,
+          jsDoc: entry.jsDoc,
+          definedIn: file,
+          dependencies: entry.dependencies,
+          deprecated: entry.deprecated,
+          visibility: entry.visibility,
+          isInternal: true,
+        });
+        publicSymbols.add(`${file}::${entry.name}`);
+      }
+    }
+  }
 
   return {
-    filePath: entryFilePath,
+    filePath: primaryEntry,
     exports: resolvedSymbols,
+    imports: Object.fromEntries(allRawImports),
     visitedFiles: Array.from(visited),
     typeReferencePackages: Array.from(typeRefPackages),
     circularRefs,
   };
 
-  function crawlFile(filePath: string, depth: number): void {
+  function discoverFiles(filePath: string, depth: number): void {
     const normalizedPath = normalizePath(filePath);
+    if (depth > maxDepth) return;
+    if (!fs.existsSync(normalizedPath)) return;
 
-    // Cycle detection
-    if (visited.has(normalizedPath)) {
-      circularRefs.push(normalizedPath);
+    if (discoveryPathSet.has(normalizedPath)) {
+      circularRefs.push([...discoveryPathStack, normalizedPath].join(" -> "));
       return;
     }
 
-    // Depth limit
-    if (depth > maxDepth) return;
-
-    // File must exist
-    if (!fs.existsSync(normalizedPath)) return;
-
+    if (visited.has(normalizedPath)) return;
     visited.add(normalizedPath);
 
-    // Follow triple-slash references first (e.g., @types/node/index.d.ts)
-    // These reference other .d.ts files that should be crawled as part of this package
+    discoveryPathSet.add(normalizedPath);
+    discoveryPathStack.push(normalizedPath);
+
+    const typeRefDirectives = parseTypeReferenceDirectives(normalizedPath);
+    for (const pkg of typeRefDirectives) typeRefPackages.add(pkg);
+    const { exports: exportEntries, imports: importEntries } = parseFile(normalizedPath);
+    allRawExports.set(normalizedPath, exportEntries);
+    allRawImports.set(normalizedPath, importEntries);
+
     const tripleSlashRefs = parseTripleSlashReferences(normalizedPath);
     for (const ref of tripleSlashRefs) {
-      const refPath = resolveModuleSpecifier(ref, normalizedPath)
-        ?? resolveTripleSlashRef(ref, normalizedPath);
-      if (refPath) {
-        crawlFile(refPath, depth + 1);
+      const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
+      if (refPath) discoverFiles(refPath, depth + 1);
+    }
+
+    for (const exportEntry of exportEntries) {
+      if (exportEntry.source) {
+        const sourcePath = resolveModuleSpecifier(exportEntry.source, normalizedPath);
+        if (sourcePath) discoverFiles(sourcePath, depth + 1);
       }
     }
 
-    // Collect /// <reference types="..." /> directives
-    const typeRefDirectives = parseTypeReferenceDirectives(normalizedPath);
-    for (const pkg of typeRefDirectives) {
-      typeRefPackages.add(pkg);
+    // Follow regular imports so internal types are discovered
+    for (const importEntry of importEntries) {
+      if (importEntry.source) {
+        const importedPath = resolveModuleSpecifier(importEntry.source, normalizedPath);
+        if (importedPath) discoverFiles(importedPath, depth + 1);
+      }
     }
 
-    // Then parse and process exports
-    const exports = parseExports(normalizedPath);
+    discoveryPathStack.pop();
+    discoveryPathSet.delete(normalizedPath);
+  }
 
-    for (const exp of exports) {
-      // Skip global augmentations (declare global { }) — they're not real exports
-      if (exp.isGlobalAugmentation) continue;
+  function resolveFile(
+    filePath: string,
+    depth: number,
+    namePrefix: string = ""
+  ): ResolvedSymbol[] {
+    const normalizedPath = normalizePath(filePath);
+    if (depth > maxDepth || resolutionPath.has(normalizedPath)) return [];
 
-      if (exp.source && exp.kind !== ts.SyntaxKind.ImportEqualsDeclaration) {
-        handleReExport(exp, normalizedPath, depth);
-      } else if (exp.kind !== ts.SyntaxKind.ExportDeclaration) {
-        resolvedSymbols.push({
-          name: exp.name,
-          kind: exp.kind,
-          kindName: exp.kindName,
-          isTypeOnly: exp.isTypeOnly,
-          signature: exp.signature,
-          jsDoc: exp.jsDoc,
+    if (!namePrefix && resolutionCache.has(normalizedPath)) {
+      return resolutionCache.get(normalizedPath)!;
+    }
+
+    const rawExports = allRawExports.get(normalizedPath);
+    if (!rawExports) return [];
+
+    resolutionPath.add(normalizedPath);
+
+    const actualExports = [...rawExports];
+    const knownNames = new Set(rawExports.map(entry => entry.name));
+
+    const tripleSlashRefs = parseTripleSlashReferences(normalizedPath);
+    for (const ref of tripleSlashRefs) {
+      const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
+      if (refPath) {
+        const nestedSymbols = resolveFile(refPath, depth + 1);
+        for (const sym of nestedSymbols) {
+          if (!knownNames.has(sym.name)) {
+            knownNames.add(sym.name);
+            actualExports.push({
+              name: sym.name,
+              kind: sym.kind,
+              kindName: sym.kindName,
+              signature: sym.signature,
+              jsDoc: sym.jsDoc,
+              isExplicitExport: true,
+              isTypeOnly: sym.isTypeOnly,
+              dependencies: sym.dependencies,
+              deprecated: sym.deprecated,
+              visibility: sym.visibility,
+            });
+          }
+        }
+      }
+    }
+
+    const localIndex = new Map<string, ParsedExport[]>();
+    for (const exp of actualExports) {
+      const existing = localIndex.get(exp.name) || [];
+      existing.push(exp);
+      localIndex.set(exp.name, existing);
+    }
+
+    const results: ResolvedSymbol[] = [];
+
+    for (const exportEntry of actualExports) {
+      if (exportEntry.isGlobalAugmentation) continue;
+      // Skip non-exported declarations — they'll be captured as internal symbols
+      if (!exportEntry.isExplicitExport) continue;
+
+      if (exportEntry.source) {
+        results.push(...resolveReExport(exportEntry, normalizedPath, depth, namePrefix));
+      } else if (exportEntry.kind === ts.SyntaxKind.ExportAssignment || exportEntry.kind === ts.SyntaxKind.ExportDeclaration) {
+        results.push(...resolveLocalAssignment(exportEntry, localIndex, normalizedPath, namePrefix));
+      } else {
+        results.push({
+          name: namePrefix ? `${namePrefix}.${exportEntry.name}` : exportEntry.name,
+          kind: exportEntry.kind,
+          kindName: exportEntry.kindName,
+          isTypeOnly: exportEntry.isTypeOnly,
+          signature: exportEntry.signature,
+          jsDoc: exportEntry.jsDoc,
           definedIn: normalizedPath,
-          dependencies: exp.dependencies,
-          deprecated: exp.deprecated,
-          visibility: exp.visibility,
+          dependencies: exportEntry.dependencies,
+          deprecated: exportEntry.deprecated,
+          visibility: exportEntry.visibility,
         });
       }
     }
+
+    resolutionPath.delete(normalizedPath);
+
+    // Only cache if there's no prefix (global resolution for this file)
+    if (!namePrefix) {
+      resolutionCache.set(normalizedPath, results);
+    }
+
+    return results;
   }
 
-  function handleReExport(
+  function resolveReExport(
     exp: ParsedExport,
     currentFile: string,
-    depth: number
-  ): void {
-    const sourceFile = resolveModuleSpecifier(exp.source!, currentFile);
-    if (!sourceFile) return;
+    depth: number,
+    namePrefix: string
+  ): ResolvedSymbol[] {
+    const results: ResolvedSymbol[] = [];
+    const fullName = namePrefix ? `${namePrefix}.${exp.name}` : exp.name;
+    const sourcePath = resolveModuleSpecifier(exp.source!, currentFile);
+
+    if (!sourcePath) {
+      if (!exp.isWildcard) {
+        results.push({
+          name: fullName,
+          kind: exp.kind,
+          kindName: exp.kindName,
+          isTypeOnly: exp.isTypeOnly,
+          definedIn: currentFile,
+          reExportChain: [currentFile],
+          signature: exp.signature,
+        });
+      }
+      return results;
+    }
+
+    const nestedSymbols = resolveFile(sourcePath, depth + 1);
 
     if (exp.isWildcard) {
-      // export * from "..." — crawl the source and add all its exports
-      crawlFile(sourceFile, depth + 1);
+      return nestedSymbols;
     } else if (exp.isNamespaceExport) {
-      // export * as ns from "..." — crawl but wrap in namespace
-      const nestedResult = getNestedExports(sourceFile, depth + 1);
-      if (nestedResult) {
-        resolvedSymbols.push({
-          name: exp.name,
-          kind: ts.SyntaxKind.ModuleDeclaration,
-          kindName: "ModuleDeclaration",
-          isTypeOnly: exp.isTypeOnly,
-          definedIn: normalizePath(sourceFile),
-          signature: `namespace ${exp.name} { ${nestedResult.length} symbols }`,
+      results.push({
+        name: fullName,
+        kind: exp.kind,
+        kindName: exp.kindName,
+        isTypeOnly: exp.isTypeOnly,
+        definedIn: normalizePath(sourcePath),
+        reExportChain: [currentFile],
+        signature: exp.signature || `namespace ${exp.name} { ${nestedSymbols.length} symbols }`,
+      });
+      for (const sym of nestedSymbols) {
+        results.push({
+          ...sym,
+          name: namePrefix ? `${namePrefix}.${exp.name}.${sym.name}` : `${exp.name}.${sym.name}`,
+          reExportChain: [currentFile, ...(sym.reExportChain ?? [])],
         });
       }
     } else {
-      // Named re-export: export { X } from "..." or export { X as Y } from "..."
       const targetName = exp.originalName ?? exp.name;
-      const index = getNestedExportsIndex(sourceFile, depth + 1);
-
-      if (index) {
-        const found = index.get(targetName);
-        if (found) {
-          resolvedSymbols.push({
-            ...found,
-            name: exp.name,
-            isTypeOnly: exp.isTypeOnly || found.isTypeOnly,
-            reExportChain: [...(found.reExportChain ?? []), currentFile],
-          });
-        } else {
-          // Symbol not found in the target — add as unresolved
-          resolvedSymbols.push({
-            name: exp.name,
-            kind: ts.SyntaxKind.ExportDeclaration,
-            kindName: "ExportDeclaration",
-            isTypeOnly: exp.isTypeOnly,
-            definedIn: normalizePath(sourceFile),
-            reExportChain: [currentFile],
-          });
-        }
-      }
-    }
-  }
-
-  /**
-   * Get all exports from a nested file, using cache to avoid
-   * re-parsing and to allow multiple named re-exports from the
-   * same source file.
-   */
-  function getNestedExports(
-    filePath: string,
-    depth: number
-  ): ResolvedSymbol[] | null {
-    const normalizedPath = normalizePath(filePath);
-
-    // Return cached results if available
-    if (nestedCache.has(normalizedPath)) {
-      return nestedCache.get(normalizedPath)!;
-    }
-
-    const result = crawlNestedFile(normalizedPath, depth);
-    if (result) {
-      nestedCache.set(normalizedPath, result);
-    }
-    return result;
-  }
-
-  /**
-   * Get a name-indexed map of exports from a nested file.
-   */
-  function getNestedExportsIndex(
-    filePath: string,
-    depth: number
-  ): Map<string, ResolvedSymbol> | null {
-    const normalizedPath = normalizePath(filePath);
-    if (nestedIndexCache.has(normalizedPath)) {
-      return nestedIndexCache.get(normalizedPath)!;
-    }
-    const exports = getNestedExports(filePath, depth);
-    if (!exports) return null;
-    const index = new Map<string, ResolvedSymbol>();
-    for (const sym of exports) {
-      if (!index.has(sym.name)) index.set(sym.name, sym);
-    }
-    nestedIndexCache.set(normalizedPath, index);
-    return index;
-  }
-
-  /**
-   * Crawl a file and return its exports without adding them to the
-   * main results list. Used for resolving named and namespace re-exports.
-   */
-  function crawlNestedFile(
-    filePath: string,
-    depth: number
-  ): ResolvedSymbol[] | null {
-    if (depth > maxDepth) return null;
-    if (!fs.existsSync(filePath)) return null;
-
-    // Cycle detection against the main visited set
-    if (visited.has(filePath)) {
-      circularRefs.push(filePath);
-      return null;
-    }
-
-    visited.add(filePath);
-
-    const exports = parseExports(filePath);
-    const results: ResolvedSymbol[] = [];
-
-    for (const exp of exports) {
-      if (exp.source && exp.kind !== ts.SyntaxKind.ImportEqualsDeclaration) {
-        const sourceFile = resolveModuleSpecifier(exp.source, filePath);
-        if (!sourceFile) continue;
-
-        if (exp.isWildcard) {
-          const nested = getNestedExports(sourceFile, depth + 1);
-          if (nested) results.push(...nested);
-        } else {
-          const targetName = exp.originalName ?? exp.name;
-          const nestedIndex = getNestedExportsIndex(sourceFile, depth + 1);
-          if (nestedIndex) {
-            const found = nestedIndex.get(targetName);
-            if (found) {
-              results.push({
-                ...found,
-                name: exp.name,
-                isTypeOnly: exp.isTypeOnly || found.isTypeOnly,
-              });
-            }
-          }
-        }
-      } else if (exp.kind !== ts.SyntaxKind.ExportDeclaration && !exp.isGlobalAugmentation) {
+      const match = nestedSymbols.find(sym => sym.name === targetName);
+      if (match) {
         results.push({
-          name: exp.name,
+          ...match,
+          name: fullName,
+          reExportChain: [currentFile, ...(match.reExportChain ?? [])],
+        });
+      } else {
+        results.push({
+          name: fullName,
           kind: exp.kind,
           kindName: exp.kindName,
           isTypeOnly: exp.isTypeOnly,
+          definedIn: normalizePath(sourcePath),
+          reExportChain: [currentFile],
           signature: exp.signature,
-          jsDoc: exp.jsDoc,
-          definedIn: filePath,
-          dependencies: exp.dependencies,
-          deprecated: exp.deprecated,
-          visibility: exp.visibility,
         });
       }
     }
 
     return results;
   }
-}
 
-/**
- * Resolve a module specifier relative to the current file.
- */
-function resolveModuleSpecifier(
-  specifier: string,
-  currentFile: string
-): string | null {
-  if (!specifier.startsWith(".")) return null;
+  function resolveLocalAssignment(
+    exp: ParsedExport,
+    localIndex: Map<string, ParsedExport[]>,
+    currentFile: string,
+    namePrefix: string
+  ): ResolvedSymbol[] {
+    const targetName = exp.originalName ?? exp.name;
+    const targets = localIndex.get(targetName) || [];
 
-  const dir = path.dirname(currentFile);
-  let resolved: string;
+    const actualTargets = targets.filter(target => target !== exp);
+    if (actualTargets.length === 0) return [];
 
-  // Strip .js/.mjs/.cjs extension and try .d.ts (single regex match)
-  const extMatch = specifier.match(JS_EXT_RE);
-  if (extMatch) {
-    const base = specifier.slice(0, -extMatch[0].length);
-    resolved = path.resolve(dir, base + ".d.ts");
-    if (isFileSafe(resolved)) return normalizePath(resolved);
+    const results: ResolvedSymbol[] = [];
+    const fullName = namePrefix ? `${namePrefix}.${exp.name}` : exp.name;
 
-    if (extMatch[1] === "mjs") {
-      resolved = path.resolve(dir, base + ".d.mts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
+    const primaryTarget = actualTargets[0]!;
+    results.push({
+      name: fullName,
+      kind: primaryTarget.kind,
+      kindName: primaryTarget.kindName,
+      isTypeOnly: primaryTarget.isTypeOnly,
+      signature: primaryTarget.signature,
+      jsDoc: primaryTarget.jsDoc,
+      definedIn: currentFile,
+      dependencies: primaryTarget.dependencies,
+      deprecated: primaryTarget.deprecated,
+      visibility: primaryTarget.visibility,
+    });
+
+    // Expand namespace members using prefix matching
+    for (const target of actualTargets) {
+      const memberPrefix = target.name + ".";
+      const matchingMembers: ParsedExport[] = [];
+      for (const [memberName, members] of localIndex) {
+        if (memberName.startsWith(memberPrefix)) {
+          matchingMembers.push(...members);
+        }
+      }
+      for (const member of matchingMembers) {
+        results.push({
+          name: namePrefix ? `${namePrefix}.${member.name}` : member.name,
+          kind: member.kind,
+          kindName: member.kindName,
+          isTypeOnly: member.isTypeOnly,
+          signature: member.signature,
+          jsDoc: member.jsDoc,
+          definedIn: currentFile,
+          dependencies: member.dependencies,
+          deprecated: member.deprecated,
+          visibility: member.visibility,
+        });
+      }
     }
-    if (extMatch[1] === "cjs") {
-      resolved = path.resolve(dir, base + ".d.cts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
-    }
 
-    // Try as directory with index.d.ts (e.g., "./scope.js" → "./scope/index.d.ts")
-    resolved = path.resolve(dir, base, "index.d.ts");
-    if (isFileSafe(resolved)) return normalizePath(resolved);
-  }
-
-  // Try adding .d.ts directly
-  resolved = path.resolve(dir, specifier + ".d.ts");
-  if (isFileSafe(resolved)) return normalizePath(resolved);
-
-  // Try as-is (already ends in .d.ts) — MUST be a file, not a directory
-  resolved = path.resolve(dir, specifier);
-  if (isFileSafe(resolved)) return normalizePath(resolved);
-
-  // Try as a directory with index.d.ts (e.g., "./scope" → "./scope/index.d.ts")
-  resolved = path.resolve(dir, specifier, "index.d.ts");
-  if (isFileSafe(resolved)) return normalizePath(resolved);
-
-  return null;
-}
-
-/** Check if a path exists and is a file. */
-function isFileSafe(filePath: string): boolean {
-  try {
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
+    return results;
   }
 }
 
@@ -345,6 +377,3 @@ function resolveTripleSlashRef(
   return null;
 }
 
-function normalizePath(filePath: string): string {
-  return path.resolve(filePath).replace(/\\/g, "/");
-}

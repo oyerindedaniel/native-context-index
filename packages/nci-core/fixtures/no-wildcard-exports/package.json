@@ -1,0 +1,9 @@
+{
+  "name": "no-wildcard",
+  "version": "1.0.0",
+  "exports": {
+    "./sub": {
+      "types": { "condition": "./dist/no-star.d.ts" }
+    }
+  }
+}

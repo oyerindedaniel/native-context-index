@@ -1,0 +1,15 @@
+{
+  "name": "specifier-resolution",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    },
+    "./esm": {
+      "types": "./esm.d.mts"
+    },
+    "./common": {
+      "types": "./common.d.cts"
+    }
+  }
+}

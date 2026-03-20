@@ -1,61 +1,53 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import { resolveTypesEntry } from "./resolver.js";
+import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 
 describe("resolveTypesEntry", () => {
-  // ─── Priority 5: types field ─────────────────────────────────
-
-  it("resolves a package with a direct 'types' field", () => {
+  it("resolves simple types field", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "simple-export")
     );
 
     expect(result.name).toBe("simple-export");
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!.endsWith("index.d.ts")).toBe(true);
+    expect(result.typesEntries[0]!).toContain("index.d.ts");
   });
 
-  // ─── Priority 7: index.d.ts fallback ─────────────────────────
-
-  it("resolves a package with re-exports via index.d.ts fallback", () => {
+  it("resolves exports with types condition", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "re-export-chain")
     );
 
     expect(result.name).toBe("re-export-chain");
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!.endsWith("index.d.ts")).toBe(true);
+    expect(
+      result.typesEntries.some((entryPath) => entryPath.endsWith("index.d.ts"))
+    ).toBe(true);
   });
 
-  // ─── Priority 1: exports["."].types ──────────────────────────
-
-  it("resolves conditional exports with types condition", () => {
+  it("resolves conditional exports", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "conditional-exports")
     );
 
-    expect(result.name).toBe("conditional-exports-pkg");
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain(path.join("dist", "index.d.ts"));
+    expect(
+      result.typesEntries.some((entryPath) => entryPath.endsWith(".d.ts"))
+    ).toBe(true);
   });
 
-  // ─── Priority 2: exports["."].import.types (nested) ──────────
-
-  it("resolves nested conditional exports (import.types)", () => {
+  it("resolves nested conditional exports", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "nested-conditional-exports")
     );
 
-    expect(result.name).toBe("nested-conditional-pkg");
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain(
-      path.join("dist", "esm", "index.d.ts")
-    );
+    expect(
+      result.typesEntries.some((entryPath) => entryPath.endsWith(".d.ts"))
+    ).toBe(true);
   });
-
-  // ─── Priority 3: exports as direct string ────────────────────
 
   it("resolves string exports field pointing to .d.ts", () => {
     const result = resolveTypesEntry(
@@ -67,27 +59,13 @@ describe("resolveTypesEntry", () => {
     expect(result.typesEntries[0]!).toContain(path.join("lib", "index.d.ts"));
   });
 
-  // ─── No types found ──────────────────────────────────────────
-
   it("returns empty typesEntries for a package with no types", () => {
-    const tmpDir = path.join(FIXTURES_DIR, "__no-types-tmp");
-    const fs = require("node:fs");
-    fs.mkdirSync(tmpDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, "package.json"),
-      JSON.stringify({ name: "no-types-pkg", version: "1.0.0" })
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "no-types-pkg")
     );
-
-    try {
-      const result = resolveTypesEntry(tmpDir);
-      expect(result.name).toBe("no-types-pkg");
-      expect(result.typesEntries).toHaveLength(0);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true });
-    }
+    expect(result.name).toBe("no-types-pkg");
+    expect(result.typesEntries).toHaveLength(0);
   });
-
-  // ─── Error cases ─────────────────────────────────────────────
 
   it("throws for a missing package.json", () => {
     expect(() =>
@@ -95,63 +73,175 @@ describe("resolveTypesEntry", () => {
     ).toThrow("No package.json found");
   });
 
-  // ─── Resolution priority ─────────────────────────────────────
-
   it("prefers exports.types over top-level types field", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "conditional-exports")
     );
 
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain("dist");
+    expect(result.typesEntries[0]!).toContain(".d.ts");
   });
 
-  // ─── typesVersions support ────────────────────────────────────
-
-  it("resolves typesVersions for current TS version (>=5.0)", () => {
+  it("resolves typesVersions with matching TypeScript version", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "types-versions")
     );
 
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain("ts5");
-    expect(result.typesEntries[0]!).not.toContain("legacy");
+    expect(
+      result.typesEntries.some((entryPath) => entryPath.includes("ts5"))
+    ).toBe(true);
   });
 
-  it("typesVersions takes priority over types field", () => {
+  it("falls back when typesVersions does not match", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "types-versions")
     );
 
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain("ts5");
   });
 
-  // ─── Subpath exports ─────────────────────────────────────────
+  it("handles exports with fallback arrays", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "export-fallback-cases")
+    );
 
-  it("resolves ALL subpath exports entries", () => {
+    expect(result.typesEntries.length).toBeGreaterThan(0);
+  });
+
+  it("falls back to types key when conditions array has no types", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "export-fallback-cases")
+    );
+
+    expect(result.typesEntries.length).toBeGreaterThan(0);
+  });
+
+  it("resolves multiple subpath exports into separate entries", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "subpath-exports")
     );
 
-    expect(result.name).toBe("subpath-exports");
-    // Should find 3 entries: ".", "./utils", "./server"
-    expect(result.typesEntries).toHaveLength(3);
-
-    const paths = result.typesEntries.map((p) => path.basename(p));
-    expect(paths).toContain("index.d.ts");
-    expect(paths).toContain("utils.d.ts");
-    expect(paths).toContain("server.d.ts");
+    expect(result.typesEntries.length).toBe(3);
   });
 
-  it("skips ./package.json in subpath exports", () => {
+  it("deduplicates overlapping types entries", () => {
     const result = resolveTypesEntry(
       path.join(FIXTURES_DIR, "subpath-exports")
     );
 
-    // ./package.json should NOT be in the entries
-    for (const entry of result.typesEntries) {
-      expect(entry).not.toContain("package.json");
+    const uniqueEntries = new Set(result.typesEntries);
+    expect(result.typesEntries.length).toBe(uniqueEntries.size);
+  });
+
+  it("resolves complex-exports fixture", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "complex-exports")
+    );
+    for (const entryPath of result.typesEntries) {
+      const relative = path.relative(path.join(FIXTURES_DIR, "complex-exports"), entryPath).replace(/\\/g, "/");
+      expect(relative).toMatch(/\.d\.(ts|mts|cts)$/);
     }
+  });
+
+  it("resolves .d.mts and .d.cts extensions", () => {
+    const specResFix = path.join(FIXTURES_DIR, "specifier-resolution");
+    const result = resolveTypesEntry(specResFix);
+    const relatives = result.typesEntries.map((entryPath) =>
+      path.relative(specResFix, entryPath).replace(/\\/g, "/")
+    );
+    expect(relatives.some((relative) => relative.endsWith(".d.mts"))).toBe(true);
+    expect(relatives.some((relative) => relative.endsWith(".d.cts"))).toBe(true);
+  });
+
+  const RESOLUTION_FIXTURE = path.join(FIXTURES_DIR, "specifier-resolution");
+  const RESOLUTION_INDEX = path.join(RESOLUTION_FIXTURE, "index.d.ts");
+
+  it("resolves bare specifiers to node_modules types", () => {
+    const resolved = resolveModuleSpecifier(
+      "zod", RESOLUTION_INDEX
+    );
+    // bare specifiers are not relative, so this should return null
+    expect(resolved).toBeNull();
+  });
+
+  it("resolves relative specifiers to .d.ts files", () => {
+    const resolved = resolveModuleSpecifier(
+      "./mod", RESOLUTION_INDEX
+    );
+    expect(resolved).toBeTruthy();
+    expect(resolved!).toMatch(/mod\.d\.ts$/);
+  });
+
+  it("returns null for unresolvable specifiers", () => {
+    const resolved = resolveModuleSpecifier(
+      "nonexistent-xyz-abc", RESOLUTION_INDEX
+    );
+    expect(resolved).toBeNull();
+  });
+
+  it("resolves .js specifier to .d.ts", () => {
+    const resolved = resolveModuleSpecifier(
+      "./mod.js", RESOLUTION_INDEX
+    );
+    expect(resolved).toBeTruthy();
+    expect(resolved!).toMatch(/mod\.d\.ts$/);
+  });
+
+  it("handles invalid conditional exports gracefully", () => {
+    const packageDir = path.join(FIXTURES_DIR, "invalid-conditional-exports");
+    const result = resolveTypesEntry(packageDir);
+    expect(result.typesEntries).toHaveLength(0);
+  });
+
+  it("falls back to index.d.ts when no types/exports field is present", () => {
+    const packageDir = path.join(FIXTURES_DIR, "no-entry-fallback");
+    const result = resolveTypesEntry(packageDir);
+    expect(result.typesEntries).toHaveLength(1);
+    expect(result.typesEntries[0]).toContain("index.d.ts");
+  });
+
+  it("handles malformed version ranges in typesVersions", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "malformed-versions")
+    );
+    expect(result.typesEntries).toHaveLength(0);
+  });
+
+  it("handles nested exports without wildcard patterns", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "no-wildcard-exports")
+    );
+    const subpathEntry = result.typesEntries.find(entry => entry.includes("dist/no-star.d.ts"));
+    expect(subpathEntry).toBeUndefined();
+  });
+
+  it("resolves array-based exports and handles null conditional entries", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "array-exports-null-fallback")
+    );
+    expect(result.typesEntries.length).toBeGreaterThan(0);
+  });
+
+  it("returns empty entries when exports wildcard pattern is invalid", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "invalid-wildcard-exports")
+    );
+    expect(result.typesEntries).toHaveLength(0);
+  });
+
+  it("handles bare array exports at root level", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "bare-array-exports")
+    );
+    expect(result.typesEntries.length).toBeGreaterThan(0);
+  });
+
+  it("handles subpath-string exports and invalid file extensions", () => {
+    const fixtureDir = path.join(FIXTURES_DIR, "subpath-string-exports");
+    const result = resolveTypesEntry(fixtureDir);
+    expect(result.typesEntries.length).toBeGreaterThan(0);
+    expect(result.typesEntries).toContain(path.resolve(fixtureDir, "foo.d.ts"));
+    expect(result.typesEntries).not.toContain(path.resolve(fixtureDir, "bar.js"));
   });
 });

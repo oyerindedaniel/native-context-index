@@ -1,0 +1,10 @@
+{
+  "name": "invalid-conditional-exports",
+  "version": "1.0.0",
+  "exports": {
+    ".": [
+      null,
+      "./ghost.d.ts"
+    ]
+  }
+}

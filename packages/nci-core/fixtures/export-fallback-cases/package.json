@@ -1,0 +1,12 @@
+{
+  "name": "final-coverage",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+       "default": "./index.d.ts"
+    }
+  },
+  "typesVersions": {
+    "invalid-range": { "*": ["./index.d.ts"] }
+  }
+}

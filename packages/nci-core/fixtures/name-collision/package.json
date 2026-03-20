@@ -1,0 +1,9 @@
+{
+  "name": "name-collision",
+  "version": "1.0.0",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts" },
+    "./stream": { "types": "./dist/stream.d.ts" },
+    "./channel": { "types": "./dist/channel.d.ts" }
+  }
+}
