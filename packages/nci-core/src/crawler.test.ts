@@ -160,12 +160,30 @@ describe("crawl", () => {
     const names = result.exports.map((exportItem) => exportItem.name);
 
     expect(names).toContain("merged");
-
     expect(names).toContain("merged.Config");
-
     expect(names).toContain("merged.version");
     expect(names).toContain("merged.options");
     expect(names).toContain("merged.options.verbose");
+  });
+
+  it("correctly attributes definedIn for namespace re-exports (export * as)", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "namespace-reexport", "index.d.ts")
+    );
+
+    const lib = result.exports.find(e => e.name === "Lib");
+    const version = result.exports.find(e => e.name === "Lib.VERSION");
+
+    expect(lib).toBeDefined();
+    expect(version).toBeDefined();
+
+    // The 'Lib' symbol name is defined in index.d.ts
+    expect(lib!.definedIn).toContain("index.d.ts");
+    expect(lib!.signature).toContain("export * as Lib from");
+
+    // The 'VERSION' symbol name is defined in lib.d.ts
+    expect(version!.definedIn).toContain("lib.d.ts");
+    expect(version!.signature).toContain("const VERSION");
   });
 
   it("extracts dependencies from inline import() types", () => {

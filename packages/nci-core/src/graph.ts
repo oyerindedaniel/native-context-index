@@ -192,6 +192,10 @@ function mergeDeclarations(nodes: SymbolNode[]): SymbolNode[] {
       if (node.visibility && !existing.visibility) {
         existing.visibility = node.visibility;
       }
+
+      if (node.since && !existing.since) {
+        existing.since = node.since;
+      }
     } else {
       merged.set(mergeKey, { ...node });
     }
@@ -228,6 +232,7 @@ function toSymbolNode(
     reExportedFrom: reExportSource !== symbolFilePath ? reExportSource : undefined,
     deprecated: resolved.deprecated,
     visibility: resolved.visibility,
+    since: resolved.since,
   };
 }
 

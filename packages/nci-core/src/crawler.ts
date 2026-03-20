@@ -183,6 +183,7 @@ export function crawl(
               dependencies: sym.dependencies,
               deprecated: sym.deprecated,
               visibility: sym.visibility,
+              since: sym.since,
             });
           }
         }
@@ -219,6 +220,7 @@ export function crawl(
           dependencies: exportEntry.dependencies,
           deprecated: exportEntry.deprecated,
           visibility: exportEntry.visibility,
+          since: exportEntry.since,
         });
       }
     }
@@ -253,6 +255,10 @@ export function crawl(
           definedIn: currentFile,
           reExportChain: [currentFile],
           signature: exp.signature,
+          jsDoc: exp.jsDoc,
+          deprecated: exp.deprecated,
+          visibility: exp.visibility,
+          since: exp.since,
         });
       }
       return results;
@@ -268,9 +274,13 @@ export function crawl(
         kind: exp.kind,
         kindName: exp.kindName,
         isTypeOnly: exp.isTypeOnly,
-        definedIn: normalizePath(sourcePath),
+        definedIn: currentFile,
         reExportChain: [currentFile],
         signature: exp.signature || `namespace ${exp.name} { ${nestedSymbols.length} symbols }`,
+        jsDoc: exp.jsDoc,
+        deprecated: exp.deprecated,
+        visibility: exp.visibility,
+        since: exp.since,
       });
       for (const sym of nestedSymbols) {
         results.push({
@@ -297,6 +307,10 @@ export function crawl(
           definedIn: normalizePath(sourcePath),
           reExportChain: [currentFile],
           signature: exp.signature,
+          jsDoc: exp.jsDoc,
+          deprecated: exp.deprecated,
+          visibility: exp.visibility,
+          since: exp.since,
         });
       }
     }

@@ -73,6 +73,8 @@ export interface ParsedExport {
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
   visibility?: VisibilityLevel;
+  /** Version when this symbol was introduced (from @since tag) */
+  since?: string;
   /** Whether the 'export' keyword was explicitly used on the declaration */
   isExplicitExport?: boolean;
 }
@@ -133,6 +135,8 @@ export interface ResolvedSymbol {
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
   visibility?: VisibilityLevel;
+  /** Version when this symbol was introduced (from @since tag) */
+  since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
   /** Temporary storage for raw dependencies during graph building (not in final report) */
@@ -169,6 +173,8 @@ export interface SymbolNode {
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
   visibility?: VisibilityLevel;
+  /** Version when this symbol was introduced (from @since tag) */
+  since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
   /** Original type references for resolution */

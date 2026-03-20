@@ -39,6 +39,7 @@ interface JSDocInfo {
   jsDoc?: string;
   deprecated?: string | boolean;
   visibility?: VisibilityLevel;
+  since?: string;
 }
 
 /**
@@ -257,7 +258,7 @@ function extractDirectExport(
 
         // If the variable has a type literal, extract its members as sub-symbols
         if (decl.type && ts.isTypeLiteralNode(decl.type)) {
-          exports.push(...extractTypeLiteralMembers(decl.type, sourceFile, name, isExplicitExport));
+          exports.push(...extractTypeLiteralMembers(decl.type, sourceFile, name, isExplicitExport, jsdoc));
         }
       }
     }
@@ -312,7 +313,8 @@ function extractTypeLiteralMembers(
   node: ts.TypeLiteralNode,
   sourceFile: ts.SourceFile,
   parentName: string,
-  isExplicitExport: boolean
+  isExplicitExport: boolean,
+  parentJSDoc?: JSDocInfo
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
@@ -335,6 +337,9 @@ function extractTypeLiteralMembers(
         signature: member.getText(sourceFile).trim(),
         dependencies: deps,
         ...jsdoc,
+        since: jsdoc.since || parentJSDoc?.since,
+        visibility: jsdoc.visibility || parentJSDoc?.visibility,
+        deprecated: jsdoc.deprecated || parentJSDoc?.deprecated,
       });
 
       // Recurse if the property type is also a TypeLiteral
@@ -343,7 +348,7 @@ function extractTypeLiteralMembers(
         member.type &&
         ts.isTypeLiteralNode(member.type)
       ) {
-        exports.push(...extractTypeLiteralMembers(member.type, sourceFile, name, isExplicitExport));
+        exports.push(...extractTypeLiteralMembers(member.type, sourceFile, name, isExplicitExport, jsdoc));
       }
     }
   }
@@ -383,13 +388,18 @@ function extractExportDeclaration(
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
   const isTypeOnly = node.isTypeOnly;
-  const source = node.moduleSpecifier
-    ? (node.moduleSpecifier as ts.StringLiteral).text
+  const source = node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
+    ? node.moduleSpecifier.text
     : undefined;
-  const signature = node.getText(sourceFile).trim();
 
-  // ─── Pattern 10: export * from "..." (Wildcard re-export) ─────
-  if (!node.exportClause) {
+  const jsdoc = extractJSDocInfo(node);
+
+  // ─── Pattern 10: export * from "..." (Wildcard re-export)
+  if (!node.exportClause && source) {
+    const signature = isTypeOnly
+      ? `export type * from '${source}'`
+      : `export * from '${source}'`;
+
     exports.push({
       name: "*",
       kind: ts.SyntaxKind.ExportDeclaration,
@@ -399,12 +409,17 @@ function extractExportDeclaration(
       isWildcard: true,
       isExplicitExport: true,
       signature,
+      ...jsdoc,
     });
     return exports;
   }
 
   // ─── Pattern 11: export * as ns from "..." (Namespace re-export)
-  if (ts.isNamespaceExport(node.exportClause)) {
+  if (node.exportClause && ts.isNamespaceExport(node.exportClause)) {
+    const signature = isTypeOnly
+      ? `export type * as ${node.exportClause.name.text} from '${source}'`
+      : `export * as ${node.exportClause.name.text} from '${source}'`;
+
     exports.push({
       name: node.exportClause.name.text,
       kind: ts.SyntaxKind.ExportDeclaration,
@@ -414,12 +429,13 @@ function extractExportDeclaration(
       isNamespaceExport: true,
       isExplicitExport: true,
       signature,
+      ...jsdoc,
     });
     return exports;
   }
 
   // ─── Patterns 7, 8, 9, 12: Named / Aliased / Type-only re-exports
-  if (ts.isNamedExports(node.exportClause)) {
+  if (node.exportClause && ts.isNamedExports(node.exportClause)) {
     for (const specifier of node.exportClause.elements) {
       const exportedName = specifier.name.text;
       const originalName = specifier.propertyName
@@ -443,6 +459,7 @@ function extractExportDeclaration(
         originalName: originalName !== exportedName ? originalName : undefined,
         isExplicitExport: true,
         signature: perSpecifierSignature,
+        ...jsdoc,
       });
     }
   }
@@ -555,6 +572,12 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
 
         if (!result.visibility && VISIBILITY_TAGS.has(tagName)) {
           result.visibility = tagName as VisibilityLevel;
+        }
+
+        if (tagName === "since" && !result.since && tag.comment) {
+          result.since = typeof tag.comment === "string" 
+            ? tag.comment 
+            : ts.getTextOfJSDocComment(tag.comment);
         }
       }
     }

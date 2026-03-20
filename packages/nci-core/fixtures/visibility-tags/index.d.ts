@@ -1,4 +1,7 @@
-/** @public */
+/**
+ * @public
+ * @since 1.0.0
+ */
 export interface PublicAPI {
   version: string;
 }
@@ -11,7 +14,10 @@ export interface AlphaFeature {
   experimental: boolean;
 }
 
-/** @beta */
+/**
+ * @beta
+ * @since 2.1.0
+ */
 export declare function betaFunction(): string;
 
 /** No visibility tag */

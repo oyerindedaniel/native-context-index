@@ -538,7 +538,7 @@ describe("parseImports", () => {
   it("handles default export of literal values and complex expressions", () => {
     const tmpFile = makeTmpFile("literal-export");
     fs.writeFileSync(tmpFile, "export default 123;");
-    
+
     try {
       const exports = parseExports(tmpFile);
       const defaultExport = exports.find(exportItem => exportItem.name === "default");
@@ -552,7 +552,7 @@ describe("parseImports", () => {
   it("extracts type references from export specifiers", () => {
     const tmpFile = makeTmpFile("export-specifier-refs");
     fs.writeFileSync(tmpFile, "type Foo = string; export { Foo };");
-    
+
     try {
       const exports = parseExports(tmpFile);
       const specifier = exports.find(exportItem => exportItem.name === "Foo");
@@ -573,7 +573,7 @@ describe("parseImports", () => {
       
       export interface Complex extends Array<string | number> {}
     `);
-    
+
     try {
       const exports = parseExports(tmpFile);
       expect(exports.some(exportItem => exportItem.name === "DepImplicit" && exportItem.deprecated === true)).toBe(true);
@@ -601,19 +601,121 @@ describe("parseImports", () => {
       
       import X = require("pkg");
     `);
-    
+
     try {
       const exports = parseExports(tmpFile);
       const imports = parseImports(tmpFile);
-      
+
       expect(exports.some(exportItem => exportItem.name === "myRef")).toBe(true);
       expect(exports.some(exportItem => exportItem.name === "ns")).toBe(true);
       expect(exports.some(exportItem => exportItem.name === "default")).toBe(true);
       expect(imports.some(importItem => importItem.name === "X")).toBe(true);
-      
+
       const refs = extractTypeReferences(getFileSource(tmpFile));
       expect(refs.some(reference => reference.name === "Type")).toBe(true);
       expect(refs.some(reference => reference.name === "Base")).toBe(true);
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+  it("extracts @since tags from various export forms", () => {
+    const fixturePath = path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts");
+    const exports = parseExports(fixturePath);
+
+    // Direct declaration
+    const publicAPI = exports.find(exportItem => exportItem.name === "PublicAPI");
+    expect(publicAPI).toBeDefined();
+    expect(publicAPI!.since).toBe("1.0.0");
+
+    // Function declaration
+    const betaFunction = exports.find(exportItem => exportItem.name === "betaFunction");
+    expect(betaFunction).toBeDefined();
+    expect(betaFunction!.since).toBe("2.1.0");
+
+    const alphaFeature = exports.find(exportItem => exportItem.name === "AlphaFeature");
+    expect(alphaFeature).toBeDefined();
+    expect(alphaFeature!.since).toBeUndefined();
+
+    // Namespace re-export (the Arbitrary case)
+    const tmpFile = makeTmpFile("jsdoc-since-namespace");
+    fs.writeFileSync(tmpFile, `
+      /** @since 3.10.0 */
+      export * as NS from './mod';
+    `);
+
+    try {
+      const parsedExports = parseExports(tmpFile);
+      const nsExport = parsedExports.find(exportItem => exportItem.name === "NS");
+      expect(nsExport?.since).toBe("3.10.0");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+
+    // Named re-export
+    const tmpFile2 = makeTmpFile("jsdoc-since-named");
+    fs.writeFileSync(tmpFile2, `
+      /** @since 4.0.0 */
+      export { exportedVal } from './mod';
+    `);
+
+    try {
+      const parsedExports = parseExports(tmpFile2);
+      const valExport = parsedExports.find(exportItem => exportItem.name === "exportedVal");
+      expect(valExport?.since).toBe("4.0.0");
+    } finally {
+      fs.unlinkSync(tmpFile2);
+    }
+  });
+
+  it("extracts @since from interface declarations", () => {
+    const tmpFile = makeTmpFile("jsdoc-since-interface");
+    fs.writeFileSync(tmpFile, `
+      /** @since 2.0.0 */
+      export interface MyInterface {
+        name: string;
+      }
+    `);
+
+    try {
+      const exports = parseExports(tmpFile);
+      const myIntf = exports.find(exportItem => exportItem.name === "MyInterface");
+      expect(myIntf?.since).toBe("2.0.0");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("extracts @since from variable exports", () => {
+    const tmpFile = makeTmpFile("jsdoc-since-variable");
+    fs.writeFileSync(tmpFile, `
+      /** @since 2.0.0 */
+      export declare const myVar: string;
+    `);
+
+    try {
+      const exports = parseExports(tmpFile);
+      const myVar = exports.find(exportItem => exportItem.name === "myVar");
+      expect(myVar?.since).toBe("2.0.0");
+    } finally {
+      fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it("inherits @since from parent in TypeLiteral members", () => {
+    const tmpFile = makeTmpFile("jsdoc-since-inheritance");
+    fs.writeFileSync(tmpFile, `
+      /** @since 1.5.0 */
+      export declare const Parent: {
+        /** Simple comment without the since tag anywhere */
+        child: string;
+      };
+    `);
+
+    try {
+      const exports = parseExports(tmpFile);
+      const child = exports.find(exportItem => exportItem.name === "Parent.child");
+      expect(child).toBeDefined();
+      expect(child!.since).toBe("1.5.0");
     } finally {
       fs.unlinkSync(tmpFile);
     }
