@@ -92,7 +92,6 @@ function resolveAllExports(
   const entries: string[] = [];
   const seen = new Set<string>();
 
-  // Case 1: exports is a direct string
   if (typeof exports === "string") {
     if (exports.endsWith(".d.ts") || exports.endsWith(".d.mts") || exports.endsWith(".d.cts")) {
       const resolved = resolveFile(packageDir, exports);
@@ -101,21 +100,16 @@ function resolveAllExports(
     return entries;
   }
 
-  // Case 2: exports is an object
   if (typeof exports === "object" && exports !== null) {
     const obj = exports as Record<string, unknown>;
 
-    // Check if keys are subpaths (start with ".") or conditions
     const hasSubpaths = Object.keys(obj).some((key) => key.startsWith("."));
 
     if (hasSubpaths) {
-      // Iterate ALL subpath entries: ".", "./utils", "./server", etc.
       for (const [subpath, value] of Object.entries(obj)) {
         if (!subpath.startsWith(".")) continue;
-        // Skip package.json subpath
         if (subpath === "./package.json") continue;
 
-        // Wildcard subpath expansion: "./*" → scan filesystem
         if (subpath.includes("*")) {
           const wildcardEntries = expandWildcardSubpath(packageDir, value);
           for (const wEntry of wildcardEntries) {
@@ -134,14 +128,11 @@ function resolveAllExports(
         }
       }
     } else {
-      // No subpaths — the object is the condition map itself
-      // e.g., { "types": "...", "import": "..." }
       const resolved = resolveExportCondition(packageDir, obj);
       if (resolved) entries.push(resolved);
     }
   }
 
-  // Case 3: exports is an array
   if (Array.isArray(exports)) {
     for (const item of exports) {
       const resolved = resolveAllExports(packageDir, item);
@@ -273,7 +264,6 @@ function resolveFile(packageDir: string, relativePath: string): string | null {
   return isFileSafe(absPath) ? absPath : null;
 }
 
-
 /**
  * Expand wildcard subpath exports by scanning the filesystem.
  *
@@ -308,9 +298,8 @@ function expandWildcardSubpath(
 
   for (const candidate of candidates) {
     const relToPackage = path.relative(packageDir, candidate).replace(/\\/g, "/");
-    // Ensure relative path starts with ./ if the pattern does (or vice versa)
+    // Ensure relative path starts with ./ to match glob expectation
     const normalizedRel = relToPackage.startsWith("./") ? relToPackage : `./${relToPackage}`;
-    const normalizedPattern = pattern.startsWith("./") ? pattern : `./${pattern}`;
 
     if (globRegex.test(normalizedRel) || globRegex.test(relToPackage)) {
       if (candidate.endsWith(".d.ts") || candidate.endsWith(".d.mts") || candidate.endsWith(".d.cts")) {
@@ -369,6 +358,7 @@ function extractWildcardPattern(value: unknown): string | null {
   }
   return null;
 }
+
 /**
  * Resolve a module specifier relative to the current file.
  */
@@ -383,7 +373,6 @@ export function resolveModuleSpecifier(
 
   const JS_EXT_RE = /\.(js|mjs|cjs)$/;
 
-  // Strip .js/.mjs/.cjs extension and try .d.ts (single regex match)
   const extMatch = specifier.match(JS_EXT_RE);
   if (extMatch) {
     const base = specifier.slice(0, -extMatch[0].length);

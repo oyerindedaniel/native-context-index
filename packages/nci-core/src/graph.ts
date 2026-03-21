@@ -53,7 +53,6 @@ export function buildPackageGraph(
   const allImportsPerFile = crawlResult.imports;
   const visited = new Set(crawlResult.visitedFiles);
 
-  // 1. Symbol Mapping and Declaration Merging: Consolidate multiple declarations into unique nodes.
   const merged = new Map<string, SymbolNode>();
   const sameFileCounters = new Map<string, number>();
 
@@ -137,7 +136,6 @@ export function buildPackageGraph(
   const fileLocalToId = new Map<string, string>();
   const nameCount = new Map<string, number>();
 
-  // 2. ID Generation: Assign unique identifiers and build fast-lookup reference maps.
   for (const symbolNode of symbols) {
     const count = (nameCount.get(symbolNode.name) ?? 0) + 1;
     nameCount.set(symbolNode.name, count);
@@ -155,7 +153,6 @@ export function buildPackageGraph(
     }
   }
 
-  // 3. Dependency Resolution: Link raw type references to unique symbol IDs across the package.
   for (const symbolNode of symbols) {
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();

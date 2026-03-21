@@ -298,8 +298,7 @@ function extractDirectExport(
   }
 
   if (isNamedDeclaration(statement)) {
-    const namedNode = statement as ts.DeclarationStatement & { name?: ts.Node };
-    const rawName = namedNode.name && ts.isIdentifier(namedNode.name) ? namedNode.name.text : "<unnamed>";
+    const rawName = statement.name && ts.isIdentifier(statement.name) ? statement.name.text : "<unnamed>";
     const name = parentName && rawName !== "<unnamed>" ? `${parentName}.${rawName}` : rawName;
     const deps = extractTypeReferences(statement);
     const jsdoc = extractJSDocInfo(statement);
@@ -364,8 +363,7 @@ function extractClassMembers(
     if (memberName.startsWith("_") && !memberJsDoc.visibility) {
       memberJsDoc.visibility = "internal";
     }
-    let signature = member.getText(sourceFile).trim();
-    signature = signature.replace(/^(public|private|protected)\s+/, "");
+    const signature = member.getText(sourceFile).trim();
 
     const dependencies = extractTypeReferences(member);
 
@@ -408,7 +406,7 @@ function extractComplexTypeMembers(
   if (ts.isTypeLiteralNode(node)) {
     members = node.members;
   } else if (ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) {
-    members = node.members as ts.NodeArray<ts.TypeElement | ts.ClassElement>;
+    members = node.members;
   }
 
   if (members) {
@@ -440,19 +438,18 @@ function extractComplexTypeMembers(
           modifiers: extractModifiers(member),
         });
 
-        const memberType = (member as ts.PropertySignature | ts.PropertyDeclaration).type;
-        if ((ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) && memberType) {
-          exports.push(...extractComplexTypeMembers(memberType, sourceFile, name, isExplicitExport, jsdoc, depth + 1, visitedNames));
+        if ((ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) && member.type) {
+          exports.push(...extractComplexTypeMembers(member.type, sourceFile, name, isExplicitExport, jsdoc, depth + 1, visitedNames));
         }
       }
     }
-  } else if (ts.isIntersectionTypeNode(node as ts.Node)) {
-    const intersection = node as ts.IntersectionTypeNode;
+  } else if (ts.isIntersectionTypeNode(node)) {
+    const intersection = node;
     for (const type of intersection.types) {
       exports.push(...extractComplexTypeMembers(type, sourceFile, parentName, isExplicitExport, parentJSDoc, depth + 1, visitedNames));
     }
-  } else if (ts.isTypeQueryNode(node as ts.Node) || ts.isTypeReferenceNode(node as ts.Node)) {
-    const typeNode = node as ts.TypeNode;
+  } else if (ts.isTypeQueryNode(node) || ts.isTypeReferenceNode(node)) {
+    const typeNode = node;
     // Tracing typeof or direct reference to local declarations
     const searchName = getSearchName(typeNode);
     if (searchName && !visitedNames.has(searchName)) {
@@ -552,14 +549,14 @@ function extractModifiers(node: ts.Node): string[] | undefined {
   return modifiers.map(modifier => modifier.getText());
 }
 
-/** Extracts decorator metadata in a type-safe manner using modern TS Compiler API (4.8+) */
+/** Extracts decorator metadata associated with the given AST node. */
 function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorMetadata[] | undefined {
   if (!ts.canHaveDecorators(node)) return undefined;
 
   const decorators = ts.getDecorators(node);
   if (!decorators || decorators.length === 0) return undefined;
 
-  return (decorators as ts.Decorator[]).map((decorator: ts.Decorator): DecoratorMetadata => {
+  return (decorators).map((decorator: ts.Decorator): DecoratorMetadata => {
     const expression = decorator.expression;
     if (ts.isCallExpression(expression)) {
       return {
@@ -672,7 +669,7 @@ function extractExportAssignment(node: ts.ExportAssignment, sourceFile: ts.Sourc
   };
 }
 
-function isNamedDeclaration(node: ts.Node): boolean {
+function isNamedDeclaration(node: ts.Node): node is ts.DeclarationStatement & { name?: ts.DeclarationName } {
   return ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isModuleDeclaration(node);
 }
 
