@@ -103,6 +103,7 @@ export function buildPackageGraph(
       if (resolved.deprecated && !existing.deprecated) existing.deprecated = resolved.deprecated;
       if (resolved.visibility && !existing.visibility) existing.visibility = resolved.visibility;
       if (resolved.since && !existing.since) existing.since = resolved.since;
+      if (resolved.modifiers && !existing.modifiers) existing.modifiers = resolved.modifiers;
     } else {
       const reExportSource = resolved.reExportChain?.[0]
         ? makeRelative(resolved.reExportChain[0], packageInfo.dir)
@@ -126,6 +127,7 @@ export function buildPackageGraph(
         visibility: resolved.visibility,
         since: resolved.since,
         heritage: resolved.heritage,
+        modifiers: resolved.modifiers,
       });
     }
   }
@@ -174,7 +176,7 @@ export function buildPackageGraph(
           if (!targetId) {
             const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
             const fileImports = allImportsPerFile[absPathForLookup] || [];
-            const matchingImport = fileImports.find(imp => imp.name === rawDep.name);
+            const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
 
             if (matchingImport) {
               const absSourcePath = resolveModuleSpecifier(matchingImport.source, path.join(packageInfo.dir, symbolNode.filePath));
@@ -276,8 +278,6 @@ function flattenInheritedMembers(
         if (childMemberNames.has(shortName)) continue;
         childMemberNames.add(shortName);
 
-        // Skip private or protected if they have those modifiers? 
-        // We don't track modifiers strictly yet, but JSDoc visibility works:
         if (parentMember.visibility === "internal") continue;
 
         const isPrototype = parentMember.name.includes(".prototype.");

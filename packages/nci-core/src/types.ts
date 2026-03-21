@@ -92,6 +92,8 @@ export interface ParsedExport {
   decorators?: DecoratorMetadata[];
   /** Names of classes or interfaces this symbol extends/implements */
   heritage?: string[];
+  /** Structured modifiers (readonly, abstract, static, etc.) */
+  modifiers?: string[];
 }
 
 /** Documentation for an import in a file */
@@ -162,6 +164,8 @@ export interface ResolvedSymbol {
   isInherited?: boolean;
   /** ID of the symbol this one was inherited from */
   inheritedFrom?: string;
+  /** Structured modifiers (readonly, abstract, static, etc.) */
+  modifiers?: string[];
   /** Temporary storage for raw dependencies during graph building (not in final report) */
   rawDependencies?: TypeReference[];
 }
@@ -210,6 +214,8 @@ export interface SymbolNode {
   inheritedFrom?: string;
   /** Names of classes or interfaces this symbol extends/implements */
   heritage?: string[];
+  /** Structured modifiers (readonly, abstract, static, etc.) */
+  modifiers?: string[];
   /** Original type references for resolution */
   rawDependencies?: TypeReference[];
 }

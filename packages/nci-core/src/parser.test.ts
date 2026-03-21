@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
 import ts from "typescript";
-import { parseFile, extractTypeReferences, getFileSource } from "./parser.js";
+import { parseFile, parseFileFromSource, extractTypeReferences, getFileSource } from "./parser.js";
+import type { ParsedExport } from "./types.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 
@@ -147,6 +148,45 @@ describe("parseExports — Patterns 1-17", () => {
     expect(assignment!.signature).toContain("export =");
   });
 
+  describe("Structured Modifiers", () => {
+    it("extracts abstract, readonly, and static modifiers from classes", () => {
+      const source = `
+        export abstract class Service {
+          public static readonly VERSION = "1.0";
+          protected abstract init(): void;
+        }
+      `;
+      const sourceFile = ts.createSourceFile("a.ts", source, ts.ScriptTarget.Latest, true);
+      const result = parseFileFromSource(sourceFile);
+
+      const serviceClass = result.exports.find(exportEntry => exportEntry.name === "Service")!;
+      expect(serviceClass.modifiers).toContain("abstract");
+      expect(serviceClass.modifiers).toContain("export");
+
+      const versionProp = result.exports.find(exportEntry => exportEntry.name === "Service.VERSION")!;
+      expect(versionProp.modifiers).toContain("public");
+      expect(versionProp.modifiers).toContain("static");
+      expect(versionProp.modifiers).toContain("readonly");
+
+      const initMethod = result.exports.find(exportEntry => exportEntry.name === "Service.prototype.init")!;
+      expect(initMethod.modifiers).toContain("protected");
+      expect(initMethod.modifiers).toContain("abstract");
+    });
+
+    it("extracts readonly and optional from interfaces", () => {
+      const source = `
+        export interface Config {
+          readonly endpoint: string;
+          apiKey?: string;
+        }
+      `;
+      const sourceFile = ts.createSourceFile("a.ts", source, ts.ScriptTarget.Latest, true);
+      const result = parseFileFromSource(sourceFile);
+
+      const endpointProp = result.exports.find(exportEntry => exportEntry.name === "Config.endpoint")!;
+      expect(endpointProp.modifiers).toContain("readonly");
+    });
+  });
   // ─── Pattern 15: declare module "name" ────────────────────────
   it("Pattern 15: parses ambient module declaration", () => {
     const pluginModule = findExport("my-plugin");
@@ -671,7 +711,7 @@ describe("Parser Expansion (Synthetic Members)", () => {
   it("Prototype Member Assignment: captures ad-hoc assignments via ExpressionStatement", () => {
     const fixturePath = path.join(FIXTURES_DIR, "prototype-member-assignment", "index.d.ts");
     const { exports } = parseFile(fixturePath);
-    
+
     const upgradeMethod = exports.find(exportItem => exportItem.name === "BaseNode.prototype.upgrade");
     expect(upgradeMethod).toBeDefined();
     expect(upgradeMethod?.since).toBe("1.2.0");
@@ -684,7 +724,7 @@ describe("Parser Expansion (Synthetic Members)", () => {
   it("Decorator Metadata: extracts metadata from class declarations and members", () => {
     const fixturePath = path.join(FIXTURES_DIR, "decorator-metadata-extraction", "index.d.ts");
     const { exports } = parseFile(fixturePath);
-    
+
     const serviceNode = exports.find(exportItem => exportItem.name === "ServiceNode");
     expect(serviceNode).toBeDefined();
     expect(serviceNode!.decorators).toBeDefined();
@@ -704,18 +744,18 @@ describe("Parser Expansion (Synthetic Members)", () => {
 
       expect(exports.length).toBe(3);
 
-      const strInterface = exports.find(exp => exp.name === "String");
+      const strInterface = exports.find(exportEntry => exportEntry.name === "String");
       expect(strInterface).toBeDefined();
       expect(strInterface!.kindName).toBe("InterfaceDeclaration");
       expect(strInterface!.isGlobalAugmentation).toBe(true);
       expect(strInterface!.since).toBe("1.0.0");
 
-      const strMethod = exports.find(exp => exp.name === "String.toCustomFormat");
+      const strMethod = exports.find(exportEntry => exportEntry.name === "String.toCustomFormat");
       expect(strMethod).toBeDefined();
       expect(strMethod!.kindName).toBe("MethodSignature");
       expect(strMethod!.isGlobalAugmentation).toBe(true);
 
-      const varDecl = exports.find(exp => exp.name === "AppVersion");
+      const varDecl = exports.find(exportEntry => exportEntry.name === "AppVersion");
       expect(varDecl).toBeDefined();
       expect(varDecl!.kindName).toBe("VariableStatement");
       expect(varDecl!.isGlobalAugmentation).toBe(true);

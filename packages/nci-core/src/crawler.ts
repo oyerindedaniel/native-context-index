@@ -65,28 +65,28 @@ export function crawl(
 
   for (const file of visited) {
     const exports = allRawExports.get(file) || [];
-    for (const entry of exports) {
-      if (entry.isGlobalAugmentation || entry.isWildcard || !entry.name) continue;
+    for (const exportEntry of exports) {
+      if (exportEntry.isGlobalAugmentation || exportEntry.isWildcard || !exportEntry.name) continue;
       // Skip ExportDeclarations — they're forwarding statements, not definitions.
-      if (entry.kind === ts.SyntaxKind.ExportDeclaration) continue;
+      if (exportEntry.kind === ts.SyntaxKind.ExportDeclaration) continue;
 
-      if (!publicSymbols.has(`${file}::${entry.name}`)) {
+      if (!publicSymbols.has(`${file}::${exportEntry.name}`)) {
         resolvedSymbols.push({
-          name: entry.name,
-          kind: entry.kind,
-          kindName: entry.kindName,
-          isTypeOnly: entry.isTypeOnly,
-          signature: entry.signature,
-          jsDoc: entry.jsDoc,
+          name: exportEntry.name,
+          kind: exportEntry.kind,
+          kindName: exportEntry.kindName,
+          isTypeOnly: exportEntry.isTypeOnly,
+          signature: exportEntry.signature,
+          jsDoc: exportEntry.jsDoc,
           definedIn: file,
-          dependencies: entry.dependencies,
-          deprecated: entry.deprecated,
-          visibility: entry.visibility,
-          since: entry.since,
-          heritage: entry.heritage,
+          dependencies: exportEntry.dependencies,
+          deprecated: exportEntry.deprecated,
+          visibility: exportEntry.visibility,
+          since: exportEntry.since,
+          heritage: exportEntry.heritage,
           isInternal: true,
         });
-        publicSymbols.add(`${file}::${entry.name}`);
+        publicSymbols.add(`${file}::${exportEntry.name}`);
       }
     }
   }
@@ -122,8 +122,8 @@ export function crawl(
     allRawImports.set(normalizedPath, importEntries);
     allRawReferences.set(normalizedPath, tripleSlashRefs);
 
-    for (const ref of tripleSlashRefs) {
-      const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
+    for (const reference of tripleSlashRefs) {
+      const refPath = resolveModuleSpecifier(reference, normalizedPath) ?? resolveTripleSlashRef(reference, normalizedPath);
       if (refPath) discoverFiles(refPath, depth + 1);
     }
 
@@ -185,8 +185,10 @@ export function crawl(
               dependencies: symbolNode.dependencies,
               deprecated: symbolNode.deprecated,
               visibility: symbolNode.visibility,
-              since: symbolNode.since,
+              decorators: symbolNode.decorators,
               heritage: symbolNode.heritage,
+              modifiers: symbolNode.modifiers,
+              since: symbolNode.since,
             });
           }
         }
@@ -194,10 +196,10 @@ export function crawl(
     }
 
     const localIndex = new Map<string, ParsedExport[]>();
-    for (const exp of actualExports) {
-      const existing = localIndex.get(exp.name) || [];
-      existing.push(exp);
-      localIndex.set(exp.name, existing);
+    for (const exportEntry of actualExports) {
+      const existing = localIndex.get(exportEntry.name) || [];
+      existing.push(exportEntry);
+      localIndex.set(exportEntry.name, existing);
     }
 
     const results: ResolvedSymbol[] = [];
@@ -229,6 +231,8 @@ export function crawl(
           visibility: exportEntry.visibility,
           since: exportEntry.since,
           heritage: exportEntry.heritage,
+          decorators: exportEntry.decorators,
+          modifiers: exportEntry.modifiers,
         });
       }
     }
@@ -244,30 +248,32 @@ export function crawl(
   }
 
   function resolveReExport(
-    exp: ParsedExport,
+    exportEntry: ParsedExport,
     currentFile: string,
     depth: number,
     namePrefix: string
   ): ResolvedSymbol[] {
     const results: ResolvedSymbol[] = [];
-    const fullName = namePrefix ? `${namePrefix}.${exp.name}` : exp.name;
-    const sourcePath = resolveModuleSpecifier(exp.source!, currentFile);
+    const fullName = namePrefix ? `${namePrefix}.${exportEntry.name}` : exportEntry.name;
+    const sourcePath = resolveModuleSpecifier(exportEntry.source!, currentFile);
 
     if (!sourcePath) {
-      if (!exp.isWildcard) {
+      if (!exportEntry.isWildcard) {
         results.push({
           name: fullName,
-          kind: exp.kind,
-          kindName: exp.kindName,
-          isTypeOnly: exp.isTypeOnly,
+          kind: exportEntry.kind,
+          kindName: exportEntry.kindName,
+          isTypeOnly: exportEntry.isTypeOnly,
           definedIn: currentFile,
           reExportChain: [currentFile],
-          signature: exp.signature,
-          jsDoc: exp.jsDoc,
-          deprecated: exp.deprecated,
-          visibility: exp.visibility,
-          since: exp.since,
-          heritage: exp.heritage,
+          signature: exportEntry.signature,
+          jsDoc: exportEntry.jsDoc,
+          deprecated: exportEntry.deprecated,
+          visibility: exportEntry.visibility,
+          since: exportEntry.since,
+          heritage: exportEntry.heritage,
+          decorators: exportEntry.decorators,
+          modifiers: exportEntry.modifiers,
         });
       }
       return results;
@@ -275,31 +281,34 @@ export function crawl(
 
     const nestedSymbols = resolveFile(sourcePath, depth + 1);
 
-    if (exp.isWildcard) {
+    if (exportEntry.isWildcard) {
       return nestedSymbols;
-    } else if (exp.isNamespaceExport) {
+    } else if (exportEntry.isNamespaceExport) {
       results.push({
         name: fullName,
-        kind: exp.kind,
-        kindName: exp.kindName,
-        isTypeOnly: exp.isTypeOnly,
+        kind: exportEntry.kind,
+        kindName: exportEntry.kindName,
+        isTypeOnly: exportEntry.isTypeOnly,
         definedIn: currentFile,
         reExportChain: [currentFile],
-        signature: exp.signature || `namespace ${exp.name} { ${nestedSymbols.length} symbols }`,
-        jsDoc: exp.jsDoc,
-        deprecated: exp.deprecated,
-        visibility: exp.visibility,
-        since: exp.since,
+        signature: exportEntry.signature || `namespace ${exportEntry.name} { ${nestedSymbols.length} symbols }`,
+        jsDoc: exportEntry.jsDoc,
+        deprecated: exportEntry.deprecated,
+        visibility: exportEntry.visibility,
+        since: exportEntry.since,
+        heritage: exportEntry.heritage,
+        decorators: exportEntry.decorators,
+        modifiers: exportEntry.modifiers,
       });
       for (const symbolNode of nestedSymbols) {
         results.push({
           ...symbolNode,
-          name: namePrefix ? `${namePrefix}.${exp.name}.${symbolNode.name}` : `${exp.name}.${symbolNode.name}`,
+          name: namePrefix ? `${namePrefix}.${exportEntry.name}.${symbolNode.name}` : `${exportEntry.name}.${symbolNode.name}`,
           reExportChain: [currentFile, ...(symbolNode.reExportChain ?? [])],
         });
       }
     } else {
-      const targetName = exp.originalName ?? exp.name;
+      const targetName = exportEntry.originalName ?? exportEntry.name;
       const match = nestedSymbols.find(symbolNode => symbolNode.name === targetName);
       if (match) {
         results.push({
@@ -310,17 +319,19 @@ export function crawl(
       } else {
         results.push({
           name: fullName,
-          kind: exp.kind,
-          kindName: exp.kindName,
-          isTypeOnly: exp.isTypeOnly,
+          kind: exportEntry.kind,
+          kindName: exportEntry.kindName,
+          isTypeOnly: exportEntry.isTypeOnly,
           definedIn: normalizePath(sourcePath),
           reExportChain: [currentFile],
-          signature: exp.signature,
-          jsDoc: exp.jsDoc,
-          deprecated: exp.deprecated,
-          visibility: exp.visibility,
-          since: exp.since,
-          heritage: exp.heritage,
+          signature: exportEntry.signature,
+          jsDoc: exportEntry.jsDoc,
+          deprecated: exportEntry.deprecated,
+          visibility: exportEntry.visibility,
+          since: exportEntry.since,
+          heritage: exportEntry.heritage,
+          decorators: exportEntry.decorators,
+          modifiers: exportEntry.modifiers,
         });
       }
     }
@@ -329,20 +340,20 @@ export function crawl(
   }
 
   function resolveLocalAssignment(
-    exp: ParsedExport,
+    exportEntry: ParsedExport,
     localIndex: Map<string, ParsedExport[]>,
     currentFile: string,
     namePrefix: string
   ): ResolvedSymbol[] {
-    const targetName = exp.originalName ?? exp.name;
+    const targetName = exportEntry.originalName ?? exportEntry.name;
     const targets = localIndex.get(targetName) || [];
 
-    const actualTargets = targets.filter(target => target !== exp);
+    const actualTargets = targets.filter(target => target !== exportEntry);
     
     if (actualTargets.length === 0) return [];
 
     const results: ResolvedSymbol[] = [];
-    const fullName = namePrefix ? `${namePrefix}.${exp.name}` : exp.name;
+    const fullName = namePrefix ? `${namePrefix}.${exportEntry.name}` : exportEntry.name;
 
     for (const target of actualTargets) {
       results.push({
@@ -358,6 +369,8 @@ export function crawl(
         visibility: target.visibility,
         since: target.since,
         heritage: target.heritage,
+        decorators: target.decorators,
+        modifiers: target.modifiers,
       });
     }
 
@@ -372,7 +385,7 @@ export function crawl(
       }
       for (const member of matchingMembers) {
         const localMemberName = member.name.slice(memberPrefix.length);
-        const newName = namePrefix ? `${namePrefix}.${exp.name}.${localMemberName}` : `${exp.name}.${localMemberName}`;
+        const newName = namePrefix ? `${namePrefix}.${exportEntry.name}.${localMemberName}` : `${exportEntry.name}.${localMemberName}`;
         results.push({
           name: newName,
           kind: member.kind,
@@ -384,6 +397,10 @@ export function crawl(
           dependencies: member.dependencies,
           deprecated: member.deprecated,
           visibility: member.visibility,
+          since: member.since,
+          heritage: member.heritage,
+          decorators: member.decorators,
+          modifiers: member.modifiers,
         });
       }
     }

@@ -286,6 +286,7 @@ function extractDirectExport(
           signature: `declare const ${decl.name.text}: ${decl.type?.getText(sourceFile) ?? "any"}`,
           dependencies: dependencies.length > 0 ? dependencies : undefined,
           ...jsdoc,
+          modifiers: extractModifiers(statement),
         });
 
         if (decl.type) {
@@ -313,6 +314,7 @@ function extractDirectExport(
       dependencies: deps,
       ...jsdoc,
       decorators: extractDecorators(statement, sourceFile),
+      modifiers: extractModifiers(statement),
       heritage: (ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement))
         ? extractHeritage(statement, sourceFile)
         : undefined,
@@ -380,6 +382,7 @@ function extractClassMembers(
       deprecated: memberJsDoc.deprecated || parentJsDoc.deprecated,
       visibility: memberJsDoc.visibility || parentJsDoc.visibility,
       decorators: extractDecorators(member, sourceFile),
+      modifiers: extractModifiers(member),
     });
   }
 
@@ -434,6 +437,7 @@ function extractComplexTypeMembers(
           visibility: jsdoc.visibility || parentJSDoc?.visibility,
           deprecated: jsdoc.deprecated || parentJSDoc?.deprecated,
           decorators: extractDecorators(member, sourceFile),
+          modifiers: extractModifiers(member),
         });
 
         const memberType = (member as ts.PropertySignature | ts.PropertyDeclaration).type;
@@ -537,6 +541,15 @@ function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string
     if (printed) return `[${printed}]`;
   }
   return undefined;
+}
+
+/** Extracts structured modifiers (abstract, readonly, static, etc.) */
+function extractModifiers(node: ts.Node): string[] | undefined {
+  if (!ts.canHaveModifiers(node)) return undefined;
+  const modifiers = ts.getModifiers(node);
+  if (!modifiers || modifiers.length === 0) return undefined;
+
+  return modifiers.map(modifier => modifier.getText());
 }
 
 /** Extracts decorator metadata in a type-safe manner using modern TS Compiler API (4.8+) */
