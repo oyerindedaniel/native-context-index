@@ -26,7 +26,9 @@ Use dynamic temps when:
 
 All fixtures and test symbols must use **functional, purpose-driven notation**. This ensures that the test suite decoupled from implementation details.
 
-1.  **Fixtures**: Names must describe the technical scenario (e.g., `complex-wildcard-subpaths`), not the development status (❌ `resolver-final-gap`) or internal branch (❌ `resolver-branch-test`).
+1.  **Fixtures**: Names must describe the technical scenario (e.g., `complex-wildcard-subpaths`, `prototype-member-assignment`), not the development status or internal classification.
+    - ❌ **Forbidden (Classification)**: `edge-cases`, `limitations`, `bug-fix`, `test-coverage`, `new-feature`.
+    - ✅ **Allowed (Technical)**: `circular-re-export`, `abstract-class-members`, `decorator-metadata-extraction`.
 2.  **Comments**: Avoid referencing line numbers or coverage metrics. Use descriptions of the behavior being verified (e.g., "Verifies recursive wildcard success" instead of ❌ "Triggers Line 343").
 3.  **Symbols**: All test variables and objects must have descriptive roles. Use `mockPackageJson` or `fixturePath` instead of single-letter variables (❌ `p`, `f`).
 

@@ -15,7 +15,6 @@ import ts from "typescript";
 import type {
   PackageGraph,
   PackageInfo,
-  ResolvedSymbol,
   SymbolNode,
 } from "./types.js";
 import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
@@ -126,6 +125,7 @@ export function buildPackageGraph(
         deprecated: resolved.deprecated,
         visibility: resolved.visibility,
         since: resolved.since,
+        heritage: resolved.heritage,
       });
     }
   }
@@ -194,6 +194,8 @@ export function buildPackageGraph(
     delete symbolNode.rawDependencies;
   }
 
+  flattenInheritedMembers(symbols, nameToId, packageInfo.name, packageInfo.version);
+
   const result: PackageGraph = {
     package: packageInfo.name,
     version: packageInfo.version,
@@ -206,6 +208,100 @@ export function buildPackageGraph(
   clearParserCache();
 
   return result;
+}
+
+/**
+ * Recursively extracts and synthesizes inherited members for all classes and interfaces.
+ */
+function flattenInheritedMembers(
+  symbols: SymbolNode[],
+  nameToId: Map<string, string>,
+  pkgName: string,
+  pkgVersion: string
+): void {
+  const idToNode = new Map<string, SymbolNode>();
+  const membersByParentName = new Map<string, SymbolNode[]>();
+  
+  for (const symbolNode of symbols) {
+    idToNode.set(symbolNode.id, symbolNode);
+    const parts = symbolNode.name.split(".");
+    if (parts.length > 1) {
+      const isPrototype = parts.includes("prototype");
+      const parentName = isPrototype 
+        ? parts.slice(0, parts.indexOf("prototype")).join(".") 
+        : parts.slice(0, -1).join(".");
+      
+      let list = membersByParentName.get(parentName);
+      if (!list) {
+        list = [];
+        membersByParentName.set(parentName, list);
+      }
+      list.push(symbolNode);
+    }
+  }
+
+  const classOrInterfaceNodes = symbols.filter(
+    (symbolNode) => symbolNode.kind === ts.SyntaxKind.ClassDeclaration || symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
+  );
+
+  const syntheticSymbols: SymbolNode[] = [];
+
+  for (const node of classOrInterfaceNodes) {
+    if (!node.heritage || node.heritage.length === 0) continue;
+
+    const childMembers = membersByParentName.get(node.name) || [];
+    const childMemberNames = new Set(childMembers.map(member => member.name.split(".").pop()!));
+
+    const visitedParents = new Set<string>();
+    const parentsToVisit = [...node.heritage];
+
+    while (parentsToVisit.length > 0) {
+      const parentName = parentsToVisit.shift()!;
+      if (visitedParents.has(parentName)) continue;
+      visitedParents.add(parentName);
+
+      const parentId = nameToId.get(parentName);
+      if (!parentId) continue;
+
+      const parentNode = idToNode.get(parentId);
+      if (parentNode && parentNode.heritage) {
+        parentsToVisit.push(...parentNode.heritage);
+      }
+
+      const parentMembers = membersByParentName.get(parentName) || [];
+      for (const parentMember of parentMembers) {
+        const shortName = parentMember.name.split(".").pop()!;
+
+        // Shadowing Detection (Override)
+        if (childMemberNames.has(shortName)) continue;
+        childMemberNames.add(shortName);
+
+        // Skip private or protected if they have those modifiers? 
+        // We don't track modifiers strictly yet, but JSDoc visibility works:
+        if (parentMember.visibility === "internal") continue;
+
+        const isPrototype = parentMember.name.includes(".prototype.");
+        const newMemberName = isPrototype 
+          ? `${node.name}.prototype.${shortName}` 
+          : `${node.name}.${shortName}`;
+
+        const synthId = `${pkgName}@${pkgVersion}::${newMemberName}`;
+
+        syntheticSymbols.push({
+          ...parentMember,
+          id: synthId,
+          name: newMemberName,
+          isInherited: true,
+          inheritedFrom: parentMember.id,
+          additionalFiles: undefined,
+        });
+      }
+    }
+  }
+
+  for (const synth of syntheticSymbols) {
+    symbols.push(synth);
+  }
 }
 
 /**

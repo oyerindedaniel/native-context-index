@@ -13,5 +13,8 @@
     "@vitest/coverage-v8": "^4.1.0",
     "effect": "^3.21.0",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@oyerinde/caliper": "^0.2.3"
   }
 }

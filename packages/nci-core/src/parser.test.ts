@@ -666,3 +666,59 @@ describe("Structural Stability & Resource Parsing", () => {
     });
   });
 });
+
+describe("Parser Expansion (Synthetic Members)", () => {
+  it("Prototype Member Assignment: captures ad-hoc assignments via ExpressionStatement", () => {
+    const fixturePath = path.join(FIXTURES_DIR, "prototype-member-assignment", "index.d.ts");
+    const { exports } = parseFile(fixturePath);
+    
+    const upgradeMethod = exports.find(exportItem => exportItem.name === "BaseNode.prototype.upgrade");
+    expect(upgradeMethod).toBeDefined();
+    expect(upgradeMethod?.since).toBe("1.2.0");
+
+    const legacyProp = exports.find(exportItem => exportItem.name === "BaseNode.prototype.isLegacy");
+    expect(legacyProp).toBeDefined();
+    expect(legacyProp?.since).toBe("1.1.0");
+  });
+
+  it("Decorator Metadata: extracts metadata from class declarations and members", () => {
+    const fixturePath = path.join(FIXTURES_DIR, "decorator-metadata-extraction", "index.d.ts");
+    const { exports } = parseFile(fixturePath);
+    
+    const serviceNode = exports.find(exportItem => exportItem.name === "ServiceNode");
+    expect(serviceNode).toBeDefined();
+    expect(serviceNode!.decorators).toBeDefined();
+    expect(serviceNode!.decorators).toContainEqual(expect.objectContaining({ name: "injectable" }));
+
+    const executeMethod = exports.find(exportItem => exportItem.name === "ServiceNode.prototype.execute");
+    expect(executeMethod).toBeDefined();
+    expect(executeMethod!.decorators).toBeDefined();
+    expect(executeMethod!.decorators).toContainEqual(expect.objectContaining({ name: "authenticated" }));
+  });
+
+  describe("Implicit Script Globals", () => {
+    it("extracts all top-level declarations in a script file as global augmentations", () => {
+      const fixtureDir = path.resolve(__dirname, "../fixtures/implicit-script-globals");
+      const filePath = path.join(fixtureDir, "index.d.ts");
+      const { exports } = parseFile(filePath);
+
+      expect(exports.length).toBe(3);
+
+      const strInterface = exports.find(exp => exp.name === "String");
+      expect(strInterface).toBeDefined();
+      expect(strInterface!.kindName).toBe("InterfaceDeclaration");
+      expect(strInterface!.isGlobalAugmentation).toBe(true);
+      expect(strInterface!.since).toBe("1.0.0");
+
+      const strMethod = exports.find(exp => exp.name === "String.toCustomFormat");
+      expect(strMethod).toBeDefined();
+      expect(strMethod!.kindName).toBe("MethodSignature");
+      expect(strMethod!.isGlobalAugmentation).toBe(true);
+
+      const varDecl = exports.find(exp => exp.name === "AppVersion");
+      expect(varDecl).toBeDefined();
+      expect(varDecl!.kindName).toBe("VariableStatement");
+      expect(varDecl!.isGlobalAugmentation).toBe(true);
+    });
+  });
+});

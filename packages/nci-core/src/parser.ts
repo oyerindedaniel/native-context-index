@@ -12,6 +12,7 @@ import type {
   TypeReference,
   VisibilityLevel,
   CompositionNode,
+  DecoratorMetadata,
 } from "./types.js";
 import { BUILTIN_TYPES, VISIBILITY_TAGS, DECLARATION_KINDS, MAX_RECURSION_DEPTH } from "./constants.js";
 
@@ -52,6 +53,8 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
   const imports: ParsedImport[] = [];
   const references = sourceFile.referencedFiles.map((ref) => ref.fileName);
   const typeReferences = sourceFile.typeReferenceDirectives.map((ref) => ref.fileName);
+
+  const isScript = !ts.isExternalModule(sourceFile);
 
   for (const statement of sourceFile.statements) {
     // ─── Imports ──────────────────────────────────────────────
@@ -194,11 +197,43 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
       continue;
     }
 
+    // ─── Expression Statements (Ad-hoc Prototypes) ─────────────
+    if (ts.isExpressionStatement(statement)) {
+      const expression = statement.expression;
+      if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+        const left = expression.left;
+        if (ts.isPropertyAccessExpression(left)) {
+          const leftText = left.getText(sourceFile);
+          if (leftText.includes(".prototype.")) {
+            const parts = leftText.split(".prototype.");
+            const parentName = parts[0]!;
+            const memberName = parts[1]!;
+            const jsdoc = extractJSDocInfo(statement);
+            
+            exports.push({
+              name: `${parentName}.prototype.${memberName}`,
+              kind: statement.kind,
+              kindName: "ExpressionStatement",
+              isTypeOnly: false,
+              isExplicitExport: false,
+              ...(isScript ? { isGlobalAugmentation: true } : {}),
+              signature: statement.getText(sourceFile).trim(),
+              ...jsdoc,
+            });
+          }
+        }
+      }
+      continue;
+    }
+
     // ─── Direct Declarations ────────────────────────────────────
     if (DECLARATION_KINDS.has(statement.kind)) {
       const isExported = isExportedDeclaration(statement);
       const directExports = extractDirectExport(statement, sourceFile, isExported);
       for (const exp of directExports) {
+        if (!isExported && isScript) {
+          exp.isGlobalAugmentation = true;
+        }
         exports.push(exp);
       }
       continue;
@@ -277,6 +312,10 @@ function extractDirectExport(
       signature: statement.getText(sourceFile).trim(),
       dependencies: deps,
       ...jsdoc,
+      decorators: extractDecorators(statement, sourceFile),
+      heritage: (ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement))
+        ? extractHeritage(statement, sourceFile)
+        : undefined,
     });
 
     if (ts.isModuleDeclaration(statement) && statement.body && ts.isModuleBlock(statement.body)) {
@@ -340,6 +379,7 @@ function extractClassMembers(
       since: memberJsDoc.since || parentJsDoc.since,
       deprecated: memberJsDoc.deprecated || parentJsDoc.deprecated,
       visibility: memberJsDoc.visibility || parentJsDoc.visibility,
+      decorators: extractDecorators(member, sourceFile),
     });
   }
 
@@ -393,6 +433,7 @@ function extractComplexTypeMembers(
           since: jsdoc.since || parentJSDoc?.since,
           visibility: jsdoc.visibility || parentJSDoc?.visibility,
           deprecated: jsdoc.deprecated || parentJSDoc?.deprecated,
+          decorators: extractDecorators(member, sourceFile),
         });
 
         const memberType = (member as ts.PropertySignature | ts.PropertyDeclaration).type;
@@ -496,6 +537,38 @@ function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string
     if (printed) return `[${printed}]`;
   }
   return undefined;
+}
+
+/** Extracts decorator metadata in a type-safe manner using modern TS Compiler API (4.8+) */
+function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorMetadata[] | undefined {
+  if (!ts.canHaveDecorators(node)) return undefined;
+
+  const decorators = ts.getDecorators(node);
+  if (!decorators || decorators.length === 0) return undefined;
+
+  return (decorators as ts.Decorator[]).map((decorator: ts.Decorator): DecoratorMetadata => {
+    const expression = decorator.expression;
+    if (ts.isCallExpression(expression)) {
+      return {
+        name: expression.expression.getText(sourceFile),
+        arguments: expression.arguments.map((arg) => arg.getText(sourceFile).replace(/['"`]/g, "")),
+      };
+    }
+    return { name: expression.getText(sourceFile) };
+  });
+}
+
+/** Extracts names of classes or interfaces this node extends or implements */
+function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, sourceFile: ts.SourceFile): string[] | undefined {
+  if (!node.heritageClauses) return undefined;
+  const heritage: string[] = [];
+  for (const clause of node.heritageClauses) {
+    for (const type of clause.types) {
+      const text = type.expression.getText(sourceFile).trim();
+      if (text) heritage.push(text);
+    }
+  }
+  return heritage.length > 0 ? heritage : undefined;
 }
 
 function isExportedDeclaration(node: ts.Node): boolean {

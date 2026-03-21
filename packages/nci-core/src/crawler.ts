@@ -82,6 +82,8 @@ export function crawl(
           dependencies: entry.dependencies,
           deprecated: entry.deprecated,
           visibility: entry.visibility,
+          since: entry.since,
+          heritage: entry.heritage,
           isInternal: true,
         });
         publicSymbols.add(`${file}::${entry.name}`);
@@ -169,21 +171,22 @@ export function crawl(
       const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
       if (refPath) {
         const nestedSymbols = resolveFile(refPath, depth + 1);
-        for (const sym of nestedSymbols) {
-          if (!knownNames.has(sym.name)) {
-            knownNames.add(sym.name);
+        for (const symbolNode of nestedSymbols) {
+          if (!knownNames.has(symbolNode.name)) {
+            knownNames.add(symbolNode.name);
             actualExports.push({
-              name: sym.name,
-              kind: sym.kind,
-              kindName: sym.kindName,
-              signature: sym.signature,
-              jsDoc: sym.jsDoc,
+              name: symbolNode.name,
+              kind: symbolNode.kind,
+              kindName: symbolNode.kindName,
+              signature: symbolNode.signature,
+              jsDoc: symbolNode.jsDoc,
               isExplicitExport: true,
-              isTypeOnly: sym.isTypeOnly,
-              dependencies: sym.dependencies,
-              deprecated: sym.deprecated,
-              visibility: sym.visibility,
-              since: sym.since,
+              isTypeOnly: symbolNode.isTypeOnly,
+              dependencies: symbolNode.dependencies,
+              deprecated: symbolNode.deprecated,
+              visibility: symbolNode.visibility,
+              since: symbolNode.since,
+              heritage: symbolNode.heritage,
             });
           }
         }
@@ -225,6 +228,7 @@ export function crawl(
           deprecated: exportEntry.deprecated,
           visibility: exportEntry.visibility,
           since: exportEntry.since,
+          heritage: exportEntry.heritage,
         });
       }
     }
@@ -263,6 +267,7 @@ export function crawl(
           deprecated: exp.deprecated,
           visibility: exp.visibility,
           since: exp.since,
+          heritage: exp.heritage,
         });
       }
       return results;
@@ -286,16 +291,16 @@ export function crawl(
         visibility: exp.visibility,
         since: exp.since,
       });
-      for (const sym of nestedSymbols) {
+      for (const symbolNode of nestedSymbols) {
         results.push({
-          ...sym,
-          name: namePrefix ? `${namePrefix}.${exp.name}.${sym.name}` : `${exp.name}.${sym.name}`,
-          reExportChain: [currentFile, ...(sym.reExportChain ?? [])],
+          ...symbolNode,
+          name: namePrefix ? `${namePrefix}.${exp.name}.${symbolNode.name}` : `${exp.name}.${symbolNode.name}`,
+          reExportChain: [currentFile, ...(symbolNode.reExportChain ?? [])],
         });
       }
     } else {
       const targetName = exp.originalName ?? exp.name;
-      const match = nestedSymbols.find(sym => sym.name === targetName);
+      const match = nestedSymbols.find(symbolNode => symbolNode.name === targetName);
       if (match) {
         results.push({
           ...match,
@@ -315,6 +320,7 @@ export function crawl(
           deprecated: exp.deprecated,
           visibility: exp.visibility,
           since: exp.since,
+          heritage: exp.heritage,
         });
       }
     }
@@ -351,6 +357,7 @@ export function crawl(
         deprecated: target.deprecated,
         visibility: target.visibility,
         since: target.since,
+        heritage: target.heritage,
       });
     }
 

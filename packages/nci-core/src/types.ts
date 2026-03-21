@@ -9,6 +9,14 @@ import type ts from "typescript";
 /** API visibility level from JSDoc tags: @public, @internal, @alpha, @beta */
 export type VisibilityLevel = "public" | "internal" | "alpha" | "beta";
 
+/** Metadata for a TypeScript decorator: @name(args) */
+export interface DecoratorMetadata {
+  /** The name of the decorator (e.g., "injectable" or "route") */
+  name: string;
+  /** Optional string arguments passed to the decorator */
+  arguments?: string[];
+}
+
 // ─── Scanner Output ────────────────────────────────────────────
 
 /** Metadata for a discovered package in node_modules */
@@ -80,6 +88,10 @@ export interface ParsedExport {
   since?: string;
   /** Whether the 'export' keyword was explicitly used on the declaration */
   isExplicitExport?: boolean;
+  /** Metadata for decorators attached to the declaration */
+  decorators?: DecoratorMetadata[];
+  /** Names of classes or interfaces this symbol extends/implements */
+  heritage?: string[];
 }
 
 /** Documentation for an import in a file */
@@ -142,6 +154,14 @@ export interface ResolvedSymbol {
   since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
+  /** Metadata for decorators attached to the declaration */
+  decorators?: DecoratorMetadata[];
+  /** Names of classes or interfaces this symbol extends/implements */
+  heritage?: string[];
+  /** Whether this is an inherited symbol synthesized from a parent */
+  isInherited?: boolean;
+  /** ID of the symbol this one was inherited from */
+  inheritedFrom?: string;
   /** Temporary storage for raw dependencies during graph building (not in final report) */
   rawDependencies?: TypeReference[];
 }
@@ -182,6 +202,14 @@ export interface SymbolNode {
   since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
+  /** Metadata for decorators attached to the declaration */
+  decorators?: DecoratorMetadata[];
+  /** Whether this is an inherited symbol synthesized from a parent */
+  isInherited?: boolean;
+  /** ID of the symbol this one was inherited from */
+  inheritedFrom?: string;
+  /** Names of classes or interfaces this symbol extends/implements */
+  heritage?: string[];
   /** Original type references for resolution */
   rawDependencies?: TypeReference[];
 }

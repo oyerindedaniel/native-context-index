@@ -358,10 +358,40 @@ describe("buildPackageGraph", () => {
   describe("makeRelative — Path Normalization Fallbacks", () => {
     it("handles paths outside the package directory by falling back to relative calculation", () => {
       const graph = buildPackageGraph(makePackageInfo("simple-export"));
-      // The internal makeRelative is not exported, but we verify the graph's path handling
-      // through its effect on SymbolNodes if we can force an out-of-bounds path.
-      // (This test is mainly to ensure the file remains valid and extensible for utility testing).
       expect(graph.package).toBe("simple-export");
+    });
+  });
+
+  describe("Inherited Member Flattening", () => {
+    it("flattens inherited class and interface members into full symbol lists", () => {
+      const graph = buildPackageGraph(makePackageInfo("inherited-member-flattening"));
+
+      const leafProps = graph.symbols.filter(symbolNode => symbolNode.name.startsWith("LeafNode."));
+      const leafPropNames = leafProps.map(symbolNode => symbolNode.name);
+
+      // Direct property
+      expect(leafPropNames).toContain("LeafNode.prototype.leafProp");
+      
+      // Inherited from MiddleNode
+      expect(leafPropNames).toContain("LeafNode.prototype.middleProp");
+      
+      // Inherited from BaseNode (via MiddleNode)
+      expect(leafPropNames).toContain("LeafNode.prototype.baseProp");
+
+      // Method overrides: commonMethod is overridden in MiddleNode
+      expect(leafPropNames).toContain("LeafNode.prototype.commonMethod");
+
+      const derivedInterfaceMethods = graph.symbols.filter(symbolNode => symbolNode.name.startsWith("DerivedInterface."));
+      const derivedInterfaceNames = derivedInterfaceMethods.map(symbolNode => symbolNode.name);
+      
+      expect(derivedInterfaceNames).toContain("DerivedInterface.derivedFunc");
+      expect(derivedInterfaceNames).toContain("DerivedInterface.baseFunc");
+
+      const leafMiddle = graph.symbols.find(symbolNode => symbolNode.name === "LeafNode.prototype.middleProp");
+      expect(leafMiddle).toBeDefined();
+      expect(leafMiddle!.since).toBe("2.0.0");
+      expect(leafMiddle!.isInherited).toBe(true);
+      expect(leafMiddle!.inheritedFrom).toContain("MiddleNode");
     });
   });
 });
