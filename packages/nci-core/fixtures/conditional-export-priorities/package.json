@@ -1,0 +1,13 @@
+{
+  "name": "conditional-export-priorities",
+  "exports": {
+    ".": {
+      "types": {
+        "import": null,
+        "default": {
+          "require": "./index.d.ts"
+        }
+      }
+    }
+  }
+}

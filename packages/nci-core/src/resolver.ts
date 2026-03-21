@@ -187,7 +187,7 @@ function resolveExportCondition(
   const obj = entry as Record<string, unknown>;
 
   // Priority order: types → import → require → default
-  if (obj.types) {
+  if (obj.types !== undefined) {
     const resolved = resolveExportCondition(packageDir, obj.types);
     if (resolved) return resolved;
   }
@@ -202,7 +202,7 @@ function resolveExportCondition(
     if (resolved) return resolved;
   }
 
-  if (obj.default) {
+  if (obj.default !== undefined) {
     const resolved = resolveExportCondition(packageDir, obj.default);
     if (resolved) return resolved;
   }
@@ -293,37 +293,61 @@ function expandWildcardSubpath(
   const pattern = extractWildcardPattern(value);
   if (!pattern || !pattern.includes("*")) return entries;
 
-  // Convert "dist/*.d.ts" → dir="dist", prefix="", suffix=".d.ts"
-  const parts = pattern.split("*");
-  if (parts.length !== 2) return entries; // Only single * supported
+  // Extract base directory (everything before the first '*')
+  const firstStarIndex = pattern.indexOf("*");
+  const beforeFirstStar = pattern.slice(0, firstStarIndex);
+  const lastSlashBeforeStar = beforeFirstStar.lastIndexOf("/");
 
-  const [beforeStar, afterStar] = parts;
-  const fileSuffix = afterStar!;
-
-  // Split beforeStar at the last "/" to get directory and file prefix
-  // For "./dist/*.d.ts": beforeStar="./dist/", we want scanDir="./dist", filePrefix=""
-  // For "./dist/lib-*.d.ts": beforeStar="./dist/lib-", we want scanDir="./dist", filePrefix="lib-"
-  const lastSlash = beforeStar!.lastIndexOf("/");
-  const dirPart = lastSlash >= 0 ? beforeStar!.slice(0, lastSlash) : ".";
-  const filePrefix = lastSlash >= 0 ? beforeStar!.slice(lastSlash + 1) : beforeStar!;
-
+  const dirPart = lastSlashBeforeStar >= 0 ? beforeFirstStar.slice(0, lastSlashBeforeStar) : ".";
   const scanDir = path.resolve(packageDir, dirPart);
+
   if (!fs.existsSync(scanDir)) return entries;
 
-  try {
-    const dirents = fs.readdirSync(scanDir, { withFileTypes: true });
-    for (const dirent of dirents) {
-      const file = dirent.name;
-      if (dirent.isFile() && file.startsWith(filePrefix) && file.endsWith(fileSuffix)) {
-        if (file.endsWith(".d.ts") || file.endsWith(".d.mts") || file.endsWith(".d.cts")) {
-          entries.push(path.join(scanDir, file));
-        }
+  const globRegex = globToRegExp(pattern);
+  const candidates = scanDirectoryRecursive(scanDir);
+
+  for (const candidate of candidates) {
+    const relToPackage = path.relative(packageDir, candidate).replace(/\\/g, "/");
+    // Ensure relative path starts with ./ if the pattern does (or vice versa)
+    const normalizedRel = relToPackage.startsWith("./") ? relToPackage : `./${relToPackage}`;
+    const normalizedPattern = pattern.startsWith("./") ? pattern : `./${pattern}`;
+
+    if (globRegex.test(normalizedRel) || globRegex.test(relToPackage)) {
+      if (candidate.endsWith(".d.ts") || candidate.endsWith(".d.mts") || candidate.endsWith(".d.cts")) {
+        entries.push(candidate);
       }
     }
-  } catch {
   }
 
   return entries;
+}
+
+/**
+ * Converts a glob pattern (with multiple *) into a RegExp.
+ */
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&"); // Escape regex chars except *
+  const regexStr = escaped.replace(/\*/g, "([^/]+)"); // * matches anything except /
+  return new RegExp(`^${regexStr}$`);
+}
+
+/**
+ * Recursively scans a directory for all files.
+ */
+function scanDirectoryRecursive(dir: string): string[] {
+  const results: string[] = [];
+  const list = fs.readdirSync(dir, { withFileTypes: true });
+
+  for (const file of list) {
+    const res = path.resolve(dir, file.name);
+    if (file.isDirectory()) {
+      results.push(...scanDirectoryRecursive(res));
+    } else {
+      results.push(res);
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -338,7 +362,7 @@ function extractWildcardPattern(value: unknown): string | null {
 
   // Priority order: types → import → require → default
   for (const key of ["types", "import", "require", "default"]) {
-    if (obj[key]) {
+    if (obj[key] !== undefined) {
       const result = extractWildcardPattern(obj[key]);
       if (result) return result;
     }

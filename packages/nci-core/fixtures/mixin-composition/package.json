@@ -1,0 +1,6 @@
+{
+  "name": "mixin-composition",
+  "exports": {
+    ".": "./index.d.ts"
+  }
+}

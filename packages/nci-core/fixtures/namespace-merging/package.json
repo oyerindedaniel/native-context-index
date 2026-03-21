@@ -1,0 +1,5 @@
+{
+  "name": "namespace-merging",
+  "version": "1.0.0",
+  "types": "core.d.ts"
+}

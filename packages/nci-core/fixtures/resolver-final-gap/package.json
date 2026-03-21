@@ -1,0 +1,11 @@
+{
+  "name": "resolver-final-gap",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    },
+    "sub/*": {
+      "types": "dist/*.d.ts"
+    }
+  }
+}

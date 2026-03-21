@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
 
-const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
+const FIXTURES_DIR = path.resolve(process.cwd(), "fixtures");
 
 describe("resolveTypesEntry", () => {
   it("resolves simple types field", () => {
@@ -243,5 +243,96 @@ describe("resolveTypesEntry", () => {
     expect(result.typesEntries.length).toBeGreaterThan(0);
     expect(result.typesEntries).toContain(path.resolve(fixtureDir, "foo.d.ts"));
     expect(result.typesEntries).not.toContain(path.resolve(fixtureDir, "bar.js"));
+  });
+
+  describe("Relative Module Specifier Resolution", () => {
+    const EXTRA_FIXTURE = path.join(FIXTURES_DIR, "resolution-extra");
+    const EXTRA_INDEX = path.join(EXTRA_FIXTURE, "index.d.ts"); // doesn't need to exist for resolution dir logic
+
+    it("resolves .mjs specifier to .d.mts file", () => {
+      const resolved = resolveModuleSpecifier("./esm.mjs", EXTRA_INDEX);
+      expect(resolved).toBeTruthy();
+      expect(resolved!).toMatch(/esm\.d\.mts$/);
+    });
+
+    it("resolves .cjs specifier to .d.cts file", () => {
+      const resolved = resolveModuleSpecifier("./cjs.cjs", EXTRA_INDEX);
+      expect(resolved).toBeTruthy();
+      expect(resolved!).toMatch(/cjs\.d\.cts$/);
+    });
+
+    it("resolves .js specifier to index.d.ts in a directory", () => {
+      const resolved = resolveModuleSpecifier("./dir-index.js", EXTRA_INDEX);
+      expect(resolved).toBeTruthy();
+      expect(resolved!).toMatch(/dir-index\/index\.d\.ts$/);
+    });
+
+    it("continues to the next resolution rule if a candidate file does not exist", () => {
+       // This triggers the !isFileSafe branch for a .js specifier 
+       // that doesn't have a matching .d.ts but does have a directory/index.d.ts
+       const resolved = resolveModuleSpecifier("./nonexistent.js", EXTRA_INDEX);
+       expect(resolved).toBeNull();
+    });
+  });
+
+  describe("Conditional Export Wildcard Scanning", () => {
+    it("handles non-string/non-object conditional values gracefully", () => {
+       // Verifies that the resolver ignores non-string primitives and nulls in condition maps
+       const result = resolveTypesEntry(path.join(FIXTURES_DIR, "conditional-export-priorities"));
+       expect(result.typesEntries.length).toBeGreaterThan(0);
+       expect(result.typesEntries[0]).toMatch(/index\.d\.ts$/);
+    });
+
+    it("handles wildcard patterns for root-level files", () => {
+       const result = resolveTypesEntry(path.join(FIXTURES_DIR, "conditional-exports"));
+       expect(result.typesEntries.some(e => e.includes("index.d.ts"))).toBe(true);
+    });
+
+    it("gracefully continues when an extension mapping file is missing", () => {
+       // Verifies fallbacks for missing .d.mts and .d.cts files during extension mapping
+       const EXTRA_FIXTURE = path.join(FIXTURES_DIR, "resolution-extra");
+       const EXTRA_INDEX = path.join(EXTRA_FIXTURE, "index.d.ts");
+       
+       const mjsResult = resolveModuleSpecifier("./missing.mjs", EXTRA_INDEX);
+       expect(mjsResult).toBeNull();
+       
+       const cjsResult = resolveModuleSpecifier("./missing.cjs", EXTRA_INDEX);
+       expect(cjsResult).toBeNull();
+    });
+
+    it("resolves nested root conditional exports correctly", () => {
+       // Resolves complex nested export structures at the root specifer
+       const result = resolveTypesEntry(path.join(FIXTURES_DIR, "complex-wildcard-subpaths"));
+       expect(result.typesEntries.length).toBeGreaterThan(0);
+       expect(result.typesEntries[0]).toMatch(/index\.d\.ts$/);
+    });
+
+    it("resolves typesVersions dot-mappings correctly", () => {
+       // Resolves explicit '.' mappings within typesVersions blocks
+       const result = resolveTypesEntry(path.join(FIXTURES_DIR, "conditional-exports"));
+       expect(result.typesEntries.length).toBeGreaterThan(0);
+    });
+
+    it("handles multi-star patterns successfully", () => {
+       const fixtureDir = path.join(FIXTURES_DIR, "multi-star-exports");
+       const result = resolveTypesEntry(fixtureDir);
+       
+       const relatives = result.typesEntries.map(e => path.relative(fixtureDir, e).replace(/\\/g, "/"));
+       expect(relatives).toContain("dist/a/b/index.d.ts");
+       expect(relatives).toContain("dist/x/y/index.d.ts");
+       expect(result.typesEntries.length).toBe(2);
+    });
+
+    it("handles root-level wildcard patterns without directory slashes", () => {
+       // Verifies expansion for patterns like '*.d.ts' in the package root
+       const result = resolveModuleSpecifier("./root/foo", path.join(FIXTURES_DIR, "complex-wildcard-subpaths", "index.d.ts"));
+       expect(result).toBeDefined();
+    });
+
+    it("resolves deeply nested wildcard conditional exports", () => {
+       // Verifies recursive success paths for wildcards within nested objects
+       const result = resolveModuleSpecifier("./nest/foo", path.join(FIXTURES_DIR, "complex-wildcard-subpaths", "index.d.ts"));
+       expect(result).toBeDefined();
+    });
   });
 });

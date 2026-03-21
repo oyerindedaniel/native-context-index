@@ -1,0 +1,9 @@
+{
+  "name": "multi-star-exports",
+  "version": "1.0.0",
+  "exports": {
+    "./*/*": {
+      "types": "./dist/*/*/index.d.ts"
+    }
+  }
+}

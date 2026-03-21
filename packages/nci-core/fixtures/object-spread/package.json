@@ -1,0 +1,6 @@
+{
+  "name": "object-spread",
+  "exports": {
+    ".": "./index.d.ts"
+  }
+}

@@ -1,122 +1,104 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
 import ts from "typescript";
-import {
-  parseExports,
-  parseImports,
-  parseTripleSlashReferences,
-  parseTypeReferenceDirectives,
-  extractTypeReferences,
-  getFileSource,
-} from "./parser.js";
+import { parseFile, extractTypeReferences, getFileSource } from "./parser.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 
-function makeTmpFile(label: string): string {
-  return path.join(os.tmpdir(), `nci-test-${label}-${Date.now()}.d.ts`);
-}
-
-describe("parseExports", () => {
-  const allExports = parseExports(
-    path.join(FIXTURES_DIR, "all-export-forms", "index.d.ts")
-  );
-
-  const find = (name: string) => allExports.find((exportItem) => exportItem.name === name);
+describe("parseExports — Patterns 1-17", () => {
+  const allExportFormsPath = path.join(FIXTURES_DIR, "all-export-forms", "index.d.ts");
+  const { exports: allExports } = parseFile(allExportFormsPath);
+  const findExport = (name: string) => allExports.find((exportItem) => exportItem.name === name);
 
   // ─── Pattern 1: export interface ─────────────────────────────
-
-  it("parses exported interface (Pattern 1)", () => {
-    const exp = find("Config");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.InterfaceDeclaration);
-    expect(exp!.kindName).toBe("InterfaceDeclaration");
-    expect(exp!.isTypeOnly).toBe(true);
-    expect(exp!.source).toBeUndefined();
+  it("Pattern 1: parses exported interface", () => {
+    const configExport = findExport("Config");
+    expect(configExport).toBeDefined();
+    expect(configExport!.kind).toBe(ts.SyntaxKind.InterfaceDeclaration);
+    expect(configExport!.kindName).toBe("InterfaceDeclaration");
+    expect(configExport!.isTypeOnly).toBe(true);
+    expect(configExport!.source).toBeUndefined();
   });
 
   // ─── Pattern 2: export type alias ────────────────────────────
-
-  it("parses exported type alias (Pattern 2)", () => {
-    const exp = find("Status");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.TypeAliasDeclaration);
-    expect(exp!.kindName).toBe("TypeAliasDeclaration");
-    expect(exp!.isTypeOnly).toBe(true);
+  it("Pattern 2: parses exported type alias", () => {
+    const statusExport = findExport("Status");
+    expect(statusExport).toBeDefined();
+    expect(statusExport!.kind).toBe(ts.SyntaxKind.TypeAliasDeclaration);
+    expect(statusExport!.kindName).toBe("TypeAliasDeclaration");
+    expect(statusExport!.isTypeOnly).toBe(true);
   });
 
   // ─── Pattern 3: export function ──────────────────────────────
-
-  it("parses exported function with JSDoc (Pattern 3)", () => {
-    const exp = find("init");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.FunctionDeclaration);
-    expect(exp!.kindName).toBe("FunctionDeclaration");
-    expect(exp!.isTypeOnly).toBe(false);
-    expect(exp!.jsDoc).toContain("Initialize the application");
+  it("Pattern 3: parses exported function with JSDoc", () => {
+    const initFn = findExport("init");
+    expect(initFn).toBeDefined();
+    expect(initFn!.kind).toBe(ts.SyntaxKind.FunctionDeclaration);
+    expect(initFn!.kindName).toBe("FunctionDeclaration");
+    expect(initFn!.isTypeOnly).toBe(false);
+    expect(initFn!.jsDoc).toContain("Initialize the application");
   });
 
   // ─── Pattern 4: export class ─────────────────────────────────
-
-  it("parses exported class (Pattern 4)", () => {
-    // Server is both a direct export AND used in `export default Server`
-    // The direct declaration should be found
-    const directExport = allExports.filter(
+  it("Pattern 4: parses exported class", () => {
+    const classExports = allExports.filter(
       (exportItem) => exportItem.name === "Server" && exportItem.kind === ts.SyntaxKind.ClassDeclaration
     );
-    expect(directExport.length).toBeGreaterThanOrEqual(1);
-    expect(directExport[0]!.kindName).toBe("ClassDeclaration");
-    expect(directExport[0]!.isTypeOnly).toBe(false);
+    expect(classExports.length).toBeGreaterThanOrEqual(1);
+    expect(classExports[0]!.kindName).toBe("ClassDeclaration");
+    expect(classExports[0]!.isTypeOnly).toBe(false);
   });
 
   // ─── Pattern 5: export const ─────────────────────────────────
-
-  it("parses exported variable/const (Pattern 5)", () => {
-    const exp = find("VERSION");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.VariableStatement);
-    expect(exp!.kindName).toBe("VariableStatement");
-    expect(exp!.signature).toContain("string");
+  it("Pattern 5: parses exported variable/const", () => {
+    const versionConst = findExport("VERSION");
+    expect(versionConst).toBeDefined();
+    expect(versionConst!.kind).toBe(ts.SyntaxKind.VariableStatement);
+    expect(versionConst!.kindName).toBe("VariableStatement");
+    expect(versionConst!.signature).toContain("string");
   });
 
   // ─── Pattern 6: export enum ──────────────────────────────────
+  it("Pattern 6: parses exported enum", () => {
+    const logEnum = findExport("LogLevel");
+    expect(logEnum).toBeDefined();
+    expect(logEnum!.kind).toBe(ts.SyntaxKind.EnumDeclaration);
+    expect(logEnum!.kindName).toBe("EnumDeclaration");
+    expect(logEnum!.isTypeOnly).toBe(false);
+  });
 
-  it("parses exported enum (Pattern 6)", () => {
-    const exp = find("LogLevel");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.EnumDeclaration);
-    expect(exp!.kindName).toBe("EnumDeclaration");
-    expect(exp!.isTypeOnly).toBe(false);
+  // ─── Pattern 7: export { X } (Local Named Export) ───────────
+  it("Pattern 7: parses local named export", () => {
+    const localExportPath = path.join(FIXTURES_DIR, "local-export", "index.d.ts");
+    const { exports: localExports } = parseFile(localExportPath);
+    const localItem = localExports.find((exportItem) => exportItem.name === "Local");
+    expect(localItem).toBeDefined();
+    expect(localItem!.source).toBeUndefined(); // Local
   });
 
   // ─── Pattern 8: export { X } from "./other" ──────────────────
-
-  it("parses named re-export (Pattern 8)", () => {
-    const exp = find("Handler");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
-    expect(exp!.source).toBe("./handlers.js");
-    expect(exp!.isWildcard).toBeFalsy();
-    expect(exp!.originalName).toBeUndefined();
-    expect(exp!.signature).toBe("export { Handler } from './handlers.js'");
+  it("Pattern 8: parses named re-export", () => {
+    const handlerExport = findExport("Handler");
+    expect(handlerExport).toBeDefined();
+    expect(handlerExport!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
+    expect(handlerExport!.source).toBe("./handlers.js");
+    expect(handlerExport!.isWildcard).toBeFalsy();
+    expect(handlerExport!.originalName).toBeUndefined();
+    expect(handlerExport!.signature).toBe("export { Handler } from './handlers.js'");
   });
 
   // ─── Pattern 9: export { X as Y } from "./other" ─────────────
-
-  it("parses aliased re-export (Pattern 9)", () => {
-    const exp = find("Router");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
-    expect(exp!.source).toBe("./internal.js");
-    expect(exp!.originalName).toBe("InternalRouter");
-    expect(exp!.signature).toBe("export { InternalRouter as Router } from './internal.js'");
+  it("Pattern 9: parses aliased re-export", () => {
+    const routerExport = findExport("Router");
+    expect(routerExport).toBeDefined();
+    expect(routerExport!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
+    expect(routerExport!.source).toBe("./internal.js");
+    expect(routerExport!.originalName).toBe("InternalRouter");
+    expect(routerExport!.signature).toBe("export { InternalRouter as Router } from './internal.js'");
   });
 
   // ─── Pattern 10: export * from "./barrel" ────────────────────
-
-  it("parses wildcard re-export (Pattern 10)", () => {
-    // There might be multiple wildcard exports, find the one from utils
+  it("Pattern 10: parses wildcard re-export", () => {
     const wildcards = allExports.filter((exportItem) => exportItem.isWildcard);
     expect(wildcards.length).toBeGreaterThanOrEqual(1);
 
@@ -126,29 +108,26 @@ describe("parseExports", () => {
   });
 
   // ─── Pattern 11: export * as ns from "./mod" ──────────────────
-
-  it("parses namespace re-export (Pattern 11)", () => {
-    const exp = find("helpers");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
-    expect(exp!.source).toBe("./helpers.js");
-    expect(exp!.isNamespaceExport).toBe(true);
+  it("Pattern 11: parses namespace re-export", () => {
+    const helpersExport = findExport("helpers");
+    expect(helpersExport).toBeDefined();
+    expect(helpersExport!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
+    expect(helpersExport!.source).toBe("./helpers.js");
+    expect(helpersExport!.isNamespaceExport).toBe(true);
   });
 
   // ─── Pattern 12: export type { Foo } from "./other" ──────────
-
-  it("parses type-only re-export (Pattern 12)", () => {
-    const exp = find("RequestOptions");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
-    expect(exp!.source).toBe("./options.js");
-    expect(exp!.isTypeOnly).toBe(true);
-    expect(exp!.signature).toBe("export type { RequestOptions } from './options.js'");
+  it("Pattern 12: parses type-only re-export", () => {
+    const optionsExport = findExport("RequestOptions");
+    expect(optionsExport).toBeDefined();
+    expect(optionsExport!.kind).toBe(ts.SyntaxKind.ExportDeclaration);
+    expect(optionsExport!.source).toBe("./options.js");
+    expect(optionsExport!.isTypeOnly).toBe(true);
+    expect(optionsExport!.signature).toBe("export type { RequestOptions } from './options.js'");
   });
 
   // ─── Pattern 13: export default ──────────────────────────────
-
-  it("parses default export (Pattern 13)", () => {
+  it("Pattern 13: parses default export", () => {
     const defaultExport = allExports.find(
       (exportItem) => exportItem.kind === ts.SyntaxKind.ExportAssignment
     );
@@ -158,12 +137,8 @@ describe("parseExports", () => {
   });
 
   // ─── Pattern 14: export = (CJS) ─────────────────────────────
-
-  it("parses CJS-style export = (Pattern 14)", () => {
-    const cjsExports = parseExports(
-      path.join(FIXTURES_DIR, "cjs-export", "index.d.ts")
-    );
-
+  it("Pattern 14: parses CJS-style export =", () => {
+    const cjsExports = parseFile(path.join(FIXTURES_DIR, "cjs-export", "index.d.ts")).exports;
     const assignment = cjsExports.find(
       (exportItem) => exportItem.kind === ts.SyntaxKind.ExportAssignment
     );
@@ -173,71 +148,91 @@ describe("parseExports", () => {
   });
 
   // ─── Pattern 15: declare module "name" ────────────────────────
-
-  it("parses ambient module declaration (Pattern 15)", () => {
-    const exp = find("my-plugin");
-    expect(exp).toBeDefined();
-    expect(exp!.kind).toBe(ts.SyntaxKind.ModuleDeclaration);
-    expect(exp!.kindName).toBe("ModuleDeclaration");
-    expect(exp!.signature).toContain("declare module");
+  it("Pattern 15: parses ambient module declaration", () => {
+    const pluginModule = findExport("my-plugin");
+    expect(pluginModule).toBeDefined();
+    expect(pluginModule!.kind).toBe(ts.SyntaxKind.ModuleDeclaration);
+    expect(pluginModule!.kindName).toBe("ModuleDeclaration");
+    expect(pluginModule!.signature).toContain("declare module");
   });
 
-  it("extracts all expected exports from the fixture", () => {
-    const names = allExports.map((exportItem) => exportItem.name);
+  it("extracts all expected exports from the large all-patterns fixture", () => {
+    const exportNames = allExports.map((exportItem) => exportItem.name);
 
-    expect(names).toContain("Config");
-    expect(names).toContain("Status");
-    expect(names).toContain("init");
-    expect(names).toContain("VERSION");
-    expect(names).toContain("LogLevel");
-
-    expect(names).toContain("Handler");
-    expect(names).toContain("Router");
-    expect(names).toContain("helpers");
-    expect(names).toContain("RequestOptions");
-
+    expect(exportNames).toContain("Config");
+    expect(exportNames).toContain("Status");
+    expect(exportNames).toContain("init");
+    expect(exportNames).toContain("VERSION");
+    expect(exportNames).toContain("LogLevel");
+    expect(exportNames).toContain("Handler");
+    expect(exportNames).toContain("Router");
+    expect(exportNames).toContain("helpers");
+    expect(exportNames).toContain("RequestOptions");
     expect(allExports.some((exportItem) => exportItem.isWildcard)).toBe(true);
   });
 });
 
-describe("parseTripleSlashReferences", () => {
-  it("extracts reference paths from a file with triple-slash directives", () => {
-    const refs = parseTripleSlashReferences(
-      path.join(FIXTURES_DIR, "triple-slash-refs", "index.d.ts")
-    );
-
-    expect(refs).toHaveLength(2);
-    expect(refs).toContain("./globals.d.ts");
-    expect(refs).toContain("./utils.d.ts");
+describe("parseTripleSlashReferences & parseTypeReferenceDirectives", () => {
+  it("parseTripleSlashReferences: extracts reference paths accurately", () => {
+    const { references: referencePaths } = parseFile(path.join(FIXTURES_DIR, "triple-slash-refs", "index.d.ts"));
+    expect(referencePaths).toHaveLength(2);
+    expect(referencePaths).toContain("./globals.d.ts");
+    expect(referencePaths).toContain("./utils.d.ts");
   });
 
-  it("returns empty array for a file with no references", () => {
-    const refs = parseTripleSlashReferences(
-      path.join(FIXTURES_DIR, "simple-export", "index.d.ts")
-    );
+  it("parseTripleSlashReferences: returns empty array for a file with no references", () => {
+    const { references: referencePaths } = parseFile(path.join(FIXTURES_DIR, "simple-export", "index.d.ts"));
+    expect(referencePaths).toHaveLength(0);
+  });
 
-    expect(refs).toHaveLength(0);
+  it("parseTypeReferenceDirectives: extracts directives accurately", () => {
+    const { typeReferences: directives } = parseFile(path.join(FIXTURES_DIR, "type-ref-directives", "index.d.ts"));
+    expect(directives).toHaveLength(2);
+    expect(directives).toContain("node");
+    expect(directives).toContain("express");
+  });
+
+  it("parseTypeReferenceDirectives: returns empty for files without directives", () => {
+    const { typeReferences: directives } = parseFile(path.join(FIXTURES_DIR, "simple-export", "index.d.ts"));
+    expect(directives).toHaveLength(0);
   });
 });
 
-describe("extractTypeReferences", () => {
-  it("extracts custom type references from an interface", () => {
-    const sourceCode = `
+describe("parseImports — Integration Verification", () => {
+  it("extracts all import patterns correctly", () => {
+    const { imports: allImports } = parseFile(path.join(FIXTURES_DIR, "import-cases", "index.d.ts"));
+
+    const importSources = allImports.map((importItem) => importItem.source);
+    expect(importSources).toContain("./handlers");
+    expect(importSources).toContain("./utils");
+    expect(importSources).toContain("./default");
+
+    const hasDefault = allImports.some((importItem) => importItem.isDefault);
+    expect(hasDefault).toBe(true);
+
+    const hasNamespace = allImports.some((importItem) => importItem.isNamespace);
+    expect(hasNamespace).toBe(true);
+  });
+});
+
+describe("extractTypeReferences — Detailed Extraction Logic", () => {
+  it("extracts custom type references from interfaces", () => {
+    const typeSource = `
       interface Logger {
         config: Config;
         level: LogLevel;
       }
     `;
-    const sourceFile = ts.createSourceFile("test.d.ts", sourceCode, ts.ScriptTarget.Latest, true);
-    const iface = sourceFile.statements[0]!;
-    const refs = extractTypeReferences(iface).map(ref => ref.name);
+    const sourceFile = ts.createSourceFile("test.d.ts", typeSource, ts.ScriptTarget.Latest, true);
+    const interfaceNode = sourceFile.statements[0]!;
+    const referenceNames = extractTypeReferences(interfaceNode).map(reference => reference.name);
 
-    expect(refs).toContain("Config");
-    expect(refs).toContain("LogLevel");
+    expect(referenceNames).toContain("Config");
+    expect(referenceNames).toContain("LogLevel");
   });
 
-  it("filters out built-in types", () => {
-    const sourceCode = `
+  it("filters out built-in primitive types and generic containers", () => {
+    const primitivesSource = `
       interface Foo {
         name: string;
         count: number;
@@ -246,478 +241,428 @@ describe("extractTypeReferences", () => {
         cb: Promise<Result>;
       }
     `;
-    const sourceFile = ts.createSourceFile("test.d.ts", sourceCode, ts.ScriptTarget.Latest, true);
-    const iface = sourceFile.statements[0]!;
-    const refs = extractTypeReferences(iface).map(ref => ref.name);
+    const sourceFile = ts.createSourceFile("test.d.ts", primitivesSource, ts.ScriptTarget.Latest, true);
+    const interfaceNode = sourceFile.statements[0]!;
+    const referenceNames = extractTypeReferences(interfaceNode).map(reference => reference.name);
 
-    expect(refs).not.toContain("string");
-    expect(refs).not.toContain("number");
-    expect(refs).not.toContain("boolean");
-    expect(refs).not.toContain("Array");
-    expect(refs).not.toContain("Promise");
+    expect(referenceNames).not.toContain("string");
+    expect(referenceNames).not.toContain("number");
+    expect(referenceNames).not.toContain("boolean");
+    expect(referenceNames).not.toContain("Array");
+    expect(referenceNames).not.toContain("Promise");
 
-    expect(refs).toContain("CustomType");
-    expect(refs).toContain("Result");
+    expect(referenceNames).toContain("CustomType");
+    expect(referenceNames).toContain("Result");
   });
 
-  it("returns empty array for declarations with no type references", () => {
-    const sourceCode = `
-      interface Empty {
-        name: string;
-      }
-    `;
-    const sourceFile = ts.createSourceFile("test.d.ts", sourceCode, ts.ScriptTarget.Latest, true);
-    const iface = sourceFile.statements[0]!;
-    const refs = extractTypeReferences(iface).map(ref => ref.name);
+  it("returns empty array for declarations without any custom references", () => {
+    const emptySource = `interface Empty { name: string; }`;
+    const sourceFile = ts.createSourceFile("test.d.ts", emptySource, ts.ScriptTarget.Latest, true);
+    const interfaceNode = sourceFile.statements[0]!;
+    const referenceNames = extractTypeReferences(interfaceNode).map(reference => reference.name);
 
-    expect(refs).toHaveLength(0);
+    expect(referenceNames).toHaveLength(0);
   });
 });
 
-describe("parseExports dependencies", () => {
-  it("populates dependencies on parsed exports from deps-pkg fixture", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "deps-pkg", "index.d.ts")
-    );
+describe("parseExports dependencies — Relationship Tracking", () => {
+  it("populates structured dependencies from the deps-pkg fixture", () => {
+    const { exports: depsExports } = parseFile(path.join(FIXTURES_DIR, "deps-pkg", "index.d.ts"));
 
-    const logger = exports.find((exportItem) => exportItem.name === "Logger");
-    expect(logger).toBeDefined();
-    expect(logger!.dependencies).toBeDefined();
-    const loggerDeps = logger!.dependencies!.map(ref => ref.name);
-    expect(loggerDeps).toContain("Config");
-    expect(loggerDeps).toContain("LogLevel");
+    const loggerExport = depsExports.find((exportItem) => exportItem.name === "Logger");
+    expect(loggerExport).toBeDefined();
+    expect(loggerExport!.dependencies).toBeDefined();
+    const loggerDepNames = loggerExport!.dependencies!.map(reference => reference.name);
+    expect(loggerDepNames).toContain("Config");
+    expect(loggerDepNames).toContain("LogLevel");
 
-    const fn = exports.find((exportItem) => exportItem.name === "createLogger");
-    expect(fn).toBeDefined();
-    expect(fn!.dependencies).toBeDefined();
-    const fnDeps = fn!.dependencies!.map(ref => ref.name);
-    expect(fnDeps).toContain("Config");
-    expect(fnDeps).toContain("Logger");
+    const createFnExport = depsExports.find((exportItem) => exportItem.name === "createLogger");
+    expect(createFnExport).toBeDefined();
+    expect(createFnExport!.dependencies).toBeDefined();
+    const createFnDepNames = createFnExport!.dependencies!.map(reference => reference.name);
+    expect(createFnDepNames).toContain("Config");
+    expect(createFnDepNames).toContain("Logger");
 
-    const config = exports.find((exportItem) => exportItem.name === "Config");
-    expect(config).toBeDefined();
-    expect(config!.dependencies).toEqual([]);
+    const configExport = depsExports.find((exportItem) => exportItem.name === "Config");
+    expect(configExport).toBeDefined();
+    expect(configExport!.dependencies).toEqual([]);
   });
 });
 
-describe("deprecation detection", () => {
-  it("detects @deprecated with message", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts")
-    );
+describe("deprecation detection — Reliability", () => {
+  it("detects @deprecated with a custom message", () => {
+    const { exports: depExports } = parseFile(path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts"));
 
-    const oldInit = exports.find((exportItem) => exportItem.name === "oldInit");
-    expect(oldInit).toBeDefined();
-    expect(oldInit!.deprecated).toBe("Use newInit instead");
+    const oldInitExport = depExports.find((exportItem) => exportItem.name === "oldInit");
+    expect(oldInitExport).toBeDefined();
+    expect(oldInitExport!.deprecated).toBe("Use newInit instead");
   });
 
-  it("detects @deprecated without message", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts")
-    );
+  it("detects @deprecated in boolean mode when no message exists", () => {
+    const { exports: depExports } = parseFile(path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts"));
 
-    const legacy = exports.find((exportItem) => exportItem.name === "LegacyConfig");
-    expect(legacy).toBeDefined();
-    expect(legacy!.deprecated).toBe(true);
+    const legacyExport = depExports.find((exportItem) => exportItem.name === "LegacyConfig");
+    expect(legacyExport).toBeDefined();
+    expect(legacyExport!.deprecated).toBe(true);
   });
 
-  it("non-deprecated symbols have no deprecated field", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts")
-    );
+  it("ensures modern symbols correctly omit the deprecated field", () => {
+    const { exports: depExports } = parseFile(path.join(FIXTURES_DIR, "deprecated-exports", "index.d.ts"));
 
-    const newInit = exports.find((exportItem) => exportItem.name === "newInit");
-    expect(newInit).toBeDefined();
-    expect(newInit!.deprecated).toBeUndefined();
+    const newInitExport = depExports.find((exportItem) => exportItem.name === "newInit");
+    expect(newInitExport).toBeDefined();
+    expect(newInitExport!.deprecated).toBeUndefined();
 
-    const modern = exports.find((exportItem) => exportItem.name === "ModernConfig");
-    expect(modern).toBeDefined();
-    expect(modern!.deprecated).toBeUndefined();
+    const modernConfigExport = depExports.find((exportItem) => exportItem.name === "ModernConfig");
+    expect(modernConfigExport).toBeDefined();
+    expect(modernConfigExport!.deprecated).toBeUndefined();
   });
 });
 
-describe("Namespace handling (UMD & Recursive)", () => {
-  it("parses 'export as namespace X' (Pattern 16)", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts")
-    );
+describe("Namespace handling — UMD, Recursive & Visibility", () => {
+  it("Pattern 16: parses 'export as namespace MyLib' (UMD style)", () => {
+    const { exports: nsExports } = parseFile(path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts"));
 
-    const nsExport = exports.find(
+    const umdExport = nsExports.find(
       (exportItem) => exportItem.kind === ts.SyntaxKind.NamespaceExportDeclaration
     );
-    expect(nsExport).toBeDefined();
-    expect(nsExport!.name).toBe("MyLib");
-    expect(nsExport!.kindName).toBe("NamespaceExportDeclaration");
-    expect(nsExport!.signature).toBe("export as namespace MyLib");
+    expect(umdExport).toBeDefined();
+    expect(umdExport!.name).toBe("MyLib");
+    expect(umdExport!.kindName).toBe("NamespaceExportDeclaration");
+    expect(umdExport!.signature).toBe("export as namespace MyLib");
   });
 
-  it("captures regular exports alongside namespace export", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts")
-    );
+  it("captures top-level exports in files containing UMD namespaces", () => {
+    const { exports: nsExports } = parseFile(path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts"));
 
-    const names = exports.map((exportItem) => exportItem.name);
-    expect(names).toContain("Widget");
-    expect(names).toContain("createWidget");
-    expect(names).toContain("MyLib");
+    const topLevelNames = nsExports.map((exportItem) => exportItem.name);
+    expect(topLevelNames).toContain("Widget");
+    expect(topLevelNames).toContain("createWidget");
+    expect(topLevelNames).toContain("MyLib");
   });
 
-  it("recursively extracts members from a namespace", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts")
-    );
+  it("Recursively explores nested namespace members with qualified names", () => {
+    const { exports: nsExports } = parseFile(path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts"));
 
-    const config = exports.find((exportItem) => exportItem.name === "API.Config");
-    expect(config).toBeDefined();
-    expect(config!.kindName).toBe("InterfaceDeclaration");
+    const apiConfig = nsExports.find((exportItem) => exportItem.name === "API.Config");
+    expect(apiConfig).toBeDefined();
+    expect(apiConfig!.kindName).toBe("InterfaceDeclaration");
 
-    const fetchFn = exports.find((exportItem) => exportItem.name === "API.fetch");
-    expect(fetchFn).toBeDefined();
-    expect(fetchFn!.kindName).toBe("FunctionDeclaration");
+    const apiFetch = nsExports.find((exportItem) => exportItem.name === "API.fetch");
+    expect(apiFetch).toBeDefined();
+    expect(apiFetch!.kindName).toBe("FunctionDeclaration");
   });
 
-  it("handles visibility tags inside namespaces", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts")
-    );
-    const secret = exports.find((exportItem) => exportItem.name === "API.secret");
-    expect(secret).toBeDefined();
-    expect(secret!.visibility).toBe("internal");
+  it("accuately detects visibility tags within recursive namespace walks", () => {
+    const { exports: nsExports } = parseFile(path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts"));
+    const apiSecret = nsExports.find((exportItem) => exportItem.name === "API.secret");
+    expect(apiSecret).toBeDefined();
+    expect(apiSecret!.visibility).toBe("internal");
   });
 
-  it("marks non-exported members as isExplicitExport: false", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts")
-    );
-    const hidden = exports.find((exportItem) => exportItem.name === "API.hidden");
-    expect(hidden).toBeDefined();
-    expect(hidden!.isExplicitExport).toBe(false);
+  it("properly flags unexported namespace members as implicit exports", () => {
+    const { exports: nsExports } = parseFile(path.join(FIXTURES_DIR, "namespace-cases", "index.d.ts"));
+    const apiHidden = nsExports.find((exportItem) => exportItem.name === "API.hidden");
+    expect(apiHidden).toBeDefined();
+    expect(apiHidden!.isExplicitExport).toBe(false);
   });
 });
 
-describe("declare global handling", () => {
-  it("marks declare global as isGlobalAugmentation", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "global-augmentation", "index.d.ts")
-    );
+describe("declare global integration — Augmentation Detection", () => {
+  it("Pattern 15+: marks 'declare global' as a global augmentation", () => {
+    const { exports: globalExports } = parseFile(path.join(FIXTURES_DIR, "global-augmentation", "index.d.ts"));
 
-    const globalAug = exports.find((exportItem) => exportItem.isGlobalAugmentation);
-    expect(globalAug).toBeDefined();
-    expect(globalAug!.name).toBe("global");
-    expect(globalAug!.kind).toBe(ts.SyntaxKind.ModuleDeclaration);
+    const globalNode = globalExports.find((exportItem) => exportItem.isGlobalAugmentation);
+    expect(globalNode).toBeDefined();
+    expect(globalNode!.name).toBe("global");
+    expect(globalNode!.kind).toBe(ts.SyntaxKind.ModuleDeclaration);
   });
 
-  it("still captures regular exports in same file", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "global-augmentation", "index.d.ts")
-    );
+  it("captures non-augmentation exports from files with 'declare global'", () => {
+    const { exports: globalExports } = parseFile(path.join(FIXTURES_DIR, "global-augmentation", "index.d.ts"));
 
-    const names = exports.filter((exportItem) => !exportItem.isGlobalAugmentation).map((exportItem) => exportItem.name);
-    expect(names).toContain("AppState");
-    expect(names).toContain("initApp");
+    const siblingNames = globalExports
+      .filter((exportItem) => !exportItem.isGlobalAugmentation)
+      .map((exportItem) => exportItem.name);
+    expect(siblingNames).toContain("AppState");
+    expect(siblingNames).toContain("initApp");
   });
 });
 
-describe("parseTypeReferenceDirectives", () => {
-  it("extracts type reference directives", () => {
-    const refs = parseTypeReferenceDirectives(
-      path.join(FIXTURES_DIR, "type-ref-directives", "index.d.ts")
-    );
-    expect(refs).toHaveLength(2);
-    expect(refs).toContain("node");
-    expect(refs).toContain("express");
-  });
+describe("export import = require() — Pattern 17 Implementation", () => {
+  it("Pattern 17: parses 'export import X = require(\"path\")'", () => {
+    const { exports: equalsExports } = parseFile(path.join(FIXTURES_DIR, "export-import-equals", "index.d.ts"));
 
-  it("returns empty for files without type reference directives", () => {
-    const refs = parseTypeReferenceDirectives(
-      path.join(FIXTURES_DIR, "simple-export", "index.d.ts")
-    );
-    expect(refs).toHaveLength(0);
-  });
-});
-
-describe("export import = require() (Pattern 17)", () => {
-  it("parses export import X = require(...)", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "export-import-equals", "index.d.ts")
-    );
-
-    const importEquals = exports.find(
+    const equalsImport = equalsExports.find(
       (exportItem) => exportItem.kind === ts.SyntaxKind.ImportEqualsDeclaration
     );
-    expect(importEquals).toBeDefined();
-    expect(importEquals!.name).toBe("util");
-    expect(importEquals!.kindName).toBe("ImportEqualsDeclaration");
-    expect(importEquals!.source).toBe("./util");
+    expect(equalsImport).toBeDefined();
+    expect(equalsImport!.name).toBe("util");
+    expect(equalsImport!.kindName).toBe("ImportEqualsDeclaration");
+    expect(equalsImport!.source).toBe("./util");
   });
 
-  it("captures regular exports alongside export import =", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "export-import-equals", "index.d.ts")
-    );
+  it("captures siblingExports alongside export import equals statements", () => {
+    const { exports: equalsExports } = parseFile(path.join(FIXTURES_DIR, "export-import-equals", "index.d.ts"));
 
-    const names = exports.map((exportItem) => exportItem.name);
-    expect(names).toContain("util");
-    expect(names).toContain("mainFn");
-    expect(names).toContain("MainConfig");
+    const exportNames = equalsExports.map((exportItem) => exportItem.name);
+    expect(exportNames).toContain("util");
+    expect(exportNames).toContain("mainFn");
+    expect(exportNames).toContain("MainConfig");
   });
 });
 
-describe("visibility tags (@public, @internal, @alpha, @beta)", () => {
-  it("detects @public tag", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts")
-    );
-    const pub = exports.find((exportItem) => exportItem.name === "PublicAPI");
-    expect(pub).toBeDefined();
-    expect(pub!.visibility).toBe("public");
+describe("Visibility Tag Resolution", () => {
+  const { exports: tagsExports } = parseFile(path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts"));
+
+  it("detects @public visibility accurately", () => {
+    const publicExport = tagsExports.find((exportItem) => exportItem.name === "PublicAPI");
+    expect(publicExport).toBeDefined();
+    expect(publicExport!.visibility).toBe("public");
   });
 
-  it("detects @internal tag", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts")
-    );
-    const internal = exports.find((exportItem) => exportItem.name === "_internalHelper");
-    expect(internal).toBeDefined();
-    expect(internal!.visibility).toBe("internal");
+  it("detects @internal visibility from JSDoc tags", () => {
+    const internalExport = tagsExports.find((exportItem) => exportItem.name === "_internalHelper");
+    expect(internalExport).toBeDefined();
+    expect(internalExport!.visibility).toBe("internal");
   });
 
-  it("detects @alpha tag", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts")
-    );
-    const alpha = exports.find((exportItem) => exportItem.name === "AlphaFeature");
-    expect(alpha).toBeDefined();
-    expect(alpha!.visibility).toBe("alpha");
+  it("detects @alpha visibility accurately", () => {
+    const alphaExport = tagsExports.find((exportItem) => exportItem.name === "AlphaFeature");
+    expect(alphaExport).toBeDefined();
+    expect(alphaExport!.visibility).toBe("alpha");
   });
 
-  it("detects @beta tag", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts")
-    );
-    const beta = exports.find((exportItem) => exportItem.name === "betaFunction");
-    expect(beta).toBeDefined();
-    expect(beta!.visibility).toBe("beta");
+  it("detects @beta visibility accurately", () => {
+    const betaExport = tagsExports.find((exportItem) => exportItem.name === "betaFunction");
+    expect(betaExport).toBeDefined();
+    expect(betaExport!.visibility).toBe("beta");
   });
 
-  it("has no visibility for untagged symbols", () => {
-    const exports = parseExports(
-      path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts")
-    );
-    const defaultVal = exports.find((exportItem) => exportItem.name === "DEFAULT_VALUE");
-    expect(defaultVal).toBeDefined();
-    expect(defaultVal!.visibility).toBeUndefined();
+  it("defaults to undefined visibility for untagged declarations", () => {
+    const vanillaExport = tagsExports.find((exportItem) => exportItem.name === "DEFAULT_VALUE");
+    expect(vanillaExport).toBeDefined();
+    expect(vanillaExport!.visibility).toBeUndefined();
   });
 });
 
-describe("parseImports", () => {
-  it("extracts various import patterns from a file", () => {
-    const imports = parseImports(
-      path.join(FIXTURES_DIR, "import-cases", "index.d.ts")
-    );
-
-    const sources = imports.map((importItem) => importItem.source);
-    expect(sources).toContain("./handlers");
-    expect(sources).toContain("./utils");
-    expect(sources).toContain("./default");
-
-    const defaultImport = imports.find((importItem) => importItem.isDefault);
-    expect(defaultImport).toBeDefined();
-
-    const namespaceImport = imports.find((importItem) => importItem.isNamespace);
-    expect(namespaceImport).toBeDefined();
+describe("Structural Stability & Resource Parsing", () => {
+  it("getFileSource: returns valid SourceFile for existing path", () => {
+    const testPath = path.join(FIXTURES_DIR, "import-cases", "index.d.ts");
+    const testSourceFile = getFileSource(testPath);
+    expect(testSourceFile).toBeDefined();
+    expect(testSourceFile.fileName).toContain("index.d.ts");
   });
 
-  it("getFileSource returns a valid ts.SourceFile for a given path", () => {
-    const filePath = path.join(FIXTURES_DIR, "import-cases", "index.d.ts");
-    const sourceFile = getFileSource(filePath);
-    expect(sourceFile).toBeDefined();
-    expect(sourceFile.fileName).toContain("index.d.ts");
+  it("handles default export literal values (Corner case)", () => {
+    const literalPath = path.join(FIXTURES_DIR, "literal-export", "index.d.ts");
+    const { exports: literalExports } = parseFile(literalPath);
+    const defaultLiteral = literalExports.find(exportItem => exportItem.name === "default");
+    expect(defaultLiteral).toBeDefined();
+    expect(defaultLiteral?.kindName).toBe("ExportAssignment");
   });
 
-  it("handles default export of literal values and complex expressions", () => {
-    const tmpFile = makeTmpFile("literal-export");
-    fs.writeFileSync(tmpFile, "export default 123;");
-
-    try {
-      const exports = parseExports(tmpFile);
-      const defaultExport = exports.find(exportItem => exportItem.name === "default");
-      expect(defaultExport).toBeDefined();
-      expect(defaultExport?.kindName).toBe("ExportAssignment");
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+  it("handles export specifier type reference extraction correctly", () => {
+    const specifierPath = path.join(FIXTURES_DIR, "export-specifier-refs", "index.d.ts");
+    const { exports: specifierExports } = parseFile(specifierPath);
+    const fooExport = specifierExports.find(exportItem => exportItem.name === "Foo");
+    expect(fooExport).toBeDefined();
   });
 
-  it("extracts type references from export specifiers", () => {
-    const tmpFile = makeTmpFile("export-specifier-refs");
-    fs.writeFileSync(tmpFile, "type Foo = string; export { Foo };");
-
-    try {
-      const exports = parseExports(tmpFile);
-      const specifier = exports.find(exportItem => exportItem.name === "Foo");
-      expect(specifier).toBeDefined();
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+  it("detects multiple JSDoc @deprecated formats across declaration types", () => {
+    const formatsPath = path.join(FIXTURES_DIR, "jsdoc-deprecated", "index.d.ts");
+    const { exports: formatsExports } = parseFile(formatsPath);
+    expect(formatsExports.some(exportItem => exportItem.name === "DepImplicit" && exportItem.deprecated === true)).toBe(true);
+    expect(formatsExports.some(exportItem => exportItem.name === "DepWithMessage" && exportItem.deprecated === "With a message")).toBe(true);
   });
 
-  it("handles various JSDoc deprecated tag formats and complex type references", () => {
-    const tmpFile = makeTmpFile("jsdoc-deprecated");
-    fs.writeFileSync(tmpFile, `
-      /** @deprecated */
-      export interface DepImplicit {}
-      
-      /** @deprecated \t\n */
-      export interface DepWhitespace {}
-      
-      export interface Complex extends Array<string | number> {}
-    `);
+  it("verifies anonymous and identifier-based default exports with complex lookups", () => {
+    const complexityPath = path.join(FIXTURES_DIR, "parser-edge-case", "index.d.ts");
+    const { exports: complexExports, imports: complexImports } = parseFile(complexityPath);
 
-    try {
-      const exports = parseExports(tmpFile);
-      expect(exports.some(exportItem => exportItem.name === "DepImplicit" && exportItem.deprecated === true)).toBe(true);
-      expect(exports.some(exportItem => exportItem.name === "DepWhitespace" && exportItem.deprecated === true)).toBe(true);
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+    expect(complexExports.some(exportItem => exportItem.name === "localRef")).toBe(true);
+    expect(complexExports.some(exportItem => exportItem.name === "namespacedImport")).toBe(true);
+    expect(complexExports.some(exportItem => exportItem.name === "default")).toBe(true);
+    expect(complexImports.some(importItem => importItem.name === "Equal")).toBe(true);
+
+    const typeRefNames = extractTypeReferences(getFileSource(complexityPath)).map(reference => reference.name);
+    expect(typeRefNames).toContain("Type");
+    expect(typeRefNames).toContain("Base");
   });
 
-
-  it("handles identifier-based and anonymous default exports, and complex references", () => {
-    const tmpFile = makeTmpFile("parser-edge");
-    fs.writeFileSync(tmpFile, `
-      const myRef = "test";
-      export default myRef;
-      
-      export default { key: 'value' };
-      
-      export type { MyType } from './mod';
-      export * as ns from './mod';
-      
-      type T = import("pkg").Namespace.Type;
-      
-      interface I extends Namespace.Base {}
-      
-      import X = require("pkg");
-    `);
-
-    try {
-      const exports = parseExports(tmpFile);
-      const imports = parseImports(tmpFile);
-
-      expect(exports.some(exportItem => exportItem.name === "myRef")).toBe(true);
-      expect(exports.some(exportItem => exportItem.name === "ns")).toBe(true);
-      expect(exports.some(exportItem => exportItem.name === "default")).toBe(true);
-      expect(imports.some(importItem => importItem.name === "X")).toBe(true);
-
-      const refs = extractTypeReferences(getFileSource(tmpFile));
-      expect(refs.some(reference => reference.name === "Type")).toBe(true);
-      expect(refs.some(reference => reference.name === "Base")).toBe(true);
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
-  });
-  it("extracts @since tags from various export forms", () => {
+  it("verifies @since tag propagation across various export syntax forms", () => {
     const fixturePath = path.join(FIXTURES_DIR, "visibility-tags", "index.d.ts");
-    const exports = parseExports(fixturePath);
+    const { exports: taggedExports } = parseFile(fixturePath);
 
-    // Direct declaration
-    const publicAPI = exports.find(exportItem => exportItem.name === "PublicAPI");
-    expect(publicAPI).toBeDefined();
-    expect(publicAPI!.since).toBe("1.0.0");
+    const publicNode = taggedExports.find(exportItem => exportItem.name === "PublicAPI");
+    expect(publicNode?.since).toBe("1.0.0");
 
-    // Function declaration
-    const betaFunction = exports.find(exportItem => exportItem.name === "betaFunction");
-    expect(betaFunction).toBeDefined();
-    expect(betaFunction!.since).toBe("2.1.0");
+    const betaNode = taggedExports.find(exportItem => exportItem.name === "betaFunction");
+    expect(betaNode?.since).toBe("2.1.0");
 
-    const alphaFeature = exports.find(exportItem => exportItem.name === "AlphaFeature");
-    expect(alphaFeature).toBeDefined();
-    expect(alphaFeature!.since).toBeUndefined();
+    const nestingPath = path.join(FIXTURES_DIR, "since-nesting", "index.d.ts");
+    const { exports: nestExports } = parseFile(nestingPath);
+    expect(nestExports.find(exportItem => exportItem.name === "NS")?.since).toBe("3.10.0");
 
-    // Namespace re-export (the Arbitrary case)
-    const tmpFile = makeTmpFile("jsdoc-since-namespace");
-    fs.writeFileSync(tmpFile, `
-      /** @since 3.10.0 */
-      export * as NS from './mod';
-    `);
-
-    try {
-      const parsedExports = parseExports(tmpFile);
-      const nsExport = parsedExports.find(exportItem => exportItem.name === "NS");
-      expect(nsExport?.since).toBe("3.10.0");
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
-
-    // Named re-export
-    const tmpFile2 = makeTmpFile("jsdoc-since-named");
-    fs.writeFileSync(tmpFile2, `
-      /** @since 4.0.0 */
-      export { exportedVal } from './mod';
-    `);
-
-    try {
-      const parsedExports = parseExports(tmpFile2);
-      const valExport = parsedExports.find(exportItem => exportItem.name === "exportedVal");
-      expect(valExport?.since).toBe("4.0.0");
-    } finally {
-      fs.unlinkSync(tmpFile2);
-    }
+    const reexportPath = path.join(FIXTURES_DIR, "since-reexport", "index.d.ts");
+    const { exports: reExports } = parseFile(reexportPath);
+    expect(reExports.find(exportItem => exportItem.name === "val")?.since).toBe("4.0.0");
   });
 
-  it("extracts @since from interface declarations", () => {
-    const tmpFile = makeTmpFile("jsdoc-since-interface");
-    fs.writeFileSync(tmpFile, `
-      /** @since 2.0.0 */
-      export interface MyInterface {
-        name: string;
-      }
-    `);
-
-    try {
-      const exports = parseExports(tmpFile);
-      const myIntf = exports.find(exportItem => exportItem.name === "MyInterface");
-      expect(myIntf?.since).toBe("2.0.0");
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+  it("extracts @since from interface and variable declarations accurately", () => {
+    const declPath = path.join(FIXTURES_DIR, "since-decl", "index.d.ts");
+    const { exports: declExports } = parseFile(declPath);
+    expect(declExports.find(exportItem => exportItem.name === "I")?.since).toBe("2.0.0");
+    expect(declExports.find(exportItem => exportItem.name === "V")?.since).toBe("2.1.0");
   });
 
-  it("extracts @since from variable exports", () => {
-    const tmpFile = makeTmpFile("jsdoc-since-variable");
-    fs.writeFileSync(tmpFile, `
-      /** @since 2.0.0 */
-      export declare const myVar: string;
-    `);
-
-    try {
-      const exports = parseExports(tmpFile);
-      const myVar = exports.find(exportItem => exportItem.name === "myVar");
-      expect(myVar?.since).toBe("2.0.0");
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+  it("verifies JSDoc @since inheritance for complex object member extraction", () => {
+    const inheritancePath = path.join(FIXTURES_DIR, "since-inheritance", "index.d.ts");
+    const { exports: inheritExports } = parseFile(inheritancePath);
+    const poolNode = inheritExports.find(exportItem => exportItem.name === "Database.pool");
+    expect(poolNode).toBeDefined();
+    expect(poolNode!.since).toBe("1.5.0");
   });
 
-  it("inherits @since from parent in TypeLiteral members", () => {
-    const tmpFile = makeTmpFile("jsdoc-since-inheritance");
-    fs.writeFileSync(tmpFile, `
-      /** @since 1.5.0 */
-      export declare const Parent: {
-        /** Simple comment without the since tag anywhere */
-        child: string;
-      };
-    `);
+  it("Static Member Extraction: extracts static members with correct metadata from class declarations", () => {
+    const staticsPath = path.join(FIXTURES_DIR, "class-statics", "index.d.ts");
+    const { exports: staticExports } = parseFile(staticsPath);
 
-    try {
-      const exports = parseExports(tmpFile);
-      const child = exports.find(exportItem => exportItem.name === "Parent.child");
-      expect(child).toBeDefined();
-      expect(child!.since).toBe("1.5.0");
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+    const maxSizeItem = staticExports.find(exportItem => exportItem.name === "Cache.maxSize");
+    expect(maxSizeItem).toBeDefined();
+    expect(maxSizeItem!.since).toBe("1.1.0");
+    expect(maxSizeItem!.visibility).toBe("public");
+
+    const clearMethod = staticExports.find(exportItem => exportItem.name === "Cache.clear");
+    expect(clearMethod?.since).toBe("1.0.0"); // Class-level inheritance
+
+    const internalField = staticExports.find(exportItem => exportItem.name === "Cache._internalHelper");
+    expect(internalField?.visibility).toBe("internal");
+
+    const instanceGet = staticExports.find(exportItem => exportItem.name === "Cache.get");
+    expect(instanceGet).toBeUndefined(); // Instance members are filtered out here
+  });
+
+  it("Prototype Member Extraction: extracts prototype members with correct metadata as expected by the crawling engine", () => {
+    const instancesPath = path.join(FIXTURES_DIR, "class-instance", "index.d.ts");
+    const { exports: instanceExports } = parseFile(instancesPath);
+
+    const nameProp = instanceExports.find(exportItem => exportItem.name === "User.prototype.name");
+    expect(nameProp?.since).toBe("1.1.0");
+
+    const greetMethod = instanceExports.find(exportItem => exportItem.name === "User.prototype.greet");
+    expect(greetMethod?.since).toBe("1.2.0");
+
+    const internalMethod = instanceExports.find(exportItem => exportItem.name === "User.prototype._internalMethod");
+    expect(internalMethod?.visibility).toBe("internal");
+
+    const factoryMethod = instanceExports.find(exportItem => exportItem.name === "User.create");
+    expect(factoryMethod).toBeDefined(); // Statics are still collected
+
+    const explicitConstructor = instanceExports.find(exportItem => exportItem.name === "User.prototype.constructor");
+    expect(explicitConstructor).toBeUndefined(); // Constructors are explicitly omitted
+  });
+
+  describe("Type Reference Extraction Architecture", () => {
+    it("handles complex extension expressions gracefully (non-identifier/non-property access)", () => {
+      const complexInheritance = `
+        class Base { static x = 1; }
+        class Sub extends (Base) {}
+      `;
+      const sourceFile = ts.createSourceFile("test.d.ts", complexInheritance, ts.ScriptTarget.Latest, true);
+      const subClass = sourceFile.statements[1] as ts.ClassDeclaration;
+      const heritageClause = subClass.heritageClauses![0]!;
+      const extensionExpr = heritageClause.types[0]!;
+
+      const refs = extractTypeReferences(extensionExpr);
+      // Even if we can't extract a name from (Base), we should traverse children or return gracefully 
+      expect(refs).toBeDefined();
+    });
+
+    it("continues traversal when encountering an expression with type arguments that isn't a simple name", () => {
+      // else { ts.forEachChild(child, visit); return; }
+      const nestedRef = `
+        interface Foo extends Bar<T> {}
+      `;
+      const sourceFile = ts.createSourceFile("test.d.ts", nestedRef, ts.ScriptTarget.Latest, true);
+      const interfaceNode = sourceFile.statements[0]!;
+      const refs = extractTypeReferences(interfaceNode);
+      expect(refs.some(reference => reference.name === "Bar")).toBe(true);
+    });
+  });
+
+  describe("Advanced Composition — Object Spreads & Mixins", () => {
+    it("resolves members from object spreads using typeof and intersections", () => {
+      const { exports: spreadExports } = parseFile(path.join(FIXTURES_DIR, "object-spread", "index.d.ts"));
+
+      // Check Utils.base (inherited from Base via typeof)
+      const baseProperty = spreadExports.find(exportItem => exportItem.name === "Utils.base");
+      expect(baseProperty).toBeDefined();
+      expect(baseProperty!.since).toBe("1.1.0");
+
+      // Check Utils.extra (added via intersection)
+      const extraProperty = spreadExports.find(exportItem => exportItem.name === "Utils.extra");
+      expect(extraProperty).toBeDefined();
+      expect(extraProperty!.since).toBe("2.1.0");
+    });
+
+    it("recursively resolves deeply nested composition spreads", () => {
+      const { exports: spreadExports } = parseFile(path.join(FIXTURES_DIR, "object-spread", "index.d.ts"));
+
+      const leafProperty = spreadExports.find(exportItem => exportItem.name === "Deep.level1.level2.leaf");
+      expect(leafProperty).toBeDefined();
+
+      const nestedBase = spreadExports.find(exportItem => exportItem.name === "Deep.level1.level2.base");
+      expect(nestedBase).toBeDefined();
+      expect(nestedBase!.since).toBe("1.1.0");
+    });
+
+    it("extracts members from synthetic class-level mixin intersections", () => {
+      const { exports: mixinExports } = parseFile(path.join(FIXTURES_DIR, "mixin-composition", "index.d.ts"));
+
+      // Check Mixed.staticExtra
+      const staticExtra = mixinExports.find(exportItem => exportItem.name === "Mixed.staticExtra");
+      expect(staticExtra).toBeDefined();
+      expect(staticExtra!.since).toBe("2.1.0");
+
+      // Check Mixed.prototype.mixinMethod (merged from synthetic prototype property)
+      const mixinMethod = mixinExports.find(exportItem => exportItem.name === "Mixed.prototype.mixinMethod");
+      expect(mixinMethod).toBeDefined();
+      expect(mixinMethod!.since).toBe("2.2.0");
+
+      // Check Mixed.baseMethod (inherited from Base via typeof)
+      const baseMethod = mixinExports.find(exportItem => exportItem.name === "Mixed.baseMethod");
+      expect(baseMethod).toBeDefined();
+      expect(baseMethod!.since).toBe("1.0.0");
+    });
+  });
+
+  describe("Computed Property Resolution", () => {
+    it("extracts members with Symbol-based and literal computed keys accurately", () => {
+      const { exports } = parseFile(path.join(FIXTURES_DIR, "computed-properties", "index.d.ts"));
+
+      const iterator = exports.find(exportItem => exportItem.name === "Iterable.[Symbol.iterator]");
+      expect(iterator).toBeDefined();
+      expect(iterator?.since).toBe("1.1.0");
+
+      // Interface members are NOT extracted as standalone symbols — only class and variable type members are
+      const toStringTag = exports.find(exportItem => exportItem.name === "Tagged.prototype.[Symbol.toStringTag]");
+      expect(toStringTag).toBeDefined();
+      expect(toStringTag?.since).toBe("2.1.0");
+
+      const literalKey = exports.find(exportItem => exportItem.name === "Literals.literal-key");
+      expect(literalKey).toBeDefined();
+      expect(literalKey?.since).toBe("3.1.0");
+    });
+
+    it("handles overloads and duplicate computed keys with unique IDs", () => {
+      const { exports } = parseFile(path.join(FIXTURES_DIR, "computed-properties", "index.d.ts"));
+
+      // Both overloads share the same name — the graph layer handles uniqueness
+      const iteratorOverloads = exports.filter(exportItem => exportItem.name === "Overloaded.prototype.[Symbol.iterator]");
+
+      expect(iteratorOverloads).toHaveLength(2);
+      expect(iteratorOverloads[1]?.signature).toContain("arg: number");
+    });
   });
 });

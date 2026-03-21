@@ -22,8 +22,18 @@ Use dynamic temps when:
 - The file content is intentionally invalid (corrupt JSON)
 - The test is platform-specific
 
-### Naming
+### Generic Notation (The "Noten" Concept)
 
-- Static fixtures use `kebab-case` names (e.g., `subpath-exports/`)
-- Dynamic temps use `nci-test-` prefix in `os.tmpdir()` (e.g., `nci-test-broken-symlink`)
-- The `.gitignore` includes `__*` as a safety net for any leftover temp dirs
+All fixtures and test symbols must use **functional, purpose-driven notation**. This ensures that the test suite decoupled from implementation details.
+
+1.  **Fixtures**: Names must describe the technical scenario (e.g., `complex-wildcard-subpaths`), not the development status (❌ `resolver-final-gap`) or internal branch (❌ `resolver-branch-test`).
+2.  **Comments**: Avoid referencing line numbers or coverage metrics. Use descriptions of the behavior being verified (e.g., "Verifies recursive wildcard success" instead of ❌ "Triggers Line 343").
+3.  **Symbols**: All test variables and objects must have descriptive roles. Use `mockPackageJson` or `fixturePath` instead of single-letter variables (❌ `p`, `f`).
+
+### Test Descriptions
+
+`describe` and `it` blocks must use generic, purpose-driven language. They should describe **what** the code solves or **how** it behaves, rather than referencing internal metrics like "coverage" or implementation details like "testing the if statement."
+
+**Example**:
+- ❌ `it("hits the else branch in parseFile for coverage")`
+- ✅ `it("handles missing module specifiers gracefully")`

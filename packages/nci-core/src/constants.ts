@@ -35,3 +35,6 @@ export const DECLARATION_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.ModuleDeclaration,
   ts.SyntaxKind.VariableStatement,
 ]);
+
+/** The maximum recursion depth for complex type expansion (Object Spreads & Mixins) */
+export const MAX_RECURSION_DEPTH = 10;

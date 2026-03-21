@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import { parseFile, parseTripleSlashReferences, parseTypeReferenceDirectives } from "./parser.js";
+import { parseFile } from "./parser.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
 import { DEFAULT_MAX_DEPTH } from "./constants.js";
@@ -40,6 +40,7 @@ export function crawl(
 
   const allRawExports = new Map<string, ParsedExport[]>();
   const allRawImports = new Map<string, ParsedImport[]>();
+  const allRawReferences = new Map<string, string[]>();
   const discoveryPathSet = new Set<string>();
   const discoveryPathStack: string[] = [];
   const resolutionPath = new Set<string>();
@@ -113,13 +114,12 @@ export function crawl(
     discoveryPathSet.add(normalizedPath);
     discoveryPathStack.push(normalizedPath);
 
-    const typeRefDirectives = parseTypeReferenceDirectives(normalizedPath);
+    const { exports: exportEntries, imports: importEntries, references: tripleSlashRefs, typeReferences: typeRefDirectives } = parseFile(normalizedPath);
     for (const pkg of typeRefDirectives) typeRefPackages.add(pkg);
-    const { exports: exportEntries, imports: importEntries } = parseFile(normalizedPath);
     allRawExports.set(normalizedPath, exportEntries);
     allRawImports.set(normalizedPath, importEntries);
+    allRawReferences.set(normalizedPath, tripleSlashRefs);
 
-    const tripleSlashRefs = parseTripleSlashReferences(normalizedPath);
     for (const ref of tripleSlashRefs) {
       const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
       if (refPath) discoverFiles(refPath, depth + 1);
@@ -164,7 +164,7 @@ export function crawl(
     const actualExports = [...rawExports];
     const knownNames = new Set(rawExports.map(entry => entry.name));
 
-    const tripleSlashRefs = parseTripleSlashReferences(normalizedPath);
+    const tripleSlashRefs = allRawReferences.get(normalizedPath) || [];
     for (const ref of tripleSlashRefs) {
       const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
       if (refPath) {
@@ -206,7 +206,11 @@ export function crawl(
 
       if (exportEntry.source) {
         results.push(...resolveReExport(exportEntry, normalizedPath, depth, namePrefix));
-      } else if (exportEntry.kind === ts.SyntaxKind.ExportAssignment || exportEntry.kind === ts.SyntaxKind.ExportDeclaration) {
+      } else if (
+        exportEntry.kind === ts.SyntaxKind.ExportAssignment ||
+        exportEntry.kind === ts.SyntaxKind.ExportDeclaration ||
+        exportEntry.kind === ts.SyntaxKind.ImportEqualsDeclaration
+      ) {
         results.push(...resolveLocalAssignment(exportEntry, localIndex, normalizedPath, namePrefix));
       } else {
         results.push({
@@ -328,26 +332,29 @@ export function crawl(
     const targets = localIndex.get(targetName) || [];
 
     const actualTargets = targets.filter(target => target !== exp);
+    
     if (actualTargets.length === 0) return [];
 
     const results: ResolvedSymbol[] = [];
     const fullName = namePrefix ? `${namePrefix}.${exp.name}` : exp.name;
 
-    const primaryTarget = actualTargets[0]!;
-    results.push({
-      name: fullName,
-      kind: primaryTarget.kind,
-      kindName: primaryTarget.kindName,
-      isTypeOnly: primaryTarget.isTypeOnly,
-      signature: primaryTarget.signature,
-      jsDoc: primaryTarget.jsDoc,
-      definedIn: currentFile,
-      dependencies: primaryTarget.dependencies,
-      deprecated: primaryTarget.deprecated,
-      visibility: primaryTarget.visibility,
-    });
+    for (const target of actualTargets) {
+      results.push({
+        name: fullName,
+        kind: target.kind,
+        kindName: target.kindName,
+        isTypeOnly: target.isTypeOnly,
+        signature: target.signature,
+        jsDoc: target.jsDoc,
+        definedIn: currentFile,
+        dependencies: target.dependencies,
+        deprecated: target.deprecated,
+        visibility: target.visibility,
+        since: target.since,
+      });
+    }
 
-    // Expand namespace members using prefix matching
+    // Expand namespace members using prefix matching for each target
     for (const target of actualTargets) {
       const memberPrefix = target.name + ".";
       const matchingMembers: ParsedExport[] = [];
@@ -357,8 +364,10 @@ export function crawl(
         }
       }
       for (const member of matchingMembers) {
+        const localMemberName = member.name.slice(memberPrefix.length);
+        const newName = namePrefix ? `${namePrefix}.${exp.name}.${localMemberName}` : `${exp.name}.${localMemberName}`;
         results.push({
-          name: namePrefix ? `${namePrefix}.${member.name}` : member.name,
+          name: newName,
           kind: member.kind,
           kindName: member.kindName,
           isTypeOnly: member.isTypeOnly,

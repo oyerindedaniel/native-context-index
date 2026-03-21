@@ -43,6 +43,9 @@ export interface TypeReference {
   importPath?: string;
 }
 
+/** Union of AST nodes that can be expanded for member extraction (Spread, Mixin) */
+export type CompositionNode = ts.TypeNode | ts.ClassDeclaration | ts.InterfaceDeclaration;
+
 /** A single export statement parsed from a .d.ts file */
 export interface ParsedExport {
   /** Symbol name */
@@ -159,6 +162,8 @@ export interface SymbolNode {
   package: string;
   /** File path relative to package root */
   filePath: string;
+  /** Additional files that contribute to this symbol (for multi-file declarations) */
+  additionalFiles?: string[];
   /** Full type signature */
   signature?: string;
   /** JSDoc comment */

@@ -1,0 +1,16 @@
+{
+  "name": "complex-wildcard-subpaths",
+  "exports": {
+    "./multi/*": {
+      "types": "./dist/*/*.d.ts"
+    },
+    "./root/*": {
+      "types": "./*.d.ts"
+    },
+    "./nest/*": {
+      "import": {
+        "types": "./dist/*.d.ts"
+      }
+    }
+  }
+}

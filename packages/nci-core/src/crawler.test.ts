@@ -241,10 +241,13 @@ describe("crawl", () => {
     };
     const packageGraph = buildPackageGraph(packageInfo);
 
-    expect(packageGraph.totalSymbols).toBe(2);
+    // Total symbols: Server (class), ServerOptions (interface),
+    // plus Server.prototype.listen, Server.prototype.close (class members)
+    // plus ServerOptions.port, ServerOptions.host (interface members)
+    expect(packageGraph.totalSymbols).toBe(6);
 
     const internalSymbols = packageGraph.symbols.filter((symbol) => symbol.isInternal);
-    expect(internalSymbols).toHaveLength(0);
+    expect(internalSymbols).toHaveLength(4); // The 2 prototype members + 2 interface members
 
     const exportDeclarations = packageGraph.symbols.filter(
       (symbol) => symbol.kindName === "ExportDeclaration"
@@ -281,8 +284,8 @@ describe("crawl", () => {
     };
     const packageGraph = buildPackageGraph(packageInfo);
 
-    // Should have 3 types: RunnerTask, RunnerFile, and Local
-    expect(packageGraph.totalSymbols).toBe(3);
+    // Should have 4 types: RunnerTask, RunnerFile, Local, and Local.id
+    expect(packageGraph.totalSymbols).toBe(4);
 
     const task = packageGraph.symbols.find(symbol => symbol.name === "RunnerTask");
     expect(task).toBeDefined();
@@ -305,5 +308,31 @@ describe("crawl", () => {
     const names = result.exports.map((exportItem) => exportItem.name);
     expect(names).toContain("x");
     expect(result.visitedFiles.length).toBe(1); // Should only visit the entry file
+  });
+
+  describe("Name Prefixing & Symbol Resolution", () => {
+    it("handles deeply nested namespace re-exports with dot-prefixing", () => {
+      const result = crawl(
+        path.join(FIXTURES_DIR, "nested-prefix", "index.d.ts")
+      );
+      const names = result.exports.map(e => e.name);
+      expect(names).toContain("Mid");
+      expect(names).toContain("Mid.Inner");
+      expect(names).toContain("Mid.Inner.val");
+      
+      const val = result.exports.find(e => e.name === "Mid.Inner.val");
+      expect(val!.reExportChain).toHaveLength(2);
+    });
+
+    it("handles namespaced local assignments correctly", () => {
+      const result = crawl(
+        path.join(FIXTURES_DIR, "nested-locals", "index.d.ts")
+      );
+      const names = result.exports.map(e => e.name);
+      expect(names).toContain("A");
+      expect(names).toContain("A.x");
+      expect(names).toContain("B");
+      expect(names).toContain("B.x");
+    });
   });
 });

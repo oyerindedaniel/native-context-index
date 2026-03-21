@@ -24,7 +24,7 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    expect(graph.totalSymbols).toBe(2);
+    expect(graph.totalSymbols).toBe(6);
     expect(graph.totalFiles).toBe(2);
 
     const ids = graph.symbols.map((symbol) => symbol.id);
@@ -40,7 +40,7 @@ describe("integration", () => {
       isScoped: false,
     });
 
-    expect(graph.totalSymbols).toBe(3);
+    expect(graph.totalSymbols).toBe(5);
     expect(graph.totalFiles).toBe(2);
 
     const names = graph.symbols.map((symbol) => symbol.name);
@@ -78,8 +78,8 @@ describe("integration", () => {
 
     expect(parsed.package).toBe("simple-export");
     expect(parsed.version).toBe("1.0.0");
-    expect(parsed.totalSymbols).toBe(2);
-    expect(parsed.symbols).toHaveLength(2);
+    expect(parsed.totalSymbols).toBe(5);
+    expect(parsed.symbols).toHaveLength(5);
 
     expect(json).toContain('"simple-export@1.0.0::Config"');
     expect(json).toContain('"simple-export@1.0.0::init"');
@@ -114,7 +114,7 @@ describe("integration", () => {
     expect(names).toContain("createServer");  // from ./server
     expect(names).toContain("Server");        // from ./server
 
-    expect(graph.totalSymbols).toBe(7);
+    expect(graph.totalSymbols).toBe(11);
     expect(graph.totalFiles).toBe(3);
   });
 
@@ -186,7 +186,7 @@ describe("integration", () => {
     expect(names).toContain("helperB");
     expect(names).toContain("HelperBResult");
 
-    expect(graph.totalSymbols).toBe(6);
+    expect(graph.totalSymbols).toBe(8);
     expect(graph.totalFiles).toBe(3);
   });
 

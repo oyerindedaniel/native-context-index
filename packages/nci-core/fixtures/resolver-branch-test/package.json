@@ -1,0 +1,10 @@
+{
+  "name": "resolver-branch-test",
+  "exports": {
+    "./*": {
+      "types": true,
+      "import": null,
+      "default": "*.d.ts"
+    }
+  }
+}
