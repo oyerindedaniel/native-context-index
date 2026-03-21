@@ -171,8 +171,8 @@ describe("crawl", () => {
       path.join(FIXTURES_DIR, "namespace-reexport", "index.d.ts")
     );
 
-    const lib = result.exports.find(e => e.name === "Lib");
-    const version = result.exports.find(e => e.name === "Lib.VERSION");
+    const lib = result.exports.find(exportEntry => exportEntry.name === "Lib");
+    const version = result.exports.find(exportEntry => exportEntry.name === "Lib.VERSION");
 
     expect(lib).toBeDefined();
     expect(version).toBeDefined();
@@ -315,12 +315,12 @@ describe("crawl", () => {
       const result = crawl(
         path.join(FIXTURES_DIR, "nested-prefix", "index.d.ts")
       );
-      const names = result.exports.map(e => e.name);
+      const names = result.exports.map(exportEntry => exportEntry.name);
       expect(names).toContain("Mid");
       expect(names).toContain("Mid.Inner");
       expect(names).toContain("Mid.Inner.val");
       
-      const val = result.exports.find(e => e.name === "Mid.Inner.val");
+      const val = result.exports.find(exportEntry => exportEntry.name === "Mid.Inner.val");
       expect(val!.reExportChain).toHaveLength(2);
     });
 
@@ -328,11 +328,30 @@ describe("crawl", () => {
       const result = crawl(
         path.join(FIXTURES_DIR, "nested-locals", "index.d.ts")
       );
-      const names = result.exports.map(e => e.name);
+      const names = result.exports.map(exportEntry => exportEntry.name);
       expect(names).toContain("A");
       expect(names).toContain("A.x");
       expect(names).toContain("B");
       expect(names).toContain("B.x");
+    });
+  });
+
+  describe("Deep Symbol Resolution (Cross-Package)", () => {
+    it("resolves symbols through multiple external package re-exports", () => {
+      const entryFile = path.join(FIXTURES_DIR, "cross-package-resolution", "meta-package", "index.d.ts");
+      const result = crawl(entryFile, { maxDepth: 5 });
+
+      expect(result.visitedFiles.length).toBe(3);
+      
+      const coreService = result.exports.find(exportEntry => exportEntry.name === "CoreService");
+      expect(coreService).toBeDefined();
+      expect(coreService!.signature).toContain("interface CoreService");
+      expect(coreService!.definedIn).toContain("@nci-test/core");
+
+      // Verify recursive ingest of InternalConfig (which is not exported)
+      const internalConfig = result.exports.find(exportEntry => exportEntry.name.includes("InternalConfig"));
+      expect(internalConfig).toBeDefined();
+      expect(internalConfig!.signature).toContain("interface InternalConfig");
     });
   });
 });

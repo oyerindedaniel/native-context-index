@@ -159,10 +159,13 @@ describe("resolveTypesEntry", () => {
 
   it("resolves bare specifiers to node_modules types", () => {
     const resolved = resolveModuleSpecifier(
-      "zod", RESOLUTION_INDEX
+      "@nci-test/bridge", 
+      path.join(FIXTURES_DIR, "cross-package-resolution", "meta-package", "index.d.ts")
     );
-    // bare specifiers are not relative, so this should return null
-    expect(resolved).toBeNull();
+    expect(resolved).toBeTruthy();
+    const normalized = resolved!.replace(/\\/g, "/");
+    expect(normalized).toContain("@nci-test/bridge");
+    expect(normalized).toContain("index.d.ts");
   });
 
   it("resolves relative specifiers to .d.ts files", () => {

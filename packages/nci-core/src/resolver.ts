@@ -278,10 +278,10 @@ function expandWildcardSubpath(
   packageDir: string,
   value: unknown
 ): string[] {
-  const entries: string[] = [];
+  const matchingEntries: string[] = [];
 
   const pattern = extractWildcardPattern(value);
-  if (!pattern || !pattern.includes("*")) return entries;
+  if (!pattern || !pattern.includes("*")) return matchingEntries;
 
   // Extract base directory (everything before the first '*')
   const firstStarIndex = pattern.indexOf("*");
@@ -289,26 +289,30 @@ function expandWildcardSubpath(
   const lastSlashBeforeStar = beforeFirstStar.lastIndexOf("/");
 
   const dirPart = lastSlashBeforeStar >= 0 ? beforeFirstStar.slice(0, lastSlashBeforeStar) : ".";
-  const scanDir = path.resolve(packageDir, dirPart);
+  const scanDirectory = path.resolve(packageDir, dirPart);
 
-  if (!fs.existsSync(scanDir)) return entries;
+  if (!fs.existsSync(scanDirectory)) return matchingEntries;
 
   const globRegex = globToRegExp(pattern);
-  const candidates = scanDirectoryRecursive(scanDir);
+  const fileCandidates = scanDirectoryRecursive(scanDirectory);
 
-  for (const candidate of candidates) {
-    const relToPackage = path.relative(packageDir, candidate).replace(/\\/g, "/");
+  for (const candidatePath of fileCandidates) {
+    const relativeToPackage = path.relative(packageDir, candidatePath).replace(/\\/g, "/");
     // Ensure relative path starts with ./ to match glob expectation
-    const normalizedRel = relToPackage.startsWith("./") ? relToPackage : `./${relToPackage}`;
+    const normalizedRelative = relativeToPackage.startsWith("./") ? relativeToPackage : `./${relativeToPackage}`;
 
-    if (globRegex.test(normalizedRel) || globRegex.test(relToPackage)) {
-      if (candidate.endsWith(".d.ts") || candidate.endsWith(".d.mts") || candidate.endsWith(".d.cts")) {
-        entries.push(candidate);
+    if (globRegex.test(normalizedRelative) || globRegex.test(relativeToPackage)) {
+      if (
+        candidatePath.endsWith(".d.ts") ||
+        candidatePath.endsWith(".d.mts") ||
+        candidatePath.endsWith(".d.cts")
+      ) {
+        matchingEntries.push(candidatePath);
       }
     }
   }
 
-  return entries;
+  return matchingEntries;
 }
 
 /**
@@ -328,11 +332,11 @@ function scanDirectoryRecursive(dir: string): string[] {
   const list = fs.readdirSync(dir, { withFileTypes: true });
 
   for (const file of list) {
-    const res = path.resolve(dir, file.name);
+    const resolvedPath = path.resolve(dir, file.name);
     if (file.isDirectory()) {
-      results.push(...scanDirectoryRecursive(res));
+      results.push(...scanDirectoryRecursive(resolvedPath));
     } else {
-      results.push(res);
+      results.push(resolvedPath);
     }
   }
 
@@ -366,45 +370,105 @@ export function resolveModuleSpecifier(
   specifier: string,
   currentFile: string
 ): string | null {
-  if (!specifier.startsWith(".")) return null;
+  if (specifier.startsWith(".")) {
+    const dir = path.dirname(currentFile);
+    let resolved: string;
 
-  const dir = path.dirname(currentFile);
-  let resolved: string;
+    const JS_EXT_RE = /\.(js|mjs|cjs)$/;
 
-  const JS_EXT_RE = /\.(js|mjs|cjs)$/;
+    const extMatch = specifier.match(JS_EXT_RE);
+    if (extMatch) {
+      const base = specifier.slice(0, -extMatch[0].length);
+      resolved = path.resolve(dir, base + ".d.ts");
+      if (isFileSafe(resolved)) return normalizePath(resolved);
 
-  const extMatch = specifier.match(JS_EXT_RE);
-  if (extMatch) {
-    const base = specifier.slice(0, -extMatch[0].length);
-    resolved = path.resolve(dir, base + ".d.ts");
+      if (extMatch[1] === "mjs") {
+        resolved = path.resolve(dir, base + ".d.mts");
+        if (isFileSafe(resolved)) return normalizePath(resolved);
+      }
+      if (extMatch[1] === "cjs") {
+        resolved = path.resolve(dir, base + ".d.cts");
+        if (isFileSafe(resolved)) return normalizePath(resolved);
+      }
+
+      // Try as directory with index.d.ts (e.g., "./scope.js" → "./scope/index.d.ts")
+      resolved = path.resolve(dir, base, "index.d.ts");
+      if (isFileSafe(resolved)) return normalizePath(resolved);
+    }
+
+    // Try adding .d.ts directly
+    resolved = path.resolve(dir, specifier + ".d.ts");
     if (isFileSafe(resolved)) return normalizePath(resolved);
 
-    if (extMatch[1] === "mjs") {
-      resolved = path.resolve(dir, base + ".d.mts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
-    }
-    if (extMatch[1] === "cjs") {
-      resolved = path.resolve(dir, base + ".d.cts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
-    }
+    // Try as-is (already ends in .d.ts) — MUST be a file, not a directory
+    resolved = path.resolve(dir, specifier);
+    if (isFileSafe(resolved)) return normalizePath(resolved);
 
-    // Try as directory with index.d.ts (e.g., "./scope.js" → "./scope/index.d.ts")
-    resolved = path.resolve(dir, base, "index.d.ts");
+    // Try as a directory with index.d.ts (e.g., "./scope" → "./scope/index.d.ts")
+    resolved = path.resolve(dir, specifier, "index.d.ts");
     if (isFileSafe(resolved)) return normalizePath(resolved);
   }
 
-  // Try adding .d.ts directly
-  resolved = path.resolve(dir, specifier + ".d.ts");
-  if (isFileSafe(resolved)) return normalizePath(resolved);
+  // Try as a third-party package
+  return resolvePackageEntry(specifier, currentFile);
+}
 
-  // Try as-is (already ends in .d.ts) — MUST be a file, not a directory
-  resolved = path.resolve(dir, specifier);
-  if (isFileSafe(resolved)) return normalizePath(resolved);
+/**
+ * Resolve a package-level entry point by searching node_modules.
+ */
+function resolvePackageEntry(specifier: string, currentFile: string): string | null {
+  const parts = specifier.split("/");
+  let packageName = parts[0]!;
+  let subpath = ".";
 
-  // Try as a directory with index.d.ts (e.g., "./scope" → "./scope/index.d.ts")
-  resolved = path.resolve(dir, specifier, "index.d.ts");
-  if (isFileSafe(resolved)) return normalizePath(resolved);
+  if (packageName.startsWith("@") && parts.length >= 2) {
+    packageName = `${parts[0]}/${parts[1]}`;
+    subpath = parts.length > 2 ? `./${parts.slice(2).join("/")}` : ".";
+  } else {
+    subpath = parts.length > 1 ? `./${parts.slice(1).join("/")}` : ".";
+  }
 
+  const pkgDir = findPackageDir(packageName, path.dirname(currentFile));
+  if (!pkgDir) return null;
+
+  // Verify it's actually a package with a package.json before resolving
+  if (!fs.existsSync(path.join(pkgDir, "package.json"))) {
+    return null;
+  }
+
+  const pkgEntry = resolveTypesEntry(pkgDir);
+  
+  if (subpath === ".") {
+    return pkgEntry.typesEntries[0] || null;
+  }
+
+  // If subpath is specified, we need to find it in the pkgEntry or try resolving it manually
+  // For now, we try to resolve it as a relative file within the package
+  const subpathParsed = subpath.startsWith("./") ? subpath : `./${subpath}`;
+  const resolvedSub = resolveFile(pkgDir, subpathParsed);
+  if (resolvedSub) return normalizePath(resolvedSub);
+  
+  // Try adding .d.ts
+  const resolvedSubWithExt = resolveFile(pkgDir, subpathParsed + ".d.ts");
+  if (resolvedSubWithExt) return normalizePath(resolvedSubWithExt);
+
+  return null;
+}
+
+/**
+ * Find the package directory by walking up node_modules.
+ */
+function findPackageDir(packageName: string, startDir: string): string | null {
+  let current = path.resolve(startDir);
+  while (true) {
+    const potential = path.join(current, "node_modules", packageName);
+    if (fs.existsSync(potential) && fs.statSync(potential).isDirectory()) {
+      return potential;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
   return null;
 }
 
