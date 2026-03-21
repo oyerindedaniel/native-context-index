@@ -37,8 +37,12 @@ export interface PackageInfo {
 export interface PackageEntry {
   /** Package name */
   name: string;
-  /** Absolute paths to ALL resolved .d.ts entry files (root + subpaths) */
+  /** Absolute path to the package directory */
+  dirPath: string;
+  /** Primary types entries (e.g. from "types" field or "." export) */
   typesEntries: string[];
+  /** Map of subpaths to their resolved .d.ts files (e.g. "./sub" -> "/abs/path/sub.d.ts") */
+  subpaths: Record<string, string>;
 }
 
 // ─── Parser Output ─────────────────────────────────────────────

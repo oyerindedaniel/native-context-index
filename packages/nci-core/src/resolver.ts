@@ -34,47 +34,47 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
 
   const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
   const name: string = pkg.name ?? path.basename(packageDir);
-  const entries: string[] = [];
+  const typesEntries: string[] = [];
+  const subpaths: Record<string, string> = {};
 
-  // Priority 1-3: exports field (all subpaths)
   if (pkg.exports) {
-    const resolved = resolveAllExports(packageDir, pkg.exports);
-    entries.push(...resolved);
+    const resolved = resolveAllExports(packageDir, pkg.exports, subpaths);
+    typesEntries.push(...resolved);
   }
 
-  // Priority 4: typesVersions field (only if no exports found)
-  if (entries.length === 0 && pkg.typesVersions) {
+  if (typesEntries.length === 0 && pkg.typesVersions) {
     const resolved = resolveTypesVersions(packageDir, pkg.typesVersions);
     if (resolved) {
-      entries.push(resolved);
+      typesEntries.push(resolved);
+      subpaths["."] = resolved;
     }
   }
 
-  // Priority 5: types field (only if nothing found yet)
-  if (entries.length === 0 && pkg.types) {
+  if (typesEntries.length === 0 && pkg.types) {
     const resolved = resolveFile(packageDir, pkg.types);
     if (resolved) {
-      entries.push(resolved);
+      typesEntries.push(resolved);
+      subpaths["."] = resolved;
     }
   }
 
-  // Priority 6: typings field (legacy)
-  if (entries.length === 0 && pkg.typings) {
+  if (typesEntries.length === 0 && pkg.typings) {
     const resolved = resolveFile(packageDir, pkg.typings);
     if (resolved) {
-      entries.push(resolved);
+      typesEntries.push(resolved);
+      subpaths["."] = resolved;
     }
   }
 
-  // Priority 7: index.d.ts fallback
-  if (entries.length === 0) {
+  if (typesEntries.length === 0) {
     const fallback = path.join(packageDir, "index.d.ts");
     if (fs.existsSync(fallback)) {
-      entries.push(fallback);
+      typesEntries.push(fallback);
+      subpaths["."] = fallback;
     }
   }
 
-  return { name, typesEntries: entries };
+  return { name, dirPath: packageDir, typesEntries, subpaths };
 }
 
 /**
@@ -87,7 +87,8 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
  */
 function resolveAllExports(
   packageDir: string,
-  exports: unknown
+  exports: unknown,
+  subpaths: Record<string, string>
 ): string[] {
   const entries: string[] = [];
   const seen = new Set<string>();
@@ -95,7 +96,10 @@ function resolveAllExports(
   if (typeof exports === "string") {
     if (exports.endsWith(".d.ts") || exports.endsWith(".d.mts") || exports.endsWith(".d.cts")) {
       const resolved = resolveFile(packageDir, exports);
-      if (resolved) entries.push(resolved);
+      if (resolved) {
+        entries.push(resolved);
+        if (!subpaths["."]) subpaths["."] = resolved;
+      }
     }
     return entries;
   }
@@ -116,26 +120,34 @@ function resolveAllExports(
             if (!seen.has(wEntry)) {
               seen.add(wEntry);
               entries.push(wEntry);
+              // For wildcards, we don't easily map back to the exact subpath without more logic,
+              // but those are usually accessed via file resolution anyway.
             }
           }
           continue;
         }
 
         const resolved = resolveExportCondition(packageDir, value);
-        if (resolved && !seen.has(resolved)) {
-          seen.add(resolved);
-          entries.push(resolved);
+        if (resolved) {
+          subpaths[subpath] = resolved;
+          if (!seen.has(resolved)) {
+            seen.add(resolved);
+            entries.push(resolved);
+          }
         }
       }
     } else {
       const resolved = resolveExportCondition(packageDir, obj);
-      if (resolved) entries.push(resolved);
+      if (resolved) {
+        entries.push(resolved);
+        if (!subpaths["."]) subpaths["."] = resolved;
+      }
     }
   }
 
   if (Array.isArray(exports)) {
     for (const item of exports) {
-      const resolved = resolveAllExports(packageDir, item);
+      const resolved = resolveAllExports(packageDir, item, subpaths);
       for (const resolvedPath of resolved) {
         if (!seen.has(resolvedPath)) {
           seen.add(resolvedPath);
@@ -207,7 +219,6 @@ function resolveExportCondition(
  * Format: { ">=5.0": { "*": ["ts5/*"] } }
  *
  * Compares the installed TypeScript version against version range keys.
- * If a match is found, redirects the wildcard "*" path to the mapped directory.
  */
 function resolveTypesVersions(
   packageDir: string,
@@ -270,9 +281,6 @@ function resolveFile(packageDir: string, relativePath: string): string | null {
  * Handles patterns like:
  *   "./*": { "types": "./dist/*.d.ts" }
  *   "./*": "./dist/*.d.ts"
- *
- * Extracts the concrete path pattern from the condition value,
- * replaces * with a directory scan, and returns all matching .d.ts files.
  */
 function expandWildcardSubpath(
   packageDir: string,
@@ -396,20 +404,16 @@ export function resolveModuleSpecifier(
       if (isFileSafe(resolved)) return normalizePath(resolved);
     }
 
-    // Try adding .d.ts directly
     resolved = path.resolve(dir, specifier + ".d.ts");
     if (isFileSafe(resolved)) return normalizePath(resolved);
 
-    // Try as-is (already ends in .d.ts) — MUST be a file, not a directory
     resolved = path.resolve(dir, specifier);
     if (isFileSafe(resolved)) return normalizePath(resolved);
 
-    // Try as a directory with index.d.ts (e.g., "./scope" → "./scope/index.d.ts")
     resolved = path.resolve(dir, specifier, "index.d.ts");
     if (isFileSafe(resolved)) return normalizePath(resolved);
   }
 
-  // Try as a third-party package
   return resolvePackageEntry(specifier, currentFile);
 }
 
@@ -431,24 +435,25 @@ function resolvePackageEntry(specifier: string, currentFile: string): string | n
   const pkgDir = findPackageDir(packageName, path.dirname(currentFile));
   if (!pkgDir) return null;
 
-  // Verify it's actually a package with a package.json before resolving
   if (!fs.existsSync(path.join(pkgDir, "package.json"))) {
     return null;
   }
 
   const pkgEntry = resolveTypesEntry(pkgDir);
   
+  const mappedSubpath = pkgEntry.subpaths[subpath];
+  if (mappedSubpath) {
+    return mappedSubpath;
+  }
+
   if (subpath === ".") {
     return pkgEntry.typesEntries[0] || null;
   }
 
-  // If subpath is specified, we need to find it in the pkgEntry or try resolving it manually
-  // For now, we try to resolve it as a relative file within the package
   const subpathParsed = subpath.startsWith("./") ? subpath : `./${subpath}`;
   const resolvedSub = resolveFile(pkgDir, subpathParsed);
   if (resolvedSub) return normalizePath(resolvedSub);
   
-  // Try adding .d.ts
   const resolvedSubWithExt = resolveFile(pkgDir, subpathParsed + ".d.ts");
   if (resolvedSubWithExt) return normalizePath(resolvedSubWithExt);
 
