@@ -45,7 +45,6 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
   }
 
   // 2. typesVersions (TypeScript version-specific mappings)
-
   if (typesEntries.length === 0 && pkg.typesVersions) {
     const resolved = resolveTypesVersions(packageDir, pkg.typesVersions);
     if (resolved) {
@@ -85,12 +84,13 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
 }
 
 /**
- * Resolve ALL subpath entries from the `exports` field.
+ * Resolve ALL subpath entries from the modern Node.js `exports` field.
+ * Handles string maps, nested conditional objects, and wildcard expansion.
  *
- * Handles:
- * - String: "exports": "./dist/index.d.ts"
- * - Object with subpaths: "exports": { ".": {...}, "./utils": {...}, "./server": {...} }
- * - Nested conditions: { "types": "...", "import": { "types": "..." } }
+ * @param packageDir Absolute path to the package root.
+ * @param exports The raw exports value from package.json.
+ * @param subpaths Output map for populating discovered subpath-to-file entries.
+ * @returns Array of all absolute .d.ts paths resolved from the field.
  */
 function resolveAllExports(
   packageDir: string,
@@ -166,8 +166,12 @@ function resolveAllExports(
 }
 
 /**
- * Resolve conditions within an export entry.
- * Recursively walks { types, import.types, require.types, default }.
+ * Resolves nested conditions within an individual package export entry.
+ * Prioritizes 'types' and follows 'import', 'require', or 'default' if present.
+ *
+ * @param packageDir Absolute path to the package directory.
+ * @param entry The conditional export entry to resolve.
+ * @returns Resolved absolute file path or null if no valid type entry is found.
  */
 function resolveExportCondition(
   packageDir: string,
@@ -224,11 +228,12 @@ function resolveExportCondition(
 }
 
 /**
- * Resolve typesVersions field.
+  /**
+ * Resolves types from the legacy `typesVersions` field using the current TypeScript version.
  *
- * Format: { ">=5.0": { "*": ["ts5/*"] } }
- *
- * Compares the installed TypeScript version against version range keys.
+ * @param packageDir Absolute path to the package directory.
+ * @param typesVersions The raw typesVersions mapping object.
+ * @returns Resolved absolute .d.ts path or null if no version-matched entry is found.
  */
 function resolveTypesVersions(
   packageDir: string,
@@ -258,7 +263,12 @@ function resolveTypesVersions(
 }
 
 /**
- * Check if a version string matches a range like ">=5.0", ">=4.7", etc.
+ * Evaluates a TypeScript version against a semver-like range (e.g., ">=5.0").
+ * Used specifically for processing `typesVersions`.
+ *
+ * @param version The current TypeScript version string.
+ * @param range The version range to test against.
+ * @returns True if the version satisfies the range.
  */
 function matchesVersionRange(version: string, range: string): boolean {
   const match = range.match(/^>=\s*(\d+)\.(\d+)(?:\.(\d+))?$/);
@@ -277,20 +287,27 @@ function matchesVersionRange(version: string, range: string): boolean {
   return false;
 }
 
+
 /**
- * Resolve a relative file path and verify it exists.
+ * Resolves a relative file path against the package root and verifies its existence.
+ *
+ * @param packageDir Absolute path to the package root.
+ * @param relativePath Relative path from the package.json.
+ * @returns Fully qualified absolute path if valid, otherwise null.
  */
 function resolveFile(packageDir: string, relativePath: string): string | null {
   const absPath = path.resolve(packageDir, relativePath);
   return isFileSafe(absPath) ? absPath : null;
 }
 
+
 /**
- * Expand wildcard subpath exports by scanning the filesystem.
+ * Expands a wildcard export pattern (e.g., "./*") into a list of absolute .d.ts files.
+ * Iterates through the filesystem based on the provided pattern template.
  *
- * Handles patterns like:
- *   "./*": { "types": "./dist/*.d.ts" }
- *   "./*": "./dist/*.d.ts"
+ * @param packageDir Absolute path to the package root.
+ * @param value The raw wildcard pattern or conditional object containing it.
+ * @returns Array of absolute paths matching the expanded wildcard.
  */
 function expandWildcardSubpath(
   packageDir: string,
@@ -332,7 +349,11 @@ function expandWildcardSubpath(
 }
 
 /**
- * Converts a glob pattern (with multiple *) into a RegExp.
+ * Converts a glob-style pattern (e.g. "dist/*.d.ts") into a compiled RegExp for matching.
+ * Handles subpath wildcards according to Node.js resolution specification.
+ *
+ * @param pattern The wildcard pattern to convert.
+ * @returns Compiled RegExp instance.
  */
 function globToRegExp(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&"); // Escape regex chars except *
@@ -340,8 +361,12 @@ function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${regexStr}$`);
 }
 
+
 /**
- * Recursively scans a directory for all files.
+ * Scans a directory recursively to identify all candidate files for pattern matching.
+ *
+ * @param dir The directory to scan.
+ * @returns Array of absolute file paths.
  */
 function scanDirectoryRecursive(dir: string): string[] {
   const results: string[] = [];
@@ -360,8 +385,10 @@ function scanDirectoryRecursive(dir: string): string[] {
 }
 
 /**
- * Extract the wildcard pattern string from a conditional export value.
- * Walks through conditions to find the first string containing *.
+ * Extracts a wildcard pattern string from a conditional entry by prioritizing type-specific fields.
+ *
+ * @param value The raw entry point value.
+ * @returns The pattern string or null if not discovered.
  */
 function extractWildcardPattern(value: unknown): string | null {
   if (typeof value === "string") return value;
@@ -430,8 +457,14 @@ export function resolveModuleSpecifier(
   return resolvePackageEntry(specifier, currentFile);
 }
 
+
 /**
- * Resolve a package-level entry point by searching node_modules.
+ * Orchestrates the resolution of a package-level entry point from node_modules.
+ * Finds the nearest relevant package and delegates to `resolveTypesEntry`.
+ *
+ * @param specifier The module specifier (e.g., "react" or "react/jsx-runtime").
+ * @param currentFile Path of the file initiating the resolution.
+ * @returns Array of absolute paths to the discovered types.
  */
 function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   const parts = specifier.split("/");
@@ -488,11 +521,14 @@ function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   return [];
 }
 
+
 /**
- * Matches a targeted subpath (e.g. "./utils/formatter") against an exports map
- * that might contain wildcards (e.g. "./utils/*").
+ * Matches a target subpath (e.g. "./utils/math") against a wildcard export map.
+ * Performs replacement of capturing groups into the target path template.
  *
- * Returns the mapped value with the wildcard replaced.
+ * @param subpath The requested subpath.
+ * @param exports The raw exports map.
+ * @returns The resulting mapped value or null if no match is found.
  */
 function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null {
   if (typeof exports !== "object" || exports === null) return null;
@@ -524,7 +560,13 @@ function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null
   return null;
 }
 
-/** Helper to recursively replace wildcards in nested condition objects. */
+/**
+ * Recursively injects captured wildcard segments into template strings/objects.
+ *
+ * @param value The value template to transform.
+ * @param replacement The string captured from the wildcard.
+ * @returns The transformed value.
+ */
 function replaceWildcardInValue(value: unknown, replacement: string): unknown {
   if (typeof value === "string") {
     return value.replace("*", replacement);
@@ -543,7 +585,11 @@ function replaceWildcardInValue(value: unknown, replacement: string): unknown {
 }
 
 /**
- * Find the package directory by walking up node_modules.
+ * Discovers a package's root directory by traversing upwards to the nearest node_modules.
+ *
+ * @param packageName Name of the package to find.
+ * @param startDir Directory to begin the upward search.
+ * @returns The absolute path to the package root or null.
  */
 function findPackageDir(packageName: string, startDir: string): string | null {
   let current = path.resolve(startDir);
@@ -559,7 +605,12 @@ function findPackageDir(packageName: string, startDir: string): string | null {
   return null;
 }
 
-/** Check if a path exists and is a file. */
+/**
+ * Safely verifies if a path is a regular file using synchronous filesystem statistics.
+ *
+ * @param filePath The path to check.
+ * @returns True if the path is a file.
+ */
 export function isFileSafe(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
@@ -568,7 +619,12 @@ export function isFileSafe(filePath: string): boolean {
   }
 }
 
-/** Normalize a path to use forward slashes. */
+/**
+ * Normalizes a file path by resolving it to an absolute format and standardizing separators.
+ *
+ * @param filePath The raw path string.
+ * @returns Absolute path with normalized forward slash separators.
+ */
 export function normalizePath(filePath: string): string {
   return path.resolve(filePath).replace(/\\/g, "/");
 }

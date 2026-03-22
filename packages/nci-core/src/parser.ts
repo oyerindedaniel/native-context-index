@@ -29,6 +29,9 @@ interface JSDocInfo {
 
 /**
  * Parses a .d.ts file and extracts its exports, imports, and cross-file references.
+ *
+ * @param filePath The absolute path to the .d.ts file to parse.
+ * @returns An object containing the extracted exports, imports, and references.
  */
 export function parseFile(filePath: string): {
   exports: ParsedExport[];
@@ -42,6 +45,9 @@ export function parseFile(filePath: string): {
 
 /**
  * Core parsing logic that traverses the AST to collect all symbol and import metadata.
+ *
+ * @param sourceFile The TypeScript AST source file to parse.
+ * @returns Complete architectural metadata for the file.
  */
 export function parseFileFromSource(sourceFile: ts.SourceFile): {
   exports: ParsedExport[];
@@ -209,7 +215,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
             const parentName = parts[0]!;
             const memberName = parts[1]!;
             const jsdoc = extractJSDocInfo(statement);
-            
+
             exports.push({
               name: `${parentName}.prototype.${memberName}`,
               kind: statement.kind,
@@ -243,6 +249,12 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
   return { exports, imports, references, typeReferences };
 }
 
+/**
+ * Retrieves a cached source file or creates a new one from the filesystem.
+ *
+ * @param filePath The absolute path to the file.
+ * @returns The TypeScript SourceFile instance.
+ */
 function getOrCreateSourceFile(filePath: string): ts.SourceFile {
   const cached = sourceFileCache.get(filePath);
   if (cached) return cached;
@@ -252,16 +264,33 @@ function getOrCreateSourceFile(filePath: string): ts.SourceFile {
   return sourceFile;
 }
 
+/**
+ * Clears all internal caches (SourceFile and Declaration caches).
+ */
 export function clearParserCache(): void {
   sourceFileCache.clear();
   declarationCache.clear();
 }
 
-/** Helper to expose source file retrieval for crawler/graph */
+/**
+ * Exposes source file retrieval for components like the crawler and graph builder.
+ *
+ * @param filePath The absolute path to the file.
+ * @returns The TypeScript SourceFile instance.
+ */
 export function getFileSource(filePath: string): ts.SourceFile {
   return getOrCreateSourceFile(filePath);
 }
 
+/**
+ * Extracts architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.).
+ *
+ * @param statement The TypeScript statement to parse.
+ * @param sourceFile The containing source file.
+ * @param isExplicitExport True if the statement is explicitly marked as an export.
+ * @param parentName Optional parent symbol name for nested declarations.
+ * @returns An array of parsed symbols extracted from the declaration.
+ */
 function extractDirectExport(
   statement: ts.Statement,
   sourceFile: ts.SourceFile,
@@ -338,6 +367,16 @@ function extractDirectExport(
   return exports;
 }
 
+/**
+ * Extracts instance and static members from a class declaration.
+ *
+ * @param classNode The class AST node.
+ * @param sourceFile The containing source file.
+ * @param parentName The name of the parent class.
+ * @param isExplicitExport True if the parent class is exported.
+ * @param parentJsDoc Meta-information from the parent class JSDoc.
+ * @returns Parsed symbols for all relevant class members.
+ */
 function extractClassMembers(
   classNode: ts.ClassDeclaration,
   sourceFile: ts.SourceFile,
@@ -387,6 +426,18 @@ function extractClassMembers(
   return exports;
 }
 
+/**
+ * Extracts members from complex types, including nested object literals and intersection types.
+ *
+ * @param node The type node to decompose.
+ * @param sourceFile The containing source file.
+ * @param parentName The name of the parent symbol.
+ * @param isExplicitExport True if the parent is exported.
+ * @param parentJSDoc Meta-information from the parent JSDoc.
+ * @param depth Current recursion depth.
+ * @param visitedNames Set of names visited in this traversal to prevent cycles.
+ * @returns Parsed symbols for all extracted type members.
+ */
 function extractComplexTypeMembers(
   node: CompositionNode,
   sourceFile: ts.SourceFile,
@@ -464,14 +515,26 @@ function extractComplexTypeMembers(
   return exports;
 }
 
-/** Internal helper to extract search name from TypeQuery or TypeReference */
+/**
+ * Identifies the search string for a TypeQuery or TypeReference node.
+ * Used for navigating local symbol graphs.
+ *
+ * @param node The type node to analyze.
+ * @returns The identifier name string, if present.
+ */
 function getSearchName(node: ts.TypeNode): string | undefined {
   if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName)) return node.exprName.text;
   if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) return node.typeName.text;
   return undefined;
 }
 
-/** Resolves a TypeQuery (typeof) or TypeReference to its underlying declaration in the same file. */
+/**
+ * Resolves a TypeQuery (typeof) or TypeReference to its underlying declaration in the same file.
+ *
+ * @param node The type node to resolve.
+ * @param sourceFile The containing source file.
+ * @returns The resolved declaration node, if found locally.
+ */
 function resolveLocalType(node: ts.TypeNode, sourceFile: ts.SourceFile): CompositionNode | undefined {
   let searchName: string | undefined;
   if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName)) {
@@ -510,6 +573,10 @@ function resolveLocalType(node: ts.TypeNode, sourceFile: ts.SourceFile): Composi
 
 /**
  * Extracts a stable string representation for a property name (including well-known symbols).
+ *
+ * @param name The property name node.
+ * @param sourceFile The containing source file.
+ * @returns The string representation of the member name.
  */
 function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string | undefined {
   if (ts.isIdentifier(name)) return name.text;
@@ -540,7 +607,12 @@ function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string
   return undefined;
 }
 
-/** Extracts structured modifiers (abstract, readonly, static, etc.) */
+/**
+ * Extracts structured modifiers (abstract, readonly, static, etc.)
+ *
+ * @param node The AST node to check.
+ * @returns Array of modifier strings.
+ */
 function extractModifiers(node: ts.Node): string[] | undefined {
   if (!ts.canHaveModifiers(node)) return undefined;
   const modifiers = ts.getModifiers(node);
@@ -549,7 +621,13 @@ function extractModifiers(node: ts.Node): string[] | undefined {
   return modifiers.map(modifier => modifier.getText());
 }
 
-/** Extracts decorator metadata associated with the given AST node. */
+/**
+ * Extracts decorator metadata associated with the given AST node.
+ *
+ * @param node The AST node to check.
+ * @param sourceFile The containing source file.
+ * @returns Array of decorator metadata objects.
+ */
 function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorMetadata[] | undefined {
   if (!ts.canHaveDecorators(node)) return undefined;
 
@@ -568,7 +646,13 @@ function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorM
   });
 }
 
-/** Extracts names of classes or interfaces this node extends or implements */
+/**
+ * Extracts names of classes or interfaces this node extends or implements.
+ *
+ * @param node The class or interface declaration node.
+ * @param sourceFile The containing source file.
+ * @returns Array of heritage names.
+ */
 function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, sourceFile: ts.SourceFile): string[] | undefined {
   if (!node.heritageClauses) return undefined;
   const heritage: string[] = [];
@@ -581,6 +665,12 @@ function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, so
   return heritage.length > 0 ? heritage : undefined;
 }
 
+/**
+ * Determines if a node is explicitly being exported from the current module.
+ *
+ * @param node The AST node to check.
+ * @returns True if the node is exported.
+ */
 function isExportedDeclaration(node: ts.Node): boolean {
   if (ts.isExportAssignment(node) || ts.isExportDeclaration(node)) return true;
   const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
@@ -592,6 +682,13 @@ function isExportedDeclaration(node: ts.Node): boolean {
   return false;
 }
 
+/**
+ * Extracts all symbols from an export declaration, including re-exports and wildcards.
+ *
+ * @param node The export declaration node.
+ * @param sourceFile The containing source file.
+ * @returns An array of parsed symbols extracted from the declaration.
+ */
 function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.SourceFile): ParsedExport[] {
   const exports: ParsedExport[] = [];
   const isTypeOnly = node.isTypeOnly;
@@ -653,6 +750,13 @@ function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.Sou
   return exports;
 }
 
+/**
+ * Parses an export assignment (e.g., export default or module.exports).
+ *
+ * @param node The export assignment node.
+ * @param sourceFile The containing source file.
+ * @returns A parsed symbol representing the assignment.
+ */
 function extractExportAssignment(node: ts.ExportAssignment, sourceFile: ts.SourceFile): ParsedExport {
   const isDefault = !node.isExportEquals;
   const expression = node.expression;
@@ -669,14 +773,22 @@ function extractExportAssignment(node: ts.ExportAssignment, sourceFile: ts.Sourc
   };
 }
 
+/** Type guard to identify declarations that have a name identifier. */
 function isNamedDeclaration(node: ts.Node): node is ts.DeclarationStatement & { name?: ts.DeclarationName } {
   return ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isModuleDeclaration(node);
 }
 
+/** Type guard to identify interface or type alias declarations. */
 function isTypeDeclaration(node: ts.Node): boolean {
   return ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 }
 
+/**
+ * Extracts JSDoc commentary and tags (deprecated, since, visibility) from a node.
+ *
+ * @param node The AST node to check for JSDocs.
+ * @returns A JSDocInfo object with detected metadata.
+ */
 function extractJSDocInfo(node: ts.Node): JSDocInfo {
   const result: JSDocInfo = {};
   const jsDocs = ts.getJSDocCommentsAndTags(node);
@@ -704,45 +816,64 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
   return result;
 }
 
+/**
+ * Traverses a TypeScript AST node to extract all type-level dependencies.
+ * Correctly handles TypeReferences, ImportTypes, and TypeQueries (typeof expressions).
+ *
+ * @param node The AST node to scan.
+ * @returns An array of TypeReference identifying the detected dependencies.
+ */
 export function extractTypeReferences(node: ts.Node): TypeReference[] {
   const refs = new Map<string, TypeReference>();
-  function visit(child: ts.Node): void {
-    if (ts.isTypeParameterDeclaration(child)) return;
-    if (ts.isTypeReferenceNode(child)) {
-      const typeName = child.typeName;
-      let name: string;
-      if (ts.isIdentifier(typeName)) name = typeName.text;
-      else if (ts.isQualifiedName(typeName)) name = typeName.right.text;
-      else return;
-
-      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
-    } else if (ts.isImportTypeNode(child) && child.qualifier) {
-      let name: string;
-      if (ts.isIdentifier(child.qualifier)) name = child.qualifier.text;
-      else if (ts.isQualifiedName(child.qualifier)) name = child.qualifier.right.text;
-      else return;
-
-      let importPath: string | undefined;
-      if (ts.isLiteralTypeNode(child.argument) && ts.isStringLiteral(child.argument.literal)) importPath = child.argument.literal.text;
-      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name, importPath });
-    } else if (ts.isExpressionWithTypeArguments(child)) {
-      let name: string;
-      if (ts.isIdentifier(child.expression)) name = child.expression.text;
-      else if (ts.isPropertyAccessExpression(child.expression)) name = child.expression.name.text;
-      else { ts.forEachChild(child, visit); return; }
-
-      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
-    } else if (ts.isTypeQueryNode(child)) {
-      const exprName = child.exprName;
-      let name: string;
-      if (ts.isIdentifier(exprName)) name = exprName.text;
-      else if (ts.isQualifiedName(exprName)) name = exprName.right.text;
-      else { ts.forEachChild(child, visit); return; }
-
-      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
-    }
-    ts.forEachChild(child, visit);
-  }
-  visit(node);
+  visitTypeNode(node, refs);
   return Array.from(refs.values());
+}
+
+/** Internal visitor that recursively populates the dependency map. */
+function visitTypeNode(child: ts.Node, refs: Map<string, TypeReference>): void {
+  if (ts.isTypeParameterDeclaration(child)) return;
+
+  if (ts.isTypeReferenceNode(child)) {
+    const typeName = child.typeName;
+    let name: string;
+    if (ts.isIdentifier(typeName)) name = typeName.text;
+    else if (ts.isQualifiedName(typeName)) name = typeName.right.text;
+    else return;
+
+    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+  } else if (ts.isImportTypeNode(child) && child.qualifier) {
+    let name: string;
+    if (ts.isIdentifier(child.qualifier)) name = child.qualifier.text;
+    else if (ts.isQualifiedName(child.qualifier)) name = child.qualifier.right.text;
+    else return;
+
+    let importPath: string | undefined;
+    if (ts.isLiteralTypeNode(child.argument) && ts.isStringLiteral(child.argument.literal)) {
+      importPath = child.argument.literal.text;
+    }
+    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name, importPath });
+  } else if (ts.isExpressionWithTypeArguments(child)) {
+    let name: string;
+    if (ts.isIdentifier(child.expression)) name = child.expression.text;
+    else if (ts.isPropertyAccessExpression(child.expression)) name = child.expression.name.text;
+    else {
+      ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
+      return;
+    }
+
+    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+  } else if (ts.isTypeQueryNode(child)) {
+    const exprName = child.exprName;
+    let name: string;
+    if (ts.isIdentifier(exprName)) name = exprName.text;
+    else if (ts.isQualifiedName(exprName)) name = exprName.right.text;
+    else {
+      ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
+      return;
+    }
+
+    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+  }
+
+  ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
 }

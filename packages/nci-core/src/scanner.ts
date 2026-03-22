@@ -10,8 +10,12 @@ import path from "node:path";
 import type { PackageInfo } from "./types.js";
 
 /**
- * Check if a dirent is a directory or a symlink pointing to a directory.
- * pnpm uses symlinks in node_modules, so we need to follow them.
+ * Determines if a directory entry is a directory or a symbolic link pointing to a directory.
+ * Essential for pnpm support where node_modules contains extensive symlinks.
+ *
+ * @param entry The dirent from readdirSync.
+ * @param parentDir Absolute path to the directory containing the entry.
+ * @returns True if the target is a directory.
  */
 function isDirectoryOrSymlink(entry: fs.Dirent, parentDir: string): boolean {
   if (entry.isDirectory()) return true;
@@ -91,8 +95,11 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
 }
 
 /**
- * Read package.json from a directory and extract metadata.
- * Returns null if the directory doesn't contain a valid package.json.
+ * Reads and parses package.json from a directory to extract core metadata.
+ *
+ * @param pkgDir Absolute path to the package directory.
+ * @param fallbackName Name to use if the package.json does not specify one.
+ * @returns Discovered package metadata or null if invalid.
  */
 function readPackageInfo(
   pkgDir: string,

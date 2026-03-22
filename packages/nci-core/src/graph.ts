@@ -236,6 +236,12 @@ export function buildPackageGraph(
 
 /**
  * Recursively extracts and synthesizes inherited members for all classes and interfaces.
+ * Dynamically traverses the heritage tree to resolve members from parent symbols.
+ *
+ * @param symbols The list of all resolved symbols in the package for in-place modification.
+ * @param nameToId Map for resolving symbol names to their canonical IDs.
+ * @param pkgName Current package name for ID generation.
+ * @param pkgVersion Current package version for ID generation.
  */
 function flattenInheritedMembers(
   symbols: SymbolNode[],
@@ -327,7 +333,12 @@ function flattenInheritedMembers(
 }
 
 /**
- * Make a path relative to the package directory.
+ * Converts an absolute path to a path relative to the package root.
+ * Normalizes all path separators to forward slashes for cross-platform consistency.
+ *
+ * @param absPath The absolute path to normalize and relativize.
+ * @param packageDir The package root directory.
+ * @returns Relativized, normalized path string.
  */
 function makeRelative(absPath: string, packageDir: string): string {
   const normalized = absPath.replace(/\\/g, "/");

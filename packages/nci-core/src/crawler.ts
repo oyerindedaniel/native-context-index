@@ -100,6 +100,13 @@ export function crawl(
     circularRefs,
   };
 
+  /**
+   * Internal recursive explorer that identifies all files reachable from an entry point.
+   * Scans for both re-exports and triple-slash references to build the complete visit set.
+   *
+   * @param filePath Absolute path to the file to discover.
+   * @param depth Current recursion depth.
+   */
   function discoverFiles(filePath: string, depth: number): void {
     const normalizedPath = normalizePath(filePath);
     if (depth > maxDepth) return;
@@ -155,6 +162,14 @@ export function crawl(
     discoveryPathSet.delete(normalizedPath);
   }
 
+  /**
+   * Resolves all public symbols from a file by following its export chain.
+   *
+   * @param filePath Absolute path to the file to resolve.
+   * @param depth Current recursion depth.
+   * @param namePrefix Optional prefix for nested symbols (e.g., from namespace exports).
+   * @returns Array of fully resolved symbols.
+   */
   function resolveFile(
     filePath: string,
     depth: number,
@@ -258,6 +273,15 @@ export function crawl(
     return results;
   }
 
+  /**
+   * Resolves symbols that are re-exported from another module (e.g., export * from "./s").
+   *
+   * @param exportEntry The parsed export entry identifying the source.
+   * @param currentFile The path of the file containing the re-export.
+   * @param depth Current recursion depth.
+   * @param namePrefix Current symbol name prefix.
+   * @returns Array of resolved symbols from the target module.
+   */
   function resolveReExport(
     exportEntry: ParsedExport,
     currentFile: string,
@@ -355,6 +379,15 @@ export function crawl(
     return results;
   }
 
+  /**
+   * Resolves symbols that are assigned locally (e.g., export { x as y } or export default x).
+   *
+   * @param exportEntry The parsed export statement.
+   * @param localIndex Map of all symbols defined in the current file.
+   * @param currentFile Path to the current file.
+   * @param namePrefix Current symbol name prefix.
+   * @returns Resolved symbol associated with the assignment.
+   */
   function resolveLocalAssignment(
     exportEntry: ParsedExport,
     localIndex: Map<string, ParsedExport[]>,
@@ -426,10 +459,12 @@ export function crawl(
 }
 
 /**
- * Resolve a triple-slash reference path relative to the current file.
+ * Resolves a triple-slash reference path relative to the current file.
+ * Triple-slash references are prioritized in the discovery phase for architectural integrity.
  *
- * Triple-slash references use direct paths like "globals.d.ts" or
- * "./buffer.d.ts" that are resolved relative to the containing file.
+ * @param refPath The raw reference path from the triple-slash directive.
+ * @param currentFile The path of the containing file.
+ * @returns Resolved absolute path or null if not found.
  */
 function resolveTripleSlashRef(
   refPath: string,
