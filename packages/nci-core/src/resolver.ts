@@ -423,7 +423,7 @@ export function resolveModuleSpecifier(
 
     resolved = path.resolve(dir, specifier, "index.d.ts");
     if (isFileSafe(resolved)) return [normalizePath(resolved)];
-    
+
     return [];
   }
 
@@ -503,20 +503,19 @@ function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null
     if (!key.includes("*") || !key.startsWith(".")) continue;
 
     const keyParts = key.split("*");
-    if (keyParts.length !== 2) continue; // Only handle single wildcard for now
+    if (keyParts.length !== 2) continue; // Spec limit: Node.js and TypeScript only support a single wildcard per pattern
 
     const prefix = keyParts[0]!;
     const suffix = keyParts[1]!;
 
     if (subpath.startsWith(prefix) && subpath.endsWith(suffix)) {
       const captured = subpath.slice(prefix.length, subpath.length - suffix.length);
-      
+
       if (typeof value === "string") {
         return value.replace("*", captured);
       }
-      
+
       if (typeof value === "object" && value !== null) {
-        // Recursively replace wildcards in conditional values
         return replaceWildcardInValue(value, captured);
       }
     }
