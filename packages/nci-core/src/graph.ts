@@ -14,9 +14,10 @@ import path from "node:path";
 import ts from "typescript";
 import type {
   PackageGraph,
-  PackageInfo,
   SymbolNode,
+  PackageInfo,
 } from "./types.js";
+import { NODE_BUILTINS } from "./constants.js";
 import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
@@ -160,9 +161,9 @@ export function buildPackageGraph(
         let targetId: string | undefined;
 
         if (rawDep.importPath) {
-          const absPath = resolveModuleSpecifier(rawDep.importPath, path.join(packageInfo.dir, symbolNode.filePath));
-          if (absPath) {
-            const relPath = makeRelative(absPath, packageInfo.dir);
+          const absPaths = resolveModuleSpecifier(rawDep.importPath, path.join(packageInfo.dir, symbolNode.filePath));
+          if (absPaths.length > 0) {
+            const relPath = makeRelative(absPaths[0]!, packageInfo.dir);
             targetId = fileLocalToId.get(`${relPath}::${rawDep.name}`);
           }
         } else {
@@ -176,9 +177,9 @@ export function buildPackageGraph(
             const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
 
             if (matchingImport) {
-              const absSourcePath = resolveModuleSpecifier(matchingImport.source, path.join(packageInfo.dir, symbolNode.filePath));
-              if (absSourcePath) {
-                const relSourcePath = makeRelative(absSourcePath, packageInfo.dir);
+              const absSourcePaths = resolveModuleSpecifier(matchingImport.source, path.join(packageInfo.dir, symbolNode.filePath));
+              if (absSourcePaths.length > 0) {
+                const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
                 const originalName = matchingImport.originalName || matchingImport.name;
                 targetId = fileLocalToId.get(`${relSourcePath}::${originalName}`);
               }
@@ -186,7 +187,31 @@ export function buildPackageGraph(
           }
           if (!targetId) targetId = nameToId.get(rawDep.name);
         }
-        if (targetId) resolvedIds.add(targetId);
+        if (targetId) {
+          resolvedIds.add(targetId);
+        } else {
+          const protocolRegex = /^([a-z]+):(.*)$/;
+
+          if (rawDep.importPath && (protocolRegex.test(rawDep.importPath) || NODE_BUILTINS.has(rawDep.importPath))) {
+            const isBuiltin = NODE_BUILTINS.has(rawDep.importPath);
+            const match = rawDep.importPath.match(protocolRegex);
+            const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
+            const source = isBuiltin ? rawDep.importPath : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
+            resolvedIds.add(`${protocol}::${source}::${rawDep.name}`);
+          } else {
+            const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
+            const fileImports = allImportsPerFile[absPathForLookup] || [];
+            const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
+            
+            if (matchingImport && (protocolRegex.test(matchingImport.source) || NODE_BUILTINS.has(matchingImport.source))) {
+              const isBuiltin = NODE_BUILTINS.has(matchingImport.source);
+              const match = matchingImport.source.match(protocolRegex);
+              const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
+              const source = isBuiltin ? matchingImport.source : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
+              resolvedIds.add(`${protocol}::${source}::${matchingImport.originalName || matchingImport.name}`);
+            }
+          }
+        }
       }
       symbolNode.dependencies = Array.from(resolvedIds);
     }

@@ -732,6 +732,14 @@ export function extractTypeReferences(node: ts.Node): TypeReference[] {
       else { ts.forEachChild(child, visit); return; }
 
       if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+    } else if (ts.isTypeQueryNode(child)) {
+      const exprName = child.exprName;
+      let name: string;
+      if (ts.isIdentifier(exprName)) name = exprName.text;
+      else if (ts.isQualifiedName(exprName)) name = exprName.right.text;
+      else { ts.forEachChild(child, visit); return; }
+
+      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
     }
     ts.forEachChild(child, visit);
   }

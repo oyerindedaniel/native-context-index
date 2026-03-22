@@ -20,6 +20,16 @@ export const BUILTIN_TYPES = new Set([
   "Date", "RegExp", "Error", "Function",
 ]);
 
+/** Standard Node.js built-in modules */
+export const NODE_BUILTINS = new Set([
+  "assert", "buffer", "child_process", "cluster", "console", "constants",
+  "crypto", "dgram", "diagnostics_channel", "dns", "domain", "events",
+  "fs", "http", "http2", "https", "inspector", "module", "net", "os",
+  "path", "perf_hooks", "process", "punycode", "querystring", "readline",
+  "repl", "stream", "string_decoder", "sys", "test", "timers", "tls",
+  "trace_events", "tty", "url", "util", "v8", "vm", "worker_threads", "zlib"
+]);
+
 /** Visibility tag names used in JSDoc */
 export const VISIBILITY_TAGS = new Set(["public", "internal", "alpha", "beta"]);
 

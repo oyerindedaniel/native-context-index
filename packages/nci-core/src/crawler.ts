@@ -123,22 +123,31 @@ export function crawl(
     allRawReferences.set(normalizedPath, tripleSlashRefs);
 
     for (const reference of tripleSlashRefs) {
-      const refPath = resolveModuleSpecifier(reference, normalizedPath) ?? resolveTripleSlashRef(reference, normalizedPath);
-      if (refPath) discoverFiles(refPath, depth + 1);
+      const resolvedPaths = resolveModuleSpecifier(reference, normalizedPath);
+      if (resolvedPaths.length > 0) {
+        for (const refPath of resolvedPaths) discoverFiles(refPath, depth + 1);
+      } else {
+        const refPath = resolveTripleSlashRef(reference, normalizedPath);
+        if (refPath) discoverFiles(refPath, depth + 1);
+      }
     }
 
     for (const exportEntry of exportEntries) {
       if (exportEntry.source) {
-        const sourcePath = resolveModuleSpecifier(exportEntry.source, normalizedPath);
-        if (sourcePath) discoverFiles(sourcePath, depth + 1);
+        const sourcePaths = resolveModuleSpecifier(exportEntry.source, normalizedPath);
+        for (const sourcePath of sourcePaths) {
+          discoverFiles(sourcePath, depth + 1);
+        }
       }
     }
 
     // Follow regular imports so internal types are discovered
     for (const importEntry of importEntries) {
       if (importEntry.source) {
-        const importedPath = resolveModuleSpecifier(importEntry.source, normalizedPath);
-        if (importedPath) discoverFiles(importedPath, depth + 1);
+        const importedPaths = resolveModuleSpecifier(importEntry.source, normalizedPath);
+        for (const importedPath of importedPaths) {
+          discoverFiles(importedPath, depth + 1);
+        }
       }
     }
 
@@ -168,8 +177,10 @@ export function crawl(
 
     const tripleSlashRefs = allRawReferences.get(normalizedPath) || [];
     for (const ref of tripleSlashRefs) {
-      const refPath = resolveModuleSpecifier(ref, normalizedPath) ?? resolveTripleSlashRef(ref, normalizedPath);
-      if (refPath) {
+      const resolvedPaths = resolveModuleSpecifier(ref, normalizedPath);
+      const refPaths = resolvedPaths.length > 0 ? resolvedPaths : [resolveTripleSlashRef(ref, normalizedPath)].filter(Boolean) as string[];
+
+      for (const refPath of refPaths) {
         const nestedSymbols = resolveFile(refPath, depth + 1);
         for (const symbolNode of nestedSymbols) {
           if (!knownNames.has(symbolNode.name)) {
@@ -255,9 +266,9 @@ export function crawl(
   ): ResolvedSymbol[] {
     const results: ResolvedSymbol[] = [];
     const fullName = namePrefix ? `${namePrefix}.${exportEntry.name}` : exportEntry.name;
-    const sourcePath = resolveModuleSpecifier(exportEntry.source!, currentFile);
+    const sourcePaths = resolveModuleSpecifier(exportEntry.source!, currentFile);
 
-    if (!sourcePath) {
+    if (sourcePaths.length === 0) {
       if (!exportEntry.isWildcard) {
         results.push({
           name: fullName,
@@ -279,10 +290,13 @@ export function crawl(
       return results;
     }
 
-    const nestedSymbols = resolveFile(sourcePath, depth + 1);
+    const allNestedSymbols: ResolvedSymbol[] = [];
+    for (const sourcePath of sourcePaths) {
+      allNestedSymbols.push(...resolveFile(sourcePath, depth + 1));
+    }
 
     if (exportEntry.isWildcard) {
-      return nestedSymbols;
+      return allNestedSymbols;
     } else if (exportEntry.isNamespaceExport) {
       results.push({
         name: fullName,
@@ -291,7 +305,7 @@ export function crawl(
         isTypeOnly: exportEntry.isTypeOnly,
         definedIn: currentFile,
         reExportChain: [currentFile],
-        signature: exportEntry.signature || `namespace ${exportEntry.name} { ${nestedSymbols.length} symbols }`,
+        signature: exportEntry.signature || `namespace ${exportEntry.name} { ${allNestedSymbols.length} symbols }`,
         jsDoc: exportEntry.jsDoc,
         deprecated: exportEntry.deprecated,
         visibility: exportEntry.visibility,
@@ -300,7 +314,7 @@ export function crawl(
         decorators: exportEntry.decorators,
         modifiers: exportEntry.modifiers,
       });
-      for (const symbolNode of nestedSymbols) {
+      for (const symbolNode of allNestedSymbols) {
         results.push({
           ...symbolNode,
           name: namePrefix ? `${namePrefix}.${exportEntry.name}.${symbolNode.name}` : `${exportEntry.name}.${symbolNode.name}`,
@@ -309,20 +323,22 @@ export function crawl(
       }
     } else {
       const targetName = exportEntry.originalName ?? exportEntry.name;
-      const match = nestedSymbols.find(symbolNode => symbolNode.name === targetName);
-      if (match) {
-        results.push({
-          ...match,
-          name: fullName,
-          reExportChain: [currentFile, ...(match.reExportChain ?? [])],
-        });
+      const matches = allNestedSymbols.filter(symbolNode => symbolNode.name === targetName);
+      if (matches.length > 0) {
+        for (const match of matches) {
+          results.push({
+            ...match,
+            name: fullName,
+            reExportChain: [currentFile, ...(match.reExportChain ?? [])],
+          });
+        }
       } else {
         results.push({
           name: fullName,
           kind: exportEntry.kind,
           kindName: exportEntry.kindName,
           isTypeOnly: exportEntry.isTypeOnly,
-          definedIn: normalizePath(sourcePath),
+          definedIn: normalizePath(sourcePaths[0]!),
           reExportChain: [currentFile],
           signature: exportEntry.signature,
           jsDoc: exportEntry.jsDoc,

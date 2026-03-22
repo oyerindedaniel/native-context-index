@@ -1,0 +1,7 @@
+{
+  "name": "wildcard-subpath-resolution-root",
+  "private": true,
+  "dependencies": {
+    "dep-with-wildcards": "workspace:*"
+  }
+}

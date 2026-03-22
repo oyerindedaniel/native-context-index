@@ -1,0 +1,7 @@
+{
+  "name": "bare-package-surface-expansion-root",
+  "private": true,
+  "dependencies": {
+    "@sibling/core": "workspace:*"
+  }
+}

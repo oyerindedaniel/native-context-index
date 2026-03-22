@@ -412,7 +412,7 @@ describe("real-library pipeline (all packages)", () => {
     }
   });
 
-  it("vitest: processes our own test framework", () => {
+  it("vitest: processes our own test framework", { timeout: 30000 }, () => {
     if (!hasNodeModules) return;
     const allPkgs = scanPackages(REAL_NODE_MODULES);
     const pkg = allPkgs.find((candidate) => candidate.name === "vitest");

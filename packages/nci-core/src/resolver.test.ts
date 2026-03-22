@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import path from "node:path";
-import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
+import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./resolver.js";
 
 const FIXTURES_DIR = path.resolve(process.cwd(), "fixtures");
 
@@ -162,8 +162,8 @@ describe("resolveTypesEntry", () => {
       "@nci-test/bridge", 
       path.join(FIXTURES_DIR, "cross-package-resolution", "meta-package", "index.d.ts")
     );
-    expect(resolved).toBeTruthy();
-    const normalized = resolved!.replace(/\\/g, "/");
+    expect(resolved.length).toBeGreaterThan(0);
+    const normalized = resolved[0]!.replace(/\\/g, "/");
     expect(normalized).toContain("@nci-test/bridge");
     expect(normalized).toContain("index.d.ts");
   });
@@ -172,23 +172,23 @@ describe("resolveTypesEntry", () => {
     const resolved = resolveModuleSpecifier(
       "./mod", RESOLUTION_INDEX
     );
-    expect(resolved).toBeTruthy();
-    expect(resolved!).toMatch(/mod\.d\.ts$/);
+    expect(resolved.length).toBeGreaterThan(0);
+    expect(resolved[0]!).toMatch(/mod\.d\.ts$/);
   });
 
   it("returns null for unresolvable specifiers", () => {
     const resolved = resolveModuleSpecifier(
       "nonexistent-xyz-abc", RESOLUTION_INDEX
     );
-    expect(resolved).toBeNull();
+    expect(resolved).toHaveLength(0);
   });
 
   it("resolves .js specifier to .d.ts", () => {
     const resolved = resolveModuleSpecifier(
       "./mod.js", RESOLUTION_INDEX
     );
-    expect(resolved).toBeTruthy();
-    expect(resolved!).toMatch(/mod\.d\.ts$/);
+    expect(resolved.length).toBeGreaterThan(0);
+    expect(resolved[0]!).toMatch(/mod\.d\.ts$/);
   });
 
   it("handles invalid conditional exports gracefully", () => {
@@ -254,27 +254,27 @@ describe("resolveTypesEntry", () => {
 
     it("resolves .mjs specifier to .d.mts file", () => {
       const resolved = resolveModuleSpecifier("./esm.mjs", EXTRA_INDEX);
-      expect(resolved).toBeTruthy();
-      expect(resolved!).toMatch(/esm\.d\.mts$/);
+      expect(resolved.length).toBeGreaterThan(0);
+      expect(resolved[0]!).toMatch(/esm\.d\.mts$/);
     });
 
     it("resolves .cjs specifier to .d.cts file", () => {
       const resolved = resolveModuleSpecifier("./cjs.cjs", EXTRA_INDEX);
-      expect(resolved).toBeTruthy();
-      expect(resolved!).toMatch(/cjs\.d\.cts$/);
+      expect(resolved.length).toBeGreaterThan(0);
+      expect(resolved[0]!).toMatch(/cjs\.d\.cts$/);
     });
 
     it("resolves .js specifier to index.d.ts in a directory", () => {
       const resolved = resolveModuleSpecifier("./dir-index.js", EXTRA_INDEX);
-      expect(resolved).toBeTruthy();
-      expect(resolved!).toMatch(/dir-index\/index\.d\.ts$/);
+      expect(resolved.length).toBeGreaterThan(0);
+      expect(resolved[0]!).toMatch(/dir-index\/index\.d\.ts$/);
     });
 
     it("continues to the next resolution rule if a candidate file does not exist", () => {
        // This triggers the !isFileSafe branch for a .js specifier 
        // that doesn't have a matching .d.ts but does have a directory/index.d.ts
        const resolved = resolveModuleSpecifier("./nonexistent.js", EXTRA_INDEX);
-       expect(resolved).toBeNull();
+       expect(resolved).toHaveLength(0);
     });
   });
 
@@ -297,10 +297,10 @@ describe("resolveTypesEntry", () => {
        const EXTRA_INDEX = path.join(EXTRA_FIXTURE, "index.d.ts");
        
        const mjsResult = resolveModuleSpecifier("./missing.mjs", EXTRA_INDEX);
-       expect(mjsResult).toBeNull();
+       expect(mjsResult).toHaveLength(0);
        
        const cjsResult = resolveModuleSpecifier("./missing.cjs", EXTRA_INDEX);
-       expect(cjsResult).toBeNull();
+       expect(cjsResult).toHaveLength(0);
     });
 
     it("resolves nested root conditional exports correctly", () => {
@@ -337,5 +337,30 @@ describe("resolveTypesEntry", () => {
        const result = resolveModuleSpecifier("./nest/foo", path.join(FIXTURES_DIR, "complex-wildcard-subpaths", "index.d.ts"));
        expect(result).toBeDefined();
     });
+  it("resolves targeted subpaths against wildcard exports map", () => {
+    const fixtureDir = path.resolve(__dirname, "../fixtures/wildcard-subpath-resolution");
+    const rootFile = path.join(fixtureDir, "index.d.ts");
+    
+    // Should resolve "dep-with-wildcards/utils/formatter" to "dist/typings/formatter.d.ts"
+    // NOT the decoy at "utils/formatter.d.ts"
+    const resolved = resolveModuleSpecifier("dep-with-wildcards/utils/formatter", rootFile);
+    
+    expect(resolved.length).toBeGreaterThan(0);
+    expect(normalizePath(resolved[0]!)).toContain("node_modules/dep-with-wildcards/dist/typings/formatter.d.ts");
+    expect(normalizePath(resolved[0]!)).not.toContain("node_modules/dep-with-wildcards/utils/formatter.d.ts");
+  });
+
+  it("ingests the full surface area of a bare package re-export", () => {
+    const fixtureDir = path.resolve(__dirname, "../fixtures/bare-package-surface-expansion");
+    const rootFile = path.join(fixtureDir, "index.d.ts");
+    
+    // "@sibling/core" should expand to both index and internal entries
+    const resolved = resolveModuleSpecifier("@sibling/core", rootFile);
+    
+    expect(resolved).toHaveLength(2);
+    const relatives = resolved.map(p => path.relative(fixtureDir, p).replace(/\\/g, "/"));
+    expect(relatives).toContain("node_modules/@sibling/core/dist/index.d.ts");
+    expect(relatives).toContain("node_modules/@sibling/core/dist/internal.d.ts");
+  });
   });
 });

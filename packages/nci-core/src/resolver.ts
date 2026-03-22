@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import type { PackageEntry } from "./types.js";
+import { NODE_BUILTINS } from "./constants.js";
 
 /**
  * Resolves the types entry point(s) for a package given its directory.
@@ -37,10 +38,13 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
   const typesEntries: string[] = [];
   const subpaths: Record<string, string> = {};
 
+  // 1. Exports field (Modern Node.js resolution)
   if (pkg.exports) {
     const resolved = resolveAllExports(packageDir, pkg.exports, subpaths);
     typesEntries.push(...resolved);
   }
+
+  // 2. typesVersions (TypeScript version-specific mappings)
 
   if (typesEntries.length === 0 && pkg.typesVersions) {
     const resolved = resolveTypesVersions(packageDir, pkg.typesVersions);
@@ -50,6 +54,7 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     }
   }
 
+  // 3. types field (Standard TS field)
   if (typesEntries.length === 0 && pkg.types) {
     const resolved = resolveFile(packageDir, pkg.types);
     if (resolved) {
@@ -58,6 +63,7 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     }
   }
 
+  // 4. typings field (Legacy TS field)
   if (typesEntries.length === 0 && pkg.typings) {
     const resolved = resolveFile(packageDir, pkg.typings);
     if (resolved) {
@@ -66,6 +72,7 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     }
   }
 
+  // 5. index.d.ts fallback
   if (typesEntries.length === 0) {
     const fallback = path.join(packageDir, "index.d.ts");
     if (fs.existsSync(fallback)) {
@@ -120,8 +127,6 @@ function resolveAllExports(
             if (!seen.has(wEntry)) {
               seen.add(wEntry);
               entries.push(wEntry);
-              // For wildcards, we don't easily map back to the exact subpath without more logic,
-              // but those are usually accessed via file resolution anyway.
             }
           }
           continue;
@@ -202,6 +207,11 @@ function resolveExportCondition(
 
   if (obj.require) {
     const resolved = resolveExportCondition(packageDir, obj.require);
+    if (resolved) return resolved;
+  }
+
+  if (obj.node) {
+    const resolved = resolveExportCondition(packageDir, obj.node);
     if (resolved) return resolved;
   }
 
@@ -291,7 +301,6 @@ function expandWildcardSubpath(
   const pattern = extractWildcardPattern(value);
   if (!pattern || !pattern.includes("*")) return matchingEntries;
 
-  // Extract base directory (everything before the first '*')
   const firstStarIndex = pattern.indexOf("*");
   const beforeFirstStar = pattern.slice(0, firstStarIndex);
   const lastSlashBeforeStar = beforeFirstStar.lastIndexOf("/");
@@ -306,7 +315,6 @@ function expandWildcardSubpath(
 
   for (const candidatePath of fileCandidates) {
     const relativeToPackage = path.relative(packageDir, candidatePath).replace(/\\/g, "/");
-    // Ensure relative path starts with ./ to match glob expectation
     const normalizedRelative = relativeToPackage.startsWith("./") ? relativeToPackage : `./${relativeToPackage}`;
 
     if (globRegex.test(normalizedRelative) || globRegex.test(relativeToPackage)) {
@@ -377,7 +385,11 @@ function extractWildcardPattern(value: unknown): string | null {
 export function resolveModuleSpecifier(
   specifier: string,
   currentFile: string
-): string | null {
+): string[] {
+  if ((specifier.includes(":") || NODE_BUILTINS.has(specifier)) && !specifier.startsWith(".")) {
+    return [specifier];
+  }
+
   if (specifier.startsWith(".")) {
     const dir = path.dirname(currentFile);
     let resolved: string;
@@ -388,30 +400,31 @@ export function resolveModuleSpecifier(
     if (extMatch) {
       const base = specifier.slice(0, -extMatch[0].length);
       resolved = path.resolve(dir, base + ".d.ts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
+      if (isFileSafe(resolved)) return [normalizePath(resolved)];
 
       if (extMatch[1] === "mjs") {
         resolved = path.resolve(dir, base + ".d.mts");
-        if (isFileSafe(resolved)) return normalizePath(resolved);
+        if (isFileSafe(resolved)) return [normalizePath(resolved)];
       }
       if (extMatch[1] === "cjs") {
         resolved = path.resolve(dir, base + ".d.cts");
-        if (isFileSafe(resolved)) return normalizePath(resolved);
+        if (isFileSafe(resolved)) return [normalizePath(resolved)];
       }
 
-      // Try as directory with index.d.ts (e.g., "./scope.js" → "./scope/index.d.ts")
       resolved = path.resolve(dir, base, "index.d.ts");
-      if (isFileSafe(resolved)) return normalizePath(resolved);
+      if (isFileSafe(resolved)) return [normalizePath(resolved)];
     }
 
     resolved = path.resolve(dir, specifier + ".d.ts");
-    if (isFileSafe(resolved)) return normalizePath(resolved);
+    if (isFileSafe(resolved)) return [normalizePath(resolved)];
 
     resolved = path.resolve(dir, specifier);
-    if (isFileSafe(resolved)) return normalizePath(resolved);
+    if (isFileSafe(resolved)) return [normalizePath(resolved)];
 
     resolved = path.resolve(dir, specifier, "index.d.ts");
-    if (isFileSafe(resolved)) return normalizePath(resolved);
+    if (isFileSafe(resolved)) return [normalizePath(resolved)];
+    
+    return [];
   }
 
   return resolvePackageEntry(specifier, currentFile);
@@ -420,7 +433,7 @@ export function resolveModuleSpecifier(
 /**
  * Resolve a package-level entry point by searching node_modules.
  */
-function resolvePackageEntry(specifier: string, currentFile: string): string | null {
+function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   const parts = specifier.split("/");
   let packageName = parts[0]!;
   let subpath = ".";
@@ -433,31 +446,101 @@ function resolvePackageEntry(specifier: string, currentFile: string): string | n
   }
 
   const pkgDir = findPackageDir(packageName, path.dirname(currentFile));
-  if (!pkgDir) return null;
+  if (!pkgDir) return [];
 
-  if (!fs.existsSync(path.join(pkgDir, "package.json"))) {
-    return null;
+  const pkgJsonPath = path.join(pkgDir, "package.json");
+  if (!fs.existsSync(pkgJsonPath)) {
+    return [];
   }
 
   const pkgEntry = resolveTypesEntry(pkgDir);
-  
-  const mappedSubpath = pkgEntry.subpaths[subpath];
-  if (mappedSubpath) {
-    return mappedSubpath;
-  }
 
   if (subpath === ".") {
-    return pkgEntry.typesEntries[0] || null;
+    return pkgEntry.typesEntries;
+  }
+
+  const mappedSubpath = pkgEntry.subpaths[subpath];
+  if (mappedSubpath) {
+    return [mappedSubpath];
+  }
+
+  // Resolve targeted subpath against wildcard patterns in exports
+  const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+  if (pkg.exports) {
+    const wildcardMatched = matchWildcardSubpath(subpath, pkg.exports);
+    if (wildcardMatched) {
+      const resolved = resolveExportCondition(pkgDir, wildcardMatched);
+      if (resolved) return [resolved];
+    }
   }
 
   const subpathParsed = subpath.startsWith("./") ? subpath : `./${subpath}`;
   const resolvedSub = resolveFile(pkgDir, subpathParsed);
-  if (resolvedSub) return normalizePath(resolvedSub);
-  
+  if (resolvedSub) return [normalizePath(resolvedSub)];
+
   const resolvedSubWithExt = resolveFile(pkgDir, subpathParsed + ".d.ts");
-  if (resolvedSubWithExt) return normalizePath(resolvedSubWithExt);
+  if (resolvedSubWithExt) return [normalizePath(resolvedSubWithExt)];
+
+  // Directory-to-index fallback
+  const indexFallback = path.join(pkgDir, subpathParsed, "index.d.ts");
+  if (fs.existsSync(indexFallback)) return [normalizePath(indexFallback)];
+
+  return [];
+}
+
+/**
+ * Matches a targeted subpath (e.g. "./utils/formatter") against an exports map
+ * that might contain wildcards (e.g. "./utils/*").
+ *
+ * Returns the mapped value with the wildcard replaced.
+ */
+function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null {
+  if (typeof exports !== "object" || exports === null) return null;
+
+  const exportsMap = exports as Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(exportsMap)) {
+    if (!key.includes("*") || !key.startsWith(".")) continue;
+
+    const keyParts = key.split("*");
+    if (keyParts.length !== 2) continue; // Only handle single wildcard for now
+
+    const prefix = keyParts[0]!;
+    const suffix = keyParts[1]!;
+
+    if (subpath.startsWith(prefix) && subpath.endsWith(suffix)) {
+      const captured = subpath.slice(prefix.length, subpath.length - suffix.length);
+      
+      if (typeof value === "string") {
+        return value.replace("*", captured);
+      }
+      
+      if (typeof value === "object" && value !== null) {
+        // Recursively replace wildcards in conditional values
+        return replaceWildcardInValue(value, captured);
+      }
+    }
+  }
 
   return null;
+}
+
+/** Helper to recursively replace wildcards in nested condition objects. */
+function replaceWildcardInValue(value: unknown, replacement: string): unknown {
+  if (typeof value === "string") {
+    return value.replace("*", replacement);
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => replaceWildcardInValue(item, replacement));
+  }
+  if (typeof value === "object" && value !== null) {
+    const result: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(value)) {
+      result[key] = replaceWildcardInValue(nestedValue, replacement);
+    }
+    return result;
+  }
+  return value;
 }
 
 /**
