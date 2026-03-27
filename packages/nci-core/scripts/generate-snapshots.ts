@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const fixturesDir = path.resolve(__dirname, "../fixtures");
 const snapshotDir = path.resolve(
   __dirname,
-  "../../../crates/nci-engine/tests/snapshots/oracle"
+  "../../nci-engine/tests/snapshots/oracle"
 );
 
 const args = process.argv.slice(2);

@@ -55,4 +55,5 @@ docs/
 # Snapshots (as requested)
 /snapshots/
 **/snapshots/
+snapshot.md
 
