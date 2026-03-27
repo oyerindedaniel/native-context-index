@@ -44,4 +44,15 @@ poc-oracle.ts
 nco-react-index.json
 packages/nci-core/nci-report.json
 packages/nci-core/docs/
+docs/
+
+# Rust build artifacts
+/target/
+
+# Backup files from `cargo fix` or other tools
+**/*.rs.bk
+
+# Snapshots (as requested)
+/snapshots/
+**/snapshots/
 

@@ -28,12 +28,10 @@ import { NODE_BUILTINS } from "./constants.js";
  */
 export function resolveTypesEntry(packageDir: string): PackageEntry {
   const pkgJsonPath = path.join(packageDir, "package.json");
+  const pkg = fs.existsSync(pkgJsonPath) 
+    ? JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"))
+    : {};
 
-  if (!fs.existsSync(pkgJsonPath)) {
-    throw new Error(`No package.json found at ${packageDir}`);
-  }
-
-  const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
   const name: string = pkg.name ?? path.basename(packageDir);
   const typesEntries: string[] = [];
   const subpaths: Record<string, string> = {};
@@ -112,21 +110,21 @@ function resolveAllExports(
   }
 
   if (typeof exports === "object" && exports !== null) {
-    const obj = exports as Record<string, unknown>;
+    const exportsMap = exports as Record<string, unknown>;
 
-    const hasSubpaths = Object.keys(obj).some((key) => key.startsWith("."));
+    const hasSubpaths = Object.keys(exportsMap).some((key) => key.startsWith("."));
 
     if (hasSubpaths) {
-      for (const [subpath, value] of Object.entries(obj)) {
+      for (const [subpath, value] of Object.entries(exportsMap)) {
         if (!subpath.startsWith(".")) continue;
         if (subpath === "./package.json") continue;
 
         if (subpath.includes("*")) {
           const wildcardEntries = expandWildcardSubpath(packageDir, value);
-          for (const wEntry of wildcardEntries) {
-            if (!seen.has(wEntry)) {
-              seen.add(wEntry);
-              entries.push(wEntry);
+          for (const wildcardEntry of wildcardEntries) {
+            if (!seen.has(wildcardEntry)) {
+              seen.add(wildcardEntry);
+              entries.push(wildcardEntry);
             }
           }
           continue;
@@ -142,7 +140,7 @@ function resolveAllExports(
         }
       }
     } else {
-      const resolved = resolveExportCondition(packageDir, obj);
+      const resolved = resolveExportCondition(packageDir, exportsMap);
       if (resolved) {
         entries.push(resolved);
         if (!subpaths["."]) subpaths["."] = resolved;
@@ -196,31 +194,31 @@ function resolveExportCondition(
     return null;
   }
 
-  const obj = entry as Record<string, unknown>;
+  const entryObj = entry as Record<string, unknown>;
 
   // Priority order: types → import → require → default
-  if (obj.types !== undefined) {
-    const resolved = resolveExportCondition(packageDir, obj.types);
+  if (entryObj.types !== undefined) {
+    const resolved = resolveExportCondition(packageDir, entryObj.types);
     if (resolved) return resolved;
   }
 
-  if (obj.import) {
-    const resolved = resolveExportCondition(packageDir, obj.import);
+  if (entryObj.import) {
+    const resolved = resolveExportCondition(packageDir, entryObj.import);
     if (resolved) return resolved;
   }
 
-  if (obj.require) {
-    const resolved = resolveExportCondition(packageDir, obj.require);
+  if (entryObj.require) {
+    const resolved = resolveExportCondition(packageDir, entryObj.require);
     if (resolved) return resolved;
   }
 
-  if (obj.node) {
-    const resolved = resolveExportCondition(packageDir, obj.node);
+  if (entryObj.node) {
+    const resolved = resolveExportCondition(packageDir, entryObj.node);
     if (resolved) return resolved;
   }
 
-  if (obj.default !== undefined) {
-    const resolved = resolveExportCondition(packageDir, obj.default);
+  if (entryObj.default !== undefined) {
+    const resolved = resolveExportCondition(packageDir, entryObj.default);
     if (resolved) return resolved;
   }
 
