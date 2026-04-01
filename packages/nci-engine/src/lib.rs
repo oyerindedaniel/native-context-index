@@ -1,4 +1,5 @@
 pub mod constants;
+pub mod dedupe;
 pub mod crawler;
 pub mod graph;
 pub mod parser;

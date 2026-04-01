@@ -42,9 +42,7 @@ fn oracle_dir() -> PathBuf {
 fn normalise_graph(graph: &mut PackageGraph, fixture_dir: &Path) {
     graph.crawl_duration_ms = 0.0;
 
-    let fixture_dir_str = fixture_dir
-        .to_string_lossy()
-        .replace('\\', "/");
+    let fixture_dir_str = fixture_dir.to_string_lossy().replace('\\', "/");
 
     for symbol in &mut graph.symbols {
         let abs = symbol.file_path.replace('\\', "/");
@@ -59,7 +57,9 @@ fn normalise_graph(graph: &mut PackageGraph, fixture_dir: &Path) {
                 let abs = file.replace('\\', "/");
                 if abs.starts_with(&fixture_dir_str) {
                     let rest = &abs[fixture_dir_str.len()..];
-                    new_files.push(SharedString::from(rest.strip_prefix('/').unwrap_or(rest).to_string()));
+                    new_files.push(SharedString::from(
+                        rest.strip_prefix('/').unwrap_or(rest).to_string(),
+                    ));
                 } else {
                     new_files.push(file.clone());
                 }
@@ -115,11 +115,7 @@ fn normalise_oracle(oracle: &mut serde_json::Value) {
     if let Some(symbols) = oracle.get_mut("symbols").and_then(|s| s.as_array_mut()) {
         for sym in symbols.iter_mut() {
             if let Some(deps) = sym.get_mut("dependencies").and_then(|d| d.as_array_mut()) {
-                deps.sort_by(|a, b| {
-                    a.as_str()
-                        .unwrap_or("")
-                        .cmp(b.as_str().unwrap_or(""))
-                });
+                deps.sort_by(|a, b| a.as_str().unwrap_or("").cmp(b.as_str().unwrap_or("")));
             }
             if let Some(obj) = sym.as_object_mut() {
                 obj.remove("rawDependencies");
@@ -138,10 +134,7 @@ fn compare_symbol_names_and_counts(
     oracle: &serde_json::Value,
     fixture_name: &str,
 ) {
-    let oracle_symbols = oracle
-        .get("symbols")
-        .and_then(|s| s.as_array())
-        .unwrap();
+    let oracle_symbols = oracle.get("symbols").and_then(|s| s.as_array()).unwrap();
 
     assert_eq!(
         rust_graph.symbols.len(),
@@ -151,11 +144,7 @@ fn compare_symbol_names_and_counts(
         oracle_symbols.len()
     );
 
-    let mut rust_names: Vec<&str> = rust_graph
-        .symbols
-        .iter()
-        .map(|s| s.name.as_ref())
-        .collect();
+    let mut rust_names: Vec<&str> = rust_graph.symbols.iter().map(|s| s.name.as_ref()).collect();
     rust_names.sort();
 
     let mut ts_names: Vec<String> = oracle_symbols
@@ -179,11 +168,7 @@ fn compare_structural_properties(
 
     let oracle_by_id: HashMap<&str, &serde_json::Value> = oracle_symbols
         .iter()
-        .filter_map(|s| {
-            s.get("id")
-                .and_then(|id| id.as_str())
-                .map(|id| (id, s))
-        })
+        .filter_map(|s| s.get("id").and_then(|id| id.as_str()).map(|id| (id, s)))
         .collect();
 
     for rust_sym in &rust_graph.symbols {
@@ -199,15 +184,18 @@ fn compare_structural_properties(
 
         if let Some(ts_kind_name) = ts_sym.get("kindName").and_then(|k| k.as_str()) {
             assert_eq!(
-                rust_sym.kind_name.as_ref(), ts_kind_name,
+                rust_sym.kind_name.as_ref(),
+                ts_kind_name,
                 "[{fixture_name}] Kind mismatch for '{}' ({})",
-                rust_sym.name, rust_sym.id
+                rust_sym.name,
+                rust_sym.id
             );
         }
 
         if let Some(ts_file_path) = ts_sym.get("filePath").and_then(|f| f.as_str()) {
             assert_eq!(
-                rust_sym.file_path.as_ref(), ts_file_path,
+                rust_sym.file_path.as_ref(),
+                ts_file_path,
                 "[{fixture_name}] File path mismatch for '{}'",
                 rust_sym.name
             );
@@ -221,13 +209,27 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_heritage) = ts_sym.get("heritage").and_then(|h| h.as_array()) {
-            let ts_heritage_strs: Vec<&str> = ts_heritage
-                .iter()
-                .filter_map(|h| h.as_str())
-                .collect();
+        if let Some(ts_space) = ts_sym.get("symbolSpace").and_then(|s| s.as_str()) {
+            let rust_space = match rust_sym.symbol_space {
+                nci_engine::types::SymbolSpace::Type => "type",
+                nci_engine::types::SymbolSpace::Value => "value",
+            };
             assert_eq!(
-                rust_sym.heritage.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                rust_space, ts_space,
+                "[{fixture_name}] symbolSpace mismatch for '{}'",
+                rust_sym.name
+            );
+        }
+
+        if let Some(ts_heritage) = ts_sym.get("heritage").and_then(|h| h.as_array()) {
+            let ts_heritage_strs: Vec<&str> =
+                ts_heritage.iter().filter_map(|h| h.as_str()).collect();
+            assert_eq!(
+                rust_sym
+                    .heritage
+                    .iter()
+                    .map(|s| s.as_ref())
+                    .collect::<Vec<_>>(),
                 ts_heritage_strs,
                 "[{fixture_name}] Heritage mismatch for '{}'",
                 rust_sym.name
@@ -265,10 +267,7 @@ macro_rules! snapshot_test {
             let fixture_name = $fixture_name;
             let rust_graph = build_fixture_graph(fixture_name);
 
-            insta::assert_json_snapshot!(
-                format!("rust_{}", fixture_name),
-                &rust_graph
-            );
+            insta::assert_json_snapshot!(format!("rust_{}", fixture_name), &rust_graph);
 
             if let Some(mut oracle) = load_oracle(fixture_name) {
                 normalise_oracle(&mut oracle);
@@ -283,7 +282,10 @@ snapshot_test!(snapshot_simple_export, "simple-export");
 snapshot_test!(snapshot_re_export_chain, "re-export-chain");
 snapshot_test!(snapshot_namespace_cases, "namespace-cases");
 snapshot_test!(snapshot_class_instance, "class-instance");
-snapshot_test!(snapshot_inherited_member_flattening, "inherited-member-flattening");
+snapshot_test!(
+    snapshot_inherited_member_flattening,
+    "inherited-member-flattening"
+);
 snapshot_test!(snapshot_deprecated_exports, "deprecated-exports");
 snapshot_test!(snapshot_visibility_tags, "visibility-tags");
 snapshot_test!(snapshot_enum_declaration, "all-export-forms");
@@ -315,11 +317,37 @@ snapshot_test!(snapshot_global_augmentation, "global-augmentation");
 snapshot_test!(snapshot_mixin_composition, "mixin-composition");
 snapshot_test!(snapshot_visibility_merge, "visibility-merge");
 snapshot_test!(snapshot_since_inheritance, "since-inheritance");
+snapshot_test!(
+    snapshot_deep_recursion_duplicates,
+    "deep-recursion-duplicates"
+);
+snapshot_test!(snapshot_id_stability_sort, "id-stability-sort");
+snapshot_test!(
+    snapshot_resolver_strict_boundary,
+    "resolver-strict-boundary"
+);
+snapshot_test!(snapshot_traversal_depth_edge, "traversal-depth-edge");
+snapshot_test!(snapshot_shared_type_pruning, "shared-type-pruning");
+snapshot_test!(
+    snapshot_shared_type_sibling_expansion,
+    "shared-type-sibling-expansion"
+);
+snapshot_test!(
+    snapshot_accessor_member_extraction,
+    "accessor-member-extraction"
+);
+snapshot_test!(
+    snapshot_member_property_extraction,
+    "member-property-extraction"
+);
+snapshot_test!(snapshot_internal_overload_ref, "internal-overload-ref");
 
 #[test]
 fn all_oracles_have_tests() {
     let oracle = oracle_dir();
-    if !oracle.exists() { return; }
+    if !oracle.exists() {
+        return;
+    }
 
     let oracle_count = fs::read_dir(&oracle)
         .unwrap()

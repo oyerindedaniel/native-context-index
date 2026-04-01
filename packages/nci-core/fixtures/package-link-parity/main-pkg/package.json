@@ -1,0 +1,8 @@
+{
+  "name": "main-pkg",
+  "version": "1.0.0",
+  "types": "./index.d.ts",
+  "dependencies": {
+    "dep-pkg": "1.0.0"
+  }
+}

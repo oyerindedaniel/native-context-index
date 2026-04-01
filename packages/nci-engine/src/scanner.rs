@@ -7,9 +7,7 @@ use crate::types::{PackageInfo, SharedString};
 #[derive(Debug, thiserror::Error)]
 pub enum ScanError {
     #[error("node_modules not found at: {path}")]
-    NotFound {
-        path: PathBuf,
-    },
+    NotFound { path: PathBuf },
 
     #[error("IO error during scan: {source}")]
     Io {
@@ -41,16 +39,12 @@ pub fn scan_packages(node_modules_path: &Path) -> Result<Vec<PackageInfo>, ScanE
         }
 
         if entry_name_str.starts_with('@') {
-            scan_scoped_packages(
-                node_modules_path,
-                &entry_name_str,
-                &mut packages,
-            )?;
+            scan_scoped_packages(node_modules_path, &entry_name_str, &mut packages)?;
         } else {
             let symlink_path = node_modules_path.join(&*entry_name_str);
             let resolved_dir = match fs::canonicalize(&symlink_path) {
                 Ok(dir) => dir,
-                Err(_) => continue, 
+                Err(_) => continue,
             };
             if let Some(info) = read_package_info(&resolved_dir, &entry_name_str) {
                 packages.push(info);
@@ -79,7 +73,7 @@ fn scan_scoped_packages(
         let symlink_path = scope_dir.join(&scoped_name);
         let resolved_dir = match fs::canonicalize(&symlink_path) {
             Ok(dir) => dir,
-            Err(_) => continue, 
+            Err(_) => continue,
         };
         let full_name = format!("{}/{}", scope_name, scoped_name.to_string_lossy());
 
@@ -113,13 +107,9 @@ fn read_package_info(package_dir: &Path, fallback_name: &str) -> Option<PackageI
     let raw_contents = fs::read_to_string(&pkg_json_path).ok()?;
     let parsed: serde_json::Value = serde_json::from_str(&raw_contents).ok()?;
 
-    let name = SharedString::from(parsed["name"]
-        .as_str()
-        .unwrap_or(fallback_name));
+    let name = SharedString::from(parsed["name"].as_str().unwrap_or(fallback_name));
 
-    let version = SharedString::from(parsed["version"]
-        .as_str()
-        .unwrap_or("0.0.0"));
+    let version = SharedString::from(parsed["version"].as_str().unwrap_or("0.0.0"));
 
     Some(PackageInfo {
         is_scoped: name.starts_with('@'),

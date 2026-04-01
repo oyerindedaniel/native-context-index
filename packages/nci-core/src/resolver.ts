@@ -1,19 +1,3 @@
-/**
- * NCI Core — Resolver
- *
- * Resolves a package directory to its .d.ts types entry point(s).
- *
- * Resolution priority (per entry):
- *  1. exports["."].types (conditional "types" condition)
- *  2. exports["."].import.types or exports["."].require.types (nested)
- *  3. exports["."] or exports (if string ending in .d.ts)
- *  4. typesVersions (version-gated type paths)
- *  5. types field
- *  6. typings field (legacy)
- *  7. index.d.ts fallback
- *
- * For subpath exports, ALL entries are resolved (not just ".").
- */
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
@@ -295,7 +279,7 @@ function matchesVersionRange(version: string, range: string): boolean {
  */
 function resolveFile(packageDir: string, relativePath: string): string | null {
   const absPath = path.resolve(packageDir, relativePath);
-  return isFileSafe(absPath) ? absPath : null;
+  return isFileSafe(absPath) ? normalizePath(absPath) : null;
 }
 
 
@@ -338,7 +322,7 @@ function expandWildcardSubpath(
         candidatePath.endsWith(".d.mts") ||
         candidatePath.endsWith(".d.cts")
       ) {
-        matchingEntries.push(candidatePath);
+        matchingEntries.push(normalizePath(candidatePath));
       }
     }
   }
@@ -624,5 +608,11 @@ export function isFileSafe(filePath: string): boolean {
  * @returns Absolute path with normalized forward slash separators.
  */
 export function normalizePath(filePath: string): string {
-  return path.resolve(filePath).replace(/\\/g, "/");
+  const resolved = path.resolve(filePath);
+  try {
+    return fs.realpathSync(resolved).replace(/\\/g, "/");
+  } catch {
+    // If realpathSync fails (file doesn't exist yet), fall back to resolved path
+    return resolved.replace(/\\/g, "/");
+  }
 }

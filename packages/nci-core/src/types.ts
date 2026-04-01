@@ -9,6 +9,12 @@ import type ts from "typescript";
 /** API visibility level from JSDoc tags: @public, @internal, @alpha, @beta */
 export type VisibilityLevel = "public" | "internal" | "alpha" | "beta";
 
+/**
+ * TypeScript symbol namespace for the declaration site (not `export type` / re-export flags).
+ * Interface and type-only shapes are `"type"`; runtime declarations are `"value"`.
+ */
+export type SymbolSpace = "type" | "value";
+
 /** Metadata for a TypeScript decorator: @name(args) */
 export interface DecoratorMetadata {
   /** The name of the decorator (e.g., "injectable" or "route") */
@@ -53,6 +59,8 @@ export interface TypeReference {
   name: string;
   /** The module specifier if it's an inline import() */
   importPath?: string;
+  /** Symbol space hint for dependency resolution */
+  resolutionHint?: "type" | "value";
 }
 
 /** Union of AST nodes that can be expanded for member extraction (Spread, Mixin) */
@@ -68,6 +76,8 @@ export interface ParsedExport {
   kindName: string;
   /** Whether this is a type-only export */
   isTypeOnly: boolean;
+  /** Type vs value namespace for this declaration (see {@link SymbolSpace}). */
+  symbolSpace: SymbolSpace;
   /** Re-export source module specifier (e.g., "./lib/core") */
   source?: string;
   /** Original name if aliased (export { X as Y } → originalName = "X") */
@@ -84,6 +94,8 @@ export interface ParsedExport {
   dependencies?: TypeReference[];
   /** Whether this is a global augmentation (declare global { }) */
   isGlobalAugmentation?: boolean;
+  /** Absolute path of declaring file when folded from `/// <reference path />` (definition site). */
+  declaredInFile?: string;
   /** Deprecation info: true if @deprecated with no message, or the message string */
   deprecated?: string | boolean;
   /** API visibility: @public, @internal, @alpha, @beta */
@@ -130,6 +142,11 @@ export interface CrawlResult {
   typeReferencePackages: string[];
   /** Any circular references detected */
   circularRefs: string[];
+  /**
+   * Direct edges from `/// <reference path="..." />` resolution.
+   * Keys and values are absolute paths (forward slashes, `normalizePath`); each value is one hop from the key.
+   */
+  tripleSlashReferenceTargets: Record<string, string[]>;
 }
 
 /** A fully resolved symbol (after following all re-exports) */
@@ -142,12 +159,16 @@ export interface ResolvedSymbol {
   kindName: string;
   /** Whether this is type-only */
   isTypeOnly: boolean;
+  /** Type vs value namespace for this declaration */
+  symbolSpace: SymbolSpace;
   /** Full type signature */
   signature?: string;
   /** JSDoc comment */
   jsDoc?: string;
   /** File where this symbol is actually defined */
   definedIn: string;
+  /** Package types entry (absolute path) through which this symbol was discovered in pass 1. */
+  resolvedFromPackageEntry?: string;
   /** If re-exported, the chain of files it passed through */
   reExportChain?: string[];
   /** Type references found in the declaration */
@@ -198,6 +219,8 @@ export interface SymbolNode {
   jsDoc?: string;
   /** Whether this is type-only */
   isTypeOnly: boolean;
+  /** Type vs value namespace for this declaration */
+  symbolSpace: SymbolSpace;
   /** IDs of symbols this one references */
   dependencies: string[];
   /** ID of the original source symbol if re-exported */
@@ -222,6 +245,8 @@ export interface SymbolNode {
   modifiers?: string[];
   /** Original type references for resolution */
   rawDependencies?: TypeReference[];
+  /** Entry files in which this symbol is visible (relative paths) */
+  entryVisibility?: string[];
 }
 
 /** The complete graph for a single package */

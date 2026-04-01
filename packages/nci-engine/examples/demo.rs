@@ -43,12 +43,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if !target_packages_args.is_empty() {
-        discovered_packages.retain(|package_info| target_packages_args.contains(&package_info.name.to_string()));
+        discovered_packages
+            .retain(|package_info| target_packages_args.contains(&package_info.name.to_string()));
     }
 
     if discovered_packages.is_empty() {
         if !target_packages_args.is_empty() {
-            eprintln!("❌ No packages found matching: {}", target_packages_args.join(", "));
+            eprintln!(
+                "❌ No packages found matching: {}",
+                target_packages_args.join(", ")
+            );
         } else {
             println!("   No packages discovered.");
         }
@@ -57,18 +61,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📦 Found {} packages\n", discovered_packages.len());
 
-    let crawl_options = Some(CrawlOptions {
-        max_depth: 10,
-    });
+    let crawl_options = Some(CrawlOptions { max_depth: 10 });
 
     let mut graphs = Vec::new();
     for package_info in discovered_packages {
         print!("   {}...", package_info.name);
         use std::io::Write;
         std::io::stdout().flush()?;
-        
+
         let graph = build_package_graph(&package_info, crawl_options.clone());
-        println!(" {} symbols, {} files ({:.1}ms)", graph.total_symbols, graph.total_files, graph.crawl_duration_ms);
+        println!(
+            " {} symbols, {} files ({:.1}ms)",
+            graph.total_symbols, graph.total_files, graph.crawl_duration_ms
+        );
         graphs.push(graph);
     }
 
@@ -79,21 +84,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n{}", "═".repeat(78));
     println!("📊 SUMMARY\n");
     println!("   Total packages:  {}", graphs.len());
-    println!("   Total symbols:   {}", graphs.iter().map(|graph| graph.total_symbols).sum::<usize>());
-    println!("   Total files:     {}", graphs.iter().map(|graph| graph.total_files).sum::<usize>());
+    println!(
+        "   Total symbols:   {}",
+        graphs
+            .iter()
+            .map(|graph| graph.total_symbols)
+            .sum::<usize>()
+    );
+    println!(
+        "   Total files:     {}",
+        graphs.iter().map(|graph| graph.total_files).sum::<usize>()
+    );
     println!("   Total time:      {}ms\n", total_time_elapsed.as_millis());
 
-    println!("   {:<40} {:>8} {:>9} {:>7} {:>10}", "Package", "Entries", "Symbols", "Files", "Time");
+    println!(
+        "   {:<40} {:>8} {:>9} {:>7} {:>10}",
+        "Package", "Entries", "Symbols", "Files", "Time"
+    );
     println!("   {}", "─".repeat(78));
 
     for graph in &graphs {
         println!(
             "   {: <40} {: >8} {: >9} {: >7} {: >10.1}ms",
-            graph.package,
-            1,
-            graph.total_symbols,
-            graph.total_files,
-            graph.crawl_duration_ms
+            graph.package, 1, graph.total_symbols, graph.total_files, graph.crawl_duration_ms
         );
     }
 

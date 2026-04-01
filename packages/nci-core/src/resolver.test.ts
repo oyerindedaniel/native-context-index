@@ -56,7 +56,7 @@ describe("resolveTypesEntry", () => {
 
     expect(result.name).toBe("string-exports-pkg");
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries[0]!).toContain(path.join("lib", "index.d.ts"));
+    expect(result.typesEntries[0]!).toContain("lib/index.d.ts");
   });
 
   it("returns empty typesEntries for a package with no types", () => {
@@ -67,10 +67,9 @@ describe("resolveTypesEntry", () => {
     expect(result.typesEntries).toHaveLength(0);
   });
 
-  it("throws for a missing package.json", () => {
-    expect(() =>
-      resolveTypesEntry(path.join(FIXTURES_DIR, "nonexistent"))
-    ).toThrow("No package.json found");
+  it("handles a missing package.json gracefully", () => {
+    const result = resolveTypesEntry(path.join(FIXTURES_DIR, "nonexistent"));
+    expect(result.typesEntries).toHaveLength(0);
   });
 
   it("prefers exports.types over top-level types field", () => {
@@ -244,8 +243,9 @@ describe("resolveTypesEntry", () => {
     const fixtureDir = path.join(FIXTURES_DIR, "subpath-string-exports");
     const result = resolveTypesEntry(fixtureDir);
     expect(result.typesEntries.length).toBeGreaterThan(0);
-    expect(result.typesEntries).toContain(path.resolve(fixtureDir, "foo.d.ts"));
-    expect(result.typesEntries).not.toContain(path.resolve(fixtureDir, "bar.js"));
+    const normalizedFixtureDir = fixtureDir.replace(/\\/g, "/");
+    expect(result.typesEntries).toContain(normalizedFixtureDir + "/foo.d.ts");
+    expect(result.typesEntries).not.toContain(normalizedFixtureDir + "/bar.js");
   });
 
   describe("Relative Module Specifier Resolution", () => {

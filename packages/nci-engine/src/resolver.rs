@@ -8,8 +8,7 @@ use regex::Regex;
 static VERSION_RANGE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^>=\s*(\d+)\.(\d+)(?:\.(\d+))?$").unwrap());
 
-static JS_EXT_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\.(js|mjs|cjs)$").unwrap());
+static JS_EXT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.(js|mjs|cjs)$").unwrap());
 
 use crate::constants::NODE_BUILTINS;
 use crate::types::{PackageEntry, SharedString};
@@ -17,9 +16,7 @@ use crate::types::{PackageEntry, SharedString};
 #[derive(Debug, thiserror::Error)]
 pub enum ResolveError {
     #[error("No package.json found at: {path}")]
-    NoPkgJson {
-        path: PathBuf,
-    },
+    NoPkgJson { path: PathBuf },
 
     #[error("Failed to parse package.json: {source}")]
     ParseError {
@@ -49,12 +46,12 @@ pub fn resolve_types_entry(package_dir: &Path) -> Result<PackageEntry, ResolveEr
         .unwrap_or_default()
         .to_string_lossy();
 
-    let name = SharedString::from(parsed_pkg["name"]
-        .as_str()
-        .unwrap_or_else(|| basename.as_ref()));
-    let _version = SharedString::from(parsed_pkg["version"]
-        .as_str()
-        .unwrap_or("0.0.0"));
+    let name = SharedString::from(
+        parsed_pkg["name"]
+            .as_str()
+            .unwrap_or_else(|| basename.as_ref()),
+    );
+    let _version = SharedString::from(parsed_pkg["version"].as_str().unwrap_or("0.0.0"));
 
     // Priority: exports -> typesVersions -> types -> typings -> index.d.ts fallback
     let mut types_entries: Vec<SharedString> = Vec::new();
@@ -110,7 +107,8 @@ pub fn resolve_types_entry(package_dir: &Path) -> Result<PackageEntry, ResolveEr
 }
 
 pub fn resolve_module_specifier(specifier: &str, current_file: &str) -> Vec<SharedString> {
-    if (specifier.contains(':') || NODE_BUILTINS.contains(specifier)) && !specifier.starts_with('.') {
+    if (specifier.contains(':') || NODE_BUILTINS.contains(specifier)) && !specifier.starts_with('.')
+    {
         return vec![SharedString::from(specifier)];
     }
 
@@ -154,8 +152,7 @@ fn resolve_all_exports(
                     }
 
                     if subpath_key.as_ref().contains('*') {
-                        let wildcard_entries =
-                            expand_wildcard_subpath(package_dir, subpath_value);
+                        let wildcard_entries = expand_wildcard_subpath(package_dir, subpath_value);
                         for entry_path in wildcard_entries {
                             if seen_paths.insert(entry_path.clone()) {
                                 entries.push(entry_path);
@@ -164,9 +161,7 @@ fn resolve_all_exports(
                         continue;
                     }
 
-                    if let Some(resolved) =
-                        resolve_export_condition(package_dir, subpath_value)
-                    {
+                    if let Some(resolved) = resolve_export_condition(package_dir, subpath_value) {
                         subpaths.insert(subpath_key, resolved.clone());
                         if seen_paths.insert(resolved.clone()) {
                             entries.push(resolved);
@@ -174,9 +169,7 @@ fn resolve_all_exports(
                     }
                 }
             } else {
-                if let Some(resolved) =
-                    resolve_export_condition(package_dir, exports)
-                {
+                if let Some(resolved) = resolve_export_condition(package_dir, exports) {
                     entries.push(resolved.clone());
                     subpaths.entry(".".into()).or_insert(resolved);
                 }
@@ -200,10 +193,7 @@ fn resolve_all_exports(
     entries
 }
 
-fn resolve_export_condition(
-    package_dir: &Path,
-    entry: &serde_json::Value,
-) -> Option<SharedString> {
+fn resolve_export_condition(package_dir: &Path, entry: &serde_json::Value) -> Option<SharedString> {
     match entry {
         serde_json::Value::String(path_string) => {
             if is_declaration_file(path_string) {
@@ -213,11 +203,9 @@ fn resolve_export_condition(
             }
         }
 
-        serde_json::Value::Array(condition_array) => {
-            condition_array
-                .iter()
-                .find_map(|item| resolve_export_condition(package_dir, item))
-        }
+        serde_json::Value::Array(condition_array) => condition_array
+            .iter()
+            .find_map(|item| resolve_export_condition(package_dir, item)),
 
         serde_json::Value::Object(condition_map) => {
             // Priority order: types → import → require → node → default
@@ -294,8 +282,14 @@ fn matches_version_range(version: &str, range: &str) -> bool {
     let required_minor: u32 = range_captures[2].parse().unwrap_or(0);
 
     let version_parts: Vec<&str> = version.split('.').collect();
-    let current_major: u32 = version_parts.first().and_then(|part| part.parse().ok()).unwrap_or(0);
-    let current_minor: u32 = version_parts.get(1).and_then(|part| part.parse().ok()).unwrap_or(0);
+    let current_major: u32 = version_parts
+        .first()
+        .and_then(|part| part.parse().ok())
+        .unwrap_or(0);
+    let current_minor: u32 = version_parts
+        .get(1)
+        .and_then(|part| part.parse().ok())
+        .unwrap_or(0);
 
     if current_major > required_major {
         return true;
@@ -303,39 +297,36 @@ fn matches_version_range(version: &str, range: &str) -> bool {
     current_major == required_major && current_minor >= required_minor
 }
 
-fn expand_wildcard_subpath(
-    package_dir: &Path,
-    value: &serde_json::Value,
-) -> Vec<SharedString> {
-    let mut matching_entries: Vec<SharedString> = Vec::new();
-
+fn expand_wildcard_subpath(package_dir: &Path, value: &serde_json::Value) -> Vec<SharedString> {
     let pattern = match extract_wildcard_pattern(value) {
         Some(pattern_str) if pattern_str.contains('*') => pattern_str,
-        _ => return matching_entries,
+        _ => return Vec::new(),
     };
 
     let first_star_index = match pattern.find('*') {
         Some(index) => index,
-        None => return matching_entries,
+        None => return Vec::new(),
     };
 
     let before_first_star = &pattern[..first_star_index];
     let last_slash_before_star = before_first_star.rfind('/');
 
-    let dir_part = match last_slash_before_star {
-        Some(index) => &before_first_star[..index],
-        None => ".",
+    let dir_part = if let Some(idx) = last_slash_before_star {
+        &before_first_star[..idx]
+    } else {
+        "."
     };
 
-    let scan_directory = package_dir.join(dir_part);
+    let scan_directory = package_dir.join(dir_part.trim_start_matches("./"));
     if !scan_directory.exists() {
-        return matching_entries;
+        return vec![];
     }
 
     let glob_regex = glob_to_regexp(&pattern);
-    let file_candidates = scan_directory_recursive(&scan_directory);
+    let all_files = scan_directory_recursive(&scan_directory);
+    let mut matching_entries: Vec<SharedString> = Vec::new();
 
-    for candidate_path in &file_candidates {
+    for candidate_path in &all_files {
         let relative_to_package = match candidate_path.strip_prefix(package_dir) {
             Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
             Err(_) => continue,
@@ -433,13 +424,13 @@ fn resolve_relative_specifier(specifier: &str, current_file: &str) -> Vec<Shared
         if matched_ext == ".mjs" {
             let dmts_path = current_dir.join(format!("{}.d.mts", base));
             if is_file_safe(&dmts_path) {
-            return vec![normalize_path(&dmts_path)];
+                return vec![normalize_path(&dmts_path)];
             }
         }
         if matched_ext == ".cjs" {
             let dcts_path = current_dir.join(format!("{}.d.cts", base));
             if is_file_safe(&dcts_path) {
-            return vec![normalize_path(&dcts_path)];
+                return vec![normalize_path(&dcts_path)];
             }
         }
 
@@ -565,10 +556,7 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
 /// Matches a target subpath against wildcard export patterns.
 ///
 /// Performs replacement of capturing groups into the target path template.
-fn match_wildcard_subpath(
-    subpath: &str,
-    exports: &serde_json::Value,
-) -> Option<serde_json::Value> {
+fn match_wildcard_subpath(subpath: &str, exports: &serde_json::Value) -> Option<serde_json::Value> {
     let exports_map = exports.as_object()?;
 
     for (key, value) in exports_map {
@@ -600,14 +588,12 @@ fn replace_wildcard_in_value(value: &serde_json::Value, replacement: &str) -> se
             serde_json::Value::String(template.replace('*', replacement))
         }
 
-        serde_json::Value::Array(items) => {
-            serde_json::Value::Array(
-                items
-                    .iter()
-                    .map(|item| replace_wildcard_in_value(item, replacement))
-                    .collect(),
-            )
-        }
+        serde_json::Value::Array(items) => serde_json::Value::Array(
+            items
+                .iter()
+                .map(|item| replace_wildcard_in_value(item, replacement))
+                .collect(),
+        ),
 
         serde_json::Value::Object(map) => {
             let mut result = serde_json::Map::new();
@@ -668,7 +654,7 @@ fn resolve_file(package_dir: &Path, relative_path: &str) -> Option<SharedString>
     }
 }
 
-/// Safely verifies if a path is a regular file.
+/// If a path is a regular file.
 pub fn is_file_safe(file_path: &Path) -> bool {
     fs::metadata(file_path)
         .map(|metadata| metadata.is_file())
@@ -684,18 +670,14 @@ pub fn normalize_path(file_path: &Path) -> SharedString {
     let path_string = canonical.to_string_lossy().to_string();
 
     // Strip Windows UNC prefix that canonicalize adds
-    let stripped = path_string
-        .strip_prefix(r"\\?\")
-        .unwrap_or(&path_string);
+    let stripped = path_string.strip_prefix(r"\\?\").unwrap_or(&path_string);
 
     stripped.replace('\\', "/").into()
 }
 
 /// Checks if a path string ends with a `.d.ts` / `.d.mts` / `.d.cts` extension.
 fn is_declaration_file(path_str: &str) -> bool {
-    path_str.ends_with(".d.ts")
-        || path_str.ends_with(".d.mts")
-        || path_str.ends_with(".d.cts")
+    path_str.ends_with(".d.ts") || path_str.ends_with(".d.mts") || path_str.ends_with(".d.cts")
 }
 
 /// Checks if a `PathBuf` points to a declaration file.
@@ -845,7 +827,17 @@ mod tests {
         let result = resolve_types_entry(temp_dir.path());
         assert!(result.is_ok());
         let entry = result.unwrap();
-        assert_eq!(entry.name, SharedString::from(temp_dir.path().file_name().unwrap().to_string_lossy().as_ref()));
+        assert_eq!(
+            entry.name,
+            SharedString::from(
+                temp_dir
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .as_ref()
+            )
+        );
     }
 
     // ─── normalize_path tests ──────────────────────────────────

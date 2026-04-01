@@ -18,4 +18,5 @@ export type {
   ResolvedSymbol,
   SymbolNode,
   PackageGraph,
+  SymbolSpace,
 } from "./types.js";

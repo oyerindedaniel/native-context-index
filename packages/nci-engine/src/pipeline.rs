@@ -1,12 +1,11 @@
-
 use std::path::Path;
 
 use rayon::prelude::*;
 
 use crate::crawler::CrawlOptions;
 use crate::graph::build_package_graph;
-use crate::scanner::{scan_packages, ScanError};
 use crate::resolver::normalize_path;
+use crate::scanner::{ScanError, scan_packages};
 use crate::types::PackageGraph;
 
 /// Configuration for the indexing pipeline.
@@ -136,7 +135,12 @@ mod tests {
         assert_eq!(graph.package, "test-pkg".into());
         assert_eq!(graph.version, "1.0.0".into());
         assert!(graph.total_symbols >= 1);
-        assert!(graph.symbols.iter().any(|symbol| symbol.name == "hello".into()));
+        assert!(
+            graph
+                .symbols
+                .iter()
+                .any(|symbol| symbol.name == "hello".into())
+        );
     }
 
     #[test]
@@ -169,6 +173,11 @@ mod tests {
         let graphs = result.unwrap();
         assert_eq!(graphs.len(), 1);
         assert_eq!(graphs[0].package, "my-lib".into());
-        assert!(graphs[0].symbols.iter().any(|symbol| symbol.name == "VALUE".into()));
+        assert!(
+            graphs[0]
+                .symbols
+                .iter()
+                .any(|symbol| symbol.name == "VALUE".into())
+        );
     }
 }

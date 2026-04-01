@@ -1,36 +1,18 @@
-/**
- * NCI Core — Graph Constructor
- *
- * Transforms crawl results into a structured symbol graph.
- * Produces the final PackageGraph output that gets written to .nci JSON files.
- *
- * Handles:
- * - Multiple entry points (subpath exports)
- * - Declaration merging (deduplication by name + source file)
- * - ID disambiguation for same-name symbols from different files
- * - Dependency resolution to symbol IDs
- */
 import path from "node:path";
 import ts from "typescript";
 import type {
   PackageGraph,
   SymbolNode,
   PackageInfo,
+  ResolvedSymbol,
 } from "./types.js";
 import { NODE_BUILTINS } from "./constants.js";
-import { resolveTypesEntry, resolveModuleSpecifier } from "./resolver.js";
+import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
+import { normalizeSignature } from "./dedupe.js";
 
-/**
- * Build a symbol graph for a single package.
- *
- * Crawls ALL entry points (root + subpath exports) and merges results.
- *
- * @param packageInfo - Package metadata from the scanner
- * @param crawlOptions - Options for the crawler
- * @returns PackageGraph with all resolved symbols
- */
+/** Build a symbol graph for a single package. */
 export function buildPackageGraph(
   packageInfo: PackageInfo,
   crawlOptions?: CrawlOptions
@@ -54,27 +36,60 @@ export function buildPackageGraph(
   const allImportsPerFile = crawlResult.imports;
   const visited = new Set(crawlResult.visitedFiles);
 
+  const entryFiles = new Set(
+    entry.typesEntries.map((entryFilePath) => makeRelative(entryFilePath, packageInfo.dir))
+  );
+
   const merged = new Map<string, SymbolNode>();
-  const sameFileCounters = new Map<string, number>();
 
   const isCrossFileMergeable = (kind: ts.SyntaxKind): boolean =>
     kind === ts.SyntaxKind.ModuleDeclaration ||
     kind === ts.SyntaxKind.InterfaceDeclaration ||
     kind === ts.SyntaxKind.EnumDeclaration;
 
+  const isOverloadMergeable = (kind: ts.SyntaxKind): boolean =>
+    kind === ts.SyntaxKind.MethodSignature ||
+    kind === ts.SyntaxKind.PropertySignature ||
+    kind === ts.SyntaxKind.CallSignature ||
+    kind === ts.SyntaxKind.IndexSignature;
+
+  const entryVisibilityContributions = (
+    resolved: ResolvedSymbol,
+    symbolFilePath: string
+  ): string[] => {
+    const vis: string[] = [];
+    if (entryFiles.has(symbolFilePath)) {
+      vis.push(symbolFilePath);
+    }
+    if (resolved.resolvedFromPackageEntry) {
+      const rel = makeRelative(resolved.resolvedFromPackageEntry, packageInfo.dir);
+      if (entryFiles.has(rel) && !vis.includes(rel)) {
+        vis.push(rel);
+      }
+    }
+    return vis;
+  };
+
+  const pruneRedundantEntryVisibility = (node: SymbolNode): void => {
+    if (!node.entryVisibility || node.entryVisibility.length !== 1) return;
+    if (node.entryVisibility[0] === node.filePath) {
+      delete node.entryVisibility;
+    }
+  };
+
   for (const resolved of allSymbols) {
     const symbolFilePath = makeRelative(resolved.definedIn, packageInfo.dir);
+    const isEntryFile = entryFiles.has(symbolFilePath);
     let mergeKey: string;
 
     if (isCrossFileMergeable(resolved.kind)) {
       // Mergeable types (Interfaces, Namespaces) merge by name package-wide.
       mergeKey = resolved.name;
+    } else if (isOverloadMergeable(resolved.kind)) {
+      // Overload-like members merge by (name, kind, signature) across files.
+      mergeKey = `${resolved.name}::${resolved.kind}::${normalizeSignature(resolved.signature)}`;
     } else {
-      // Other declarations (like overloads) are unique by name, kind, and file.
-      const perFileKey = `${resolved.name}::${resolved.kind}::${symbolFilePath}`;
-      const count = (sameFileCounters.get(perFileKey) ?? 0) + 1;
-      sameFileCounters.set(perFileKey, count);
-      mergeKey = count === 1 ? perFileKey : `${perFileKey}#local${count}`;
+      mergeKey = `${resolved.name}::${resolved.kind}::${symbolFilePath}::${normalizeSignature(resolved.signature)}`;
     }
 
     const existing = merged.get(mergeKey);
@@ -83,6 +98,26 @@ export function buildPackageGraph(
         existing.additionalFiles = existing.additionalFiles || [];
         if (!existing.additionalFiles.includes(symbolFilePath)) {
           existing.additionalFiles.push(symbolFilePath);
+        }
+
+        const existingIsEntry = entryFiles.has(existing.filePath);
+        if (
+          existingIsEntry &&
+          !isEntryFile &&
+          (isOverloadMergeable(resolved.kind) || isCrossFileMergeable(resolved.kind))
+        ) {
+          const prev = existing.filePath;
+          existing.filePath = symbolFilePath;
+          if (!existing.additionalFiles.includes(prev)) {
+            existing.additionalFiles.push(prev);
+          }
+        }
+      }
+
+      for (const visPath of entryVisibilityContributions(resolved, symbolFilePath)) {
+        existing.entryVisibility = existing.entryVisibility || [];
+        if (!existing.entryVisibility.includes(visPath)) {
+          existing.entryVisibility.push(visPath);
         }
       }
 
@@ -108,6 +143,7 @@ export function buildPackageGraph(
       const reExportSource = resolved.reExportChain?.[0]
         ? makeRelative(resolved.reExportChain[0], packageInfo.dir)
         : undefined;
+      const visContrib = entryVisibilityContributions(resolved, symbolFilePath);
 
       merged.set(mergeKey, {
         id: "", // Assigned in next step
@@ -119,6 +155,7 @@ export function buildPackageGraph(
         signature: resolved.signature,
         jsDoc: resolved.jsDoc,
         isTypeOnly: resolved.isTypeOnly,
+        symbolSpace: resolved.symbolSpace,
         dependencies: [],
         rawDependencies: resolved.dependencies,
         isInternal: resolved.isInternal,
@@ -128,50 +165,97 @@ export function buildPackageGraph(
         since: resolved.since,
         heritage: resolved.heritage,
         modifiers: resolved.modifiers,
+        entryVisibility: visContrib.length > 0 ? visContrib : undefined,
       });
     }
   }
 
   const symbols = Array.from(merged.values());
+  for (const sym of symbols) {
+    pruneRedundantEntryVisibility(sym);
+  }
+
+  const idToKind = new Map<string, ts.SyntaxKind>();
   const nameToId = new Map<string, string>();
-  const fileLocalToId = new Map<string, string>();
+  const nameToIds = new Map<string, string[]>();
+  /** `filePath::name` → ids (all overloads in that file-local scope). */
+  const fileLocalToIds = new Map<string, string[]>();
   const nameCount = new Map<string, number>();
+  const internalFileNameCount = new Map<string, number>();
 
   for (const symbolNode of symbols) {
-    const count = (nameCount.get(symbolNode.name) ?? 0) + 1;
-    nameCount.set(symbolNode.name, count);
-
     const baseId = `${packageInfo.name}@${packageInfo.version}::${symbolNode.name}`;
+
     if (symbolNode.isInternal) {
-      symbolNode.id = `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}`;
+      const fk = `${symbolNode.filePath}::${symbolNode.name}`;
+      const ic = (internalFileNameCount.get(fk) ?? 0) + 1;
+      internalFileNameCount.set(fk, ic);
+      symbolNode.id =
+        ic === 1
+          ? `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}`
+          : `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}#${ic}`;
     } else {
+      const count = (nameCount.get(symbolNode.name) ?? 0) + 1;
+      nameCount.set(symbolNode.name, count);
       symbolNode.id = count === 1 ? baseId : `${baseId}#${count}`;
     }
 
-    fileLocalToId.set(`${symbolNode.filePath}::${symbolNode.name}`, symbolNode.id);
+    const shortKey = `${symbolNode.filePath}::${symbolNode.name}`;
+    idToKind.set(symbolNode.id, symbolNode.kind);
+    const existingShort = fileLocalToIds.get(shortKey) || [];
+    existingShort.push(symbolNode.id);
+    fileLocalToIds.set(shortKey, existingShort);
+
+    const existingByName = nameToIds.get(symbolNode.name) || [];
+    existingByName.push(symbolNode.id);
+    nameToIds.set(symbolNode.name, existingByName);
+
     if (!symbolNode.isInternal || !nameToId.has(symbolNode.name)) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
+  }
+
+  const refEdges = crawlResult.tripleSlashReferenceTargets ?? {};
+  const hasRefEdges = Object.keys(refEdges).length > 0;
+
+  const normalizedAbsCache = new Map<string, string>();
+  const closureCache = new Map<string, string[]>();
+
+  function getCachedNormalizedAbs(relFilePath: string): string {
+    let cached = normalizedAbsCache.get(relFilePath);
+    if (cached === undefined) {
+      cached = normalizePath(path.join(packageInfo.dir, relFilePath));
+      normalizedAbsCache.set(relFilePath, cached);
+    }
+    return cached;
+  }
+
+  function getCachedClosure(relFilePath: string): string[] {
+    let cached = closureCache.get(relFilePath);
+    if (cached === undefined) {
+      const abs = getCachedNormalizedAbs(relFilePath);
+      cached = tripleSlashReferenceClosure(abs, refEdges);
+      closureCache.set(relFilePath, cached);
+    }
+    return cached;
   }
 
   for (const symbolNode of symbols) {
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();
       for (const rawDep of symbolNode.rawDependencies) {
-        let targetId: string | undefined;
+        let targetIds: string[] = [];
 
         if (rawDep.importPath) {
           const absPaths = resolveModuleSpecifier(rawDep.importPath, path.join(packageInfo.dir, symbolNode.filePath));
           if (absPaths.length > 0) {
             const relPath = makeRelative(absPaths[0]!, packageInfo.dir);
-            targetId = fileLocalToId.get(`${relPath}::${rawDep.name}`);
+            targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
           }
         } else {
-          // For internal private types
-          targetId = fileLocalToId.get(`${symbolNode.filePath}::${rawDep.name}`);
+          targetIds = fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
 
-          // Try to resolve via imports in the file where this symbol is defined
-          if (!targetId) {
+          if (targetIds.length === 0) {
             const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
             const fileImports = allImportsPerFile[absPathForLookup] || [];
             const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
@@ -181,14 +265,43 @@ export function buildPackageGraph(
               if (absSourcePaths.length > 0) {
                 const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
                 const originalName = matchingImport.originalName || matchingImport.name;
-                targetId = fileLocalToId.get(`${relSourcePath}::${originalName}`);
+                targetIds = fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
               }
             }
           }
-          if (!targetId) targetId = nameToId.get(rawDep.name);
+          if (targetIds.length === 0 && hasRefEdges) {
+            const closure = getCachedClosure(symbolNode.filePath);
+            const fromClosure = new Set<string>();
+            for (const reachableFileAbs of closure) {
+              const rel = makeRelative(reachableFileAbs, packageInfo.dir);
+              if (rel === symbolNode.filePath) continue;
+              for (const symbolId of fileLocalToIds.get(`${rel}::${rawDep.name}`) || []) {
+                fromClosure.add(symbolId);
+              }
+            }
+            targetIds = [...fromClosure];
+          }
+          if (targetIds.length === 0) {
+            targetIds = nameToIds.get(rawDep.name) || [];
+          }
         }
-        if (targetId) {
-          resolvedIds.add(targetId);
+        if (targetIds.length > 0) {
+          targetIds = targetIds.filter((symbolId) =>
+            kindMatchesResolutionHint(
+              idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
+              rawDep.resolutionHint
+            )
+          );
+        }
+
+        if (targetIds.length > 0) {
+          targetIds = targetIds.filter((symbolId) => symbolId !== symbolNode.id);
+        }
+
+        if (targetIds.length > 0) {
+          for (const symbolId of targetIds) {
+            resolvedIds.add(symbolId);
+          }
         } else {
           const protocolRegex = /^([a-z]+):(.*)$/;
 
@@ -234,15 +347,7 @@ export function buildPackageGraph(
   return result;
 }
 
-/**
- * Recursively extracts and synthesizes inherited members for all classes and interfaces.
- * Dynamically traverses the heritage tree to resolve members from parent symbols.
- *
- * @param symbols The list of all resolved symbols in the package for in-place modification.
- * @param nameToId Map for resolving symbol names to their canonical IDs.
- * @param pkgName Current package name for ID generation.
- * @param pkgVersion Current package version for ID generation.
- */
+/** Flatten inherited members. */
 function flattenInheritedMembers(
   symbols: SymbolNode[],
   nameToId: Map<string, string>,
@@ -332,14 +437,24 @@ function flattenInheritedMembers(
   }
 }
 
-/**
- * Converts an absolute path to a path relative to the package root.
- * Normalizes all path separators to forward slashes for cross-platform consistency.
- *
- * @param absPath The absolute path to normalize and relativize.
- * @param packageDir The package root directory.
- * @returns Relativized, normalized path string.
- */
+/** BFS closure of files reachable from `startAbs` via direct `/// <reference path` edges. */
+function tripleSlashReferenceClosure(startAbs: string, edges: Record<string, string[]>): string[] {
+  const visited = new Set<string>();
+  const queue: string[] = [startAbs];
+  visited.add(startAbs);
+  while (queue.length > 0) {
+    const currentFileAbs = queue.shift()!;
+    for (const referencedPath of edges[currentFileAbs] ?? []) {
+      if (!visited.has(referencedPath)) {
+        visited.add(referencedPath);
+        queue.push(referencedPath);
+      }
+    }
+  }
+  return [...visited].sort();
+}
+
+/** Make a path relative to the package root. */
 function makeRelative(absPath: string, packageDir: string): string {
   const normalized = absPath.replace(/\\/g, "/");
   const normalizedDir = packageDir.replace(/\\/g, "/");
@@ -348,4 +463,28 @@ function makeRelative(absPath: string, packageDir: string): string {
     return normalized.slice(normalizedDir.length + 1);
   }
   return path.relative(packageDir, absPath).replace(/\\/g, "/");
+}
+
+function kindMatchesResolutionHint(kind: ts.SyntaxKind, hint: "type" | "value" | undefined): boolean {
+  if (!hint) return true;
+  if (hint === "value") {
+    return (
+      kind === ts.SyntaxKind.VariableStatement ||
+      kind === ts.SyntaxKind.FunctionDeclaration ||
+      kind === ts.SyntaxKind.ClassDeclaration ||
+      kind === ts.SyntaxKind.EnumDeclaration ||
+      kind === ts.SyntaxKind.ModuleDeclaration
+    );
+  }
+  return (
+    kind === ts.SyntaxKind.InterfaceDeclaration ||
+    kind === ts.SyntaxKind.TypeAliasDeclaration ||
+    kind === ts.SyntaxKind.ClassDeclaration ||
+    kind === ts.SyntaxKind.EnumDeclaration ||
+    kind === ts.SyntaxKind.ModuleDeclaration ||
+    kind === ts.SyntaxKind.MethodSignature ||
+    kind === ts.SyntaxKind.PropertySignature ||
+    kind === ts.SyntaxKind.CallSignature ||
+    kind === ts.SyntaxKind.IndexSignature
+  );
 }

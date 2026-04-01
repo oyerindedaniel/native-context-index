@@ -186,6 +186,25 @@ describe("parseExports — Patterns 1-17", () => {
       const endpointProp = result.exports.find(exportEntry => exportEntry.name === "Config.endpoint")!;
       expect(endpointProp.modifiers).toContain("readonly");
     });
+
+    it("extracts getters and setters from interfaces", () => {
+      const source = `
+        export interface AccessorTest {
+          get prop(): string;
+          set prop(value: string);
+        }
+      `;
+      const sourceFile = ts.createSourceFile("a.ts", source, ts.ScriptTarget.Latest, true);
+      const result = parseFileFromSource(sourceFile);
+
+      const getter = result.exports.find(exportEntry => exportEntry.name === "AccessorTest.prop" && exportEntry.kind === ts.SyntaxKind.GetAccessor);
+      const setter = result.exports.find(exportEntry => exportEntry.name === "AccessorTest.prop" && exportEntry.kind === ts.SyntaxKind.SetAccessor);
+
+      expect(getter).toBeDefined();
+      expect(setter).toBeDefined();
+      expect(getter!.signature).toBe("get prop(): string;");
+      expect(setter!.signature).toBe("set prop(value: string);");
+    });
   });
   // ─── Pattern 15: declare module "name" ────────────────────────
   it("Pattern 15: parses ambient module declaration", () => {
@@ -737,28 +756,29 @@ describe("Parser Expansion (Synthetic Members)", () => {
   });
 
   describe("Implicit Script Globals", () => {
-    it("extracts all top-level declarations in a script file as global augmentations", () => {
+    it("parses non-module .d.ts declarations without tagging declare-global augmentation", () => {
       const fixtureDir = path.resolve(__dirname, "../fixtures/implicit-script-globals");
       const filePath = path.join(fixtureDir, "index.d.ts");
-      const { exports } = parseFile(filePath);
+      const { exports, isExternalModule } = parseFile(filePath);
 
+      expect(isExternalModule).toBe(false);
       expect(exports.length).toBe(3);
 
       const strInterface = exports.find(exportEntry => exportEntry.name === "String");
       expect(strInterface).toBeDefined();
       expect(strInterface!.kindName).toBe("InterfaceDeclaration");
-      expect(strInterface!.isGlobalAugmentation).toBe(true);
+      expect(strInterface!.isGlobalAugmentation).toBeUndefined();
       expect(strInterface!.since).toBe("1.0.0");
 
       const strMethod = exports.find(exportEntry => exportEntry.name === "String.toCustomFormat");
       expect(strMethod).toBeDefined();
       expect(strMethod!.kindName).toBe("MethodSignature");
-      expect(strMethod!.isGlobalAugmentation).toBe(true);
+      expect(strMethod!.isGlobalAugmentation).toBeUndefined();
 
       const varDecl = exports.find(exportEntry => exportEntry.name === "AppVersion");
       expect(varDecl).toBeDefined();
       expect(varDecl!.kindName).toBe("VariableStatement");
-      expect(varDecl!.isGlobalAugmentation).toBe(true);
+      expect(varDecl!.isGlobalAugmentation).toBeUndefined();
     });
   });
 });

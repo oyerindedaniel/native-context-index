@@ -85,7 +85,7 @@ for (const pkg of allPackages) {
 
   try {
     const entry = resolveTypesEntry(pkg.dir);
-    const graph = buildPackageGraph(pkg, { maxDepth: 5 });
+    const graph = buildPackageGraph(pkg, { maxDepth: 10 });
 
     reports.push({
       name: pkg.name,

@@ -1,13 +1,3 @@
-/**
- * NCI Core — Crawler
- *
- * The core recursive engine. Given a starting .d.ts file:
- * 1. Parse it for exports
- * 2. For each re-export, JUMP into the target file
- * 3. Resolve the actual symbol definitions
- * 4. Track visited files to detect circular dependencies
- * 5. Enforce a configurable depth limit
- */
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
@@ -15,19 +5,14 @@ import { parseFile } from "./parser.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
 import { DEFAULT_MAX_DEPTH } from "./constants.js";
+import { normalizeSignature, symbolDedupeKey } from "./dedupe.js";
 
 export interface CrawlOptions {
   /** Maximum depth for following re-exports (default: 10) */
   maxDepth?: number;
 }
 
-/**
- * Crawl one or more .d.ts files, following all re-exports recursively.
- *
- * @param entryFilePaths - Absolute path(s) to the starting .d.ts file(s)
- * @param options - Crawl configuration
- * @returns CrawlResult with all resolved symbols
- */
+/** Crawl one or more .d.ts files, following all re-exports recursively. */
 export function crawl(
   entryFilePaths: string | string[],
   options: CrawlOptions = {}
@@ -41,6 +26,8 @@ export function crawl(
   const allRawExports = new Map<string, ParsedExport[]>();
   const allRawImports = new Map<string, ParsedImport[]>();
   const allRawReferences = new Map<string, string[]>();
+  const tripleSlashRefTargets = new Map<string, Set<string>>();
+  const fileIsExternalModule = new Map<string, boolean>();
   const discoveryPathSet = new Set<string>();
   const discoveryPathStack: string[] = [];
   const resolutionPath = new Set<string>();
@@ -49,17 +36,57 @@ export function crawl(
   const entries = Array.isArray(entryFilePaths) ? entryFilePaths : [entryFilePaths];
   const primaryEntry = entries[0] || "";
 
+  function recordTripleSlashEdge(fromAbs: string, toAbs: string): void {
+    const from = normalizePath(fromAbs);
+    const to = normalizePath(toAbs);
+    let set = tripleSlashRefTargets.get(from);
+    if (!set) {
+      set = new Set();
+      tripleSlashRefTargets.set(from, set);
+    }
+    set.add(to);
+  }
+
   for (const entryPath of entries) {
     discoverFiles(entryPath, 0);
   }
 
-  const publicSymbols = new Set<string>();
+  if (process.env.NCI_LOG_ALL_RAW_EXPORTS === "1") {
+    console.error(allRawExports);
+    console.error(allRawImports);
+    console.error(allRawReferences);
+  }
+
+  const seenResolvedKeys = new Set<string>();
+  const seenPublicDefinitionKeys = new Set<string>();
+
   for (const entryPath of entries) {
-    const resolved = resolveFile(entryPath, 0);
-    for (const resolvedSymbol of resolved) {
-      resolvedSymbol.isInternal = false;
-      resolvedSymbols.push(resolvedSymbol);
-      publicSymbols.add(`${resolvedSymbol.definedIn}::${resolvedSymbol.name}`);
+    const entryNorm = normalizePath(entryPath);
+    const resolvedFromEntry = resolveFile(entryPath, 0);
+    for (const resolvedSymbol of resolvedFromEntry) {
+      const perEntryKey = `${entryNorm}::${symbolDedupeKey(
+        resolvedSymbol.definedIn,
+        resolvedSymbol.name,
+        resolvedSymbol.kind,
+        resolvedSymbol.signature
+      )}`;
+      if (seenResolvedKeys.has(perEntryKey)) {
+        continue;
+      }
+      resolvedSymbols.push({
+        ...resolvedSymbol,
+        isInternal: false,
+        resolvedFromPackageEntry: entryNorm,
+      });
+      seenResolvedKeys.add(perEntryKey);
+      seenPublicDefinitionKeys.add(
+        symbolDedupeKey(
+          resolvedSymbol.definedIn,
+          resolvedSymbol.name,
+          resolvedSymbol.kind,
+          resolvedSymbol.signature
+        )
+      );
     }
   }
 
@@ -70,26 +97,47 @@ export function crawl(
       // Skip ExportDeclarations — they're forwarding statements, not definitions.
       if (exportEntry.kind === ts.SyntaxKind.ExportDeclaration) continue;
 
-      if (!publicSymbols.has(`${file}::${exportEntry.name}`)) {
-        resolvedSymbols.push({
-          name: exportEntry.name,
-          kind: exportEntry.kind,
-          kindName: exportEntry.kindName,
-          isTypeOnly: exportEntry.isTypeOnly,
-          signature: exportEntry.signature,
-          jsDoc: exportEntry.jsDoc,
-          definedIn: file,
-          dependencies: exportEntry.dependencies,
-          deprecated: exportEntry.deprecated,
-          visibility: exportEntry.visibility,
-          since: exportEntry.since,
-          heritage: exportEntry.heritage,
-          isInternal: true,
-        });
-        publicSymbols.add(`${file}::${exportEntry.name}`);
+      const definitionKey = symbolDedupeKey(
+        file,
+        exportEntry.name,
+        exportEntry.kind,
+        exportEntry.signature
+      );
+      if (seenPublicDefinitionKeys.has(definitionKey)) {
+        continue;
       }
+
+      const dedupKey = definitionKey;
+      if (seenResolvedKeys.has(dedupKey)) {
+        continue;
+      }
+      resolvedSymbols.push({
+        name: exportEntry.name,
+        kind: exportEntry.kind,
+        kindName: exportEntry.kindName,
+        isTypeOnly: exportEntry.isTypeOnly,
+        symbolSpace: exportEntry.symbolSpace,
+        signature: exportEntry.signature,
+        jsDoc: exportEntry.jsDoc,
+        definedIn: file,
+        dependencies: exportEntry.dependencies,
+        deprecated: exportEntry.deprecated,
+        visibility: exportEntry.visibility,
+        since: exportEntry.since,
+        heritage: exportEntry.heritage,
+        isInternal: true,
+      });
+      seenResolvedKeys.add(dedupKey);
     }
   }
+
+  const tripleSlashReferenceTargets: Record<string, string[]> = Object.fromEntries(
+    [...tripleSlashRefTargets.entries()]
+      .sort(([leftSourceAbs], [rightSourceAbs]) =>
+        leftSourceAbs.localeCompare(rightSourceAbs)
+      )
+      .map(([from, toSet]) => [from, [...toSet].sort()])
+  );
 
   return {
     filePath: primaryEntry,
@@ -98,15 +146,10 @@ export function crawl(
     visitedFiles: Array.from(visited),
     typeReferencePackages: Array.from(typeRefPackages),
     circularRefs,
+    tripleSlashReferenceTargets,
   };
 
-  /**
-   * Internal recursive explorer that identifies all files reachable from an entry point.
-   * Scans for both re-exports and triple-slash references to build the complete visit set.
-   *
-   * @param filePath Absolute path to the file to discover.
-   * @param depth Current recursion depth.
-   */
+/** Discover files reachable from an entry point. */
   function discoverFiles(filePath: string, depth: number): void {
     const normalizedPath = normalizePath(filePath);
     if (depth > maxDepth) return;
@@ -123,19 +166,32 @@ export function crawl(
     discoveryPathSet.add(normalizedPath);
     discoveryPathStack.push(normalizedPath);
 
-    const { exports: exportEntries, imports: importEntries, references: tripleSlashRefs, typeReferences: typeRefDirectives } = parseFile(normalizedPath);
+    const {
+      exports: exportEntries,
+      imports: importEntries,
+      references: tripleSlashRefs,
+      typeReferences: typeRefDirectives,
+      isExternalModule: isExtMod,
+    } = parseFile(normalizedPath);
     for (const pkg of typeRefDirectives) typeRefPackages.add(pkg);
     allRawExports.set(normalizedPath, exportEntries);
     allRawImports.set(normalizedPath, importEntries);
     allRawReferences.set(normalizedPath, tripleSlashRefs);
+    fileIsExternalModule.set(normalizedPath, isExtMod);
 
     for (const reference of tripleSlashRefs) {
       const resolvedPaths = resolveModuleSpecifier(reference, normalizedPath);
       if (resolvedPaths.length > 0) {
-        for (const refPath of resolvedPaths) discoverFiles(refPath, depth + 1);
+        for (const refPath of resolvedPaths) {
+          recordTripleSlashEdge(normalizedPath, refPath);
+          discoverFiles(refPath, depth + 1);
+        }
       } else {
         const refPath = resolveTripleSlashRef(reference, normalizedPath);
-        if (refPath) discoverFiles(refPath, depth + 1);
+        if (refPath) {
+          recordTripleSlashEdge(normalizedPath, refPath);
+          discoverFiles(refPath, depth + 1);
+        }
       }
     }
 
@@ -162,14 +218,7 @@ export function crawl(
     discoveryPathSet.delete(normalizedPath);
   }
 
-  /**
-   * Resolves all public symbols from a file by following its export chain.
-   *
-   * @param filePath Absolute path to the file to resolve.
-   * @param depth Current recursion depth.
-   * @param namePrefix Optional prefix for nested symbols (e.g., from namespace exports).
-   * @returns Array of fully resolved symbols.
-   */
+/** Resolve all public symbols from a file by following its export chain. */
   function resolveFile(
     filePath: string,
     depth: number,
@@ -187,8 +236,14 @@ export function crawl(
 
     resolutionPath.add(normalizedPath);
 
+    const resolvingAsScript = fileIsExternalModule.get(normalizedPath) === false;
+
     const actualExports = [...rawExports];
-    const knownNames = new Set(rawExports.map(entry => entry.name));
+    // When folding `/// <reference path="..." />` results into the entry resolution,
+    // overloads must be kept distinct. De-dupe using kind+signature, not just name.
+    const knownExportKeys = new Set(
+      rawExports.map((entry) => `${entry.name}::${entry.kind}::${normalizeSignature(entry.signature)}`)
+    );
 
     const tripleSlashRefs = allRawReferences.get(normalizedPath) || [];
     for (const ref of tripleSlashRefs) {
@@ -196,10 +251,17 @@ export function crawl(
       const refPaths = resolvedPaths.length > 0 ? resolvedPaths : [resolveTripleSlashRef(ref, normalizedPath)].filter(Boolean) as string[];
 
       for (const refPath of refPaths) {
+        const refNormalized = normalizePath(refPath);
+        const refIsModule = fileIsExternalModule.get(refNormalized) ?? true;
+        // TS: triple-slash does not pull module-scoped declarations into the referrer's global scope.
+        if (refIsModule) {
+          continue;
+        }
         const nestedSymbols = resolveFile(refPath, depth + 1);
         for (const symbolNode of nestedSymbols) {
-          if (!knownNames.has(symbolNode.name)) {
-            knownNames.add(symbolNode.name);
+          const exportKey = `${symbolNode.name}::${symbolNode.kind}::${normalizeSignature(symbolNode.signature)}`;
+          if (!knownExportKeys.has(exportKey)) {
+            knownExportKeys.add(exportKey);
             actualExports.push({
               name: symbolNode.name,
               kind: symbolNode.kind,
@@ -208,6 +270,7 @@ export function crawl(
               jsDoc: symbolNode.jsDoc,
               isExplicitExport: true,
               isTypeOnly: symbolNode.isTypeOnly,
+              symbolSpace: symbolNode.symbolSpace,
               dependencies: symbolNode.dependencies,
               deprecated: symbolNode.deprecated,
               visibility: symbolNode.visibility,
@@ -215,6 +278,7 @@ export function crawl(
               heritage: symbolNode.heritage,
               modifiers: symbolNode.modifiers,
               since: symbolNode.since,
+              declaredInFile: refNormalized,
             });
           }
         }
@@ -229,14 +293,22 @@ export function crawl(
     }
 
     const results: ResolvedSymbol[] = [];
+    const seenSymbolKeys = new Set<string>();
 
     for (const exportEntry of actualExports) {
       if (exportEntry.isGlobalAugmentation) continue;
-      // Skip non-exported declarations — they'll be captured as internal symbols
-      if (!exportEntry.isExplicitExport) continue;
+      if (!exportEntry.isExplicitExport && !resolvingAsScript) continue;
+
+      const definedInPath = exportEntry.declaredInFile ?? normalizedPath;
 
       if (exportEntry.source) {
-        results.push(...resolveReExport(exportEntry, normalizedPath, depth, namePrefix));
+        for (const resolvedSymbol of resolveReExport(exportEntry, normalizedPath, depth, namePrefix)) {
+          const symbolKey = `${resolvedSymbol.definedIn}::${resolvedSymbol.name}`;
+          if (!seenSymbolKeys.has(symbolKey)) {
+            seenSymbolKeys.add(symbolKey);
+            results.push(resolvedSymbol);
+          }
+        }
       } else if (
         exportEntry.kind === ts.SyntaxKind.ExportAssignment ||
         exportEntry.kind === ts.SyntaxKind.ExportDeclaration ||
@@ -249,9 +321,10 @@ export function crawl(
           kind: exportEntry.kind,
           kindName: exportEntry.kindName,
           isTypeOnly: exportEntry.isTypeOnly,
+          symbolSpace: exportEntry.symbolSpace,
           signature: exportEntry.signature,
           jsDoc: exportEntry.jsDoc,
-          definedIn: normalizedPath,
+          definedIn: definedInPath,
           dependencies: exportEntry.dependencies,
           deprecated: exportEntry.deprecated,
           visibility: exportEntry.visibility,
@@ -273,15 +346,7 @@ export function crawl(
     return results;
   }
 
-  /**
-   * Resolves symbols that are re-exported from another module (e.g., export * from "./s").
-   *
-   * @param exportEntry The parsed export entry identifying the source.
-   * @param currentFile The path of the file containing the re-export.
-   * @param depth Current recursion depth.
-   * @param namePrefix Current symbol name prefix.
-   * @returns Array of resolved symbols from the target module.
-   */
+/** Resolve symbols that are re-exported from another module. */
   function resolveReExport(
     exportEntry: ParsedExport,
     currentFile: string,
@@ -299,6 +364,7 @@ export function crawl(
           kind: exportEntry.kind,
           kindName: exportEntry.kindName,
           isTypeOnly: exportEntry.isTypeOnly,
+          symbolSpace: exportEntry.symbolSpace,
           definedIn: currentFile,
           reExportChain: [currentFile],
           signature: exportEntry.signature,
@@ -327,6 +393,7 @@ export function crawl(
         kind: exportEntry.kind,
         kindName: exportEntry.kindName,
         isTypeOnly: exportEntry.isTypeOnly,
+        symbolSpace: exportEntry.symbolSpace,
         definedIn: currentFile,
         reExportChain: [currentFile],
         signature: exportEntry.signature || `namespace ${exportEntry.name} { ${allNestedSymbols.length} symbols }`,
@@ -362,6 +429,7 @@ export function crawl(
           kind: exportEntry.kind,
           kindName: exportEntry.kindName,
           isTypeOnly: exportEntry.isTypeOnly,
+          symbolSpace: exportEntry.symbolSpace,
           definedIn: normalizePath(sourcePaths[0]!),
           reExportChain: [currentFile],
           signature: exportEntry.signature,
@@ -379,15 +447,7 @@ export function crawl(
     return results;
   }
 
-  /**
-   * Resolves symbols that are assigned locally (e.g., export { x as y } or export default x).
-   *
-   * @param exportEntry The parsed export statement.
-   * @param localIndex Map of all symbols defined in the current file.
-   * @param currentFile Path to the current file.
-   * @param namePrefix Current symbol name prefix.
-   * @returns Resolved symbol associated with the assignment.
-   */
+/** Resolve symbols that are assigned locally. */
   function resolveLocalAssignment(
     exportEntry: ParsedExport,
     localIndex: Map<string, ParsedExport[]>,
@@ -410,6 +470,7 @@ export function crawl(
         kind: target.kind,
         kindName: target.kindName,
         isTypeOnly: target.isTypeOnly,
+        symbolSpace: target.symbolSpace,
         signature: target.signature,
         jsDoc: target.jsDoc,
         definedIn: currentFile,
@@ -440,6 +501,7 @@ export function crawl(
           kind: member.kind,
           kindName: member.kindName,
           isTypeOnly: member.isTypeOnly,
+          symbolSpace: member.symbolSpace,
           signature: member.signature,
           jsDoc: member.jsDoc,
           definedIn: currentFile,
@@ -458,14 +520,7 @@ export function crawl(
   }
 }
 
-/**
- * Resolves a triple-slash reference path relative to the current file.
- * Triple-slash references are prioritized in the discovery phase for architectural integrity.
- *
- * @param refPath The raw reference path from the triple-slash directive.
- * @param currentFile The path of the containing file.
- * @returns Resolved absolute path or null if not found.
- */
+/** Resolve a triple-slash reference path relative to the current file. */
 function resolveTripleSlashRef(
   refPath: string,
   currentFile: string

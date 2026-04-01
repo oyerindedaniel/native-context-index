@@ -42,7 +42,8 @@ NCI_ROADMAP.md
 NCI_PROPOSAL.md
 poc-oracle.ts
 nco-react-index.json
-packages/nci-core/nci-report.json
+**/nci-report.json
+**/nci-report-rust.json
 packages/nci-core/docs/
 docs/
 
@@ -52,7 +53,7 @@ docs/
 # Backup files from `cargo fix` or other tools
 **/*.rs.bk
 
-# Snapshots (as requested)
+# Snapshots
 /snapshots/
 **/snapshots/
 snapshot.md

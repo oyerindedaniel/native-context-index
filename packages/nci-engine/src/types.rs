@@ -100,6 +100,8 @@ pub enum SymbolKind {
     PropertySignature,
     MethodDeclaration,
     MethodSignature,
+    GetAccessor,
+    SetAccessor,
     ImportEquals,
     NamespaceExportDeclaration,
     #[default]
@@ -131,6 +133,8 @@ impl SymbolKind {
             Self::PropertySignature => "PropertySignature",
             Self::MethodDeclaration => "MethodDeclaration",
             Self::MethodSignature => "MethodSignature",
+            Self::GetAccessor => "GetAccessor",
+            Self::SetAccessor => "SetAccessor",
             Self::ImportEquals => "ImportEqualsDeclaration",
             Self::NamespaceExportDeclaration => "NamespaceExportDeclaration",
             Self::Unknown => "Unknown",
@@ -152,17 +156,11 @@ impl SymbolKind {
             Self::PropertySignature => 172,
             Self::MethodDeclaration => 175,
             Self::MethodSignature => 174,
+            Self::GetAccessor => 178,
+            Self::SetAccessor => 179,
             Self::ImportEquals => 272,
             Self::NamespaceExportDeclaration => 271,
             Self::Unknown => 0,
-        }
-    }
-
-    pub fn priority(&self) -> u32 {
-        match self {
-            Self::Class | Self::Variable | Self::Function | Self::Interface | Self::Enum | Self::TypeAlias => 1,
-            Self::Namespace => 2,
-            _ => 3,
         }
     }
 }
@@ -182,6 +180,15 @@ pub enum Deprecation {
 
 // ─── Parser Output ─────────────────────────────────────────────
 
+/// TypeScript type namespace vs value namespace for a declaration site (not re-export flags).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SymbolSpace {
+    #[default]
+    Value,
+    Type,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ParsedExport {
     /// Symbol name.
@@ -192,6 +199,9 @@ pub struct ParsedExport {
 
     /// Whether this is a type-only export.
     pub is_type_only: bool,
+
+    /// Type vs value namespace for this declaration.
+    pub symbol_space: SymbolSpace,
 
     /// Re-export source module specifier (e.g., `"./lib/core"`).
     pub source: Option<SharedString>,
@@ -246,6 +256,7 @@ impl ParsedExport {
             name: name.into(),
             kind,
             is_type_only: false,
+            symbol_space: SymbolSpace::Value,
             source: None,
             original_name: None,
             is_wildcard: false,
@@ -305,6 +316,9 @@ pub struct CrawlResult {
 
     /// Any circular references detected during crawling.
     pub circular_refs: Vec<String>,
+
+    /// Direct `/// <reference path` edges: normalized absolute path → referenced paths (one hop each).
+    pub triple_slash_reference_targets: HashMap<SharedString, Vec<SharedString>>,
 }
 
 #[derive(Debug, Clone)]
@@ -317,6 +331,9 @@ pub struct ResolvedSymbol {
 
     /// Whether this is type-only.
     pub is_type_only: bool,
+
+    /// Type vs value namespace for this declaration.
+    pub symbol_space: SymbolSpace,
 
     /// Full type signature.
     pub signature: Option<SharedString>,
@@ -367,6 +384,7 @@ impl ResolvedSymbol {
             name: export.name.clone(),
             kind: export.kind,
             is_type_only: export.is_type_only,
+            symbol_space: export.symbol_space,
             signature: export.signature.clone(),
             js_doc: export.js_doc.clone(),
             defined_in: defined_in.into(),
@@ -422,6 +440,9 @@ pub struct SymbolNode {
 
     /// Whether this is type-only.
     pub is_type_only: bool,
+
+    /// Type vs value namespace for this declaration.
+    pub symbol_space: SymbolSpace,
 
     /// IDs of symbols this one references.
     pub dependencies: SharedVec<SharedString>,

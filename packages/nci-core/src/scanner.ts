@@ -1,10 +1,3 @@
-/**
- * NCI Core — Scanner
- *
- * Discovers all installed packages in a node_modules directory.
- * Handles scoped packages (@scope/name), pnpm symlinks, and
- * skips non-package entries.
- */
 import fs from "node:fs";
 import path from "node:path";
 import type { PackageInfo } from "./types.js";

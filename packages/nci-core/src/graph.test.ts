@@ -154,6 +154,114 @@ describe("buildPackageGraph", () => {
     expect(config!.dependencies).toHaveLength(0);
   });
 
+  it("tags declaration-site symbolSpace for imported types vs values (internal-overload-ref)", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("internal-overload-ref")
+    );
+
+    const iface = graph.symbols.find((symbol) => symbol.name === "ImportedShape");
+    expect(iface).toBeDefined();
+    expect(iface!.symbolSpace).toBe("type");
+
+    const member = graph.symbols.find((symbol) => symbol.name === "ImportedShape.value");
+    expect(member).toBeDefined();
+    expect(member!.symbolSpace).toBe("type");
+
+    const token = graph.symbols.find((symbol) => symbol.name === "IMPORTED_TOKEN");
+    expect(token).toBeDefined();
+    expect(token!.symbolSpace).toBe("value");
+  });
+
+  it("resolves qualified overload types across files linked by triple-slash reference paths", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("internal-overload-ref")
+    );
+
+    const usesPick = graph.symbols.find((symbol) => symbol.name === "usesPick");
+    expect(usesPick).toBeDefined();
+
+    const deps = usesPick!.dependencies.filter((dep) =>
+      dep.includes("::ref.d.ts::RefLib.Dual.pick")
+    );
+    expect(deps.length).toBe(2);
+  });
+
+  it("keeps overload members from module-style ref files internal when not imported as a module", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("internal-overload-ref")
+    );
+
+    const overloads = graph.symbols.filter(
+      (symbol) =>
+        symbol.name === "RefLib.Dual.pick" &&
+        symbol.kindName === "MethodSignature" &&
+        symbol.isInternal === true
+    );
+
+    expect(overloads.length).toBe(2);
+    for (const overload of overloads) {
+      expect(overload.filePath).toBe("ref.d.ts");
+    }
+  });
+
+  it("lifts script-style triple-slash ambient values and resolves typeof to public IDs", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("internal-overload-ref")
+    );
+
+    const ambient = graph.symbols.find(
+      (symbol) => symbol.name === "AMBIENT_PICK" && symbol.isInternal === false
+    );
+    expect(ambient).toBeDefined();
+    expect(ambient!.filePath).toBe("ambient-ref.d.ts");
+    expect(ambient!.entryVisibility).toEqual(
+      expect.arrayContaining(["index.d.ts", "extra-entry.d.ts"])
+    );
+
+    const usesAmbient = graph.symbols.find((symbol) => symbol.name === "usesAmbientPick");
+    expect(usesAmbient).toBeDefined();
+    expect(usesAmbient!.dependencies).toContain(
+      "internal-overload-ref@1.0.0::AMBIENT_PICK"
+    );
+
+    const fromExtra = graph.symbols.find(
+      (symbol) => symbol.name === "usesAmbientPickFromExtra"
+    );
+    expect(fromExtra).toBeDefined();
+    expect(fromExtra!.dependencies).toContain(
+      "internal-overload-ref@1.0.0::AMBIENT_PICK"
+    );
+  });
+
+  it("links typeof to values declared in triple-slash-referenced files before package-wide fallback", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("internal-overload-ref")
+    );
+
+    const pickType = graph.symbols.find((symbol) => symbol.name === "pickType");
+    expect(pickType).toBeDefined();
+    expect(pickType!.dependencies.some((dep) => dep.includes("::ref.d.ts::PICK_TYPE"))).toBe(
+      true
+    );
+  });
+
+  it("resolves typeof dependencies to value space without self type-alias cycles", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("type-value-dependency-split")
+    );
+
+    const typeAlias = graph.symbols.find(
+      (symbol) =>
+        symbol.name === "TypeId" &&
+        symbol.kindName === "TypeAliasDeclaration"
+    );
+    expect(typeAlias).toBeDefined();
+    expect(typeAlias!.dependencies).toContain(
+      "type-value-dependency-split@1.0.0::TypeId"
+    );
+    expect(typeAlias!.dependencies).not.toContain(typeAlias!.id);
+  });
+
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(
       makePackageInfo("triple-slash-refs")
@@ -323,9 +431,11 @@ describe("buildPackageGraph", () => {
     expect(namespaceNode).toBeDefined();
     expect(functionNode).toBeDefined();
 
-    // Verify cross-file merging still happened for the namespace part
-    expect(namespaceNode!.filePath).toBe("core.d.ts");
-    expect(namespaceNode!.additionalFiles).toContain("extra.d.ts");
+    // Verify cross-file merging still happened for the namespace part:
+    // one canonical filePath, the other contributing file recorded in additionalFiles.
+    const nsFiles = [namespaceNode!.filePath, ...(namespaceNode!.additionalFiles ?? [])];
+    const uniqueNsFiles = Array.from(new Set(nsFiles)).sort();
+    expect(uniqueNsFiles).toEqual(["core.d.ts", "extra.d.ts"].sort());
 
     const symbolNames = graphResult.symbols.map((symbolNode) => symbolNode.name);
     expect(symbolNames).toContain("MergedNS.original");
@@ -348,11 +458,14 @@ describe("buildPackageGraph", () => {
 
   it("handles same-name symbols with DIFFERENT kinds in the same file (e.g. function and namespace)", () => {
     const graphResult = buildPackageGraph(makePackageInfo("merged-symbols"));
-    const mergedNodes = graphResult.symbols.filter((symbolNode) => symbolNode.name === "merged");
+    const mergedKinds = graphResult.symbols
+      .filter((symbolNode) => symbolNode.name === "merged")
+      .map((symbolNode) => symbolNode.kindName);
 
-    expect(mergedNodes.map(node => node.kindName)).toContain("VariableStatement");
-    expect(mergedNodes.map(node => node.kindName)).toContain("ModuleDeclaration");
-    expect(mergedNodes.length).toBe(2);
+    expect(mergedKinds).toContain("VariableStatement");
+    expect(mergedKinds).toContain("ModuleDeclaration");
+    expect(mergedKinds.filter((kindName) => kindName === "VariableStatement")).toHaveLength(1);
+    expect(mergedKinds.filter((kindName) => kindName === "ModuleDeclaration")).toHaveLength(1);
   });
 
   describe("makeRelative — Path Normalization Fallbacks", () => {

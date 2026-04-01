@@ -1,8 +1,8 @@
-
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::constants::DEFAULT_MAX_DEPTH;
+use crate::dedupe::symbol_dedupe_key;
 use crate::parser;
 use crate::resolver::{normalize_path, resolve_module_specifier};
 use crate::types::{
@@ -48,12 +48,31 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
 
     for entry_path in &unique_entries {
         let resolved = session.resolve_file(entry_path, 0, "");
-        for resolved_symbol in resolved {
-            let name_key = SharedString::from(format!("{}::{}", resolved_symbol.defined_in.as_ref(), resolved_symbol.name.as_ref()).as_ref());
-            public_symbols.insert(name_key);
-
-            // Public symbols are NOT deduped here — the graph layer handles
+        for mut resolved_symbol in resolved {
+            let dedup_key = SharedString::from(
+                symbol_dedupe_key(
+                    resolved_symbol.defined_in.as_ref(),
+                    resolved_symbol.name.as_ref(),
+                    resolved_symbol.kind,
+                    resolved_symbol.signature.as_deref(),
+                )
+                .as_str(),
+            );
+            if all_seen_keys.contains(&dedup_key) {
+                continue;
+            }
+            let pub_key = SharedString::from(
+                format!(
+                    "{}::{}",
+                    resolved_symbol.defined_in.as_ref(),
+                    resolved_symbol.name.as_ref()
+                )
+                .as_ref(),
+            );
+            resolved_symbol.is_internal = false;
             resolved_symbols.push(resolved_symbol);
+            all_seen_keys.insert(dedup_key);
+            public_symbols.insert(pub_key);
         }
     }
 
@@ -64,8 +83,11 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
             None => continue,
         };
 
-        for export_entry in exports {
-            if export_entry.is_global_augmentation || export_entry.is_wildcard || export_entry.name.is_empty() {
+        for export_entry in &exports {
+            if export_entry.is_global_augmentation
+                || export_entry.is_wildcard
+                || export_entry.name.is_empty()
+            {
                 continue;
             }
 
@@ -73,26 +95,45 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
                 continue;
             }
 
-            let key = SharedString::from(format!("{}::{}", file.as_ref(), export_entry.name.as_ref()).as_ref());
-            if !public_symbols.contains(&key) {
-                let internal_results = session.resolve_name_in_file(export_entry.name.as_ref(), file);
-                for mut internal_sym in internal_results {
-                    let int_sig = if matches!(internal_sym.kind, crate::types::SymbolKind::MethodDeclaration | crate::types::SymbolKind::MethodSignature) {
-                        internal_sym.signature.as_deref().unwrap_or("")
-                    } else {
-                        ""
-                    };
-                    let definition_key = SharedString::from(format!("{}::{}::{:?}::{}", internal_sym.defined_in.as_ref(), internal_sym.name.as_ref(), internal_sym.kind, int_sig).as_ref());
-                    if !all_seen_keys.contains(&definition_key) {
-                        internal_sym.is_internal = true;
-                        resolved_symbols.push(internal_sym);
-                        all_seen_keys.insert(definition_key);
-                    }
-                }
-                public_symbols.insert(key);
+            let name_key = SharedString::from(
+                format!("{}::{}", file.as_ref(), export_entry.name.as_ref()).as_ref(),
+            );
+            if public_symbols.contains(&name_key) {
+                continue;
             }
+
+            let internal_results =
+                session.resolve_name_in_file(export_entry.name.as_ref(), file);
+            for mut internal_sym in internal_results {
+                let dedup_key = SharedString::from(
+                    symbol_dedupe_key(
+                        internal_sym.defined_in.as_ref(),
+                        internal_sym.name.as_ref(),
+                        internal_sym.kind,
+                        internal_sym.signature.as_deref(),
+                    )
+                    .as_str(),
+                );
+                if all_seen_keys.contains(&dedup_key) {
+                    continue;
+                }
+                internal_sym.is_internal = true;
+                resolved_symbols.push(internal_sym);
+                all_seen_keys.insert(dedup_key);
+            }
+            public_symbols.insert(name_key);
         }
     }
+
+    let triple_slash_reference_targets: HashMap<SharedString, Vec<SharedString>> = session
+        .triple_slash_ref_targets
+        .into_iter()
+        .map(|(from, set)| {
+            let mut v: Vec<SharedString> = set.into_iter().collect();
+            v.sort_by(|a, b| a.cmp(b));
+            (from, v)
+        })
+        .collect();
 
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
@@ -101,6 +142,7 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         visited_files,
         type_reference_packages: session.type_ref_packages.into_iter().collect(),
         circular_refs: session.circular_refs,
+        triple_slash_reference_targets,
     }
 }
 
@@ -113,6 +155,9 @@ struct CrawlSession {
 
     /// Package names from `/// <reference types="..." />` directives.
     type_ref_packages: HashSet<SharedString>,
+
+    /// Direct triple-slash reference targets per file.
+    triple_slash_ref_targets: HashMap<SharedString, HashSet<SharedString>>,
 
     /// Parsed exports per file.
     raw_exports: HashMap<SharedString, Vec<ParsedExport>>,
@@ -148,6 +193,7 @@ impl CrawlSession {
             visited: HashSet::new(),
             circular_refs: Vec::new(),
             type_ref_packages: HashSet::new(),
+            triple_slash_ref_targets: HashMap::new(),
             raw_exports: HashMap::new(),
             raw_imports: HashMap::new(),
             raw_references: HashMap::new(),
@@ -176,10 +222,16 @@ impl CrawlSession {
 
         // Circular detection during discovery (DFS ancestry)
         if self.discovery_path_set.contains(&normalized_path) {
-            let stack: Vec<&str> = self.discovery_path_stack.iter().map(|s| s.as_ref()).collect();
-            self.circular_refs.push(
-                format!("{} -> {}", stack.join(" -> "), normalized_path.as_ref())
-            );
+            let stack: Vec<&str> = self
+                .discovery_path_stack
+                .iter()
+                .map(|s| s.as_ref())
+                .collect();
+            self.circular_refs.push(format!(
+                "{} -> {}",
+                stack.join(" -> "),
+                normalized_path.as_ref()
+            ));
             return;
         }
 
@@ -216,11 +268,23 @@ impl CrawlSession {
             let resolved_paths = resolve_module_specifier(reference.as_ref(), &normalized_path);
             if !resolved_paths.is_empty() {
                 for ref_path in &resolved_paths {
+                    let from_k = normalize_path(Path::new(normalized_path.as_ref()));
+                    let to_k = normalize_path(Path::new(ref_path.as_ref()));
+                    self.triple_slash_ref_targets
+                        .entry(from_k)
+                        .or_default()
+                        .insert(to_k);
                     self.discover_files(ref_path, depth + 1);
                 }
             } else {
                 let ref_path = resolve_triple_slash_ref(reference.as_ref(), &normalized_path);
                 if let Some(ref_path) = ref_path {
+                    let from_k = normalize_path(Path::new(normalized_path.as_ref()));
+                    let to_k = normalize_path(Path::new(ref_path.as_ref()));
+                    self.triple_slash_ref_targets
+                        .entry(from_k)
+                        .or_default()
+                        .insert(to_k);
                     self.discover_files(&ref_path, depth + 1);
                 }
             }
@@ -238,7 +302,8 @@ impl CrawlSession {
 
         let imports = parse_result.imports.clone();
         for import_entry in imports.iter() {
-            let imported_paths = resolve_module_specifier(import_entry.source.as_ref(), &normalized_path);
+            let imported_paths =
+                resolve_module_specifier(import_entry.source.as_ref(), &normalized_path);
             for imported_path in &imported_paths {
                 self.discover_files(imported_path, depth + 1);
             }
@@ -275,8 +340,10 @@ impl CrawlSession {
 
         self.resolution_path.insert(normalized_path.clone());
 
-        let mut known_names: HashSet<SharedString> =
-            actual_exports.iter().map(|entry| entry.name.clone()).collect();
+        let mut known_names: HashSet<SharedString> = actual_exports
+            .iter()
+            .map(|entry| entry.name.clone())
+            .collect();
 
         let triple_slash_refs = self
             .raw_references
@@ -344,12 +411,8 @@ impl CrawlSession {
             // and do not produce a placeholder symbol themselves.
 
             if export_entry.source.is_some() {
-                let re_export_results = self.resolve_re_export(
-                    export_entry,
-                    &normalized_path,
-                    depth,
-                    name_prefix,
-                );
+                let re_export_results =
+                    self.resolve_re_export(export_entry, &normalized_path, depth, name_prefix);
                 results.extend(re_export_results);
             } else if matches!(
                 export_entry.kind,
@@ -368,10 +431,13 @@ impl CrawlSession {
                 let full_name = if name_prefix.is_empty() {
                     export_entry.name.clone()
                 } else {
-                    SharedString::from(format!("{}.{}", name_prefix, export_entry.name.as_ref()).as_ref())
+                    SharedString::from(
+                        format!("{}.{}", name_prefix, export_entry.name.as_ref()).as_ref(),
+                    )
                 };
 
-                let is_internal = export_entry.kind == SymbolKind::ExportAssignment && export_entry.name.as_ref() == "default";
+                let is_internal = export_entry.kind == SymbolKind::ExportAssignment
+                    && export_entry.name.as_ref() == "default";
                 results.push(ResolvedSymbol {
                     name: full_name,
                     is_internal,
@@ -437,11 +503,14 @@ impl CrawlSession {
         } else if export_entry.is_namespace_export {
             // export * as ns from "..." — wrap in namespace
             let namespace_sig = export_entry.signature.clone().unwrap_or_else(|| {
-                SharedString::from(format!(
-                    "namespace {} {{ {} symbols }}",
-                    export_entry.name.as_ref(),
-                    all_nested_symbols.len()
-                ).as_ref())
+                SharedString::from(
+                    format!(
+                        "namespace {} {{ {} symbols }}",
+                        export_entry.name.as_ref(),
+                        all_nested_symbols.len()
+                    )
+                    .as_ref(),
+                )
             });
 
             results.push(ResolvedSymbol {
@@ -455,9 +524,18 @@ impl CrawlSession {
             // Nest each symbol under the namespace prefix
             for symbol_node in all_nested_symbols {
                 let nested_name = if name_prefix.is_empty() {
-                    format!("{}.{}", export_entry.name.as_ref(), symbol_node.name.as_ref())
+                    format!(
+                        "{}.{}",
+                        export_entry.name.as_ref(),
+                        symbol_node.name.as_ref()
+                    )
                 } else {
-                    format!("{}.{}.{}", name_prefix, export_entry.name.as_ref(), symbol_node.name.as_ref())
+                    format!(
+                        "{}.{}.{}",
+                        name_prefix,
+                        export_entry.name.as_ref(),
+                        symbol_node.name.as_ref()
+                    )
                 };
 
                 let mut chain = vec![current_file.clone()];
@@ -494,7 +572,9 @@ impl CrawlSession {
                 }
             } else {
                 // Target not found in nested — create a stub from the first source
-                let defined_in = SharedString::from(normalize_path(Path::new(source_paths[0].as_ref())).as_ref());
+                let defined_in = SharedString::from(
+                    normalize_path(Path::new(source_paths[0].as_ref())).as_ref(),
+                );
                 results.push(ResolvedSymbol {
                     name: SharedString::from(full_name.as_ref()),
                     defined_in,
@@ -508,9 +588,43 @@ impl CrawlSession {
         results
     }
 
+    /// `extract_export_default` records both the `export default …` wrapper and the inner
+    /// declaration (e.g. class body) as separate [`ParsedExport`]s with the same name.
+    /// Resolving both yields duplicate [`ResolvedSymbol`]s that differ only by signature span;
+    /// keep the inner declaration (`is_explicit_export == false`).
+    fn prefer_inner_decl_over_export_default_wrapper(mut targets: Vec<ParsedExport>) -> Vec<ParsedExport> {
+        if targets.len() <= 1 {
+            return targets;
+        }
+        let has_non_explicit = targets.iter().any(|t| !t.is_explicit_export);
+        let has_explicit = targets.iter().any(|t| t.is_explicit_export);
+        if !has_non_explicit || !has_explicit {
+            return targets;
+        }
+        let kind0 = targets[0].kind;
+        if !targets.iter().all(|t| t.kind == kind0) {
+            return targets;
+        }
+        if matches!(
+            kind0,
+            SymbolKind::Class
+                | SymbolKind::Function
+                | SymbolKind::Interface
+                | SymbolKind::TypeAlias
+                | SymbolKind::Enum
+        ) {
+            targets.retain(|t| !t.is_explicit_export);
+        }
+        targets
+    }
+
     /// Resolves a specific name within a file, regardless of whether it is exported.
     /// Useful for following internal type references during reachability analysis.
-    fn resolve_name_in_file(&mut self, name: &str, file_path: &SharedString) -> Vec<ResolvedSymbol> {
+    fn resolve_name_in_file(
+        &mut self,
+        name: &str,
+        file_path: &SharedString,
+    ) -> Vec<ResolvedSymbol> {
         // Build and cache the local index for this file (once per file, not per call)
         let normalized_path = normalize_path(Path::new(file_path.as_ref()));
         if !self.local_index_cache.contains_key(&normalized_path) {
@@ -525,20 +639,25 @@ impl CrawlSession {
                     .or_default()
                     .push(export.clone());
             }
-            self.local_index_cache.insert(normalized_path.clone(), index);
+            self.local_index_cache
+                .insert(normalized_path.clone(), index);
         }
 
         // Clone just the matching targets (not the whole index) to satisfy borrow checker
         let targets = match self.local_index_cache.get(&normalized_path) {
             Some(index) => match index.get(name) {
-                Some(targets) => targets.clone(),
+                Some(targets) => Self::prefer_inner_decl_over_export_default_wrapper(targets.clone()),
                 None => return Vec::new(),
             },
             None => return Vec::new(),
         };
 
         // Also clone the full local_index for resolve_local_assignment (needs it for member lookup)
-        let local_index = self.local_index_cache.get(&normalized_path).cloned().unwrap_or_default();
+        let local_index = self
+            .local_index_cache
+            .get(&normalized_path)
+            .cloned()
+            .unwrap_or_default();
 
         let mut results = Vec::new();
         for target in &targets {
@@ -547,7 +666,9 @@ impl CrawlSession {
                 results.extend(self.resolve_re_export(target, &normalized_path, 0, ""));
             } else if matches!(
                 target.kind,
-                SymbolKind::ExportAssignment | SymbolKind::ExportDeclaration | SymbolKind::ImportEquals
+                SymbolKind::ExportAssignment
+                    | SymbolKind::ExportDeclaration
+                    | SymbolKind::ImportEquals
             ) {
                 // Assignment: resolve local targets
                 results.extend(resolve_local_assignment(
@@ -618,7 +739,8 @@ fn resolve_local_assignment(
     };
 
     for target in &actual_targets {
-        let is_internal = target.kind == SymbolKind::ExportAssignment && full_name.as_ref() == "default";
+        let is_internal =
+            target.kind == SymbolKind::ExportAssignment && full_name.as_ref() == "default";
         results.push(ResolvedSymbol {
             name: full_name.clone(),
             is_internal,
@@ -641,7 +763,12 @@ fn resolve_local_assignment(
             let new_name = if name_prefix.is_empty() {
                 format!("{}.{}", export_entry.name.as_ref(), local_member_name)
             } else {
-                format!("{}.{}.{}", name_prefix, export_entry.name.as_ref(), local_member_name)
+                format!(
+                    "{}.{}.{}",
+                    name_prefix,
+                    export_entry.name.as_ref(),
+                    local_member_name
+                )
             };
 
             results.push(ResolvedSymbol {
@@ -690,14 +817,18 @@ mod tests {
         let result = crawl(&[entry], None);
 
         assert_eq!(result.exports.len(), 2);
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "greet" && symbol.kind == SymbolKind::Function));
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "VERSION" && symbol.kind == SymbolKind::Variable));
+        assert!(
+            result.exports.iter().any(
+                |symbol| symbol.name.as_ref() == "greet" && symbol.kind == SymbolKind::Function
+            )
+        );
+        assert!(
+            result
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "VERSION"
+                    && symbol.kind == SymbolKind::Variable)
+        );
     }
 
     #[test]
@@ -718,10 +849,13 @@ mod tests {
 
         let result = crawl(&[entry], None);
 
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "helper" && symbol.kind == SymbolKind::Function));
+        assert!(
+            result
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "helper"
+                    && symbol.kind == SymbolKind::Function)
+        );
         assert!(result.visited_files.len() >= 2);
     }
 
@@ -729,17 +863,9 @@ mod tests {
     fn crawl_detects_circular_refs() {
         let temp_dir = TempDir::new().unwrap();
 
-        let file_a = write_dts(
-            temp_dir.path(),
-            "a.d.ts",
-            "export { b } from './b';",
-        );
+        let file_a = write_dts(temp_dir.path(), "a.d.ts", "export { b } from './b';");
 
-        write_dts(
-            temp_dir.path(),
-            "b.d.ts",
-            "export { a } from './a';",
-        );
+        write_dts(temp_dir.path(), "b.d.ts", "export { a } from './a';");
 
         let result = crawl(&[file_a], None);
 
@@ -766,10 +892,7 @@ mod tests {
             "export { deepFunc } from './deep';",
         );
 
-        let result = crawl(
-            &[entry],
-            Some(CrawlOptions { max_depth: 0 }),
-        );
+        let result = crawl(&[entry], Some(CrawlOptions { max_depth: 0 }));
 
         // With max_depth=0, we should only parse the entry file, not follow re-exports
         // The deepFunc should not be fully resolved
@@ -786,22 +909,22 @@ mod tests {
             "export interface Config { key: string; }\nexport type Mode = 'dark' | 'light';",
         );
 
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export * from './types';",
-        );
+        let entry = write_dts(temp_dir.path(), "index.d.ts", "export * from './types';");
 
         let result = crawl(&[entry], None);
 
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "Config" && symbol.kind == SymbolKind::Interface));
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "Mode" && symbol.kind == SymbolKind::TypeAlias));
+        assert!(
+            result
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "Config"
+                    && symbol.kind == SymbolKind::Interface)
+        );
+        assert!(
+            result.exports.iter().any(
+                |symbol| symbol.name.as_ref() == "Mode" && symbol.kind == SymbolKind::TypeAlias
+            )
+        );
     }
 
     #[test]
@@ -823,14 +946,18 @@ mod tests {
         let result = crawl(&[entry], None);
 
         // Should have the namespace symbol and the nested one
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "utils"));
-        assert!(result
-            .exports
-            .iter()
-            .any(|symbol| symbol.name.as_ref() == "utils.format"));
+        assert!(
+            result
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "utils")
+        );
+        assert!(
+            result
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "utils.format")
+        );
     }
 
     #[test]

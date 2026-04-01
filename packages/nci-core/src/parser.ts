@@ -1,9 +1,3 @@
-/**
- * NCI Core — Parser
- *
- * Parses a single .d.ts file and classifies every export statement.
- * Uses the TypeScript Compiler API for AST generation.
- */
 import ts from "typescript";
 import fs from "node:fs";
 import type {
@@ -13,6 +7,7 @@ import type {
   VisibilityLevel,
   CompositionNode,
   DecoratorMetadata,
+  SymbolSpace,
 } from "./types.js";
 import { BUILTIN_TYPES, VISIBILITY_TAGS, DECLARATION_KINDS, MAX_RECURSION_DEPTH } from "./constants.js";
 
@@ -38,6 +33,7 @@ export function parseFile(filePath: string): {
   imports: ParsedImport[];
   references: string[];
   typeReferences: string[];
+  isExternalModule: boolean;
 } {
   const sourceFile = getOrCreateSourceFile(filePath);
   return parseFileFromSource(sourceFile);
@@ -54,13 +50,14 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
   imports: ParsedImport[];
   references: string[];
   typeReferences: string[];
+  isExternalModule: boolean;
 } {
   const exports: ParsedExport[] = [];
   const imports: ParsedImport[] = [];
   const references = sourceFile.referencedFiles.map((ref) => ref.fileName);
   const typeReferences = sourceFile.typeReferenceDirectives.map((ref) => ref.fileName);
 
-  const isScript = !ts.isExternalModule(sourceFile);
+  const isExternalModuleFile = ts.isExternalModule(sourceFile);
 
   for (const statement of sourceFile.statements) {
     // ─── Imports ──────────────────────────────────────────────
@@ -117,6 +114,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           kind: ts.SyntaxKind.ImportEqualsDeclaration,
           kindName: "ImportEqualsDeclaration",
           isTypeOnly: false,
+          symbolSpace: "value",
           isExplicitExport: true,
           isNamespaceExport: true,
           source,
@@ -136,6 +134,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
         kind: ts.SyntaxKind.NamespaceExportDeclaration,
         kindName: "NamespaceExportDeclaration",
         isTypeOnly: false,
+        symbolSpace: "value",
         isExplicitExport: true,
         signature: `export as namespace ${statement.name.text}`,
         ...jsdoc,
@@ -152,6 +151,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           kind: ts.SyntaxKind.ModuleDeclaration,
           kindName: "ModuleDeclaration",
           isTypeOnly: false,
+          symbolSpace: "value",
           isGlobalAugmentation: true,
           isExplicitExport: false,
           signature: statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
@@ -167,6 +167,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           kind: ts.SyntaxKind.ModuleDeclaration,
           kindName: "ModuleDeclaration",
           isTypeOnly: false,
+          symbolSpace: "value",
           isExplicitExport: false,
           signature: statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
           ...jsdoc,
@@ -221,8 +222,8 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
               kind: statement.kind,
               kindName: "ExpressionStatement",
               isTypeOnly: false,
+              symbolSpace: "value",
               isExplicitExport: false,
-              ...(isScript ? { isGlobalAugmentation: true } : {}),
               signature: statement.getText(sourceFile).trim(),
               ...jsdoc,
             });
@@ -237,16 +238,13 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
       const isExported = isExportedDeclaration(statement);
       const directExports = extractDirectExport(statement, sourceFile, isExported);
       for (const exp of directExports) {
-        if (!isExported && isScript) {
-          exp.isGlobalAugmentation = true;
-        }
         exports.push(exp);
       }
       continue;
     }
   }
 
-  return { exports, imports, references, typeReferences };
+  return { exports, imports, references, typeReferences, isExternalModule: isExternalModuleFile };
 }
 
 /**
@@ -311,6 +309,7 @@ function extractDirectExport(
           kind: ts.SyntaxKind.VariableStatement,
           kindName: "VariableStatement",
           isTypeOnly: false,
+          symbolSpace: "value",
           isExplicitExport,
           signature: `declare const ${decl.name.text}: ${decl.type?.getText(sourceFile) ?? "any"}`,
           dependencies: dependencies.length > 0 ? dependencies : undefined,
@@ -319,7 +318,18 @@ function extractDirectExport(
         });
 
         if (decl.type) {
-          exports.push(...extractComplexTypeMembers(decl.type, sourceFile, name, isExplicitExport, jsdoc, 0, new Set()));
+          exports.push(
+            ...extractComplexTypeMembers(
+              decl.type,
+              sourceFile,
+              name,
+              isExplicitExport,
+              jsdoc,
+              0,
+              new Set(),
+              "type"
+            )
+          );
         }
       }
     }
@@ -337,6 +347,7 @@ function extractDirectExport(
       kind: statement.kind,
       kindName: ts.SyntaxKind[statement.kind]!,
       isTypeOnly: isTypeDeclaration(statement),
+      symbolSpace: symbolSpaceForNamedDeclaration(statement),
       isExplicitExport,
       signature: statement.getText(sourceFile).trim(),
       dependencies: deps,
@@ -360,7 +371,18 @@ function extractDirectExport(
     }
 
     if (ts.isInterfaceDeclaration(statement)) {
-      exports.push(...extractComplexTypeMembers(statement, sourceFile, name, isExplicitExport, jsdoc, 0, new Set()));
+      exports.push(
+        ...extractComplexTypeMembers(
+          statement,
+          sourceFile,
+          name,
+          isExplicitExport,
+          jsdoc,
+          0,
+          new Set(),
+          "type"
+        )
+      );
     }
   }
 
@@ -411,6 +433,7 @@ function extractClassMembers(
       kind: member.kind,
       kindName: ts.SyntaxKind[member.kind]!,
       isTypeOnly: false,
+      symbolSpace: "value",
       isExplicitExport,
       signature,
       dependencies: dependencies.length > 0 ? dependencies : undefined,
@@ -429,23 +452,17 @@ function extractClassMembers(
 /**
  * Extracts members from complex types, including nested object literals and intersection types.
  *
- * @param node The type node to decompose.
- * @param sourceFile The containing source file.
- * @param parentName The name of the parent symbol.
- * @param isExplicitExport True if the parent is exported.
- * @param parentJSDoc Meta-information from the parent JSDoc.
- * @param depth Current recursion depth.
- * @param visitedNames Set of names visited in this traversal to prevent cycles.
- * @returns Parsed symbols for all extracted type members.
+ * @param memberSymbolSpace Type vs value for extracted member rows (`interface` / type shapes → `"type"`, `class` via `typeof` → `"value"`).
  */
 function extractComplexTypeMembers(
   node: CompositionNode,
   sourceFile: ts.SourceFile,
   parentName: string,
   isExplicitExport: boolean,
-  parentJSDoc?: JSDocInfo,
-  depth = 0,
-  visitedNames = new Set<string>()
+  parentJSDoc: JSDocInfo | undefined,
+  depth: number,
+  visitedNames: Set<string>,
+  memberSymbolSpace: SymbolSpace
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
@@ -463,7 +480,14 @@ function extractComplexTypeMembers(
   if (members) {
 
     for (const member of members) {
-      if (ts.isPropertySignature(member) || ts.isMethodSignature(member) || ts.isPropertyDeclaration(member) || ts.isMethodDeclaration(member)) {
+      if (
+        ts.isPropertySignature(member) ||
+        ts.isMethodSignature(member) ||
+        ts.isPropertyDeclaration(member) ||
+        ts.isMethodDeclaration(member) ||
+        ts.isGetAccessorDeclaration(member) ||
+        ts.isSetAccessorDeclaration(member)
+      ) {
         const memberName = member.name ? getMemberName(member.name, sourceFile) : undefined;
         if (!memberName) continue;
         const name = `${parentName}.${memberName}`;
@@ -478,6 +502,7 @@ function extractComplexTypeMembers(
           kind: member.kind,
           kindName: ts.SyntaxKind[member.kind]!,
           isTypeOnly: false,
+          symbolSpace: memberSymbolSpace,
           isExplicitExport,
           signature,
           dependencies: deps,
@@ -490,14 +515,36 @@ function extractComplexTypeMembers(
         });
 
         if ((ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) && member.type) {
-          exports.push(...extractComplexTypeMembers(member.type, sourceFile, name, isExplicitExport, jsdoc, depth + 1, visitedNames));
+          exports.push(
+            ...extractComplexTypeMembers(
+              member.type,
+              sourceFile,
+              name,
+              isExplicitExport,
+              jsdoc,
+              depth + 1,
+              visitedNames,
+              "type"
+            )
+          );
         }
       }
     }
   } else if (ts.isIntersectionTypeNode(node)) {
     const intersection = node;
-    for (const type of intersection.types) {
-      exports.push(...extractComplexTypeMembers(type, sourceFile, parentName, isExplicitExport, parentJSDoc, depth + 1, visitedNames));
+    for (const intersectionMember of intersection.types) {
+      exports.push(
+        ...extractComplexTypeMembers(
+          intersectionMember,
+          sourceFile,
+          parentName,
+          isExplicitExport,
+          parentJSDoc,
+          depth + 1,
+          visitedNames,
+          memberSymbolSpace
+        )
+      );
     }
   } else if (ts.isTypeQueryNode(node) || ts.isTypeReferenceNode(node)) {
     const typeNode = node;
@@ -507,7 +554,19 @@ function extractComplexTypeMembers(
       const newVisited = new Set(visitedNames).add(searchName);
       const resolved = resolveLocalType(typeNode, sourceFile);
       if (resolved) {
-        exports.push(...extractComplexTypeMembers(resolved, sourceFile, parentName, isExplicitExport, parentJSDoc, depth + 1, newVisited));
+        const nextSpace: SymbolSpace = ts.isClassDeclaration(resolved) ? "value" : "type";
+        exports.push(
+          ...extractComplexTypeMembers(
+            resolved,
+            sourceFile,
+            parentName,
+            isExplicitExport,
+            parentJSDoc,
+            depth + 1,
+            newVisited,
+            nextSpace
+          )
+        );
       }
     }
   }
@@ -639,7 +698,9 @@ function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorM
     if (ts.isCallExpression(expression)) {
       return {
         name: expression.expression.getText(sourceFile),
-        arguments: expression.arguments.map((arg) => arg.getText(sourceFile).replace(/['"`]/g, "")),
+        arguments: expression.arguments.map((argument) =>
+          argument.getText(sourceFile).replace(/['"`]/g, "")
+        ),
       };
     }
     return { name: expression.getText(sourceFile) };
@@ -682,13 +743,7 @@ function isExportedDeclaration(node: ts.Node): boolean {
   return false;
 }
 
-/**
- * Extracts all symbols from an export declaration, including re-exports and wildcards.
- *
- * @param node The export declaration node.
- * @param sourceFile The containing source file.
- * @returns An array of parsed symbols extracted from the declaration.
- */
+/** Extract export declarations. */
 function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.SourceFile): ParsedExport[] {
   const exports: ParsedExport[] = [];
   const isTypeOnly = node.isTypeOnly;
@@ -701,6 +756,7 @@ function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.Sou
       kind: ts.SyntaxKind.ExportDeclaration,
       kindName: "ExportDeclaration",
       isTypeOnly,
+      symbolSpace: symbolSpaceForReExport(isTypeOnly),
       source,
       isWildcard: true,
       isExplicitExport: true,
@@ -716,6 +772,7 @@ function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.Sou
       kind: ts.SyntaxKind.ExportDeclaration,
       kindName: "ExportDeclaration",
       isTypeOnly,
+      symbolSpace: symbolSpaceForReExport(isTypeOnly),
       source,
       isNamespaceExport: true,
       isExplicitExport: true,
@@ -739,6 +796,7 @@ function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.Sou
         kind: ts.SyntaxKind.ExportDeclaration,
         kindName: "ExportDeclaration",
         isTypeOnly: specifierIsTypeOnly,
+        symbolSpace: symbolSpaceForReExport(specifierIsTypeOnly),
         source,
         originalName: originalName !== exportedName ? originalName : undefined,
         isExplicitExport: true,
@@ -750,13 +808,7 @@ function extractExportDeclaration(node: ts.ExportDeclaration, sourceFile: ts.Sou
   return exports;
 }
 
-/**
- * Parses an export assignment (e.g., export default or module.exports).
- *
- * @param node The export assignment node.
- * @param sourceFile The containing source file.
- * @returns A parsed symbol representing the assignment.
- */
+/** Extract export assignment. */
 function extractExportAssignment(node: ts.ExportAssignment, sourceFile: ts.SourceFile): ParsedExport {
   const isDefault = !node.isExportEquals;
   const expression = node.expression;
@@ -767,6 +819,7 @@ function extractExportAssignment(node: ts.ExportAssignment, sourceFile: ts.Sourc
     kind: ts.SyntaxKind.ExportAssignment,
     kindName: "ExportAssignment",
     isTypeOnly: false,
+    symbolSpace: "value",
     signature: node.getText(sourceFile).trim(),
     isExplicitExport: true,
     ...jsdoc,
@@ -783,12 +836,19 @@ function isTypeDeclaration(node: ts.Node): boolean {
   return ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node);
 }
 
-/**
- * Extracts JSDoc commentary and tags (deprecated, since, visibility) from a node.
- *
- * @param node The AST node to check for JSDocs.
- * @returns A JSDocInfo object with detected metadata.
- */
+/** Type vs value namespace for a named declaration (not re-export / `export type` flags). */
+function symbolSpaceForNamedDeclaration(statement: ts.Statement): SymbolSpace {
+  if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
+    return "type";
+  }
+  return "value";
+}
+
+function symbolSpaceForReExport(isTypeOnlyExport: boolean): SymbolSpace {
+  return isTypeOnlyExport ? "type" : "value";
+}
+
+/** Extract JSDoc info. */
 function extractJSDocInfo(node: ts.Node): JSDocInfo {
   const result: JSDocInfo = {};
   const jsDocs = ts.getJSDocCommentsAndTags(node);
@@ -829,51 +889,92 @@ export function extractTypeReferences(node: ts.Node): TypeReference[] {
   return Array.from(refs.values());
 }
 
-/** Internal visitor that recursively populates the dependency map. */
-function visitTypeNode(child: ts.Node, refs: Map<string, TypeReference>): void {
-  if (ts.isTypeParameterDeclaration(child)) return;
+function addTypeRef(
+  refs: Map<string, TypeReference>,
+  reference: TypeReference
+): void {
+  const key = `${reference.name}::${reference.importPath || ""}::${reference.resolutionHint || "type"}`;
+  refs.set(key, reference);
+}
 
-  if (ts.isTypeReferenceNode(child)) {
-    const typeName = child.typeName;
+/** Full dotted name for `A` or `A.B.C` (used for dependency keys matching graph symbol names). */
+function entityNameToDotted(name: ts.EntityName): string {
+  if (ts.isIdentifier(name)) return name.text;
+  return `${entityNameToDotted(name.left)}.${name.right.text}`;
+}
+
+/** Internal visitor that recursively populates the dependency map. */
+function visitTypeNode(typeAstNode: ts.Node, refs: Map<string, TypeReference>): void {
+  if (ts.isTypeParameterDeclaration(typeAstNode)) return;
+
+  if (ts.isIndexedAccessTypeNode(typeAstNode)) {
+    let indexedObjectName = "";
+    if (
+      ts.isTypeReferenceNode(typeAstNode.objectType) &&
+      typeAstNode.objectType.typeName
+    ) {
+      const typeName = typeAstNode.objectType.typeName;
+      if (ts.isIdentifier(typeName)) indexedObjectName = typeName.text;
+      else if (ts.isQualifiedName(typeName)) indexedObjectName = entityNameToDotted(typeName);
+    }
+    let indexPropertyName = "";
+    if (
+      ts.isLiteralTypeNode(typeAstNode.indexType) &&
+      ts.isStringLiteralLike(typeAstNode.indexType.literal)
+    ) {
+      indexPropertyName = typeAstNode.indexType.literal.text;
+    }
+    if (indexedObjectName && indexPropertyName) {
+      const name = `${indexedObjectName}.${indexPropertyName}`;
+      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+    }
+  }
+
+  if (ts.isTypeReferenceNode(typeAstNode)) {
+    const typeName = typeAstNode.typeName;
     let name: string;
     if (ts.isIdentifier(typeName)) name = typeName.text;
-    else if (ts.isQualifiedName(typeName)) name = typeName.right.text;
+    else if (ts.isQualifiedName(typeName)) name = entityNameToDotted(typeName);
     else return;
 
-    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
-  } else if (ts.isImportTypeNode(child) && child.qualifier) {
+    if (!BUILTIN_TYPES.has(name)) addTypeRef(refs, { name, resolutionHint: "type" });
+  } else if (ts.isImportTypeNode(typeAstNode) && typeAstNode.qualifier) {
     let name: string;
-    if (ts.isIdentifier(child.qualifier)) name = child.qualifier.text;
-    else if (ts.isQualifiedName(child.qualifier)) name = child.qualifier.right.text;
+    if (ts.isIdentifier(typeAstNode.qualifier)) name = typeAstNode.qualifier.text;
+    else if (ts.isQualifiedName(typeAstNode.qualifier)) name = typeAstNode.qualifier.right.text;
     else return;
 
     let importPath: string | undefined;
-    if (ts.isLiteralTypeNode(child.argument) && ts.isStringLiteral(child.argument.literal)) {
-      importPath = child.argument.literal.text;
+    if (
+      ts.isLiteralTypeNode(typeAstNode.argument) &&
+      ts.isStringLiteral(typeAstNode.argument.literal)
+    ) {
+      importPath = typeAstNode.argument.literal.text;
     }
-    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name, importPath });
-  } else if (ts.isExpressionWithTypeArguments(child)) {
+    if (!BUILTIN_TYPES.has(name)) addTypeRef(refs, { name, importPath, resolutionHint: "type" });
+  } else if (ts.isExpressionWithTypeArguments(typeAstNode)) {
     let name: string;
-    if (ts.isIdentifier(child.expression)) name = child.expression.text;
-    else if (ts.isPropertyAccessExpression(child.expression)) name = child.expression.name.text;
-    else {
-      ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
+    if (ts.isIdentifier(typeAstNode.expression)) name = typeAstNode.expression.text;
+    else if (ts.isPropertyAccessExpression(typeAstNode.expression)) {
+      name = typeAstNode.expression.name.text;
+    } else {
+      ts.forEachChild(typeAstNode, (descendant) => visitTypeNode(descendant, refs));
       return;
     }
 
-    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
-  } else if (ts.isTypeQueryNode(child)) {
-    const exprName = child.exprName;
+    if (!BUILTIN_TYPES.has(name)) addTypeRef(refs, { name, resolutionHint: "type" });
+  } else if (ts.isTypeQueryNode(typeAstNode)) {
+    const exprName = typeAstNode.exprName;
     let name: string;
     if (ts.isIdentifier(exprName)) name = exprName.text;
     else if (ts.isQualifiedName(exprName)) name = exprName.right.text;
     else {
-      ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
+      ts.forEachChild(typeAstNode, (descendant) => visitTypeNode(descendant, refs));
       return;
     }
 
-    if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+    if (!BUILTIN_TYPES.has(name)) addTypeRef(refs, { name, resolutionHint: "value" });
   }
 
-  ts.forEachChild(child, (childNode) => visitTypeNode(childNode, refs));
+  ts.forEachChild(typeAstNode, (descendant) => visitTypeNode(descendant, refs));
 }
