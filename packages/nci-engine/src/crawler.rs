@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::constants::DEFAULT_MAX_DEPTH;
 use crate::dedupe::symbol_dedupe_key;
 use crate::parser;
-use crate::resolver::{normalize_path, resolve_module_specifier};
+use crate::resolver::{normalize_path, normalize_path_with_cache, resolve_module_specifier};
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
 };
@@ -41,14 +42,15 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let unique_entries: Vec<&SharedString> = entry_file_paths
         .iter()
         .filter(|path| {
-            let norm = normalize_path(Path::new(path.as_ref()));
+            let norm =
+                normalize_path_with_cache(&mut session.path_norm_cache, Path::new(path.as_ref()));
             seen_entries.insert(norm)
         })
         .collect();
 
     for entry_path in &unique_entries {
         let resolved = session.resolve_file(entry_path, 0, "");
-        for mut resolved_symbol in resolved {
+        for mut resolved_symbol in resolved.iter().cloned() {
             let dedup_key = SharedString::from(
                 symbol_dedupe_key(
                     resolved_symbol.defined_in.as_ref(),
@@ -61,32 +63,29 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
             if all_seen_keys.contains(&dedup_key) {
                 continue;
             }
-            let pub_key = SharedString::from(
-                format!(
-                    "{}::{}",
-                    resolved_symbol.defined_in.as_ref(),
-                    resolved_symbol.name.as_ref()
-                )
-                .as_ref(),
-            );
             resolved_symbol.is_internal = false;
             resolved_symbols.push(resolved_symbol);
-            all_seen_keys.insert(dedup_key);
-            public_symbols.insert(pub_key);
+            all_seen_keys.insert(dedup_key.clone());
+            public_symbols.insert(dedup_key);
         }
     }
 
-    let visited_files: Vec<SharedString> = session.visited.iter().cloned().collect();
+    let mut visited_files: Vec<SharedString> = session.visited.iter().cloned().collect();
+    visited_files.sort_by(|path_a, path_b| path_a.cmp(path_b));
     for file in &visited_files {
         let exports = match session.raw_exports.get(file) {
             Some(exports) => exports.clone(),
             None => continue,
         };
+        let exports = prefer_inner_decl_over_export_default_wrapper(exports);
 
         for export_entry in &exports {
+            if export_entry.is_wildcard || export_entry.name.is_empty() {
+                continue;
+            }
             if export_entry.is_global_augmentation
-                || export_entry.is_wildcard
-                || export_entry.name.is_empty()
+                && export_entry.kind == SymbolKind::Namespace
+                && export_entry.name.as_ref() == "global"
             {
                 continue;
             }
@@ -95,55 +94,96 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
                 continue;
             }
 
-            let name_key = SharedString::from(
-                format!("{}::{}", file.as_ref(), export_entry.name.as_ref()).as_ref(),
+            let definition_key = SharedString::from(
+                symbol_dedupe_key(
+                    file.as_ref(),
+                    export_entry.name.as_ref(),
+                    export_entry.kind,
+                    export_entry.signature.as_deref(),
+                )
+                .as_str(),
             );
-            if public_symbols.contains(&name_key) {
+            if public_symbols.contains(&definition_key) {
                 continue;
             }
 
-            let internal_results =
-                session.resolve_name_in_file(export_entry.name.as_ref(), file);
-            for mut internal_sym in internal_results {
-                let dedup_key = SharedString::from(
-                    symbol_dedupe_key(
-                        internal_sym.defined_in.as_ref(),
-                        internal_sym.name.as_ref(),
-                        internal_sym.kind,
-                        internal_sym.signature.as_deref(),
-                    )
-                    .as_str(),
-                );
-                if all_seen_keys.contains(&dedup_key) {
-                    continue;
-                }
-                internal_sym.is_internal = true;
-                resolved_symbols.push(internal_sym);
-                all_seen_keys.insert(dedup_key);
+            if all_seen_keys.contains(&definition_key) {
+                continue;
             }
-            public_symbols.insert(name_key);
+
+            let mut internal_sym = ResolvedSymbol::from_export(export_entry, file.clone());
+            internal_sym.is_internal = true;
+            resolved_symbols.push(internal_sym);
+            all_seen_keys.insert(definition_key.clone());
+            public_symbols.insert(definition_key);
         }
     }
 
-    let triple_slash_reference_targets: HashMap<SharedString, Vec<SharedString>> = session
-        .triple_slash_ref_targets
+    let mut triple_rows: Vec<(SharedString, HashSet<SharedString>)> =
+        session.triple_slash_ref_targets.into_iter().collect();
+    triple_rows.sort_by(|(from_a, _), (from_b, _)| from_a.cmp(from_b));
+    let triple_slash_reference_targets: HashMap<SharedString, Vec<SharedString>> = triple_rows
         .into_iter()
         .map(|(from, set)| {
-            let mut v: Vec<SharedString> = set.into_iter().collect();
-            v.sort_by(|a, b| a.cmp(b));
-            (from, v)
+            let mut targets: Vec<SharedString> = set.into_iter().collect();
+            targets.sort_by(|path_a, path_b| path_a.cmp(path_b));
+            (from, targets)
         })
         .collect();
+
+    let mut type_ref_packages: Vec<SharedString> = session.type_ref_packages.into_iter().collect();
+    type_ref_packages.sort_by(|name_a, name_b| name_a.cmp(name_b));
 
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
         exports: resolved_symbols,
         imports: session.raw_imports,
         visited_files,
-        type_reference_packages: session.type_ref_packages.into_iter().collect(),
+        type_reference_packages: type_ref_packages,
         circular_refs: session.circular_refs,
         triple_slash_reference_targets,
     }
+}
+
+fn prefer_inner_decl_over_export_default_wrapper(exports: Vec<ParsedExport>) -> Vec<ParsedExport> {
+    let mut grouped: HashMap<String, Vec<ParsedExport>> =
+        HashMap::with_capacity(exports.len().min(256));
+    for export in exports {
+        let kind = export.kind;
+        grouped
+            .entry(format!("{}::{}", export.name.as_ref(), kind.numeric_kind()))
+            .or_default()
+            .push(export);
+    }
+
+    let mut sorted_group_keys: Vec<String> = grouped.keys().cloned().collect();
+    sorted_group_keys.sort();
+
+    let mut out = Vec::new();
+    for group_key in sorted_group_keys {
+        let mut group = grouped
+            .remove(&group_key)
+            .expect("group key was collected from the same map");
+        let kind = group[0].kind;
+        let has_non_explicit = group.iter().any(|entry| !entry.is_explicit_export);
+        let has_explicit = group.iter().any(|entry| entry.is_explicit_export);
+        let keep_non_explicit_only = has_non_explicit
+            && has_explicit
+            && matches!(
+                kind,
+                SymbolKind::Class
+                    | SymbolKind::Function
+                    | SymbolKind::Interface
+                    | SymbolKind::TypeAlias
+                    | SymbolKind::Enum
+            );
+
+        if keep_non_explicit_only {
+            group.retain(|entry| !entry.is_explicit_export);
+        }
+        out.extend(group);
+    }
+    out
 }
 
 struct CrawlSession {
@@ -168,6 +208,9 @@ struct CrawlSession {
     /// Parsed triple-slash references per file.
     raw_references: HashMap<SharedString, Vec<SharedString>>,
 
+    /// Whether each parsed file is an external module.
+    file_is_external_module: HashMap<SharedString, bool>,
+
     /// Path set for circular detection during discovery (DFS ancestry).
     discovery_path_set: HashSet<SharedString>,
 
@@ -178,10 +221,10 @@ struct CrawlSession {
     resolution_path: HashSet<SharedString>,
 
     /// Cache of resolved symbols per file.
-    resolution_cache: HashMap<SharedString, Vec<ResolvedSymbol>>,
+    resolution_cache: HashMap<SharedString, Arc<Vec<ResolvedSymbol>>>,
 
-    /// Cached name→exports index per file (built lazily, avoids repeated HashMap rebuilds).
-    local_index_cache: HashMap<SharedString, HashMap<SharedString, Vec<ParsedExport>>>,
+    /// Canonical filesystem path → normalized absolute path string (see `normalize_path_with_cache`).
+    path_norm_cache: HashMap<PathBuf, SharedString>,
 
     /// Maximum depth for re-export following.
     max_depth: usize,
@@ -197,11 +240,12 @@ impl CrawlSession {
             raw_exports: HashMap::new(),
             raw_imports: HashMap::new(),
             raw_references: HashMap::new(),
+            file_is_external_module: HashMap::new(),
             discovery_path_set: HashSet::new(),
             discovery_path_stack: Vec::new(),
             resolution_path: HashSet::new(),
             resolution_cache: HashMap::new(),
-            local_index_cache: HashMap::new(),
+            path_norm_cache: HashMap::new(),
             max_depth,
         }
     }
@@ -209,8 +253,8 @@ impl CrawlSession {
     /// Recursively discovers all files reachable from an entry point.
     /// Scans re-exports, imports, and triple-slash references.
     fn discover_files(&mut self, file_path: &SharedString, depth: usize) {
-        let normalized_path_str = normalize_path(Path::new(file_path.as_ref()));
-        let normalized_path = SharedString::from(normalized_path_str.as_ref());
+        let normalized_path =
+            normalize_path_with_cache(&mut self.path_norm_cache, Path::new(file_path.as_ref()));
 
         if depth > self.max_depth {
             return;
@@ -262,14 +306,18 @@ impl CrawlSession {
             .insert(normalized_path.clone(), parse_result.imports.to_vec());
         self.raw_references
             .insert(normalized_path.clone(), parse_result.references.to_vec());
+        self.file_is_external_module
+            .insert(normalized_path.clone(), parse_result.is_external_module);
 
-        let references = parse_result.references.clone();
-        for reference in references.iter() {
+        for reference in parse_result.references.iter() {
             let resolved_paths = resolve_module_specifier(reference.as_ref(), &normalized_path);
             if !resolved_paths.is_empty() {
                 for ref_path in &resolved_paths {
-                    let from_k = normalize_path(Path::new(normalized_path.as_ref()));
-                    let to_k = normalize_path(Path::new(ref_path.as_ref()));
+                    let from_k = normalized_path.clone();
+                    let to_k = normalize_path_with_cache(
+                        &mut self.path_norm_cache,
+                        Path::new(ref_path.as_ref()),
+                    );
                     self.triple_slash_ref_targets
                         .entry(from_k)
                         .or_default()
@@ -279,8 +327,11 @@ impl CrawlSession {
             } else {
                 let ref_path = resolve_triple_slash_ref(reference.as_ref(), &normalized_path);
                 if let Some(ref_path) = ref_path {
-                    let from_k = normalize_path(Path::new(normalized_path.as_ref()));
-                    let to_k = normalize_path(Path::new(ref_path.as_ref()));
+                    let from_k = normalized_path.clone();
+                    let to_k = normalize_path_with_cache(
+                        &mut self.path_norm_cache,
+                        Path::new(ref_path.as_ref()),
+                    );
                     self.triple_slash_ref_targets
                         .entry(from_k)
                         .or_default()
@@ -290,8 +341,7 @@ impl CrawlSession {
             }
         }
 
-        let exports = parse_result.exports.clone();
-        for export_entry in exports.iter() {
+        for export_entry in parse_result.exports.iter() {
             if let Some(source) = &export_entry.source {
                 let source_paths = resolve_module_specifier(source.as_ref(), &normalized_path);
                 for source_path in &source_paths {
@@ -300,12 +350,24 @@ impl CrawlSession {
             }
         }
 
-        let imports = parse_result.imports.clone();
-        for import_entry in imports.iter() {
+        for import_entry in parse_result.imports.iter() {
             let imported_paths =
                 resolve_module_specifier(import_entry.source.as_ref(), &normalized_path);
             for imported_path in &imported_paths {
                 self.discover_files(imported_path, depth + 1);
+            }
+        }
+
+        for export_entry in parse_result.exports.iter() {
+            for dep in export_entry.dependencies.iter() {
+                if let Some(spec) = dep.import_path.as_ref() {
+                    let dep_paths = resolve_module_specifier(spec.as_ref(), &normalized_path);
+                    for dep_path in &dep_paths {
+                        if dep_path.as_ref() != spec.as_ref() {
+                            self.discover_files(dep_path, depth + 1);
+                        }
+                    }
+                }
             }
         }
 
@@ -319,31 +381,39 @@ impl CrawlSession {
         file_path: &SharedString,
         depth: usize,
         name_prefix: &str,
-    ) -> Vec<ResolvedSymbol> {
-        let normalized_path_str = normalize_path(Path::new(file_path.as_ref()));
-        let normalized_path = SharedString::from(normalized_path_str.as_ref());
+    ) -> Arc<Vec<ResolvedSymbol>> {
+        let normalized_path =
+            normalize_path_with_cache(&mut self.path_norm_cache, Path::new(file_path.as_ref()));
 
         if depth > self.max_depth || self.resolution_path.contains(&normalized_path) {
-            return Vec::new();
+            return Arc::new(Vec::new());
         }
 
         if name_prefix.is_empty() {
             if let Some(cached) = self.resolution_cache.get(&normalized_path) {
-                return cached.clone();
+                return Arc::clone(cached);
             }
         }
 
         let mut actual_exports = match self.raw_exports.get(&normalized_path) {
             Some(exports) => exports.clone(),
-            None => return Vec::new(),
+            None => return Arc::new(Vec::new()),
         };
 
         self.resolution_path.insert(normalized_path.clone());
 
-        let mut known_names: HashSet<SharedString> = actual_exports
-            .iter()
-            .map(|entry| entry.name.clone())
-            .collect();
+        let mut known_export_keys: HashSet<SharedString> = HashSet::with_capacity(actual_exports.len());
+        known_export_keys.extend(actual_exports.iter().map(|entry| {
+            SharedString::from(
+                format!(
+                    "{}::{}::{}",
+                    entry.name.as_ref(),
+                    entry.kind.numeric_kind(),
+                    crate::dedupe::normalize_signature(entry.signature.as_deref())
+                )
+                .as_ref(),
+            )
+        }));
 
         let triple_slash_refs = self
             .raw_references
@@ -363,15 +433,37 @@ impl CrawlSession {
             };
 
             for ref_path in &ref_paths {
-                let nested_symbols = self.resolve_file(ref_path, depth + 1, "");
+                let ref_is_module = self
+                    .file_is_external_module
+                    .get(ref_path)
+                    .copied()
+                    .unwrap_or(true);
+                let nested_symbols: Vec<ResolvedSymbol> = self
+                    .resolve_file(ref_path, depth + 1, "")
+                    .iter()
+                    .filter(|symbol_node| !ref_is_module || symbol_node.is_global_augmentation)
+                    .cloned()
+                    .collect();
                 for symbol_node in nested_symbols {
-                    if !known_names.contains(&symbol_node.name) {
-                        known_names.insert(symbol_node.name.clone());
+                    let export_key = SharedString::from(
+                        format!(
+                            "{}::{}::{}",
+                            symbol_node.name.as_ref(),
+                            symbol_node.kind.numeric_kind(),
+                            crate::dedupe::normalize_signature(symbol_node.signature.as_deref())
+                        )
+                        .as_ref(),
+                    );
+                    if !known_export_keys.contains(&export_key) {
+                        known_export_keys.insert(export_key);
                         actual_exports.push(ParsedExport {
                             name: symbol_node.name.clone(),
                             kind: symbol_node.kind,
                             is_type_only: symbol_node.is_type_only,
+                            symbol_space: symbol_node.symbol_space,
                             is_explicit_export: true,
+                            is_global_augmentation: symbol_node.is_global_augmentation,
+                            declared_in_file: Some(ref_path.clone()),
                             signature: symbol_node.signature.clone(),
                             js_doc: symbol_node.js_doc.clone(),
                             dependencies: symbol_node.dependencies.clone(),
@@ -388,7 +480,8 @@ impl CrawlSession {
             }
         }
 
-        let mut local_index: HashMap<SharedString, Vec<ParsedExport>> = HashMap::new();
+        let mut local_index: HashMap<SharedString, Vec<ParsedExport>> =
+            HashMap::with_capacity(actual_exports.len().min(512));
         for export_entry in &actual_exports {
             local_index
                 .entry(export_entry.name.clone())
@@ -396,14 +489,29 @@ impl CrawlSession {
                 .push(export_entry.clone());
         }
 
+        let mut local_keys_sorted: Vec<SharedString> = local_index.keys().cloned().collect();
+        local_keys_sorted.sort_by(|key_a, key_b| key_a.cmp(key_b));
+
         let mut results: Vec<ResolvedSymbol> = Vec::new();
 
+        let resolving_as_script = !self
+            .file_is_external_module
+            .get(&normalized_path)
+            .copied()
+            .unwrap_or(true);
+
         for export_entry in &actual_exports {
-            if export_entry.is_global_augmentation {
+            if export_entry.is_global_augmentation
+                && export_entry.kind == SymbolKind::Namespace
+                && export_entry.name.as_ref() == "global"
+            {
                 continue;
             }
             // Skip non-exported declarations — captured as internal symbols later
-            if !export_entry.is_explicit_export {
+            if !export_entry.is_explicit_export
+                && !resolving_as_script
+                && !export_entry.is_global_augmentation
+            {
                 continue;
             }
 
@@ -423,6 +531,7 @@ impl CrawlSession {
                 let assignment_results = resolve_local_assignment(
                     export_entry,
                     &local_index,
+                    local_keys_sorted.as_slice(),
                     &normalized_path,
                     name_prefix,
                 );
@@ -438,22 +547,28 @@ impl CrawlSession {
 
                 let is_internal = export_entry.kind == SymbolKind::ExportAssignment
                     && export_entry.name.as_ref() == "default";
+                let defined_in_path = export_entry
+                    .declared_in_file
+                    .clone()
+                    .unwrap_or_else(|| normalized_path.clone());
                 results.push(ResolvedSymbol {
                     name: full_name,
                     is_internal,
-                    ..ResolvedSymbol::from_export(export_entry, normalized_path.clone())
+                    ..ResolvedSymbol::from_export(export_entry, defined_in_path)
                 });
             }
         }
 
         self.resolution_path.remove(&normalized_path);
 
+        let arc = Arc::new(results);
         if name_prefix.is_empty() {
-            self.resolution_cache
-                .insert(normalized_path, results.clone());
+            self
+                .resolution_cache
+                .insert(normalized_path, Arc::clone(&arc));
         }
 
-        results
+        arc
     }
 
     /// Resolves symbols that are re-exported from another module.
@@ -494,7 +609,7 @@ impl CrawlSession {
         let mut all_nested_symbols: Vec<ResolvedSymbol> = Vec::new();
         for source_path in &source_paths {
             let nested = self.resolve_file(source_path, depth + 1, "");
-            all_nested_symbols.extend(nested);
+            all_nested_symbols.extend(nested.iter().cloned());
         }
 
         if export_entry.is_wildcard {
@@ -572,8 +687,9 @@ impl CrawlSession {
                 }
             } else {
                 // Target not found in nested — create a stub from the first source
-                let defined_in = SharedString::from(
-                    normalize_path(Path::new(source_paths[0].as_ref())).as_ref(),
+                let defined_in = normalize_path_with_cache(
+                    &mut self.path_norm_cache,
+                    Path::new(source_paths[0].as_ref()),
                 );
                 results.push(ResolvedSymbol {
                     name: SharedString::from(full_name.as_ref()),
@@ -588,105 +704,6 @@ impl CrawlSession {
         results
     }
 
-    /// `extract_export_default` records both the `export default …` wrapper and the inner
-    /// declaration (e.g. class body) as separate [`ParsedExport`]s with the same name.
-    /// Resolving both yields duplicate [`ResolvedSymbol`]s that differ only by signature span;
-    /// keep the inner declaration (`is_explicit_export == false`).
-    fn prefer_inner_decl_over_export_default_wrapper(mut targets: Vec<ParsedExport>) -> Vec<ParsedExport> {
-        if targets.len() <= 1 {
-            return targets;
-        }
-        let has_non_explicit = targets.iter().any(|t| !t.is_explicit_export);
-        let has_explicit = targets.iter().any(|t| t.is_explicit_export);
-        if !has_non_explicit || !has_explicit {
-            return targets;
-        }
-        let kind0 = targets[0].kind;
-        if !targets.iter().all(|t| t.kind == kind0) {
-            return targets;
-        }
-        if matches!(
-            kind0,
-            SymbolKind::Class
-                | SymbolKind::Function
-                | SymbolKind::Interface
-                | SymbolKind::TypeAlias
-                | SymbolKind::Enum
-        ) {
-            targets.retain(|t| !t.is_explicit_export);
-        }
-        targets
-    }
-
-    /// Resolves a specific name within a file, regardless of whether it is exported.
-    /// Useful for following internal type references during reachability analysis.
-    fn resolve_name_in_file(
-        &mut self,
-        name: &str,
-        file_path: &SharedString,
-    ) -> Vec<ResolvedSymbol> {
-        // Build and cache the local index for this file (once per file, not per call)
-        let normalized_path = normalize_path(Path::new(file_path.as_ref()));
-        if !self.local_index_cache.contains_key(&normalized_path) {
-            let exports = match self.raw_exports.get(&normalized_path) {
-                Some(exports) => exports,
-                None => return Vec::new(),
-            };
-            let mut index: HashMap<SharedString, Vec<ParsedExport>> = HashMap::new();
-            for export in exports {
-                index
-                    .entry(export.name.clone())
-                    .or_default()
-                    .push(export.clone());
-            }
-            self.local_index_cache
-                .insert(normalized_path.clone(), index);
-        }
-
-        // Clone just the matching targets (not the whole index) to satisfy borrow checker
-        let targets = match self.local_index_cache.get(&normalized_path) {
-            Some(index) => match index.get(name) {
-                Some(targets) => Self::prefer_inner_decl_over_export_default_wrapper(targets.clone()),
-                None => return Vec::new(),
-            },
-            None => return Vec::new(),
-        };
-
-        // Also clone the full local_index for resolve_local_assignment (needs it for member lookup)
-        let local_index = self
-            .local_index_cache
-            .get(&normalized_path)
-            .cloned()
-            .unwrap_or_default();
-
-        let mut results = Vec::new();
-        for target in &targets {
-            if target.source.is_some() {
-                // Re-export: follow it
-                results.extend(self.resolve_re_export(target, &normalized_path, 0, ""));
-            } else if matches!(
-                target.kind,
-                SymbolKind::ExportAssignment
-                    | SymbolKind::ExportDeclaration
-                    | SymbolKind::ImportEquals
-            ) {
-                // Assignment: resolve local targets
-                results.extend(resolve_local_assignment(
-                    target,
-                    &local_index,
-                    &normalized_path,
-                    "",
-                ));
-            } else {
-                // Direct definition
-                results.push(ResolvedSymbol {
-                    is_internal: true,
-                    ..ResolvedSymbol::from_export(target, normalized_path.clone())
-                });
-            }
-        }
-        results
-    }
 }
 
 /// Resolves symbols that are locally assigned (e.g., `export { x as y }`
@@ -694,6 +711,7 @@ impl CrawlSession {
 fn resolve_local_assignment(
     export_entry: &ParsedExport,
     local_index: &HashMap<SharedString, Vec<ParsedExport>>,
+    local_keys_sorted: &[SharedString],
     current_file: &SharedString,
     name_prefix: &str,
 ) -> Vec<ResolvedSymbol> {
@@ -708,7 +726,7 @@ fn resolve_local_assignment(
     };
 
     // Only resolve to actual definitions, not other forwarding entries.
-    let mut actual_targets: Vec<&ParsedExport> = targets
+    let actual_targets: Vec<&ParsedExport> = targets
         .iter()
         .filter(|target| {
             !matches!(
@@ -722,13 +740,7 @@ fn resolve_local_assignment(
         .collect();
 
     if actual_targets.is_empty() {
-        // If it's an ExportAssignment with no local definition (e.g. export default 123),
-        // we should still return the original export entry itself as the target.
-        if export_entry.kind == SymbolKind::ExportAssignment {
-            actual_targets.push(export_entry);
-        } else {
-            return Vec::new();
-        }
+        return Vec::new();
     }
 
     let mut results: Vec<ResolvedSymbol> = Vec::new();
@@ -752,9 +764,9 @@ fn resolve_local_assignment(
         let member_prefix = format!("{}.", target.name.as_ref());
         let mut matching_members: Vec<&ParsedExport> = Vec::new();
 
-        for (member_name, members) in local_index {
+        for member_name in local_keys_sorted {
             if member_name.as_ref().starts_with(&member_prefix) {
-                matching_members.extend(members.iter());
+                matching_members.extend(local_index[member_name].iter());
             }
         }
 

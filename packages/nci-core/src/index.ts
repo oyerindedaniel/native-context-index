@@ -6,9 +6,17 @@
 
 export { scanPackages } from "./scanner.js";
 export { resolveTypesEntry } from "./resolver.js";
-export { parseExports } from "./parser.js";
+export { parseFile } from "./parser.js";
 export { crawl, type CrawlOptions } from "./crawler.js";
 export { buildPackageGraph } from "./graph.js";
+export {
+  NCI_LOG_ALL_RAW_EXPORTS,
+  NCI_PROFILE,
+  nciLogAllRawExportsEnabled,
+  nciProfileEnabled,
+  profileLog,
+  profileStat,
+} from "./nci-log-flags.js";
 
 export type {
   PackageInfo,

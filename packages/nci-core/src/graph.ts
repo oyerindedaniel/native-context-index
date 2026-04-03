@@ -11,14 +11,24 @@ import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./reso
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
 import { normalizeSignature } from "./dedupe.js";
+import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
 
 /** Build a symbol graph for a single package. */
 export function buildPackageGraph(
   packageInfo: PackageInfo,
   crawlOptions?: CrawlOptions
 ): PackageGraph {
+  const profiling = nciProfileEnabled();
   const startTime = performance.now();
+  let phaseStart = startTime;
+
   const entry = resolveTypesEntry(packageInfo.dir);
+
+  if (profiling) {
+    profileLog("resolveTypesEntry", performance.now() - phaseStart);
+    profileStat("typesEntries", entry.typesEntries.length);
+    phaseStart = performance.now();
+  }
 
   if (entry.typesEntries.length === 0) {
     return {
@@ -32,6 +42,14 @@ export function buildPackageGraph(
   }
 
   const crawlResult = crawl(entry.typesEntries, crawlOptions);
+
+  if (profiling) {
+    profileLog("crawl", performance.now() - phaseStart);
+    profileStat("resolvedSymbols (from crawl)", crawlResult.exports.length);
+    profileStat("visitedFiles", crawlResult.visitedFiles.length);
+    phaseStart = performance.now();
+  }
+
   const allSymbols = crawlResult.exports;
   const allImportsPerFile = crawlResult.imports;
   const visited = new Set(crawlResult.visitedFiles);
@@ -57,17 +75,17 @@ export function buildPackageGraph(
     resolved: ResolvedSymbol,
     symbolFilePath: string
   ): string[] => {
-    const vis: string[] = [];
+    const visibility: string[] = [];
     if (entryFiles.has(symbolFilePath)) {
-      vis.push(symbolFilePath);
+      visibility.push(symbolFilePath);
     }
     if (resolved.resolvedFromPackageEntry) {
       const rel = makeRelative(resolved.resolvedFromPackageEntry, packageInfo.dir);
-      if (entryFiles.has(rel) && !vis.includes(rel)) {
-        vis.push(rel);
+      if (entryFiles.has(rel) && !visibility.includes(rel)) {
+        visibility.push(rel);
       }
     }
-    return vis;
+    return visibility;
   };
 
   const pruneRedundantEntryVisibility = (node: SymbolNode): void => {
@@ -139,6 +157,7 @@ export function buildPackageGraph(
       if (resolved.visibility && !existing.visibility) existing.visibility = resolved.visibility;
       if (resolved.since && !existing.since) existing.since = resolved.since;
       if (resolved.modifiers && !existing.modifiers) existing.modifiers = resolved.modifiers;
+      if (resolved.isGlobalAugmentation) existing.isGlobalAugmentation = true;
     } else {
       const reExportSource = resolved.reExportChain?.[0]
         ? makeRelative(resolved.reExportChain[0], packageInfo.dir)
@@ -159,6 +178,7 @@ export function buildPackageGraph(
         dependencies: [],
         rawDependencies: resolved.dependencies,
         isInternal: resolved.isInternal,
+        isGlobalAugmentation: resolved.isGlobalAugmentation,
         reExportedFrom: reExportSource !== symbolFilePath ? reExportSource : undefined,
         deprecated: resolved.deprecated,
         visibility: resolved.visibility,
@@ -170,9 +190,15 @@ export function buildPackageGraph(
     }
   }
 
+  if (profiling) {
+    profileLog("graphMerge", performance.now() - phaseStart);
+    profileStat("mergedSymbols", merged.size);
+    phaseStart = performance.now();
+  }
+
   const symbols = Array.from(merged.values());
-  for (const sym of symbols) {
-    pruneRedundantEntryVisibility(sym);
+  for (const symbol of symbols) {
+    pruneRedundantEntryVisibility(symbol);
   }
 
   const idToKind = new Map<string, ts.SyntaxKind>();
@@ -187,13 +213,13 @@ export function buildPackageGraph(
     const baseId = `${packageInfo.name}@${packageInfo.version}::${symbolNode.name}`;
 
     if (symbolNode.isInternal) {
-      const fk = `${symbolNode.filePath}::${symbolNode.name}`;
-      const ic = (internalFileNameCount.get(fk) ?? 0) + 1;
-      internalFileNameCount.set(fk, ic);
+      const internalFileNameKey = `${symbolNode.filePath}::${symbolNode.name}`;
+      const internalOccurrenceCount = (internalFileNameCount.get(internalFileNameKey) ?? 0) + 1;
+      internalFileNameCount.set(internalFileNameKey, internalOccurrenceCount);
       symbolNode.id =
-        ic === 1
+        internalOccurrenceCount === 1
           ? `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}`
-          : `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}#${ic}`;
+          : `${packageInfo.name}@${packageInfo.version}::${symbolNode.filePath}::${symbolNode.name}#${internalOccurrenceCount}`;
     } else {
       const count = (nameCount.get(symbolNode.name) ?? 0) + 1;
       nameCount.set(symbolNode.name, count);
@@ -213,6 +239,11 @@ export function buildPackageGraph(
     if (!symbolNode.isInternal || !nameToId.has(symbolNode.name)) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
+  }
+
+  if (profiling) {
+    profileLog("assignIds", performance.now() - phaseStart);
+    phaseStart = performance.now();
   }
 
   const refEdges = crawlResult.tripleSlashReferenceTargets ?? {};
@@ -240,14 +271,66 @@ export function buildPackageGraph(
     return cached;
   }
 
+  const protocolRegex = /^([a-z]+):(.*)$/;
+  const moduleSpecifierCache = new Map<string, string[]>();
+  const absPathCache = new Map<string, string>();
+  const importsByNameCache = new Map<string, Map<string, { source: string; originalName?: string }>>();
+
+  function getCachedAbsPath(relFilePath: string): string {
+    let cached = absPathCache.get(relFilePath);
+    if (cached === undefined) {
+      cached = normalizePath(path.resolve(packageInfo.dir, relFilePath));
+      absPathCache.set(relFilePath, cached);
+    }
+    return cached;
+  }
+
+  function getCachedModuleSpecifier(specifier: string, fromRelFile: string): string[] {
+    const cacheKey = `${fromRelFile}\0${specifier}`;
+    let cached = moduleSpecifierCache.get(cacheKey);
+    if (cached === undefined) {
+      cached = resolveModuleSpecifier(specifier, path.join(packageInfo.dir, fromRelFile));
+      moduleSpecifierCache.set(cacheKey, cached);
+    }
+    return cached;
+  }
+
+  function getImportsByName(absFilePath: string): Map<string, { source: string; originalName?: string }> {
+    let cached = importsByNameCache.get(absFilePath);
+    if (cached === undefined) {
+      cached = new Map();
+      const fileImports = allImportsPerFile[absFilePath] || [];
+      for (const imp of fileImports) {
+        if (!cached.has(imp.name)) {
+          cached.set(imp.name, { source: imp.source, originalName: imp.originalName });
+        }
+      }
+      importsByNameCache.set(absFilePath, cached);
+    }
+    return cached;
+  }
+
+  function resolveProtocol(importPath: string, depName: string): string | null {
+    const isBuiltin = NODE_BUILTINS.has(importPath);
+    if (!isBuiltin && !protocolRegex.test(importPath)) return null;
+    const match = importPath.match(protocolRegex);
+    const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
+    const source = isBuiltin
+      ? importPath
+      : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
+    return `${protocol}::${source}::${depName}`;
+  }
+
   for (const symbolNode of symbols) {
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();
+      const symAbsPath = getCachedAbsPath(symbolNode.filePath);
+
       for (const rawDep of symbolNode.rawDependencies) {
         let targetIds: string[] = [];
 
         if (rawDep.importPath) {
-          const absPaths = resolveModuleSpecifier(rawDep.importPath, path.join(packageInfo.dir, symbolNode.filePath));
+          const absPaths = getCachedModuleSpecifier(rawDep.importPath, symbolNode.filePath);
           if (absPaths.length > 0) {
             const relPath = makeRelative(absPaths[0]!, packageInfo.dir);
             targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
@@ -256,15 +339,14 @@ export function buildPackageGraph(
           targetIds = fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
 
           if (targetIds.length === 0) {
-            const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
-            const fileImports = allImportsPerFile[absPathForLookup] || [];
-            const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
+            const importMap = getImportsByName(symAbsPath);
+            const matchingImport = importMap.get(rawDep.name);
 
             if (matchingImport) {
-              const absSourcePaths = resolveModuleSpecifier(matchingImport.source, path.join(packageInfo.dir, symbolNode.filePath));
+              const absSourcePaths = getCachedModuleSpecifier(matchingImport.source, symbolNode.filePath);
               if (absSourcePaths.length > 0) {
                 const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
-                const originalName = matchingImport.originalName || matchingImport.name;
+                const originalName = matchingImport.originalName || rawDep.name;
                 targetIds = fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
               }
             }
@@ -303,35 +385,42 @@ export function buildPackageGraph(
             resolvedIds.add(symbolId);
           }
         } else {
-          const protocolRegex = /^([a-z]+):(.*)$/;
-
-          if (rawDep.importPath && (protocolRegex.test(rawDep.importPath) || NODE_BUILTINS.has(rawDep.importPath))) {
-            const isBuiltin = NODE_BUILTINS.has(rawDep.importPath);
-            const match = rawDep.importPath.match(protocolRegex);
-            const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
-            const source = isBuiltin ? rawDep.importPath : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
-            resolvedIds.add(`${protocol}::${source}::${rawDep.name}`);
+          if (rawDep.importPath) {
+            const resolved = resolveProtocol(rawDep.importPath, rawDep.name);
+            if (resolved) resolvedIds.add(resolved);
           } else {
-            const absPathForLookup = path.resolve(packageInfo.dir, symbolNode.filePath).replace(/\\/g, "/");
-            const fileImports = allImportsPerFile[absPathForLookup] || [];
-            const matchingImport = fileImports.find(imported => imported.name === rawDep.name);
-            
-            if (matchingImport && (protocolRegex.test(matchingImport.source) || NODE_BUILTINS.has(matchingImport.source))) {
-              const isBuiltin = NODE_BUILTINS.has(matchingImport.source);
-              const match = matchingImport.source.match(protocolRegex);
-              const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
-              const source = isBuiltin ? matchingImport.source : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
-              resolvedIds.add(`${protocol}::${source}::${matchingImport.originalName || matchingImport.name}`);
+            const importMap = getImportsByName(symAbsPath);
+            const matchingImport = importMap.get(rawDep.name);
+            if (matchingImport) {
+              const resolved = resolveProtocol(matchingImport.source, matchingImport.originalName || rawDep.name);
+              if (resolved) resolvedIds.add(resolved);
             }
           }
         }
       }
-      symbolNode.dependencies = Array.from(resolvedIds);
+      symbolNode.dependencies = Array.from(resolvedIds).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     }
     delete symbolNode.rawDependencies;
   }
 
+  if (profiling) {
+    profileLog("resolveDeps", performance.now() - phaseStart);
+    phaseStart = performance.now();
+  }
+
   flattenInheritedMembers(symbols, nameToId, packageInfo.name, packageInfo.version);
+
+  if (profiling) {
+    profileLog("flattenInherited", performance.now() - phaseStart);
+  }
+
+  const afterFlatten = performance.now();
+  clearParserCache();
+
+  if (profiling) {
+    profileLog("clearParserCache", performance.now() - afterFlatten);
+    profileLog("buildPackageGraph total", performance.now() - startTime);
+  }
 
   const result: PackageGraph = {
     package: packageInfo.name,
@@ -341,8 +430,6 @@ export function buildPackageGraph(
     totalFiles: visited.size,
     crawlDurationMs: performance.now() - startTime,
   };
-
-  clearParserCache();
 
   return result;
 }

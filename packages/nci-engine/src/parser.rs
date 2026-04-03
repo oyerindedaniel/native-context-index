@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::path::Path;
 use std::sync::LazyLock;
 
 use oxc_allocator::Allocator;
@@ -15,6 +16,7 @@ static TRIPLE_SLASH_TYPES_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"///\s*<reference\s+types\s*=\s*"([^"]+)"\s*/>"#).unwrap());
 
 use crate::constants::{BUILTIN_TYPES, VISIBILITY_TAGS};
+use crate::resolver::{normalize_path, resolve_module_specifier};
 use crate::types::{
     Deprecation, ParsedExport, ParsedImport, SharedString, SharedVec, SymbolKind, SymbolSpace,
     TypeReference, Visibility,
@@ -34,6 +36,9 @@ pub struct ParseResult {
 
     /// Type references from `/// <reference types="..." />` directives.
     pub type_references: SharedVec<SharedString>,
+
+    /// Whether this file is an external module (`import`/`export` at top level).
+    pub is_external_module: bool,
 }
 
 /// Internal struct for aggregating JSDoc tag information.
@@ -92,16 +97,20 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
     }
 
     let program = parser_return.program;
+    let current_file_owned = normalize_path(Path::new(_file_path));
+    let current_file = current_file_owned.as_ref();
 
     let mut exports: Vec<ParsedExport> = Vec::new();
     let mut imports: Vec<ParsedImport> = Vec::new();
     let (references, type_references) = extract_triple_slash_directives(source_text);
 
-    let is_script = program.source_type.is_script();
+    let is_external_module = is_external_module_program(&program);
+    let is_script = !is_external_module;
 
     // ── Local declaration registry ────────────────────────────────────────
     // Build a lookup table of local declarations to resolve type references.
-    let mut local_decls: HashMap<SharedString, LocalDecl<'_>> = HashMap::new();
+    let mut local_decls: HashMap<SharedString, LocalDecl<'_>> =
+        HashMap::with_capacity(program.body.len().min(4096));
     for statement in &program.body {
         match statement {
             Statement::TSInterfaceDeclaration(iface) => {
@@ -182,11 +191,23 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
             }
 
             Statement::ExportNamedDeclaration(export_named) => {
-                extract_export_named(export_named, source_text, &mut exports, &local_decls);
+                extract_export_named(
+                    export_named,
+                    source_text,
+                    current_file,
+                    &mut exports,
+                    &local_decls,
+                );
             }
 
             Statement::ExportDefaultDeclaration(export_default) => {
-                extract_export_default(export_default, source_text, &mut exports, &local_decls);
+                extract_export_default(
+                    export_default,
+                    source_text,
+                    current_file,
+                    &mut exports,
+                    &local_decls,
+                );
             }
 
             Statement::ExportAllDeclaration(export_all) => {
@@ -197,9 +218,20 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                 extract_module_declaration(
                     module_decl,
                     source_text,
+                    current_file,
                     &mut exports,
                     is_script,
                     module_decl.span,
+                    &local_decls,
+                );
+            }
+
+            Statement::TSGlobalDeclaration(global_decl) => {
+                extract_global_declaration(
+                    global_decl,
+                    source_text,
+                    current_file,
+                    &mut exports,
                     &local_decls,
                 );
             }
@@ -237,7 +269,7 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
 
             _ => {
                 if let Some(direct_exports) =
-                    extract_direct_statement(statement, source_text, is_script, &local_decls)
+                    extract_direct_statement(statement, source_text, is_script, current_file, &local_decls)
                 {
                     exports.extend(direct_exports);
                 }
@@ -250,6 +282,99 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
         imports: imports.into(),
         references: references.into(),
         type_references: type_references.into(),
+        is_external_module,
+    }
+}
+
+fn is_external_module_program(program: &Program<'_>) -> bool {
+    program.body.iter().any(|statement| {
+        matches!(
+            statement,
+            Statement::ImportDeclaration(_)
+                | Statement::ExportAllDeclaration(_)
+                | Statement::ExportDefaultDeclaration(_)
+                | Statement::ExportNamedDeclaration(_)
+                | Statement::TSExportAssignment(_)
+                | Statement::TSNamespaceExportDeclaration(_)
+                | Statement::TSImportEqualsDeclaration(_)
+        )
+    })
+}
+
+/// Build the same-file declaration index as `parse_file` (for resolving `import("./x").Type` targets).
+fn extend_local_decl_map_from_body<'a>(
+    body: &'a [Statement<'a>],
+    out: &mut HashMap<SharedString, LocalDecl<'a>>,
+) {
+    for statement in body {
+        match statement {
+            Statement::TSInterfaceDeclaration(iface) => {
+                out.insert(
+                    iface.id.name.as_ref().into(),
+                    LocalDecl::Interface(&iface.body),
+                );
+            }
+            Statement::TSTypeAliasDeclaration(alias) => {
+                out.insert(
+                    alias.id.name.as_ref().into(),
+                    LocalDecl::Type(&alias.type_annotation),
+                );
+            }
+            Statement::ClassDeclaration(class) => {
+                if let Some(id) = &class.id {
+                    out.insert(id.name.as_ref().into(), LocalDecl::Class(class));
+                }
+            }
+            Statement::VariableDeclaration(var_decl) => {
+                for decl in &var_decl.declarations {
+                    if let BindingPattern::BindingIdentifier(ident) = &decl.id {
+                        if let Some(anno) = &decl.type_annotation {
+                            out.insert(
+                                ident.name.as_ref().into(),
+                                LocalDecl::Type(&anno.type_annotation),
+                            );
+                        }
+                    }
+                }
+            }
+            Statement::ExportNamedDeclaration(named) => {
+                if let Some(decl) = &named.declaration {
+                    match decl {
+                        Declaration::TSInterfaceDeclaration(iface) => {
+                            out.insert(
+                                iface.id.name.as_ref().into(),
+                                LocalDecl::Interface(&iface.body),
+                            );
+                        }
+                        Declaration::TSTypeAliasDeclaration(alias) => {
+                            out.insert(
+                                alias.id.name.as_ref().into(),
+                                LocalDecl::Type(&alias.type_annotation),
+                            );
+                        }
+                        Declaration::ClassDeclaration(class) => {
+                            if let Some(id) = &class.id {
+                                out.insert(id.name.as_ref().into(), LocalDecl::Class(class));
+                            }
+                        }
+                        Declaration::VariableDeclaration(var_decl) => {
+                            for decl in &var_decl.declarations {
+                                if let BindingPattern::BindingIdentifier(ident) = &decl.id {
+                                    if let Some(anno) = &decl.type_annotation {
+                                        out.insert(
+                                            ident.name.as_ref().into(),
+                                            LocalDecl::Type(&anno.type_annotation),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -337,6 +462,7 @@ fn extract_imports(import_decl: &ImportDeclaration<'_>, imports: &mut Vec<Parsed
 fn extract_export_named<'a>(
     export_named: &ExportNamedDeclaration<'a>,
     source_text: &str,
+    current_file: &str,
     exports: &mut Vec<ParsedExport>,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
 ) {
@@ -400,6 +526,7 @@ fn extract_export_named<'a>(
         let decl_exports = extract_declaration(
             declaration,
             source_text,
+            current_file,
             true,
             export_named.span,
             local_decls,
@@ -411,6 +538,7 @@ fn extract_export_named<'a>(
 fn extract_export_default<'a>(
     export_default: &ExportDefaultDeclaration<'a>,
     source_text: &str,
+    current_file: &str,
     exports: &mut Vec<ParsedExport>,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
 ) {
@@ -522,6 +650,7 @@ fn extract_export_default<'a>(
                 extract_class_members(
                     class_decl,
                     source_text,
+                    current_file,
                     class_name.as_ref(),
                     false,
                     &jsdoc,
@@ -553,6 +682,7 @@ fn extract_export_default<'a>(
             extract_interface_members(
                 iface_decl,
                 source_text,
+                current_file,
                 iface_name.as_ref(),
                 false,
                 &jsdoc,
@@ -638,6 +768,7 @@ fn extract_export_all(
 fn extract_module_declaration<'a>(
     module_decl: &TSModuleDeclaration<'a>,
     source_text: &str,
+    current_file: &str,
     exports: &mut Vec<ParsedExport>,
     is_script: bool,
     outer_span: oxc_span::Span,
@@ -688,17 +819,92 @@ fn extract_module_declaration<'a>(
     // Recurse into module body to extract nested exports.
     // NOTE: For ambient module declarations (quoted string names), the TS oracle
     // typically flattens the members into the top-level namespace rather than prefixing.
-    let child_parent_name = if is_string_module { "" } else { &module_name };
+    // `declare global { ... }` is also flattened in TS-style handling.
+    let child_parent_name = if is_string_module || is_global {
+        ""
+    } else {
+        &module_name
+    };
+    let before_len = exports.len();
 
     if let Some(body) = &module_decl.body {
         extract_module_body(
             body,
             source_text,
+            current_file,
             exports,
             child_parent_name,
             is_script,
             local_decls,
         );
+    }
+
+    // Mark nested declarations from `declare global { ... }` as global augmentations.
+    if is_global {
+        for nested in exports.iter_mut().skip(before_len) {
+            nested.is_global_augmentation = true;
+        }
+    }
+}
+
+fn extract_global_declaration<'a>(
+    global_decl: &TSGlobalDeclaration<'a>,
+    source_text: &str,
+    current_file: &str,
+    exports: &mut Vec<ParsedExport>,
+    local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+) {
+    let signature_text = get_span_text(source_text, global_decl.span);
+    let signature = SharedString::from(
+        (signature_text
+            .split('{')
+            .next()
+            .unwrap_or(&signature_text)
+            .trim()
+            .to_string()
+            + " { ... }")
+            .as_ref(),
+    );
+    let jsdoc = extract_jsdoc_from_leading_comments(source_text, global_decl.span);
+
+    exports.push(ParsedExport {
+        name: SharedString::from("global"),
+        kind: SymbolKind::Namespace,
+        is_explicit_export: false,
+        is_global_augmentation: true,
+        signature: Some(signature),
+        js_doc: jsdoc.js_doc,
+        deprecated: jsdoc.deprecated,
+        visibility: jsdoc.visibility,
+        since: jsdoc.since,
+        ..Default::default()
+    });
+
+    for statement in &global_decl.body.body {
+        let is_exported = statement_has_export_keyword(statement);
+        if let Some(mut decl_exports) =
+            extract_direct_statement(statement, source_text, false, current_file, local_decls)
+        {
+            for export_item in &mut decl_exports {
+                export_item.is_explicit_export = is_exported;
+                export_item.is_global_augmentation = true;
+            }
+            exports.extend(decl_exports);
+        }
+    }
+}
+
+/// True if `name` should be prefixed with `parent.` inside a namespace block.
+/// Uses a dotted boundary so `Brand` + `BrandErrors` still becomes `Brand.BrandErrors`
+/// (plain `starts_with(parent)` would wrongly treat `BrandErrors` as already qualified).
+fn needs_namespace_qualifier(name: &str, parent: &str) -> bool {
+    if parent.is_empty() || name == parent {
+        return false;
+    }
+    match name.strip_prefix(parent) {
+        Some(rest) if rest.starts_with('.') => false,
+        Some(_) => true,
+        None => true,
     }
 }
 
@@ -706,6 +912,7 @@ fn extract_module_declaration<'a>(
 fn extract_module_body<'a>(
     body: &TSModuleDeclarationBody<'a>,
     source_text: &str,
+    current_file: &str,
     exports: &mut Vec<ParsedExport>,
     parent_name: &str,
     is_script: bool,
@@ -722,12 +929,13 @@ fn extract_module_body<'a>(
                         let mut decl_exports = extract_declaration(
                             declaration,
                             source_text,
+                            current_file,
                             true,
                             export_named.span,
                             local_decls,
                         );
                         for export_item in &mut decl_exports {
-                            if !export_item.name.starts_with(parent_name) {
+                            if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
                                 export_item.name = SharedString::from(
                                     format!("{}.{}", parent_name, export_item.name).as_ref(),
                                 );
@@ -740,11 +948,11 @@ fn extract_module_body<'a>(
 
                 let is_exported = statement_has_export_keyword(statement);
                 if let Some(mut decl_exports) =
-                    extract_direct_statement(statement, source_text, is_script, local_decls)
+                    extract_direct_statement(statement, source_text, is_script, current_file, local_decls)
                 {
                     for export_item in &mut decl_exports {
                         export_item.is_explicit_export = is_exported;
-                        if !export_item.name.starts_with(parent_name) {
+                        if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
                             export_item.name = SharedString::from(
                                 format!("{}.{}", parent_name, export_item.name).as_ref(),
                             );
@@ -752,12 +960,18 @@ fn extract_module_body<'a>(
                     }
                     exports.extend(decl_exports);
                 }
+
+                if let Statement::TSGlobalDeclaration(global_decl) = statement {
+                    extract_global_declaration(global_decl, source_text, current_file, exports, local_decls);
+                    continue;
+                }
             }
         }
         TSModuleDeclarationBody::TSModuleDeclaration(nested_module) => {
             extract_module_declaration(
                 nested_module,
                 source_text,
+                current_file,
                 exports,
                 is_script,
                 nested_module.span,
@@ -771,6 +985,7 @@ fn extract_module_body<'a>(
 fn extract_declaration<'a>(
     declaration: &Declaration<'a>,
     source_text: &str,
+    current_file: &str,
     is_explicit_export: bool,
     outer_span: oxc_span::Span,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
@@ -861,6 +1076,7 @@ fn extract_declaration<'a>(
             extract_class_members(
                 class_decl,
                 source_text,
+                current_file,
                 &name,
                 is_explicit_export,
                 &jsdoc,
@@ -911,6 +1127,7 @@ fn extract_declaration<'a>(
             extract_interface_members(
                 iface_decl,
                 source_text,
+                current_file,
                 &name,
                 is_explicit_export,
                 &jsdoc,
@@ -939,20 +1156,33 @@ fn extract_declaration<'a>(
             }
 
             results.push(ParsedExport {
-                name,
+                name: name.clone(),
                 kind: SymbolKind::TypeAlias,
                 is_type_only: true,
                 symbol_space: SymbolSpace::Type,
                 is_explicit_export,
                 signature: Some(signature),
-                js_doc: jsdoc.js_doc,
+                js_doc: jsdoc.js_doc.clone(),
                 dependencies: dependencies.into(),
-                deprecated: jsdoc.deprecated,
-                visibility: jsdoc.visibility,
-                since: jsdoc.since,
+                deprecated: jsdoc.deprecated.clone(),
+                visibility: jsdoc.visibility.clone(),
+                since: jsdoc.since.clone(),
                 modifiers: SharedVec::from(modifiers),
                 ..Default::default()
             });
+            extract_complex_type_members(
+                &type_alias.type_annotation,
+                source_text,
+                current_file,
+                name.as_ref(),
+                is_explicit_export,
+                &jsdoc,
+                &mut results,
+                local_decls,
+                &mut HashSet::new(),
+                0,
+                None,
+            );
         }
 
         Declaration::TSEnumDeclaration(enum_decl) => {
@@ -1035,6 +1265,7 @@ fn extract_declaration<'a>(
                         extract_complex_type_members(
                             &annotation.type_annotation,
                             source_text,
+                            current_file,
                             &name,
                             is_explicit_export,
                             &jsdoc,
@@ -1042,6 +1273,7 @@ fn extract_declaration<'a>(
                             local_decls,
                             &mut HashSet::new(),
                             0,
+                            None,
                         );
                     }
                 }
@@ -1052,6 +1284,7 @@ fn extract_declaration<'a>(
             extract_module_declaration(
                 module_decl,
                 source_text,
+                current_file,
                 &mut results,
                 false,
                 outer_span,
@@ -1073,6 +1306,7 @@ fn extract_direct_statement<'a>(
     statement: &'a Statement<'a>,
     source_text: &str,
     is_script: bool,
+    current_file: &str,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
 ) -> Option<Vec<ParsedExport>> {
     let is_exported = statement_has_export_keyword(statement);
@@ -1131,6 +1365,7 @@ fn extract_direct_statement<'a>(
                         extract_complex_type_members(
                             &annotation.type_annotation,
                             source_text,
+                            current_file,
                             &name,
                             is_exported,
                             &jsdoc,
@@ -1138,6 +1373,7 @@ fn extract_direct_statement<'a>(
                             local_decls,
                             &mut HashSet::new(),
                             0,
+                            None,
                         );
                     }
                 }
@@ -1160,6 +1396,7 @@ fn extract_direct_statement<'a>(
             let mut results = extract_declaration(
                 declaration,
                 source_text,
+                current_file,
                 is_exported,
                 statement.span(),
                 local_decls,
@@ -1177,9 +1414,21 @@ fn extract_direct_statement<'a>(
             extract_module_declaration(
                 module_decl,
                 source_text,
+                current_file,
                 &mut results,
                 is_script,
                 module_decl.span,
+                local_decls,
+            );
+            Some(results)
+        }
+        Statement::TSGlobalDeclaration(global_decl) => {
+            let mut results = Vec::new();
+            extract_global_declaration(
+                global_decl,
+                source_text,
+                current_file,
+                &mut results,
                 local_decls,
             );
             Some(results)
@@ -1211,6 +1460,7 @@ fn statement_to_declaration<'a>(statement: &'a Statement<'a>) -> Option<&'a Decl
 fn extract_class_members<'a>(
     class_decl: &Class<'a>,
     source_text: &str,
+    _current_file: &str,
     parent_name: &str,
     is_explicit_export: bool,
     parent_jsdoc: &JsDocInfo,
@@ -1332,6 +1582,7 @@ fn extract_class_members<'a>(
 fn extract_class_body_as_type_members<'a>(
     class_decl: &Class<'a>,
     source_text: &str,
+    current_file: &str,
     parent_name: &str,
     is_explicit_export: bool,
     parent_jsdoc: &JsDocInfo,
@@ -1339,6 +1590,7 @@ fn extract_class_body_as_type_members<'a>(
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
     visited: &mut HashSet<SharedString>,
     depth: usize,
+    definition_site: Option<SharedString>,
 ) {
     for member in &class_decl.body.body {
         let (member_name_opt, member_span, member_kind) = match member {
@@ -1410,6 +1662,7 @@ fn extract_class_body_as_type_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
+            declared_in_file: definition_site.clone(),
             ..Default::default()
         });
 
@@ -1419,13 +1672,15 @@ fn extract_class_body_as_type_members<'a>(
                 extract_complex_type_members(
                     &anno.type_annotation,
                     source_text,
-                    &qualified_name,
+                    current_file,
+                    qualified_name.as_ref(),
                     is_explicit_export,
                     &member_jsdoc,
                     results,
                     local_decls,
                     visited,
                     depth + 1,
+                    definition_site.clone(),
                 );
             }
         }
@@ -1436,6 +1691,7 @@ fn extract_class_body_as_type_members<'a>(
 fn extract_interface_members<'a>(
     iface_decl: &TSInterfaceDeclaration<'a>,
     source_text: &str,
+    current_file: &str,
     parent_name: &str,
     is_explicit_export: bool,
     parent_jsdoc: &JsDocInfo,
@@ -1457,11 +1713,8 @@ fn extract_interface_members<'a>(
                 };
                 (name, method_sig.span, kind)
             }
-            TSSignature::TSCallSignatureDeclaration(call_sig) => (
-                Some(SharedString::from("()")),
-                call_sig.span,
-                SymbolKind::MethodSignature,
-            ),
+            // Call signatures on interfaces are not emitted as separate symbol rows.
+            TSSignature::TSCallSignatureDeclaration(_) => continue,
             _ => continue,
         };
 
@@ -1470,11 +1723,7 @@ fn extract_interface_members<'a>(
             None => continue,
         };
 
-        let qualified_name = if member_name.as_ref() == "()" {
-            SharedString::from(parent_name)
-        } else {
-            SharedString::from(format!("{}.{}", parent_name, member_name).as_ref())
-        };
+        let qualified_name = SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
         let signature = get_span_text(source_text, member_span);
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
 
@@ -1490,16 +1739,6 @@ fn extract_interface_members<'a>(
                     collect_type_refs(&return_type.type_annotation, &mut deps_map);
                 }
                 for param in &method_sig.params.items {
-                    if let Some(anno) = &param.type_annotation {
-                        collect_type_refs(&anno.type_annotation, &mut deps_map);
-                    }
-                }
-            }
-            TSSignature::TSCallSignatureDeclaration(call_sig) => {
-                if let Some(return_type) = &call_sig.return_type {
-                    collect_type_refs(&return_type.type_annotation, &mut deps_map);
-                }
-                for param in &call_sig.params.items {
                     if let Some(anno) = &param.type_annotation {
                         collect_type_refs(&anno.type_annotation, &mut deps_map);
                     }
@@ -1535,20 +1774,22 @@ fn extract_interface_members<'a>(
         });
 
         // Recursively extract nested type members from property type annotations.
-        // Matches TS oracle line 493: when a property has a type annotation (e.g., `config: Config`),
+        // When a property has a type annotation (e.g., `config: Config`),
         // resolve it through the local declaration registry to flatten members.
         if let TSSignature::TSPropertySignature(prop_sig) = member {
             if let Some(anno) = &prop_sig.type_annotation {
                 extract_complex_type_members(
                     &anno.type_annotation,
                     source_text,
-                    &qualified_name,
+                    current_file,
+                    qualified_name.as_ref(),
                     is_explicit_export,
                     &member_jsdoc,
                     results,
                     local_decls,
                     &mut HashSet::new(),
                     0,
+                    None,
                 );
             }
         }
@@ -1565,6 +1806,7 @@ fn extract_interface_members<'a>(
 fn extract_complex_type_members<'a>(
     ts_type: &TSType<'a>,
     source_text: &str,
+    current_file: &str,
     parent_name: &str,
     is_explicit_export: bool,
     parent_jsdoc: &JsDocInfo,
@@ -1572,6 +1814,7 @@ fn extract_complex_type_members<'a>(
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
     visited: &mut HashSet<SharedString>,
     depth: usize,
+    definition_site: Option<SharedString>,
 ) {
     if depth > 10 {
         return;
@@ -1581,6 +1824,7 @@ fn extract_complex_type_members<'a>(
             extract_type_literal_members(
                 &type_lit.members,
                 source_text,
+                current_file,
                 parent_name,
                 is_explicit_export,
                 parent_jsdoc,
@@ -1588,6 +1832,7 @@ fn extract_complex_type_members<'a>(
                 local_decls,
                 visited,
                 depth + 1,
+                definition_site.clone(),
             );
         }
         TSType::TSIntersectionType(intersection) => {
@@ -1595,13 +1840,15 @@ fn extract_complex_type_members<'a>(
                 extract_complex_type_members(
                     constituent,
                     source_text,
+                    current_file,
                     parent_name,
                     is_explicit_export,
                     parent_jsdoc,
                     results,
                     local_decls,
-                    &mut visited.clone(),
+                    visited,
                     depth + 1,
+                    definition_site.clone(),
                 );
             }
         }
@@ -1615,6 +1862,7 @@ fn extract_complex_type_members<'a>(
                             extract_complex_type_members(
                                 resolved_type,
                                 source_text,
+                                current_file,
                                 parent_name,
                                 is_explicit_export,
                                 parent_jsdoc,
@@ -1622,12 +1870,14 @@ fn extract_complex_type_members<'a>(
                                 local_decls,
                                 visited,
                                 depth + 1,
+                                definition_site.clone(),
                             );
                         }
                         LocalDecl::Interface(iface_body) => {
                             extract_type_literal_members(
                                 &iface_body.body,
                                 source_text,
+                                current_file,
                                 parent_name,
                                 is_explicit_export,
                                 parent_jsdoc,
@@ -1635,12 +1885,14 @@ fn extract_complex_type_members<'a>(
                                 local_decls,
                                 visited,
                                 depth + 1,
+                                definition_site.clone(),
                             );
                         }
                         LocalDecl::Class(class) => {
                             extract_class_body_as_type_members(
                                 class,
                                 source_text,
+                                current_file,
                                 parent_name,
                                 is_explicit_export,
                                 parent_jsdoc,
@@ -1648,6 +1900,7 @@ fn extract_complex_type_members<'a>(
                                 local_decls,
                                 visited,
                                 depth + 1,
+                                definition_site.clone(),
                             );
                         }
                     }
@@ -1666,6 +1919,7 @@ fn extract_complex_type_members<'a>(
                                 extract_complex_type_members(
                                     resolved_type,
                                     source_text,
+                                    current_file,
                                     parent_name,
                                     is_explicit_export,
                                     parent_jsdoc,
@@ -1673,12 +1927,14 @@ fn extract_complex_type_members<'a>(
                                     local_decls,
                                     visited,
                                     depth + 1,
+                                    definition_site.clone(),
                                 );
                             }
                             LocalDecl::Interface(iface_body) => {
                                 extract_type_literal_members(
                                     &iface_body.body,
                                     source_text,
+                                    current_file,
                                     parent_name,
                                     is_explicit_export,
                                     parent_jsdoc,
@@ -1686,12 +1942,14 @@ fn extract_complex_type_members<'a>(
                                     local_decls,
                                     visited,
                                     depth + 1,
+                                    definition_site.clone(),
                                 );
                             }
                             LocalDecl::Class(class) => {
                                 extract_class_body_as_type_members(
                                     class,
                                     source_text,
+                                    current_file,
                                     parent_name,
                                     is_explicit_export,
                                     parent_jsdoc,
@@ -1699,6 +1957,7 @@ fn extract_complex_type_members<'a>(
                                     local_decls,
                                     visited,
                                     depth + 1,
+                                    definition_site.clone(),
                                 );
                             }
                         }
@@ -1706,6 +1965,89 @@ fn extract_complex_type_members<'a>(
                     visited.remove(&ref_name);
                 }
             }
+        }
+        TSType::TSImportType(import_type) => {
+            let Some(qualifier) = import_type.qualifier.as_ref() else {
+                return;
+            };
+            let TSImportTypeQualifier::Identifier(ident) = qualifier else {
+                return;
+            };
+            let spec = import_type.source.value.as_str();
+            let key = SharedString::from(format!("import:{spec}::{}", ident.name.as_ref()).as_ref());
+            let was_new = visited.insert(key.clone());
+            if !was_new {
+                return;
+            }
+            let paths = resolve_module_specifier(spec, current_file);
+            let Some(target_path) = paths.first() else {
+                visited.remove(&key);
+                return;
+            };
+            if target_path.as_ref() == spec {
+                visited.remove(&key);
+                return;
+            }
+            let Ok(target_text) = fs::read_to_string(target_path.as_ref()) else {
+                visited.remove(&key);
+                return;
+            };
+            let allocator = Allocator::default();
+            let parsed = Parser::new(&allocator, &target_text, SourceType::d_ts()).parse();
+            let mut target_decls: HashMap<SharedString, LocalDecl<'_>> = HashMap::new();
+            extend_local_decl_map_from_body(parsed.program.body.as_slice(), &mut target_decls);
+            let site = normalize_path(Path::new(target_path.as_ref()));
+            let qname: SharedString = ident.name.as_ref().into();
+            if let Some(local_decl) = target_decls.get(qname.as_ref()) {
+                match local_decl {
+                    LocalDecl::Type(resolved_type) => {
+                        extract_complex_type_members(
+                            resolved_type,
+                            &target_text,
+                            target_path.as_ref(),
+                            parent_name,
+                            is_explicit_export,
+                            parent_jsdoc,
+                            results,
+                            &target_decls,
+                            visited,
+                            depth + 1,
+                            Some(site.clone()),
+                        );
+                    }
+                    LocalDecl::Interface(iface_body) => {
+                        extract_type_literal_members(
+                            &iface_body.body,
+                            &target_text,
+                            target_path.as_ref(),
+                            parent_name,
+                            is_explicit_export,
+                            parent_jsdoc,
+                            results,
+                            &target_decls,
+                            visited,
+                            depth + 1,
+                            Some(site.clone()),
+                        );
+                    }
+                    LocalDecl::Class(class) => {
+                        extract_class_body_as_type_members(
+                            class,
+                            &target_text,
+                            target_path.as_ref(),
+                            parent_name,
+                            is_explicit_export,
+                            parent_jsdoc,
+                            results,
+                            &target_decls,
+                            visited,
+                            depth + 1,
+                            Some(site.clone()),
+                        );
+                    }
+                }
+            }
+            visited.remove(&key);
         }
         _ => {}
     }
@@ -1715,6 +2057,7 @@ fn extract_complex_type_members<'a>(
 fn extract_type_literal_members<'a>(
     members: &[TSSignature<'a>],
     source_text: &str,
+    current_file: &str,
     parent_name: &str,
     is_explicit_export: bool,
     parent_jsdoc: &JsDocInfo,
@@ -1722,6 +2065,7 @@ fn extract_type_literal_members<'a>(
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
     visited: &mut HashSet<SharedString>,
     depth: usize,
+    definition_site: Option<SharedString>,
 ) {
     if depth > 10 {
         return;
@@ -1794,6 +2138,7 @@ fn extract_type_literal_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
+            declared_in_file: definition_site.clone(),
             ..Default::default()
         });
 
@@ -1804,13 +2149,15 @@ fn extract_type_literal_members<'a>(
                     extract_complex_type_members(
                         &type_annotation.type_annotation,
                         source_text,
-                        &qualified_name,
+                        current_file,
+                        qualified_name.as_ref(),
                         is_explicit_export,
                         &member_jsdoc,
                         results,
                         local_decls,
                         visited,
                         depth + 1,
+                        definition_site.clone(),
                     );
                 }
             }
@@ -1820,13 +2167,15 @@ fn extract_type_literal_members<'a>(
                         extract_complex_type_members(
                             &return_type.type_annotation,
                             source_text,
-                            &qualified_name,
+                            current_file,
+                            qualified_name.as_ref(),
                             is_explicit_export,
                             &member_jsdoc,
                             results,
                             local_decls,
                             visited,
                             depth + 1,
+                            definition_site.clone(),
                         );
                     }
                 }
@@ -1836,13 +2185,15 @@ fn extract_type_literal_members<'a>(
                             extract_complex_type_members(
                                 &type_annotation.type_annotation,
                                 source_text,
-                                &qualified_name,
+                                current_file,
+                                qualified_name.as_ref(),
                                 is_explicit_export,
                                 &member_jsdoc,
                                 results,
                                 local_decls,
                                 visited,
                                 depth + 1,
+                                definition_site.clone(),
                             );
                         }
                     }
@@ -2191,13 +2542,35 @@ fn expression_to_string(expr: &Expression<'_>) -> Option<SharedString> {
 }
 
 fn ts_type_name_to_string(type_name: &TSTypeName<'_>) -> SharedString {
-    match type_name {
-        TSTypeName::IdentifierReference(ident) => SharedString::from(ident.name.as_ref()),
-        TSTypeName::QualifiedName(qual) => SharedString::from(
-            format!("{}.{}", ts_type_name_to_string(&qual.left), qual.right.name).as_ref(),
-        ),
-        TSTypeName::ThisExpression(_) => SharedString::from("this"),
+    let mut segments_right_to_left: Vec<&str> = Vec::new();
+    let mut walker: &TSTypeName<'_> = type_name;
+    loop {
+        match walker {
+            TSTypeName::IdentifierReference(ident) => {
+                segments_right_to_left.push(ident.name.as_ref());
+                break;
+            }
+            TSTypeName::QualifiedName(qualified) => {
+                segments_right_to_left.push(qualified.right.name.as_ref());
+                walker = &qualified.left;
+            }
+            TSTypeName::ThisExpression(_) => {
+                segments_right_to_left.push("this");
+                break;
+            }
+        }
     }
+    segments_right_to_left.reverse();
+    let estimated_capacity: usize = segments_right_to_left.iter().map(|segment| segment.len()).sum::<usize>()
+        + segments_right_to_left.len().saturating_sub(1);
+    let mut qualified_name = String::with_capacity(estimated_capacity);
+    for segment in segments_right_to_left {
+        if !qualified_name.is_empty() {
+            qualified_name.push('.');
+        }
+        qualified_name.push_str(segment);
+    }
+    SharedString::from(qualified_name)
 }
 
 fn extract_jsdoc_from_leading_comments(source_text: &str, span: oxc_span::Span) -> JsDocInfo {
@@ -2208,26 +2581,22 @@ fn extract_jsdoc_from_leading_comments(source_text: &str, span: oxc_span::Span) 
         return result;
     }
 
-    // Look backwards from the span start to find a JSDoc comment
-    let before = &source_text[..start];
-    let trimmed = before.trim_end();
+    let before_span = &source_text[..start];
+    let trimmed_before = before_span.trim_end();
 
-    if !trimmed.ends_with("*/") {
+    if !trimmed_before.ends_with("*/") {
         return result;
     }
 
-    // Find the opening /**
-    if let Some(comment_start) = trimmed.rfind("/**") {
-        let comment_text = &trimmed[comment_start..];
+    if let Some(comment_start) = trimmed_before.rfind("/**") {
+        let comment_text = &trimmed_before[comment_start..];
 
-        // Extract the comment body (remove /** and */)
         let body = comment_text
             .trim_start_matches("/**")
             .trim_end_matches("*/")
             .trim();
 
-        // Parse the comment body for content and tags
-        let mut doc_lines: Vec<String> = Vec::new();
+        let mut description_lines = String::with_capacity(body.len());
 
         for line in body.lines() {
             let cleaned_line = line.trim().trim_start_matches('*').trim();
@@ -2252,7 +2621,6 @@ fn extract_jsdoc_from_leading_comments(source_text: &str, span: oxc_span::Span) 
                     }
                 }
             } else if cleaned_line.starts_with('@') {
-                // Check for visibility tags
                 let tag_name = cleaned_line
                     .strip_prefix('@')
                     .unwrap_or("")
@@ -2269,12 +2637,15 @@ fn extract_jsdoc_from_leading_comments(source_text: &str, span: oxc_span::Span) 
                     };
                 }
             } else if !cleaned_line.is_empty() {
-                doc_lines.push(cleaned_line.to_string());
+                if !description_lines.is_empty() {
+                    description_lines.push('\n');
+                }
+                description_lines.push_str(cleaned_line);
             }
         }
 
-        if !doc_lines.is_empty() {
-            result.js_doc = Some(SharedString::from(doc_lines.join("\n").as_ref()));
+        if !description_lines.is_empty() {
+            result.js_doc = Some(SharedString::from(description_lines.as_str()));
         }
     }
 
@@ -2304,6 +2675,9 @@ fn module_export_name_to_string(name: &ModuleExportName<'_>) -> SharedString {
 
 fn property_key_to_string(key: &PropertyKey<'_>, source_text: &str) -> Option<SharedString> {
     match key {
+        // Match TS `getMemberName`: private fields (`#x`) are not PropertyName branches there,
+        // so we skip them rather than emitting `[#x]` rows the TS pipeline does not produce.
+        PropertyKey::PrivateIdentifier(_) => None,
         PropertyKey::StaticIdentifier(ident) => Some(SharedString::from(ident.name.as_ref())),
         PropertyKey::StringLiteral(string_lit) => {
             Some(SharedString::from(string_lit.value.as_ref()))
@@ -2628,5 +3002,28 @@ mod tests {
             .unwrap();
         // Promise and string are builtins — should not appear in dependencies
         assert!(func.dependencies.is_empty());
+    }
+
+    #[test]
+    fn parse_module_declare_global_members() {
+        let source = r#"
+            export interface AppState { initialized: boolean; }
+            export declare function initApp(): AppState;
+            declare global {
+              interface Window {
+                __APP_STATE__: AppState;
+              }
+            }
+        "#;
+        let result = parse_file_from_source("test.d.ts", source);
+        assert!(result.is_external_module);
+        assert!(result
+            .exports
+            .iter()
+            .any(|e| e.name.as_ref() == "Window" && e.is_global_augmentation));
+        assert!(result
+            .exports
+            .iter()
+            .any(|e| e.name.as_ref() == "Window.__APP_STATE__" && e.is_global_augmentation));
     }
 }

@@ -10,6 +10,7 @@ import type {
   SymbolSpace,
 } from "./types.js";
 import { BUILTIN_TYPES, VISIBILITY_TAGS, DECLARATION_KINDS, MAX_RECURSION_DEPTH } from "./constants.js";
+import { normalizePath, resolveModuleSpecifier } from "./resolver.js";
 
 const sourceFileCache = new Map<string, ts.SourceFile>();
 const declarationCache = new Map<string, Map<string, CompositionNode>>();
@@ -22,12 +23,7 @@ interface JSDocInfo {
   since?: string;
 }
 
-/**
- * Parses a .d.ts file and extracts its exports, imports, and cross-file references.
- *
- * @param filePath The absolute path to the .d.ts file to parse.
- * @returns An object containing the extracted exports, imports, and references.
- */
+/** Parse a .d.ts file and extract its exports, imports, and cross-file references. */
 export function parseFile(filePath: string): {
   exports: ParsedExport[];
   imports: ParsedImport[];
@@ -39,12 +35,7 @@ export function parseFile(filePath: string): {
   return parseFileFromSource(sourceFile);
 }
 
-/**
- * Core parsing logic that traverses the AST to collect all symbol and import metadata.
- *
- * @param sourceFile The TypeScript AST source file to parse.
- * @returns Complete architectural metadata for the file.
- */
+/** Core parsing logic that traverses the AST to collect all symbol and import metadata. */
 export function parseFileFromSource(sourceFile: ts.SourceFile): {
   exports: ParsedExport[];
   imports: ParsedImport[];
@@ -157,6 +148,15 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           signature: statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
           ...jsdoc,
         });
+        if (statement.body && ts.isModuleBlock(statement.body)) {
+          for (const sub of statement.body.statements) {
+            const subExports = extractDirectExport(sub, sourceFile, false);
+            for (const subExp of subExports) {
+              subExp.isGlobalAugmentation = true;
+              exports.push(subExp);
+            }
+          }
+        }
         continue;
       }
 
@@ -247,12 +247,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
   return { exports, imports, references, typeReferences, isExternalModule: isExternalModuleFile };
 }
 
-/**
- * Retrieves a cached source file or creates a new one from the filesystem.
- *
- * @param filePath The absolute path to the file.
- * @returns The TypeScript SourceFile instance.
- */
+/** Retrieve a cached source file or create a new one from the filesystem. */
 function getOrCreateSourceFile(filePath: string): ts.SourceFile {
   const cached = sourceFileCache.get(filePath);
   if (cached) return cached;
@@ -262,33 +257,18 @@ function getOrCreateSourceFile(filePath: string): ts.SourceFile {
   return sourceFile;
 }
 
-/**
- * Clears all internal caches (SourceFile and Declaration caches).
- */
+/** Clear all internal caches (SourceFile and Declaration caches). */
 export function clearParserCache(): void {
   sourceFileCache.clear();
   declarationCache.clear();
 }
 
-/**
- * Exposes source file retrieval for components like the crawler and graph builder.
- *
- * @param filePath The absolute path to the file.
- * @returns The TypeScript SourceFile instance.
- */
+/** Expose source file retrieval for components like the crawler and graph builder. */
 export function getFileSource(filePath: string): ts.SourceFile {
   return getOrCreateSourceFile(filePath);
 }
 
-/**
- * Extracts architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.).
- *
- * @param statement The TypeScript statement to parse.
- * @param sourceFile The containing source file.
- * @param isExplicitExport True if the statement is explicitly marked as an export.
- * @param parentName Optional parent symbol name for nested declarations.
- * @returns An array of parsed symbols extracted from the declaration.
- */
+/** Extract architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.). */
 function extractDirectExport(
   statement: ts.Statement,
   sourceFile: ts.SourceFile,
@@ -327,7 +307,8 @@ function extractDirectExport(
               jsdoc,
               0,
               new Set(),
-              "type"
+              "type",
+              undefined
             )
           );
         }
@@ -380,7 +361,24 @@ function extractDirectExport(
           jsdoc,
           0,
           new Set(),
-          "type"
+          "type",
+          undefined
+        )
+      );
+    }
+
+    if (ts.isTypeAliasDeclaration(statement)) {
+      exports.push(
+        ...extractComplexTypeMembers(
+          statement.type,
+          sourceFile,
+          name,
+          isExplicitExport,
+          jsdoc,
+          0,
+          new Set(),
+          "type",
+          undefined
         )
       );
     }
@@ -389,16 +387,7 @@ function extractDirectExport(
   return exports;
 }
 
-/**
- * Extracts instance and static members from a class declaration.
- *
- * @param classNode The class AST node.
- * @param sourceFile The containing source file.
- * @param parentName The name of the parent class.
- * @param isExplicitExport True if the parent class is exported.
- * @param parentJsDoc Meta-information from the parent class JSDoc.
- * @returns Parsed symbols for all relevant class members.
- */
+/** Extract instance and static members from a class declaration. */
 function extractClassMembers(
   classNode: ts.ClassDeclaration,
   sourceFile: ts.SourceFile,
@@ -449,11 +438,7 @@ function extractClassMembers(
   return exports;
 }
 
-/**
- * Extracts members from complex types, including nested object literals and intersection types.
- *
- * @param memberSymbolSpace Type vs value for extracted member rows (`interface` / type shapes → `"type"`, `class` via `typeof` → `"value"`).
- */
+/** Extract members from complex types, including nested object literals and intersection types. */
 function extractComplexTypeMembers(
   node: CompositionNode,
   sourceFile: ts.SourceFile,
@@ -462,9 +447,11 @@ function extractComplexTypeMembers(
   parentJSDoc: JSDocInfo | undefined,
   depth: number,
   visitedNames: Set<string>,
-  memberSymbolSpace: SymbolSpace
+  memberSymbolSpace: SymbolSpace,
+  definitionSitePath?: string
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
+  const declSite = definitionSitePath ? { declaredInFile: definitionSitePath } : {};
 
   if (depth > MAX_RECURSION_DEPTH) {
     return exports;
@@ -512,6 +499,7 @@ function extractComplexTypeMembers(
           deprecated: jsdoc.deprecated || parentJSDoc?.deprecated,
           decorators: extractDecorators(member, sourceFile),
           modifiers: extractModifiers(member),
+          ...declSite,
         });
 
         if ((ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) && member.type) {
@@ -524,7 +512,8 @@ function extractComplexTypeMembers(
               jsdoc,
               depth + 1,
               visitedNames,
-              "type"
+              "type",
+              definitionSitePath
             )
           );
         }
@@ -542,7 +531,47 @@ function extractComplexTypeMembers(
           parentJSDoc,
           depth + 1,
           visitedNames,
-          memberSymbolSpace
+          memberSymbolSpace,
+          definitionSitePath
+        )
+      );
+    }
+  } else if (ts.isImportTypeNode(node)) {
+    const it = node;
+    if (!it.qualifier || !ts.isIdentifier(it.qualifier)) {
+      return exports;
+    }
+    const arg = it.argument;
+    if (!ts.isLiteralTypeNode(arg) || !ts.isStringLiteralLike(arg.literal)) {
+      return exports;
+    }
+    const specifier = arg.literal.text;
+    const importKey = `import:${specifier}::${it.qualifier.text}`;
+    if (visitedNames.has(importKey)) {
+      return exports;
+    }
+    const newVisited = new Set(visitedNames).add(importKey);
+    const resolvedPaths = resolveModuleSpecifier(specifier, sourceFile.fileName);
+    const targetPath = resolvedPaths[0];
+    if (!targetPath || targetPath === specifier) {
+      return exports;
+    }
+    const normalizedTarget = normalizePath(targetPath);
+    const targetSf = getOrCreateSourceFile(normalizedTarget);
+    const resolved = resolveLocalTypeByName(it.qualifier.text, targetSf);
+    if (resolved) {
+      const nextSpace: SymbolSpace = ts.isClassDeclaration(resolved) ? "value" : "type";
+      exports.push(
+        ...extractComplexTypeMembers(
+          resolved,
+          targetSf,
+          parentName,
+          isExplicitExport,
+          parentJSDoc,
+          depth + 1,
+          newVisited,
+          nextSpace,
+          normalizedTarget
         )
       );
     }
@@ -564,7 +593,8 @@ function extractComplexTypeMembers(
             parentJSDoc,
             depth + 1,
             newVisited,
-            nextSpace
+            nextSpace,
+            definitionSitePath
           )
         );
       }
@@ -574,36 +604,15 @@ function extractComplexTypeMembers(
   return exports;
 }
 
-/**
- * Identifies the search string for a TypeQuery or TypeReference node.
- * Used for navigating local symbol graphs.
- *
- * @param node The type node to analyze.
- * @returns The identifier name string, if present.
- */
+/** Identify the search string for a TypeQuery or TypeReference node. Used for navigating local symbol graphs. */
 function getSearchName(node: ts.TypeNode): string | undefined {
   if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName)) return node.exprName.text;
   if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) return node.typeName.text;
   return undefined;
 }
 
-/**
- * Resolves a TypeQuery (typeof) or TypeReference to its underlying declaration in the same file.
- *
- * @param node The type node to resolve.
- * @param sourceFile The containing source file.
- * @returns The resolved declaration node, if found locally.
- */
-function resolveLocalType(node: ts.TypeNode, sourceFile: ts.SourceFile): CompositionNode | undefined {
-  let searchName: string | undefined;
-  if (ts.isTypeQueryNode(node) && ts.isIdentifier(node.exprName)) {
-    searchName = node.exprName.text;
-  } else if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
-    searchName = node.typeName.text;
-  }
-
-  if (!searchName) return undefined;
-
+/** Resolve a named type/value declaration in a given source file (same-file index). */
+function resolveLocalTypeByName(searchName: string, sourceFile: ts.SourceFile): CompositionNode | undefined {
   let fileCache = declarationCache.get(sourceFile.fileName);
   if (!fileCache) {
     fileCache = new Map();
@@ -628,15 +637,16 @@ function resolveLocalType(node: ts.TypeNode, sourceFile: ts.SourceFile): Composi
   return fileCache.get(searchName);
 }
 
+/** Resolve a TypeQuery (typeof) or TypeReference to its underlying declaration in the same file. */
+function resolveLocalType(node: ts.TypeNode, sourceFile: ts.SourceFile): CompositionNode | undefined {
+  const searchName = getSearchName(node);
+  if (!searchName) return undefined;
+  return resolveLocalTypeByName(searchName, sourceFile);
+}
 
 
-/**
- * Extracts a stable string representation for a property name (including well-known symbols).
- *
- * @param name The property name node.
- * @param sourceFile The containing source file.
- * @returns The string representation of the member name.
- */
+
+/** Extract a stable string representation for a property name (including well-known symbols). */
 function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string | undefined {
   if (ts.isIdentifier(name)) return name.text;
   if (ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
@@ -666,12 +676,7 @@ function getMemberName(name: ts.PropertyName, sourceFile: ts.SourceFile): string
   return undefined;
 }
 
-/**
- * Extracts structured modifiers (abstract, readonly, static, etc.)
- *
- * @param node The AST node to check.
- * @returns Array of modifier strings.
- */
+/** Extract structured modifiers (abstract, readonly, static, etc.) */
 function extractModifiers(node: ts.Node): string[] | undefined {
   if (!ts.canHaveModifiers(node)) return undefined;
   const modifiers = ts.getModifiers(node);
@@ -680,13 +685,7 @@ function extractModifiers(node: ts.Node): string[] | undefined {
   return modifiers.map(modifier => modifier.getText());
 }
 
-/**
- * Extracts decorator metadata associated with the given AST node.
- *
- * @param node The AST node to check.
- * @param sourceFile The containing source file.
- * @returns Array of decorator metadata objects.
- */
+/** Extract decorator metadata associated with the given AST node. */
 function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorMetadata[] | undefined {
   if (!ts.canHaveDecorators(node)) return undefined;
 
@@ -707,13 +706,7 @@ function extractDecorators(node: ts.Node, sourceFile: ts.SourceFile): DecoratorM
   });
 }
 
-/**
- * Extracts names of classes or interfaces this node extends or implements.
- *
- * @param node The class or interface declaration node.
- * @param sourceFile The containing source file.
- * @returns Array of heritage names.
- */
+/** Extract names of classes or interfaces this node extends or implements. */
 function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, sourceFile: ts.SourceFile): string[] | undefined {
   if (!node.heritageClauses) return undefined;
   const heritage: string[] = [];
@@ -726,12 +719,7 @@ function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, so
   return heritage.length > 0 ? heritage : undefined;
 }
 
-/**
- * Determines if a node is explicitly being exported from the current module.
- *
- * @param node The AST node to check.
- * @returns True if the node is exported.
- */
+/** Determine if a node is explicitly being exported from the current module. */
 function isExportedDeclaration(node: ts.Node): boolean {
   if (ts.isExportAssignment(node) || ts.isExportDeclaration(node)) return true;
   const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
@@ -876,19 +864,14 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
   return result;
 }
 
-/**
- * Traverses a TypeScript AST node to extract all type-level dependencies.
- * Correctly handles TypeReferences, ImportTypes, and TypeQueries (typeof expressions).
- *
- * @param node The AST node to scan.
- * @returns An array of TypeReference identifying the detected dependencies.
- */
+/** Traverse a TypeScript AST node to extract all type-level dependencies. */
 export function extractTypeReferences(node: ts.Node): TypeReference[] {
   const refs = new Map<string, TypeReference>();
   visitTypeNode(node, refs);
   return Array.from(refs.values());
 }
 
+/** Add a type reference to the dependency map. */
 function addTypeRef(
   refs: Map<string, TypeReference>,
   reference: TypeReference

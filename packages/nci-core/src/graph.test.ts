@@ -245,6 +245,60 @@ describe("buildPackageGraph", () => {
     );
   });
 
+  it("merges declare global from module-shaped ref files into entry scope with entryVisibility", () => {
+    const graph = buildPackageGraph(makePackageInfo("internal-overload-ref"));
+
+    const globalFromRef = graph.symbols.find(
+      (symbol) => symbol.name === "GLOBAL_FROM_REF" && symbol.filePath === "ref.d.ts"
+    );
+    expect(globalFromRef).toBeDefined();
+    expect(globalFromRef!.isGlobalAugmentation).toBe(true);
+    expect(globalFromRef!.isInternal).toBe(false);
+    expect(globalFromRef!.entryVisibility).toEqual(
+      expect.arrayContaining(["index.d.ts", "extra-entry.d.ts"])
+    );
+
+    const uses = graph.symbols.find((symbol) => symbol.name === "usesGlobalFromRef");
+    expect(uses).toBeDefined();
+    expect(uses!.dependencies).toContain("internal-overload-ref@1.0.0::GLOBAL_FROM_REF");
+
+    const usesExtra = graph.symbols.find(
+      (symbol) => symbol.name === "usesGlobalFromRefExtra"
+    );
+    expect(usesExtra).toBeDefined();
+    expect(usesExtra!.dependencies).toContain("internal-overload-ref@1.0.0::GLOBAL_FROM_REF");
+  });
+
+  it("resolves module-scoped declare global members through triple-slash references", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("module-global-augmentation-ref")
+    );
+
+    const globalPick = graph.symbols.find(
+      (symbol) => symbol.name === "PICK_TYPE" && symbol.filePath === "global-types.d.ts"
+    );
+    expect(globalPick).toBeDefined();
+    expect(globalPick!.isGlobalAugmentation).toBe(true);
+    expect(globalPick!.isInternal).toBe(false);
+    expect(globalPick!.entryVisibility).toEqual(
+      expect.arrayContaining(["index.d.ts", "extra-entry.d.ts"])
+    );
+
+    const usesPick = graph.symbols.find((symbol) => symbol.name === "usesPick");
+    expect(usesPick).toBeDefined();
+    expect(usesPick!.dependencies).toContain(
+      "module-global-augmentation-ref@1.0.0::PICK_TYPE"
+    );
+
+    const usesPickFromExtra = graph.symbols.find(
+      (symbol) => symbol.name === "usesPickFromExtra"
+    );
+    expect(usesPickFromExtra).toBeDefined();
+    expect(usesPickFromExtra!.dependencies).toContain(
+      "module-global-augmentation-ref@1.0.0::PICK_TYPE"
+    );
+  });
+
   it("resolves typeof dependencies to value space without self type-alias cycles", () => {
     const graph = buildPackageGraph(
       makePackageInfo("type-value-dependency-split")

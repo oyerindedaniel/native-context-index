@@ -1,0 +1,9 @@
+{
+  "name": "module-global-augmentation-ref",
+  "version": "1.0.0",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": "./index.d.ts",
+    "./extra": "./extra-entry.d.ts"
+  }
+}

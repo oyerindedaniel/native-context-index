@@ -6,6 +6,7 @@ import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
 import { DEFAULT_MAX_DEPTH } from "./constants.js";
 import { normalizeSignature, symbolDedupeKey } from "./dedupe.js";
+import { nciProfileEnabled, profileLog, profileStat } from "./nci-log-flags.js";
 
 export interface CrawlOptions {
   /** Maximum depth for following re-exports (default: 10) */
@@ -35,6 +36,8 @@ export function crawl(
 
   const entries = Array.isArray(entryFilePaths) ? entryFilePaths : [entryFilePaths];
   const primaryEntry = entries[0] || "";
+  const crawlProfiling = nciProfileEnabled();
+  let profileResolveFileCacheHits = 0;
 
   function recordTripleSlashEdge(fromAbs: string, toAbs: string): void {
     const from = normalizePath(fromAbs);
@@ -47,19 +50,19 @@ export function crawl(
     set.add(to);
   }
 
+  const discoveryStart = performance.now();
   for (const entryPath of entries) {
     discoverFiles(entryPath, 0);
   }
-
-  if (process.env.NCI_LOG_ALL_RAW_EXPORTS === "1") {
-    console.error(allRawExports);
-    console.error(allRawImports);
-    console.error(allRawReferences);
+  if (crawlProfiling) {
+    profileLog("  crawl:discoverFiles", performance.now() - discoveryStart);
+    profileStat("  crawl:filesDiscovered", visited.size);
   }
 
   const seenResolvedKeys = new Set<string>();
   const seenPublicDefinitionKeys = new Set<string>();
 
+  const crawlResolveStart = performance.now();
   for (const entryPath of entries) {
     const entryNorm = normalizePath(entryPath);
     const resolvedFromEntry = resolveFile(entryPath, 0);
@@ -90,10 +93,26 @@ export function crawl(
     }
   }
 
-  for (const file of visited) {
+  if (crawlProfiling) {
+    profileLog("  crawl:entryResolve", performance.now() - crawlResolveStart);
+    profileStat("  crawl:entryRoots", entries.length);
+    profileStat("  crawl:resolveCacheHits", profileResolveFileCacheHits);
+    profileStat("  crawl:publicSymbols", resolvedSymbols.length);
+  }
+
+  const internalStart = performance.now();
+  const visitedSorted = [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const file of visitedSorted) {
     const exports = allRawExports.get(file) || [];
     for (const exportEntry of exports) {
-      if (exportEntry.isGlobalAugmentation || exportEntry.isWildcard || !exportEntry.name) continue;
+      if (exportEntry.isWildcard || !exportEntry.name) continue;
+      if (
+        exportEntry.isGlobalAugmentation &&
+        exportEntry.kind === ts.SyntaxKind.ModuleDeclaration &&
+        exportEntry.name === "global"
+      ) {
+        continue;
+      }
       // Skip ExportDeclarations — they're forwarding statements, not definitions.
       if (exportEntry.kind === ts.SyntaxKind.ExportDeclaration) continue;
 
@@ -125,10 +144,15 @@ export function crawl(
         visibility: exportEntry.visibility,
         since: exportEntry.since,
         heritage: exportEntry.heritage,
+        isGlobalAugmentation: exportEntry.isGlobalAugmentation,
         isInternal: true,
       });
       seenResolvedKeys.add(dedupKey);
     }
+  }
+  if (crawlProfiling) {
+    profileLog("  crawl:internalCollect", performance.now() - internalStart);
+    profileStat("  crawl:totalSymbols", resolvedSymbols.length);
   }
 
   const tripleSlashReferenceTargets: Record<string, string[]> = Object.fromEntries(
@@ -139,12 +163,16 @@ export function crawl(
       .map(([from, toSet]) => [from, [...toSet].sort()])
   );
 
+  const importsSorted = [...allRawImports.entries()].sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0
+  );
+
   return {
     filePath: primaryEntry,
     exports: resolvedSymbols,
-    imports: Object.fromEntries(allRawImports),
-    visitedFiles: Array.from(visited),
-    typeReferencePackages: Array.from(typeRefPackages),
+    imports: Object.fromEntries(importsSorted),
+    visitedFiles: [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    typeReferencePackages: [...typeRefPackages].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     circularRefs,
     tripleSlashReferenceTargets,
   };
@@ -152,6 +180,7 @@ export function crawl(
 /** Discover files reachable from an entry point. */
   function discoverFiles(filePath: string, depth: number): void {
     const normalizedPath = normalizePath(filePath);
+  
     if (depth > maxDepth) return;
     if (!fs.existsSync(normalizedPath)) return;
 
@@ -162,7 +191,6 @@ export function crawl(
 
     if (visited.has(normalizedPath)) return;
     visited.add(normalizedPath);
-
     discoveryPathSet.add(normalizedPath);
     discoveryPathStack.push(normalizedPath);
 
@@ -173,6 +201,7 @@ export function crawl(
       typeReferences: typeRefDirectives,
       isExternalModule: isExtMod,
     } = parseFile(normalizedPath);
+
     for (const pkg of typeRefDirectives) typeRefPackages.add(pkg);
     allRawExports.set(normalizedPath, exportEntries);
     allRawImports.set(normalizedPath, importEntries);
@@ -204,12 +233,24 @@ export function crawl(
       }
     }
 
-    // Follow regular imports so internal types are discovered
     for (const importEntry of importEntries) {
       if (importEntry.source) {
         const importedPaths = resolveModuleSpecifier(importEntry.source, normalizedPath);
         for (const importedPath of importedPaths) {
           discoverFiles(importedPath, depth + 1);
+        }
+      }
+    }
+
+    for (const exportEntry of exportEntries) {
+      if (!exportEntry.dependencies) continue;
+      for (const dep of exportEntry.dependencies) {
+        if (!dep.importPath) continue;
+        const depPaths = resolveModuleSpecifier(dep.importPath, normalizedPath);
+        for (const depPath of depPaths) {
+          if (depPath !== dep.importPath) {
+            discoverFiles(depPath, depth + 1);
+          }
         }
       }
     }
@@ -228,6 +269,7 @@ export function crawl(
     if (depth > maxDepth || resolutionPath.has(normalizedPath)) return [];
 
     if (!namePrefix && resolutionCache.has(normalizedPath)) {
+      if (crawlProfiling) profileResolveFileCacheHits++;
       return resolutionCache.get(normalizedPath)!;
     }
 
@@ -246,6 +288,7 @@ export function crawl(
     );
 
     const tripleSlashRefs = allRawReferences.get(normalizedPath) || [];
+  
     for (const ref of tripleSlashRefs) {
       const resolvedPaths = resolveModuleSpecifier(ref, normalizedPath);
       const refPaths = resolvedPaths.length > 0 ? resolvedPaths : [resolveTripleSlashRef(ref, normalizedPath)].filter(Boolean) as string[];
@@ -254,10 +297,10 @@ export function crawl(
         const refNormalized = normalizePath(refPath);
         const refIsModule = fileIsExternalModule.get(refNormalized) ?? true;
         // TS: triple-slash does not pull module-scoped declarations into the referrer's global scope.
-        if (refIsModule) {
-          continue;
-        }
-        const nestedSymbols = resolveFile(refPath, depth + 1);
+        // Exception: module files can still contribute ambient declarations via `declare global`.
+        const nestedSymbols = resolveFile(refPath, depth + 1).filter((symbolNode) =>
+          refIsModule ? symbolNode.isGlobalAugmentation === true : true
+        );
         for (const symbolNode of nestedSymbols) {
           const exportKey = `${symbolNode.name}::${symbolNode.kind}::${normalizeSignature(symbolNode.signature)}`;
           if (!knownExportKeys.has(exportKey)) {
@@ -279,6 +322,7 @@ export function crawl(
               modifiers: symbolNode.modifiers,
               since: symbolNode.since,
               declaredInFile: refNormalized,
+              isGlobalAugmentation: symbolNode.isGlobalAugmentation,
             });
           }
         }
@@ -296,14 +340,25 @@ export function crawl(
     const seenSymbolKeys = new Set<string>();
 
     for (const exportEntry of actualExports) {
-      if (exportEntry.isGlobalAugmentation) continue;
-      if (!exportEntry.isExplicitExport && !resolvingAsScript) continue;
+      if (
+        exportEntry.isGlobalAugmentation &&
+        exportEntry.kind === ts.SyntaxKind.ModuleDeclaration &&
+        exportEntry.name === "global"
+      ) {
+        continue;
+      }
+      if (!exportEntry.isExplicitExport && !resolvingAsScript && !exportEntry.isGlobalAugmentation) continue;
 
       const definedInPath = exportEntry.declaredInFile ?? normalizedPath;
 
       if (exportEntry.source) {
         for (const resolvedSymbol of resolveReExport(exportEntry, normalizedPath, depth, namePrefix)) {
-          const symbolKey = `${resolvedSymbol.definedIn}::${resolvedSymbol.name}`;
+          const symbolKey = symbolDedupeKey(
+            resolvedSymbol.definedIn,
+            resolvedSymbol.name,
+            resolvedSymbol.kind,
+            resolvedSymbol.signature
+          );
           if (!seenSymbolKeys.has(symbolKey)) {
             seenSymbolKeys.add(symbolKey);
             results.push(resolvedSymbol);
@@ -332,6 +387,7 @@ export function crawl(
           heritage: exportEntry.heritage,
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
+          isGlobalAugmentation: exportEntry.isGlobalAugmentation,
         });
       }
     }
@@ -375,6 +431,7 @@ export function crawl(
           heritage: exportEntry.heritage,
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
+          isGlobalAugmentation: exportEntry.isGlobalAugmentation,
         });
       }
       return results;
@@ -404,6 +461,7 @@ export function crawl(
         heritage: exportEntry.heritage,
         decorators: exportEntry.decorators,
         modifiers: exportEntry.modifiers,
+        isGlobalAugmentation: exportEntry.isGlobalAugmentation,
       });
       for (const symbolNode of allNestedSymbols) {
         results.push({
@@ -440,6 +498,7 @@ export function crawl(
           heritage: exportEntry.heritage,
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
+          isGlobalAugmentation: exportEntry.isGlobalAugmentation,
         });
       }
     }
@@ -481,6 +540,7 @@ export function crawl(
         heritage: target.heritage,
         decorators: target.decorators,
         modifiers: target.modifiers,
+        isGlobalAugmentation: target.isGlobalAugmentation,
       });
     }
 
@@ -512,6 +572,7 @@ export function crawl(
           heritage: member.heritage,
           decorators: member.decorators,
           modifiers: member.modifiers,
+          isGlobalAugmentation: member.isGlobalAugmentation,
         });
       }
     }

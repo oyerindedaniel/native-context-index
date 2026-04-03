@@ -446,6 +446,28 @@ describe("declare global integration — Augmentation Detection", () => {
     expect(siblingNames).toContain("AppState");
     expect(siblingNames).toContain("initApp");
   });
+
+  it("extracts members from module-scoped declare global blocks for downstream linking", () => {
+    const { exports: globalExports, isExternalModule } = parseFile(
+      path.join(FIXTURES_DIR, "module-global-augmentation-ref", "global-types.d.ts")
+    );
+
+    expect(isExternalModule).toBe(true);
+
+    const pickType = globalExports.find((exportItem) => exportItem.name === "PICK_TYPE");
+    expect(pickType).toBeDefined();
+    expect(pickType!.isGlobalAugmentation).toBe(true);
+    expect(pickType!.symbolSpace).toBe("value");
+
+    const globalInterface = globalExports.find((exportItem) => exportItem.name === "MyGlobalType");
+    expect(globalInterface).toBeDefined();
+    expect(globalInterface!.isGlobalAugmentation).toBe(true);
+    expect(globalInterface!.symbolSpace).toBe("type");
+
+    const namespaced = globalExports.find((exportItem) => exportItem.name === "MyNamespace.VERSION");
+    expect(namespaced).toBeDefined();
+    expect(namespaced!.isGlobalAugmentation).toBe(true);
+  });
 });
 
 describe("export import = require() — Pattern 17 Implementation", () => {

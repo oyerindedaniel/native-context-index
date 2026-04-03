@@ -99,8 +99,8 @@ const extraTsRows = tsDupKeys.reduce((n, [, rows]) => n + rows.length - 1, 0);
 
 console.log(`\nPackage: ${pkg}`);
 console.log(`\nRow counts:`);
-console.log(`  TS:   ${tsSyms.toLocaleString()}`);
-console.log(`  Rust: ${rustSyms.toLocaleString()}`);
+console.log(`  TS:   ${tsSyms.length.toLocaleString()}`);
+console.log(`  Rust: ${rustSyms.length.toLocaleString()}`);
 console.log(`  Δ:    ${(rustSyms.length - tsSyms.length).toLocaleString()} (Rust − TS)`);
 
 console.log(`\nUnique keys (basename(filePath)::name):`);

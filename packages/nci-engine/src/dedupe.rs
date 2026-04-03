@@ -1,17 +1,31 @@
-//! Stable keys for crawl dedupe and overload identity (aligned with `packages/nci-core/src/dedupe.ts`).
+//! Stable keys for crawl dedupe and overload identity (same declaration → one key; overloads differ by signature).
 
 use crate::types::SymbolKind;
 
 /// Normalize signature text for comparison (trim + collapse whitespace).
-pub fn normalize_signature(sig: Option<&str>) -> String {
-    let s = sig.unwrap_or("").trim();
-    if s.is_empty() {
+pub fn normalize_signature(signature: Option<&str>) -> String {
+    let trimmed = signature.unwrap_or("").trim();
+    if trimmed.is_empty() {
         return String::new();
     }
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
+
+    let mut normalized = String::with_capacity(trimmed.len());
+    let mut after_whitespace_run = false;
+    for character in trimmed.chars() {
+        if character.is_whitespace() {
+            after_whitespace_run = true;
+        } else {
+            if after_whitespace_run && !normalized.is_empty() {
+                normalized.push(' ');
+            }
+            after_whitespace_run = false;
+            normalized.push(character);
+        }
+    }
+    normalized
 }
 
-/// `file::name::kind::normalizedSignature` — matches TS `symbolDedupeKey` (kind = TS syntax kind number).
+/// One row per `file::name::syntaxKind::normalizedSignature` (kind is the same numeric code the serializer uses).
 pub fn symbol_dedupe_key(
     file: &str,
     name: &str,

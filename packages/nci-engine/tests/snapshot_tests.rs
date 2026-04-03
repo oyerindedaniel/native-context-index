@@ -9,6 +9,9 @@
 ///    `cd packages/nci-core && npx tsx scripts/generate-snapshots.ts`
 /// 2. Run these tests:
 ///    `cargo test --test snapshot_tests`
+/// 3. If insta reports new `*.snap.new` files under `tests/snapshots/`, accept them with
+///    `cargo insta accept --manifest-path packages/nci-engine/Cargo.toml --include-ignored`
+///    (that directory is gitignored, so insta needs `--include-ignored`).
 ///
 /// Any mismatch indicates a behavioral difference between the
 /// Rust and TypeScript implementations.
@@ -136,14 +139,6 @@ fn compare_symbol_names_and_counts(
 ) {
     let oracle_symbols = oracle.get("symbols").and_then(|s| s.as_array()).unwrap();
 
-    assert_eq!(
-        rust_graph.symbols.len(),
-        oracle_symbols.len(),
-        "[{fixture_name}] Symbol count mismatch: Rust={}, TS={}",
-        rust_graph.symbols.len(),
-        oracle_symbols.len()
-    );
-
     let mut rust_names: Vec<&str> = rust_graph.symbols.iter().map(|s| s.name.as_ref()).collect();
     rust_names.sort();
 
@@ -152,6 +147,14 @@ fn compare_symbol_names_and_counts(
         .filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(String::from))
         .collect();
     ts_names.sort();
+
+    assert_eq!(
+        rust_graph.symbols.len(),
+        oracle_symbols.len(),
+        "[{fixture_name}] Symbol count mismatch: Rust={}, TS={}",
+        rust_graph.symbols.len(),
+        oracle_symbols.len()
+    );
 
     assert_eq!(
         rust_names, ts_names,
@@ -315,6 +318,10 @@ snapshot_test!(snapshot_inline_import_type, "inline-import-type");
 snapshot_test!(snapshot_class_statics, "class-statics");
 snapshot_test!(snapshot_global_augmentation, "global-augmentation");
 snapshot_test!(snapshot_mixin_composition, "mixin-composition");
+snapshot_test!(
+    snapshot_module_global_augmentation_ref,
+    "module-global-augmentation-ref"
+);
 snapshot_test!(snapshot_visibility_merge, "visibility-merge");
 snapshot_test!(snapshot_since_inheritance, "since-inheritance");
 snapshot_test!(
@@ -341,6 +348,19 @@ snapshot_test!(
     "member-property-extraction"
 );
 snapshot_test!(snapshot_internal_overload_ref, "internal-overload-ref");
+snapshot_test!(
+    snapshot_merge_key_signature_parity,
+    "merge-key-signature-parity"
+);
+snapshot_test!(
+    snapshot_namespace_name_prefix_boundary,
+    "namespace-name-prefix-boundary"
+);
+snapshot_test!(
+    snapshot_namespace_export_method_overloads,
+    "namespace-export-method-overloads"
+);
+snapshot_test!(snapshot_private_class_field_skip, "private-class-field-skip");
 
 #[test]
 fn all_oracles_have_tests() {

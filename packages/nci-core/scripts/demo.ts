@@ -10,12 +10,14 @@
  *   npx tsx scripts/demo.ts --output ./my-report.json
  *   npx tsx scripts/demo.ts --package effect
  *   npx tsx scripts/demo.ts --package vitest --package prettier
+ *
+ * Discovers packages from repo root, `nci-core`, and `nci-engine` node_modules (in that order)
+ * and skips duplicate installs that share the same real directory (pnpm-style duplicates).
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { scanPackages } from "../src/scanner.js";
-import { resolveTypesEntry } from "../src/resolver.js";
 import { buildPackageGraph } from "../src/graph.js";
 import type { PackageGraph, PackageInfo } from "../src/types.js";
 
@@ -28,6 +30,11 @@ const outputPath = outputIdx !== -1 && args[outputIdx + 1]
   ? path.resolve(args[outputIdx + 1])
   : path.resolve(__dirname, "../nci-report.json");
 
+const prettyPrint = args.includes("--pretty");
+if (args.includes("--profile")) {
+  process.env.NCI_PROFILE = "1";
+}
+
 const targetPackages: string[] = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--package" && args[i + 1]) {
@@ -35,62 +42,81 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const rootNodeModules = path.resolve(__dirname, "../../../node_modules");
-const localNodeModules = path.resolve(__dirname, "../node_modules");
+const repoRoot = path.resolve(__dirname, "../../../");
+const nciCoreRoot = path.resolve(__dirname, "..");
+const nciEngineRoot = path.resolve(__dirname, "../../nci-engine");
+
+const nodeModulesRoots = [
+  path.join(repoRoot, "node_modules"),
+  path.join(nciCoreRoot, "node_modules"),
+  path.join(nciEngineRoot, "node_modules"),
+];
+
+const realpathCanonical =
+  typeof fs.realpathSync.native === "function"
+    ? (dir: string) => fs.realpathSync.native(dir)
+    : (dir: string) => fs.realpathSync(dir);
+
+/** First root wins; same physical package dir (realpath) is only indexed once. */
+function mergePackagesFromNodeModulesRoots(roots: string[]): PackageInfo[] {
+  const seenCanonicalDirs = new Set<string>();
+  const merged: PackageInfo[] = [];
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    for (const pkg of scanPackages(root)) {
+      let canonicalDir: string;
+      try {
+        canonicalDir = realpathCanonical(pkg.dir);
+      } catch {
+        canonicalDir = path.resolve(pkg.dir);
+      }
+      if (seenCanonicalDirs.has(canonicalDir)) continue;
+      seenCanonicalDirs.add(canonicalDir);
+      merged.push(pkg);
+    }
+  }
+  return merged;
+}
 
 console.log("🔍 Scanning node_modules...\n");
 
-let allPackages: PackageInfo[] = [];
+const scanStart = performance.now();
+const allPackages = mergePackagesFromNodeModulesRoots(nodeModulesRoots);
+const scanMs = Math.round(performance.now() - scanStart);
 
-if (fs.existsSync(rootNodeModules)) {
-  allPackages.push(...scanPackages(rootNodeModules));
-}
-if (fs.existsSync(localNodeModules)) {
-  const localPkgs = scanPackages(localNodeModules);
-  const existingNames = new Set(allPackages.map((pkg) => pkg.name));
-  for (const pkg of localPkgs) {
-    if (!existingNames.has(pkg.name)) {
-      allPackages.push(pkg);
-    }
-  }
-}
-
+let packagesToIndex = allPackages;
 if (targetPackages.length > 0) {
-  allPackages = allPackages.filter((pkg) => targetPackages.includes(pkg.name));
-  if (allPackages.length === 0) {
+  packagesToIndex = allPackages.filter((pkg) => targetPackages.includes(pkg.name));
+  if (packagesToIndex.length === 0) {
     console.error(`❌ No packages found matching: ${targetPackages.join(", ")}`);
     process.exit(1);
   }
 }
 
-console.log(`📦 Found ${allPackages.length} packages\n`);
+console.log(`📦 Found ${packagesToIndex.length} packages\n`);
 
 interface PackageReport {
   name: string;
   version: string;
-  entries: number;
   totalSymbols: number;
   totalFiles: number;
   crawlDurationMs: number;
   graph: PackageGraph;
-  error?: string;
 }
 
 const reports: PackageReport[] = [];
 const errors: { name: string; error: string }[] = [];
 const startTime = performance.now();
 
-for (const pkg of allPackages) {
+for (const pkg of packagesToIndex) {
   process.stdout.write(`   ${pkg.name}...`);
 
   try {
-    const entry = resolveTypesEntry(pkg.dir);
     const graph = buildPackageGraph(pkg, { maxDepth: 10 });
 
     reports.push({
       name: pkg.name,
       version: pkg.version,
-      entries: entry.typesEntries.length,
       totalSymbols: graph.totalSymbols,
       totalFiles: graph.totalFiles,
       crawlDurationMs: Math.round(graph.crawlDurationMs),
@@ -109,22 +135,22 @@ const totalTime = Math.round(performance.now() - startTime);
 
 console.log("\n" + "═".repeat(70));
 console.log("📊 SUMMARY\n");
+console.log(`   Scan time:       ${scanMs}ms`);
 console.log(`   Total packages:  ${reports.length}`);
 console.log(`   With types:      ${reports.filter((report) => report.totalSymbols > 0).length}`);
 console.log(`   Without types:   ${reports.filter((report) => report.totalSymbols === 0).length}`);
 console.log(`   Errors:          ${errors.length}`);
 console.log(`   Total symbols:   ${reports.reduce((sum, report) => sum + report.totalSymbols, 0)}`);
 console.log(`   Total files:     ${reports.reduce((sum, report) => sum + report.totalFiles, 0)}`);
-console.log(`   Total time:      ${totalTime}ms\n`);
+console.log(`   Graph time:      ${totalTime}ms\n`);
 
-console.log("   " + "Package".padEnd(40) + "Entries".padStart(8) + "Symbols".padStart(9) + "Files".padStart(7) + "Time".padStart(8));
-console.log("   " + "─".repeat(72));
+console.log("   " + "Package".padEnd(40) + "Symbols".padStart(9) + "Files".padStart(7) + "Time".padStart(8));
+console.log("   " + "─".repeat(64));
 
 for (const report of reports.sort((a, b) => b.totalSymbols - a.totalSymbols)) {
   console.log(
     "   " +
     report.name.padEnd(40) +
-    String(report.entries).padStart(8) +
     String(report.totalSymbols).padStart(9) +
     String(report.totalFiles).padStart(7) +
     `${report.crawlDurationMs}ms`.padStart(8)
@@ -148,6 +174,15 @@ const output = {
   packages: reports.map((report) => report.graph),
 };
 
-fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
+const stringifyStart = performance.now();
+const jsonStr = prettyPrint ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+const stringifyMs = Math.round(performance.now() - stringifyStart);
+
+const writeStart = performance.now();
+fs.writeFileSync(outputPath, jsonStr);
+const writeMs = Math.round(performance.now() - writeStart);
+const fileSizeKB = (fs.statSync(outputPath).size / 1024).toFixed(1);
+
 console.log(`\n💾 Report saved to: ${outputPath}`);
-console.log(`   File size: ${(fs.statSync(outputPath).size / 1024).toFixed(1)} KB\n`);
+console.log(`   File size: ${fileSizeKB} KB`);
+console.log(`   Stringify: ${stringifyMs}ms | Write: ${writeMs}ms${prettyPrint ? " (pretty)" : " (compact)"}\n`);

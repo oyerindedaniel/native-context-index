@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -221,6 +221,9 @@ pub struct ParsedExport {
     /// Whether this is a global augmentation (`declare global { }`).
     pub is_global_augmentation: bool,
 
+    /// Definition-site file when synthesized from referenced files.
+    pub declared_in_file: Option<SharedString>,
+
     /// Full type signature text.
     pub signature: Option<SharedString>,
 
@@ -263,6 +266,7 @@ impl ParsedExport {
             is_namespace_export: false,
             is_explicit_export: false,
             is_global_augmentation: false,
+            declared_in_file: None,
             signature: None,
             js_doc: None,
             dependencies: Arc::from([]),
@@ -362,6 +366,9 @@ pub struct ResolvedSymbol {
     /// Whether this is an internal (non-exported) symbol.
     pub is_internal: bool,
 
+    /// Whether this symbol originates from `declare global { ... }`.
+    pub is_global_augmentation: bool,
+
     /// Metadata for decorators attached to the declaration.
     pub decorators: SharedVec<DecoratorMetadata>,
 
@@ -394,6 +401,7 @@ impl ResolvedSymbol {
             visibility: export.visibility.clone(),
             since: export.since.clone(),
             is_internal: false,
+            is_global_augmentation: export.is_global_augmentation,
             decorators: export.decorators.clone(),
             heritage: export.heritage.clone(),
             is_inherited: false,
@@ -466,6 +474,10 @@ pub struct SymbolNode {
     /// Whether this is an internal (non-exported) symbol.
     pub is_internal: bool,
 
+    /// Whether this symbol originates from `declare global { ... }`.
+    #[serde(skip_serializing_if = "is_false")]
+    pub is_global_augmentation: bool,
+
     /// Metadata for decorators.
     #[serde(skip_serializing_if = "is_shared_vec_empty")]
     pub decorators: SharedVec<DecoratorMetadata>,
@@ -485,6 +497,10 @@ pub struct SymbolNode {
     /// Structured modifiers.
     #[serde(skip_serializing_if = "is_shared_vec_empty")]
     pub modifiers: SharedVec<SharedString>,
+
+    /// Dedupe keys when merging [`Self::raw_dependencies`] across merged symbol rows.
+    #[serde(skip)]
+    pub dep_dedupe_keys: Option<HashSet<(SharedString, SharedString)>>,
 
     /// Original type references for resolution.
     #[serde(skip)]

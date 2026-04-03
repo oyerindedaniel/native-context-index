@@ -186,6 +186,17 @@ describe("crawl", () => {
     expect(version!.signature).toContain("const VERSION");
   });
 
+  it("keeps every method overload when expanding export * as (no definedIn+name collapse)", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "namespace-export-method-overloads", "index.d.ts")
+    );
+
+    const useMembers = result.exports.filter((entry) => entry.name === "Ns.Service.use");
+    expect(useMembers).toHaveLength(2);
+    const signatures = new Set(useMembers.map((entry) => entry.signature ?? ""));
+    expect(signatures.size).toBe(2);
+  });
+
   it("extracts dependencies from inline import() types", () => {
     const result = crawl(
       path.join(FIXTURES_DIR, "inline-import-type", "index.d.ts")
@@ -202,6 +213,15 @@ describe("crawl", () => {
     expect(otherKey!.dependencies).toBeDefined();
     const otherKeyDeps = otherKey!.dependencies!.map(ref => ref.name);
     expect(otherKeyDeps).toContain("OtherKey");
+  });
+
+  it("expands import() type aliases so member symbols use the dependency file as definedIn", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "inline-import-type", "index.d.ts")
+    );
+    const member = result.exports.find((exportItem) => exportItem.name === "ExpandedViaImport.n");
+    expect(member).toBeDefined();
+    expect(member!.definedIn).toContain("inline-import-type-remote-target.d.ts");
   });
 
   it("should handle complex resolution (internal types and path normalization)", async () => {
@@ -310,6 +330,15 @@ describe("crawl", () => {
     expect(result.visitedFiles.length).toBe(1); // Should only visit the entry file
   });
 
+  it("skips private class fields (#) so Rust parity does not emit [#…] member rows", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "private-class-field-skip", "index.d.ts")
+    );
+    const names = result.exports.map((exportItem) => exportItem.name);
+    expect(names).toContain("WithPrivate");
+    expect(names).toContain("WithPrivate.prototype.visible");
+    expect(names.some((name) => name.includes("#"))).toBe(false);
+  });
   describe("Name Prefixing & Symbol Resolution", () => {
     it("handles deeply nested namespace re-exports with dot-prefixing", () => {
       const result = crawl(

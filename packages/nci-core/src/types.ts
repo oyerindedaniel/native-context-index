@@ -181,6 +181,8 @@ export interface ResolvedSymbol {
   since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
+  /** Whether this symbol comes from a `declare global {}` augmentation context */
+  isGlobalAugmentation?: boolean;
   /** Metadata for decorators attached to the declaration */
   decorators?: DecoratorMetadata[];
   /** Names of classes or interfaces this symbol extends/implements */
@@ -233,6 +235,8 @@ export interface SymbolNode {
   since?: string;
   /** Whether this is an internal (non-exported) symbol */
   isInternal?: boolean;
+  /** Whether this symbol comes from a `declare global {}` augmentation context */
+  isGlobalAugmentation?: boolean;
   /** Metadata for decorators attached to the declaration */
   decorators?: DecoratorMetadata[];
   /** Whether this is an inherited symbol synthesized from a parent */

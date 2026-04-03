@@ -2,14 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { PackageInfo } from "./types.js";
 
-/**
- * Determines if a directory entry is a directory or a symbolic link pointing to a directory.
- * Essential for pnpm support where node_modules contains extensive symlinks.
- *
- * @param entry The dirent from readdirSync.
- * @param parentDir Absolute path to the directory containing the entry.
- * @returns True if the target is a directory.
- */
+/** Determine if a directory entry is a directory or a symbolic link pointing to a directory. */
 function isDirectoryOrSymlink(entry: fs.Dirent, parentDir: string): boolean {
   if (entry.isDirectory()) return true;
   if (entry.isSymbolicLink()) {
@@ -23,18 +16,7 @@ function isDirectoryOrSymlink(entry: fs.Dirent, parentDir: string): boolean {
   return false;
 }
 
-/**
- * Scan a node_modules directory and discover all installed packages.
- *
- * Skips any entry starting with "." — the npm registry forbids package names
- * with a leading dot, so these are always package manager artifacts:
- *   npm (.package-lock.json, .cache), pnpm (.pnpm, .modules.yaml),
- *   yarn (.yarn-integrity, .yarn-state.yml, .yarn), bun (.bun, .bun-tag),
- *   and common entries (.bin, .DS_Store).
- *
- * @param nodeModulesPath - Absolute path to the node_modules directory
- * @returns Array of discovered packages with metadata
- */
+/** Scan a node_modules directory and discover all installed packages. */
 export function scanPackages(nodeModulesPath: string): PackageInfo[] {
   if (!fs.existsSync(nodeModulesPath)) {
     throw new Error(`node_modules not found at: ${nodeModulesPath}`);
@@ -87,13 +69,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
   return packages;
 }
 
-/**
- * Reads and parses package.json from a directory to extract core metadata.
- *
- * @param pkgDir Absolute path to the package directory.
- * @param fallbackName Name to use if the package.json does not specify one.
- * @returns Discovered package metadata or null if invalid.
- */
+/** Read and parse package.json from a directory to extract core metadata. */
 function readPackageInfo(
   pkgDir: string,
   fallbackName: string

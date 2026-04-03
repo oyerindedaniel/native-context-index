@@ -1,0 +1,5 @@
+{
+  "name": "merge-key-signature-parity",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

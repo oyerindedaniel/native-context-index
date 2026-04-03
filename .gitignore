@@ -58,3 +58,6 @@ docs/
 **/snapshots/
 snapshot.md
 
+context_summary.md
+*.txt
+

@@ -440,14 +440,7 @@ export function resolveModuleSpecifier(
 }
 
 
-/**
- * Orchestrates the resolution of a package-level entry point from node_modules.
- * Finds the nearest relevant package and delegates to `resolveTypesEntry`.
- *
- * @param specifier The module specifier (e.g., "react" or "react/jsx-runtime").
- * @param currentFile Path of the file initiating the resolution.
- * @returns Array of absolute paths to the discovered types.
- */
+/** Resolve a package-level entry point from node_modules. */
 function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   const parts = specifier.split("/");
   let packageName = parts[0]!;

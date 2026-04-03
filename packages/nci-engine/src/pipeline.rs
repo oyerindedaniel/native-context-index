@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 
@@ -6,9 +7,8 @@ use crate::crawler::CrawlOptions;
 use crate::graph::build_package_graph;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
-use crate::types::PackageGraph;
+use crate::types::{PackageGraph, PackageInfo};
 
-/// Configuration for the indexing pipeline.
 #[derive(Debug, Clone)]
 pub struct IndexOptions {
     /// Maximum depth for following re-exports within each package (default: 10).
@@ -65,6 +65,46 @@ pub fn index_all(
     };
 
     Ok(graphs)
+}
+
+/// Drops later entries that resolve to the same canonical package directory as an earlier one.
+/// Scan roots should be ordered from highest priority (e.g. repo root `node_modules`) first.
+pub fn dedupe_packages_by_canonical_dir(packages: Vec<PackageInfo>) -> Vec<PackageInfo> {
+    let mut seen_dirs: HashSet<PathBuf> = HashSet::new();
+    let mut unique: Vec<PackageInfo> = Vec::with_capacity(packages.len());
+    for package in packages {
+        let path = Path::new(package.dir.as_ref());
+        let canonical_key = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        if seen_dirs.insert(canonical_key) {
+            unique.push(package);
+        }
+    }
+    unique
+}
+
+/// Builds a graph for each discovered package, optionally in parallel (Rayon).
+///
+/// Use this when packages were collected from several `node_modules` trees and deduped with
+/// [`dedupe_packages_by_canonical_dir`].
+pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -> Vec<PackageGraph> {
+    let index_opts = options.unwrap_or_default();
+    let crawl_options_factory = || {
+        Some(CrawlOptions {
+            max_depth: index_opts.max_depth,
+        })
+    };
+
+    if index_opts.parallel {
+        packages
+            .par_iter()
+            .map(|package| build_package_graph(package, crawl_options_factory()))
+            .collect()
+    } else {
+        packages
+            .iter()
+            .map(|package| build_package_graph(package, crawl_options_factory()))
+            .collect()
+    }
 }
 
 /// Index a single package by its directory path.

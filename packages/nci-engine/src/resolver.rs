@@ -31,16 +31,11 @@ pub enum ResolveError {
     },
 }
 
-pub fn resolve_types_entry(package_dir: &Path) -> Result<PackageEntry, ResolveError> {
-    let pkg_json_path = package_dir.join("package.json");
-
-    let parsed_pkg: serde_json::Value = if pkg_json_path.exists() {
-        let raw_contents = fs::read_to_string(&pkg_json_path)?;
-        serde_json::from_str(&raw_contents)?
-    } else {
-        serde_json::Value::Object(serde_json::Map::new())
-    };
-
+/// Builds [`PackageEntry`] from an already-parsed `package.json` value (avoids re-reading the file).
+pub fn package_entry_from_parsed_pkg(
+    package_dir: &Path,
+    parsed_pkg: &serde_json::Value,
+) -> Result<PackageEntry, ResolveError> {
     let basename = package_dir
         .file_name()
         .unwrap_or_default()
@@ -104,6 +99,19 @@ pub fn resolve_types_entry(package_dir: &Path) -> Result<PackageEntry, ResolveEr
         types_entries,
         subpaths,
     })
+}
+
+pub fn resolve_types_entry(package_dir: &Path) -> Result<PackageEntry, ResolveError> {
+    let pkg_json_path = package_dir.join("package.json");
+
+    let parsed_pkg: serde_json::Value = if pkg_json_path.exists() {
+        let raw_contents = fs::read_to_string(&pkg_json_path)?;
+        serde_json::from_str(&raw_contents)?
+    } else {
+        serde_json::Value::Object(serde_json::Map::new())
+    };
+
+    package_entry_from_parsed_pkg(package_dir, &parsed_pkg)
 }
 
 pub fn resolve_module_specifier(specifier: &str, current_file: &str) -> Vec<SharedString> {
@@ -281,14 +289,15 @@ fn matches_version_range(version: &str, range: &str) -> bool {
     let required_major: u32 = range_captures[1].parse().unwrap_or(0);
     let required_minor: u32 = range_captures[2].parse().unwrap_or(0);
 
-    let version_parts: Vec<&str> = version.split('.').collect();
-    let current_major: u32 = version_parts
-        .first()
-        .and_then(|part| part.parse().ok())
+    let current_major: u32 = version
+        .split('.')
+        .next()
+        .and_then(|segment| segment.parse().ok())
         .unwrap_or(0);
-    let current_minor: u32 = version_parts
-        .get(1)
-        .and_then(|part| part.parse().ok())
+    let current_minor: u32 = version
+        .split('.')
+        .nth(1)
+        .and_then(|segment| segment.parse().ok())
         .unwrap_or(0);
 
     if current_major > required_major {
@@ -496,7 +505,16 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
         return vec![];
     }
 
-    let pkg_entry = match resolve_types_entry(&pkg_dir) {
+    let raw_contents = match fs::read_to_string(&pkg_json_path) {
+        Ok(contents) => contents,
+        Err(_) => return vec![],
+    };
+    let parsed_pkg: serde_json::Value = match serde_json::from_str(&raw_contents) {
+        Ok(parsed) => parsed,
+        Err(_) => return vec![],
+    };
+
+    let pkg_entry = match package_entry_from_parsed_pkg(&pkg_dir, &parsed_pkg) {
         Ok(entry) => entry,
         Err(_) => return vec![],
     };
@@ -512,15 +530,6 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
     }
 
     // Try wildcard matching against exports
-    let raw_contents = match fs::read_to_string(&pkg_json_path) {
-        Ok(contents) => contents,
-        Err(_) => return vec![],
-    };
-    let parsed_pkg: serde_json::Value = match serde_json::from_str(&raw_contents) {
-        Ok(parsed) => parsed,
-        Err(_) => return vec![],
-    };
-
     if let Some(exports) = parsed_pkg.get("exports") {
         if let Some(wildcard_matched) = match_wildcard_subpath(&subpath, exports) {
             if let Some(resolved) = resolve_export_condition(&pkg_dir, &wildcard_matched) {
@@ -661,18 +670,37 @@ pub fn is_file_safe(file_path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Normalizes a file path to an absolute format with forward slash separators.
-pub fn normalize_path(file_path: &Path) -> SharedString {
-    let canonical = file_path
-        .canonicalize()
-        .unwrap_or_else(|_| file_path.to_path_buf());
-
+fn normalize_path_from_canonical(canonical: &Path) -> SharedString {
     let path_string = canonical.to_string_lossy().to_string();
 
     // Strip Windows UNC prefix that canonicalize adds
     let stripped = path_string.strip_prefix(r"\\?\").unwrap_or(&path_string);
 
     stripped.replace('\\', "/").into()
+}
+
+/// Normalizes a file path to an absolute format with forward slash separators.
+pub fn normalize_path(file_path: &Path) -> SharedString {
+    let canonical = file_path
+        .canonicalize()
+        .unwrap_or_else(|_| file_path.to_path_buf());
+    normalize_path_from_canonical(&canonical)
+}
+
+/// Like [`normalize_path`], but reuses prior canonicalizations in `cache` (same `PathBuf` key).
+pub fn normalize_path_with_cache(
+    cache: &mut HashMap<PathBuf, SharedString>,
+    file_path: &Path,
+) -> SharedString {
+    let canonical = file_path
+        .canonicalize()
+        .unwrap_or_else(|_| file_path.to_path_buf());
+    if let Some(cached) = cache.get(&canonical) {
+        return cached.clone();
+    }
+    let result = normalize_path_from_canonical(&canonical);
+    cache.insert(canonical, result.clone());
+    result
 }
 
 /// Checks if a path string ends with a `.d.ts` / `.d.mts` / `.d.cts` extension.
