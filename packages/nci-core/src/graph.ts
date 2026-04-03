@@ -235,8 +235,20 @@ export function buildPackageGraph(
     const existingByName = nameToIds.get(symbolNode.name) || [];
     existingByName.push(symbolNode.id);
     nameToIds.set(symbolNode.name, existingByName);
+  }
 
-    if (!symbolNode.isInternal || !nameToId.has(symbolNode.name)) {
+  // Same-name value + type (e.g. zod schemas): inheritance flattening must follow the interface/class.
+  nameToId.clear();
+  for (const symbolNode of symbols) {
+    if (
+      symbolNode.kind === ts.SyntaxKind.ClassDeclaration ||
+      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
+    ) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (const symbolNode of symbols) {
+    if (!nameToId.has(symbolNode.name)) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }

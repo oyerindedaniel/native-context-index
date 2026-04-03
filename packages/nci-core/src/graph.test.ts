@@ -560,5 +560,13 @@ describe("buildPackageGraph", () => {
       expect(leafMiddle!.isInherited).toBe(true);
       expect(leafMiddle!.inheritedFrom).toContain("MiddleNode");
     });
+
+    it("resolves heritage on the interface when a const shares the same name (value listed after interface)", () => {
+      const graph = buildPackageGraph(makePackageInfo("dual-name-interface-const"));
+      expect(graph.symbols.some(symbolNode => symbolNode.name === "Dual.onlyOnDual")).toBe(true);
+      const inherited = graph.symbols.find(symbolNode => symbolNode.name === "Dual.fromRoot");
+      expect(inherited).toBeDefined();
+      expect(inherited!.isInherited).toBe(true);
+    });
   });
 });

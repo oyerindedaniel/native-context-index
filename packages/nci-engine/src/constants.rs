@@ -105,7 +105,8 @@ mod tests {
     }
 
     #[test]
-    fn depth_constants_match_ts() {
+    fn recursion_caps_stay_in_sync() {
+        // `DEFAULT_MAX_DEPTH` (crawl) and `MAX_RECURSION_DEPTH` (type expansion) both cap at 10.
         assert_eq!(DEFAULT_MAX_DEPTH, 10);
         assert_eq!(MAX_RECURSION_DEPTH, 10);
     }

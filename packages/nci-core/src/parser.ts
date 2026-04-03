@@ -318,7 +318,22 @@ function extractDirectExport(
   }
 
   if (isNamedDeclaration(statement)) {
-    const rawName = statement.name && ts.isIdentifier(statement.name) ? statement.name.text : "<unnamed>";
+    let rawName: string;
+    if (ts.isModuleDeclaration(statement) && ts.isStringLiteral(statement.name)) {
+      rawName = statement.name.text;
+    } else if (
+      (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      !statement.name &&
+      isExplicitExport
+    ) {
+      const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
+      const isDefaultExport = modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword) ?? false;
+      rawName = isDefaultExport ? "default" : "<unnamed>";
+    } else if (statement.name && ts.isIdentifier(statement.name)) {
+      rawName = statement.name.text;
+    } else {
+      rawName = "<unnamed>";
+    }
     const name = parentName && rawName !== "<unnamed>" ? `${parentName}.${rawName}` : rawName;
     const deps = extractTypeReferences(statement);
     const jsdoc = extractJSDocInfo(statement);
@@ -455,6 +470,20 @@ function extractComplexTypeMembers(
 
   if (depth > MAX_RECURSION_DEPTH) {
     return exports;
+  }
+
+  if (ts.isTypeNode(node) && ts.isParenthesizedTypeNode(node)) {
+    return extractComplexTypeMembers(
+      node.type,
+      sourceFile,
+      parentName,
+      isExplicitExport,
+      parentJSDoc,
+      depth,
+      visitedNames,
+      memberSymbolSpace,
+      definitionSitePath
+    );
   }
 
   let members: ts.NodeArray<ts.TypeElement | ts.ClassElement> | undefined;

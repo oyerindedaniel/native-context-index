@@ -9,6 +9,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@pulumi/aws": "^7.24.0",
     "@repo/typescript-config": "workspace:*",
     "@vitest/coverage-v8": "^4.1.0",
     "ai": "^6.0.134",

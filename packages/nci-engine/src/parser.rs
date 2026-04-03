@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -190,6 +191,10 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                 extract_imports(import_decl, &mut imports);
             }
 
+            Statement::TSImportEqualsDeclaration(import_eq) => {
+                register_ts_import_equals_require(import_eq, &mut imports);
+            }
+
             Statement::ExportNamedDeclaration(export_named) => {
                 extract_export_named(
                     export_named,
@@ -223,6 +228,8 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                     is_script,
                     module_decl.span,
                     &local_decls,
+                    false,
+                    None,
                 );
             }
 
@@ -233,6 +240,7 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                     current_file,
                     &mut exports,
                     &local_decls,
+                    None,
                 );
             }
 
@@ -268,9 +276,14 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
             }
 
             _ => {
-                if let Some(direct_exports) =
-                    extract_direct_statement(statement, source_text, is_script, current_file, &local_decls)
-                {
+                if let Some(direct_exports) = extract_direct_statement(
+                    statement,
+                    source_text,
+                    is_script,
+                    current_file,
+                    &local_decls,
+                    None,
+                ) {
                     exports.extend(direct_exports);
                 }
             }
@@ -378,22 +391,48 @@ fn extend_local_decl_map_from_body<'a>(
     }
 }
 
+/// Matches TypeScript’s “file prolog”: triple-slash directives may follow whitespace,
+/// `//` comments, shebangs, and `/* … */` block comments (e.g. long license banners before refs).
 fn extract_triple_slash_directives(source_text: &str) -> (Vec<SharedString>, Vec<SharedString>) {
     let mut references = Vec::new();
     let mut type_references = Vec::new();
 
     let path_re = &*TRIPLE_SLASH_PATH_RE;
     let types_re = &*TRIPLE_SLASH_TYPES_RE;
+    let mut in_block_comment = false;
 
     for line in source_text.lines() {
         let trimmed = line.trim();
-        if !trimmed.starts_with("///") {
-            // Triple-slash directives must appear at the top of the file
-            // before any statements, but after blank/comment lines
-            if !trimmed.is_empty() && !trimmed.starts_with("//") {
-                break;
+
+        if in_block_comment {
+            if trimmed.contains("*/") {
+                in_block_comment = false;
             }
             continue;
+        }
+
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.starts_with("#!") {
+            continue;
+        }
+
+        // Single-line // comments (not /// directives)
+        if trimmed.starts_with("//") && !trimmed.starts_with("///") {
+            continue;
+        }
+
+        if trimmed.starts_with("/*") {
+            if !trimmed.contains("*/") {
+                in_block_comment = true;
+            }
+            continue;
+        }
+
+        if !trimmed.starts_with("///") {
+            break;
         }
 
         if let Some(caps) = path_re.captures(trimmed) {
@@ -408,6 +447,23 @@ fn extract_triple_slash_directives(source_text: &str) -> (Vec<SharedString>, Vec
     }
 
     (references, type_references)
+}
+
+fn register_ts_import_equals_require(
+    decl: &TSImportEqualsDeclaration<'_>,
+    imports: &mut Vec<ParsedImport>,
+) {
+    let TSModuleReference::ExternalModuleReference(ext) = &decl.module_reference else {
+        return;
+    };
+    let source = SharedString::from(ext.expression.value.as_str());
+    imports.push(ParsedImport {
+        name: SharedString::from(decl.id.name.as_ref()),
+        source,
+        original_name: None,
+        is_default: false,
+        is_namespace: false,
+    });
 }
 
 fn extract_imports(import_decl: &ImportDeclaration<'_>, imports: &mut Vec<ParsedImport>) {
@@ -765,6 +821,46 @@ fn extract_export_all(
     let _ = source_text; // Used for consistency; export_all is self-contained
 }
 
+fn type_ref_dedupe_key(d: &TypeReference) -> String {
+    format!(
+        "{}|{}",
+        d.name.as_ref(),
+        d.import_path.as_deref().unwrap_or("")
+    )
+}
+
+/// Rolls up `dependencies` from declarations nested under a namespace/module so the container
+/// row reflects every type edge reachable inside its subtree (not only the headline signature).
+fn merge_nested_dependencies_into_namespace(
+    exports: &mut [ParsedExport],
+    ns_idx: usize,
+    nested_start: usize,
+) {
+    if nested_start >= exports.len() || ns_idx >= nested_start {
+        return;
+    }
+    let (head, nested_slice) = exports.split_at_mut(nested_start);
+    let Some(ns) = head.get_mut(ns_idx) else {
+        return;
+    };
+    let mut seen: HashSet<String> = ns.dependencies.iter().map(type_ref_dedupe_key).collect();
+    let mut extra: Vec<TypeReference> = Vec::new();
+    for nested in nested_slice.iter() {
+        for type_ref in nested.dependencies.iter() {
+            let dedupe_key = type_ref_dedupe_key(type_ref);
+            if seen.insert(dedupe_key) {
+                extra.push(type_ref.clone());
+            }
+        }
+    }
+    if extra.is_empty() {
+        return;
+    }
+    let mut merged = ns.dependencies.to_vec();
+    merged.extend(extra);
+    ns.dependencies = merged.into();
+}
+
 fn extract_module_declaration<'a>(
     module_decl: &TSModuleDeclaration<'a>,
     source_text: &str,
@@ -773,6 +869,12 @@ fn extract_module_declaration<'a>(
     is_script: bool,
     outer_span: oxc_span::Span,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+    // True when `export` wraps this namespace (or `export namespace` / `export declare namespace`).
+    namespace_is_explicit_export: bool,
+    // `global_enclosing_qualifier` drives how names inside a `global`-named block get prefixed:
+    // None → top-level `global` (members unprefixed); Some("") → under `declare module "…"`
+    // (inner names become `global.*`); Some("Ns") → under `namespace Ns` (`Ns.global.*`).
+    global_enclosing_qualifier: Option<&str>,
 ) {
     let module_name = match &module_decl.id {
         TSModuleDeclarationName::Identifier(ident) => SharedString::from(ident.name.as_str()),
@@ -784,46 +886,52 @@ fn extract_module_declaration<'a>(
     let is_global = module_name.as_ref() == "global";
     let is_string_module = matches!(&module_decl.id, TSModuleDeclarationName::StringLiteral(_));
 
-    let signature_text = get_span_text(source_text, outer_span);
-    let signature = SharedString::from(
-        (signature_text
-            .split('{')
-            .next()
-            .unwrap_or(&signature_text)
-            .trim()
-            .to_string()
-            + " { ... }")
-            .as_ref(),
-    );
+    let signature = SharedString::from(get_span_text(source_text, outer_span).trim());
 
     let jsdoc = extract_jsdoc_from_leading_comments(source_text, outer_span);
+
+    let mut modifiers: Vec<SharedString> = Vec::new();
+    if module_decl.declare {
+        modifiers.push(SharedString::from("declare"));
+    }
+    if namespace_is_explicit_export && !is_global && !is_string_module {
+        modifiers.push(SharedString::from("export"));
+    }
+    modifiers.sort();
+
+    // Only file-top `global` is treated as an augmentation wrapper (flagged for downstream).
+    // A `global { }` nested only under `declare module "…"` is ordinary ambient structure; if we
+    // flag it the same way, the crawler drops the namespace row as a duplicate “global” shell.
+    let global_wrap_is_augmentation = is_global && global_enclosing_qualifier.is_none();
 
     exports.push(ParsedExport {
         name: module_name.clone(),
         kind: SymbolKind::Namespace,
-        is_explicit_export: !is_global && !is_string_module,
-        is_global_augmentation: is_global,
+        is_explicit_export: namespace_is_explicit_export && !is_global && !is_string_module,
+        is_global_augmentation: global_wrap_is_augmentation,
         signature: Some(signature),
         js_doc: jsdoc.js_doc,
         deprecated: jsdoc.deprecated,
         visibility: jsdoc.visibility,
         since: jsdoc.since,
-        modifiers: if !is_global && !is_string_module {
-            SharedVec::from([SharedString::from("export")])
-        } else {
-            SharedVec::from([])
-        },
+        modifiers: SharedVec::from(modifiers),
         ..Default::default()
     });
 
     // Recurse into module body to extract nested exports.
-    // NOTE: For ambient module declarations (quoted string names), the TS oracle
-    // typically flattens the members into the top-level namespace rather than prefixing.
-    // `declare global { ... }` is also flattened in TS-style handling.
-    let child_parent_name = if is_string_module || is_global {
-        ""
+    // Ambient string modules (`declare module "m"`) use an empty `parent_name` for children so
+    // exports surface as `Foo`, not `"m".Foo`. Nested `global` blocks still need a `global.*`
+    // (or `Ns.global.*`) prefix so nested members don’t collide with the enclosing scope.
+    let child_parent_name: Cow<'_, str> = if is_global {
+        match global_enclosing_qualifier {
+            None => Cow::Borrowed(""),
+            Some("") => Cow::Borrowed("global"),
+            Some(ns) => Cow::Owned(format!("{ns}.global")),
+        }
+    } else if is_string_module {
+        Cow::Borrowed("")
     } else {
-        &module_name
+        Cow::Borrowed(module_name.as_ref())
     };
     let before_len = exports.len();
 
@@ -833,14 +941,18 @@ fn extract_module_declaration<'a>(
             source_text,
             current_file,
             exports,
-            child_parent_name,
+            child_parent_name.as_ref(),
             is_script,
             local_decls,
         );
     }
 
-    // Mark nested declarations from `declare global { ... }` as global augmentations.
-    if is_global {
+    if exports.len() > before_len {
+        merge_nested_dependencies_into_namespace(exports, before_len - 1, before_len);
+    }
+
+    // Propagate the augmentation flag only for true file-top `global` wrappers (see above).
+    if global_wrap_is_augmentation {
         for nested in exports.iter_mut().skip(before_len) {
             nested.is_global_augmentation = true;
         }
@@ -853,6 +965,8 @@ fn extract_global_declaration<'a>(
     current_file: &str,
     exports: &mut Vec<ParsedExport>,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+    // Same semantics as `extract_module_declaration`'s `global_enclosing_qualifier`.
+    global_enclosing_qualifier: Option<&str>,
 ) {
     let signature_text = get_span_text(source_text, global_decl.span);
     let signature = SharedString::from(
@@ -867,11 +981,15 @@ fn extract_global_declaration<'a>(
     );
     let jsdoc = extract_jsdoc_from_leading_comments(source_text, global_decl.span);
 
+    // `Some("")` means “only inside a string module”, not under a real namespace: that `global`
+    // block is lexical scoping, not the file-top augment pattern, so skip augmentation metadata.
+    let global_decl_is_augmentation = !matches!(global_enclosing_qualifier, Some(""));
+
     exports.push(ParsedExport {
         name: SharedString::from("global"),
         kind: SymbolKind::Namespace,
         is_explicit_export: false,
-        is_global_augmentation: true,
+        is_global_augmentation: global_decl_is_augmentation,
         signature: Some(signature),
         js_doc: jsdoc.js_doc,
         deprecated: jsdoc.deprecated,
@@ -880,14 +998,25 @@ fn extract_global_declaration<'a>(
         ..Default::default()
     });
 
+    let member_prefix: Cow<'_, str> = match global_enclosing_qualifier {
+        None => Cow::Borrowed(""),
+        Some("") => Cow::Borrowed("global"),
+        Some(ns) => Cow::Owned(format!("{ns}.global")),
+    };
+
     for statement in &global_decl.body.body {
         let is_exported = statement_has_export_keyword(statement);
         if let Some(mut decl_exports) =
-            extract_direct_statement(statement, source_text, false, current_file, local_decls)
+            extract_direct_statement(statement, source_text, false, current_file, local_decls, None)
         {
             for export_item in &mut decl_exports {
                 export_item.is_explicit_export = is_exported;
-                export_item.is_global_augmentation = true;
+                export_item.is_global_augmentation = global_decl_is_augmentation;
+                if needs_namespace_qualifier(export_item.name.as_ref(), member_prefix.as_ref()) {
+                    export_item.name = SharedString::from(
+                        format!("{}.{}", member_prefix.as_ref(), export_item.name).as_ref(),
+                    );
+                }
             }
             exports.extend(decl_exports);
         }
@@ -898,7 +1027,9 @@ fn extract_global_declaration<'a>(
 /// Uses a dotted boundary so `Brand` + `BrandErrors` still becomes `Brand.BrandErrors`
 /// (plain `starts_with(parent)` would wrongly treat `BrandErrors` as already qualified).
 fn needs_namespace_qualifier(name: &str, parent: &str) -> bool {
-    if parent.is_empty() || name == parent {
+    // Same simple name as the parent namespace still needs `Parent.Child` (e.g. `Scope` inside
+    // `namespace Scope`); skipping when `name == parent` would merge two different declarations.
+    if parent.is_empty() {
         return false;
     }
     match name.strip_prefix(parent) {
@@ -947,9 +1078,14 @@ fn extract_module_body<'a>(
                 }
 
                 let is_exported = statement_has_export_keyword(statement);
-                if let Some(mut decl_exports) =
-                    extract_direct_statement(statement, source_text, is_script, current_file, local_decls)
-                {
+                if let Some(mut decl_exports) = extract_direct_statement(
+                    statement,
+                    source_text,
+                    is_script,
+                    current_file,
+                    local_decls,
+                    Some(parent_name),
+                ) {
                     for export_item in &mut decl_exports {
                         export_item.is_explicit_export = is_exported;
                         if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
@@ -960,11 +1096,7 @@ fn extract_module_body<'a>(
                     }
                     exports.extend(decl_exports);
                 }
-
-                if let Statement::TSGlobalDeclaration(global_decl) = statement {
-                    extract_global_declaration(global_decl, source_text, current_file, exports, local_decls);
-                    continue;
-                }
+                // `TSGlobalDeclaration` is handled inside `extract_direct_statement` — do not duplicate here.
             }
         }
         TSModuleDeclarationBody::TSModuleDeclaration(nested_module) => {
@@ -976,6 +1108,8 @@ fn extract_module_body<'a>(
                 is_script,
                 nested_module.span,
                 local_decls,
+                false,
+                Some(parent_name),
             );
         }
     }
@@ -1289,6 +1423,8 @@ fn extract_declaration<'a>(
                 false,
                 outer_span,
                 local_decls,
+                is_explicit_export,
+                None,
             );
         }
 
@@ -1308,6 +1444,8 @@ fn extract_direct_statement<'a>(
     is_script: bool,
     current_file: &str,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+    // In a namespace or module body, `Some(prefix)` is the qualifier applied before member names.
+    global_enclosing_qualifier: Option<&str>,
 ) -> Option<Vec<ParsedExport>> {
     let is_exported = statement_has_export_keyword(statement);
 
@@ -1419,6 +1557,8 @@ fn extract_direct_statement<'a>(
                 is_script,
                 module_decl.span,
                 local_decls,
+                is_exported,
+                global_enclosing_qualifier,
             );
             Some(results)
         }
@@ -1430,6 +1570,7 @@ fn extract_direct_statement<'a>(
                 current_file,
                 &mut results,
                 local_decls,
+                global_enclosing_qualifier,
             );
             Some(results)
         }
@@ -1576,9 +1717,8 @@ fn extract_class_members<'a>(
 /// Extracts class members as flat type members (no `prototype.` prefix).
 ///
 /// Used when resolving `typeof ClassName` or type references to classes through
-/// the local declaration registry. The TS oracle treats class bodies like interface
-/// bodies in `extractComplexTypeMembers`, producing names like `Parent.method`
-/// instead of `Parent.prototype.method`.
+/// the local declaration registry. Here instance members flatten as `Parent.member`
+/// (not `Parent.prototype.member`) so `typeof`-driven expansion stays type-shaped.
 fn extract_class_body_as_type_members<'a>(
     class_decl: &Class<'a>,
     source_text: &str,
@@ -1593,18 +1733,43 @@ fn extract_class_body_as_type_members<'a>(
     definition_site: Option<SharedString>,
 ) {
     for member in &class_decl.body.body {
-        let (member_name_opt, member_span, member_kind) = match member {
+        let (member_name_opt, member_span, member_kind, is_static) = match member {
             ClassElement::PropertyDefinition(prop_def) => {
                 let name = property_key_to_string(&prop_def.key, source_text);
-                (name, prop_def.span, SymbolKind::PropertyDeclaration)
+                (
+                    name,
+                    prop_def.span,
+                    SymbolKind::PropertyDeclaration,
+                    prop_def.r#static,
+                )
             }
             ClassElement::MethodDefinition(method_def) => {
                 if method_def.kind == MethodDefinitionKind::Constructor {
                     continue;
                 }
                 let name = property_key_to_string(&method_def.key, source_text);
-                (name, method_def.span, SymbolKind::MethodDeclaration)
+                let kind = match method_def.kind {
+                    MethodDefinitionKind::Get => SymbolKind::GetAccessor,
+                    MethodDefinitionKind::Set => SymbolKind::SetAccessor,
+                    _ => SymbolKind::MethodDeclaration,
+                };
+                (
+                    name,
+                    method_def.span,
+                    kind,
+                    method_def.r#static,
+                )
             }
+            ClassElement::AccessorProperty(accessor) => {
+                let name = property_key_to_string(&accessor.key, source_text);
+                (
+                    name,
+                    accessor.span,
+                    SymbolKind::PropertyDeclaration,
+                    accessor.r#static,
+                )
+            }
+            ClassElement::TSIndexSignature(_) => continue,
             _ => continue,
         };
 
@@ -1618,6 +1783,14 @@ fn extract_class_body_as_type_members<'a>(
             SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
         let signature = get_span_text(source_text, member_span);
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
+
+        let visibility = member_jsdoc.visibility.clone().or_else(|| {
+            if member_name.starts_with('_') {
+                Some(Visibility::Internal)
+            } else {
+                parent_jsdoc.visibility.clone()
+            }
+        });
 
         let mut deps_map = HashMap::new();
         match member {
@@ -1636,14 +1809,20 @@ fn extract_class_body_as_type_members<'a>(
                     }
                 }
             }
+            ClassElement::AccessorProperty(accessor) => {
+                if let Some(anno) = &accessor.type_annotation {
+                    collect_type_refs(&anno.type_annotation, &mut deps_map);
+                }
+            }
             _ => {}
         }
         let dependencies: Vec<TypeReference> = deps_map.into_values().collect();
 
-        let visibility = member_jsdoc
-            .visibility
-            .clone()
-            .or_else(|| parent_jsdoc.visibility.clone());
+        let modifiers = if is_static {
+            SharedVec::from([SharedString::from("static")])
+        } else {
+            SharedVec::from([])
+        };
 
         results.push(ParsedExport {
             name: qualified_name.clone(),
@@ -1662,6 +1841,7 @@ fn extract_class_body_as_type_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
+            modifiers,
             declared_in_file: definition_site.clone(),
             ..Default::default()
         });
@@ -1796,13 +1976,117 @@ fn extract_interface_members<'a>(
     }
 }
 
-/// Extracts members from complex type annotations on variable declarations.
-///
-/// Matches the TS oracle's `extractComplexTypeMembers()`. Handles:
-/// - `TSTypeLiteral`: `declare const x: { version: string; }` → extracts `x.version`
-/// - `TSIntersectionType`: `typeof Base & { extra(): void } & { prototype: { ... } }`
-///   → extracts members from each constituent type literal
-/// - Nested `prototype: { ... }` → extracts as `parent.prototype.memberName`
+fn import_type_qualifier_segments<'a>(
+    qualifier: &'a TSImportTypeQualifier<'a>,
+) -> Vec<&'a str> {
+    match qualifier {
+        TSImportTypeQualifier::Identifier(ident) => vec![ident.name.as_ref()],
+        TSImportTypeQualifier::QualifiedName(qn) => {
+            let mut segs = import_type_qualifier_segments(&qn.left);
+            segs.push(qn.right.name.as_ref());
+            segs
+        }
+    }
+}
+
+/// `import('./m').X` / `typeof import('./m').X` — resolve the module and flatten the exported type/class.
+fn expand_ts_import_type_members<'a>(
+    import_type: &TSImportType<'a>,
+    _source_file_text: &str,
+    current_file: &str,
+    parent_name: &str,
+    is_explicit_export: bool,
+    parent_jsdoc: &JsDocInfo,
+    results: &mut Vec<ParsedExport>,
+    visited: &mut HashSet<SharedString>,
+    depth: usize,
+    _definition_site: Option<SharedString>,
+) {
+    let Some(qualifier) = import_type.qualifier.as_ref() else {
+        return;
+    };
+    let spec = import_type.source.value.as_str();
+    let segs = import_type_qualifier_segments(qualifier);
+    let lookup_name = *segs.last().unwrap_or(&"");
+    let key = SharedString::from(format!("import:{spec}::{}", segs.join(".")).as_ref());
+    let was_new = visited.insert(key.clone());
+    if !was_new {
+        return;
+    }
+    let paths = resolve_module_specifier(spec, current_file);
+    let Some(target_path) = paths.first() else {
+        visited.remove(&key);
+        return;
+    };
+    if target_path.as_ref() == spec {
+        visited.remove(&key);
+        return;
+    }
+    let Ok(target_text) = fs::read_to_string(target_path.as_ref()) else {
+        visited.remove(&key);
+        return;
+    };
+    let allocator = Allocator::default();
+    let parsed = Parser::new(&allocator, &target_text, SourceType::d_ts()).parse();
+    let mut target_decls: HashMap<SharedString, LocalDecl<'_>> = HashMap::new();
+    extend_local_decl_map_from_body(parsed.program.body.as_slice(), &mut target_decls);
+    let site = normalize_path(Path::new(target_path.as_ref()));
+    let qname: SharedString = lookup_name.into();
+    if let Some(local_decl) = target_decls.get(qname.as_ref()) {
+        match local_decl {
+            LocalDecl::Type(resolved_type) => {
+                extract_complex_type_members(
+                    resolved_type,
+                    &target_text,
+                    target_path.as_ref(),
+                    parent_name,
+                    is_explicit_export,
+                    parent_jsdoc,
+                    results,
+                    &target_decls,
+                    visited,
+                    depth + 1,
+                    Some(site.clone()),
+                );
+            }
+            LocalDecl::Interface(iface_body) => {
+                extract_type_literal_members(
+                    &iface_body.body,
+                    &target_text,
+                    target_path.as_ref(),
+                    parent_name,
+                    is_explicit_export,
+                    parent_jsdoc,
+                    results,
+                    &target_decls,
+                    visited,
+                    depth + 1,
+                    Some(site.clone()),
+                );
+            }
+            LocalDecl::Class(class) => {
+                extract_class_body_as_type_members(
+                    class,
+                    &target_text,
+                    target_path.as_ref(),
+                    parent_name,
+                    is_explicit_export,
+                    parent_jsdoc,
+                    results,
+                    &target_decls,
+                    visited,
+                    depth + 1,
+                    Some(site.clone()),
+                );
+            }
+        }
+    }
+    visited.remove(&key);
+}
+
+/// Walks type shapes rooted at a value’s annotation: object literals, intersections, `typeof`,
+/// imports, and local type aliases—mirroring how nested properties are flattened onto the parent
+/// symbol path (`x.version`, intersection members, `prototype` expansion, etc.).
 fn extract_complex_type_members<'a>(
     ts_type: &TSType<'a>,
     source_text: &str,
@@ -1820,6 +2104,23 @@ fn extract_complex_type_members<'a>(
         return;
     }
     match ts_type {
+        TSType::TSParenthesizedType(paren) => {
+            extract_complex_type_members(
+                &paren.type_annotation,
+                source_text,
+                current_file,
+                parent_name,
+                is_explicit_export,
+                parent_jsdoc,
+                results,
+                local_decls,
+                visited,
+                depth,
+                definition_site.clone(),
+            );
+        }
+        // Depth counts property nesting (`a.b.c`), not the `{ … }` wrapper—bumping here made deep
+        // anonymous configs hit `MAX_RECURSION_DEPTH` one level too early.
         TSType::TSTypeLiteral(type_lit) => {
             extract_type_literal_members(
                 &type_lit.members,
@@ -1831,7 +2132,7 @@ fn extract_complex_type_members<'a>(
                 results,
                 local_decls,
                 visited,
-                depth + 1,
+                depth,
                 definition_site.clone(),
             );
         }
@@ -1909,145 +2210,94 @@ fn extract_complex_type_members<'a>(
             }
         }
         TSType::TSTypeQuery(type_query) => {
-            if let TSTypeQueryExprName::IdentifierReference(ident) = &type_query.expr_name {
-                let ref_name = SharedString::from(ident.name.as_ref());
-                let was_inserted = visited.insert(ref_name.clone());
-                if was_inserted {
-                    if let Some(local_decl) = local_decls.get(ref_name.as_ref()) {
-                        match local_decl {
-                            LocalDecl::Type(resolved_type) => {
-                                extract_complex_type_members(
-                                    resolved_type,
-                                    source_text,
-                                    current_file,
-                                    parent_name,
-                                    is_explicit_export,
-                                    parent_jsdoc,
-                                    results,
-                                    local_decls,
-                                    visited,
-                                    depth + 1,
-                                    definition_site.clone(),
-                                );
-                            }
-                            LocalDecl::Interface(iface_body) => {
-                                extract_type_literal_members(
-                                    &iface_body.body,
-                                    source_text,
-                                    current_file,
-                                    parent_name,
-                                    is_explicit_export,
-                                    parent_jsdoc,
-                                    results,
-                                    local_decls,
-                                    visited,
-                                    depth + 1,
-                                    definition_site.clone(),
-                                );
-                            }
-                            LocalDecl::Class(class) => {
-                                extract_class_body_as_type_members(
-                                    class,
-                                    source_text,
-                                    current_file,
-                                    parent_name,
-                                    is_explicit_export,
-                                    parent_jsdoc,
-                                    results,
-                                    local_decls,
-                                    visited,
-                                    depth + 1,
-                                    definition_site.clone(),
-                                );
+            match &type_query.expr_name {
+                TSTypeQueryExprName::TSImportType(import_box) => {
+                    expand_ts_import_type_members(
+                        import_box.as_ref(),
+                        source_text,
+                        current_file,
+                        parent_name,
+                        is_explicit_export,
+                        parent_jsdoc,
+                        results,
+                        visited,
+                        depth,
+                        definition_site.clone(),
+                    );
+                }
+                TSTypeQueryExprName::IdentifierReference(ident) => {
+                    let ref_name = SharedString::from(ident.name.as_ref());
+                    let was_inserted = visited.insert(ref_name.clone());
+                    if was_inserted {
+                        if let Some(local_decl) = local_decls.get(ref_name.as_ref()) {
+                            match local_decl {
+                                LocalDecl::Type(resolved_type) => {
+                                    extract_complex_type_members(
+                                        resolved_type,
+                                        source_text,
+                                        current_file,
+                                        parent_name,
+                                        is_explicit_export,
+                                        parent_jsdoc,
+                                        results,
+                                        local_decls,
+                                        visited,
+                                        depth + 1,
+                                        definition_site.clone(),
+                                    );
+                                }
+                                LocalDecl::Interface(iface_body) => {
+                                    extract_type_literal_members(
+                                        &iface_body.body,
+                                        source_text,
+                                        current_file,
+                                        parent_name,
+                                        is_explicit_export,
+                                        parent_jsdoc,
+                                        results,
+                                        local_decls,
+                                        visited,
+                                        depth + 1,
+                                        definition_site.clone(),
+                                    );
+                                }
+                                LocalDecl::Class(class) => {
+                                    extract_class_body_as_type_members(
+                                        class,
+                                        source_text,
+                                        current_file,
+                                        parent_name,
+                                        is_explicit_export,
+                                        parent_jsdoc,
+                                        results,
+                                        local_decls,
+                                        visited,
+                                        depth + 1,
+                                        definition_site.clone(),
+                                    );
+                                }
                             }
                         }
+                        visited.remove(&ref_name);
                     }
-                    visited.remove(&ref_name);
                 }
+                TSTypeQueryExprName::QualifiedName(_)
+                | TSTypeQueryExprName::ThisExpression(_) => {}
             }
         }
         TSType::TSImportType(import_type) => {
-            let Some(qualifier) = import_type.qualifier.as_ref() else {
-                return;
-            };
-            let TSImportTypeQualifier::Identifier(ident) = qualifier else {
-                return;
-            };
-            let spec = import_type.source.value.as_str();
-            let key = SharedString::from(format!("import:{spec}::{}", ident.name.as_ref()).as_ref());
-            let was_new = visited.insert(key.clone());
-            if !was_new {
-                return;
-            }
-            let paths = resolve_module_specifier(spec, current_file);
-            let Some(target_path) = paths.first() else {
-                visited.remove(&key);
-                return;
-            };
-            if target_path.as_ref() == spec {
-                visited.remove(&key);
-                return;
-            }
-            let Ok(target_text) = fs::read_to_string(target_path.as_ref()) else {
-                visited.remove(&key);
-                return;
-            };
-            let allocator = Allocator::default();
-            let parsed = Parser::new(&allocator, &target_text, SourceType::d_ts()).parse();
-            let mut target_decls: HashMap<SharedString, LocalDecl<'_>> = HashMap::new();
-            extend_local_decl_map_from_body(parsed.program.body.as_slice(), &mut target_decls);
-            let site = normalize_path(Path::new(target_path.as_ref()));
-            let qname: SharedString = ident.name.as_ref().into();
-            if let Some(local_decl) = target_decls.get(qname.as_ref()) {
-                match local_decl {
-                    LocalDecl::Type(resolved_type) => {
-                        extract_complex_type_members(
-                            resolved_type,
-                            &target_text,
-                            target_path.as_ref(),
-                            parent_name,
-                            is_explicit_export,
-                            parent_jsdoc,
-                            results,
-                            &target_decls,
-                            visited,
-                            depth + 1,
-                            Some(site.clone()),
-                        );
-                    }
-                    LocalDecl::Interface(iface_body) => {
-                        extract_type_literal_members(
-                            &iface_body.body,
-                            &target_text,
-                            target_path.as_ref(),
-                            parent_name,
-                            is_explicit_export,
-                            parent_jsdoc,
-                            results,
-                            &target_decls,
-                            visited,
-                            depth + 1,
-                            Some(site.clone()),
-                        );
-                    }
-                    LocalDecl::Class(class) => {
-                        extract_class_body_as_type_members(
-                            class,
-                            &target_text,
-                            target_path.as_ref(),
-                            parent_name,
-                            is_explicit_export,
-                            parent_jsdoc,
-                            results,
-                            &target_decls,
-                            visited,
-                            depth + 1,
-                            Some(site.clone()),
-                        );
-                    }
-                }
-            }
-            visited.remove(&key);
+            expand_ts_import_type_members(
+                import_type,
+                source_text,
+                current_file,
+                parent_name,
+                is_explicit_export,
+                parent_jsdoc,
+                results,
+                visited,
+                depth,
+                definition_site.clone(),
+            );
         }
         _ => {}
     }
@@ -2344,6 +2594,13 @@ fn extract_type_refs_from_ts_type(ts_type: &TSType<'_>) -> Vec<TypeReference> {
     refs.into_values().collect()
 }
 
+fn import_type_qualifier_leaf_name<'a>(qualifier: &'a TSImportTypeQualifier<'a>) -> &'a str {
+    match qualifier {
+        TSImportTypeQualifier::Identifier(ident) => ident.name.as_ref(),
+        TSImportTypeQualifier::QualifiedName(qn) => qn.right.name.as_ref(),
+    }
+}
+
 /// Recursive visitor that collects type references from any TSType.
 fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, TypeReference>) {
     match ts_type {
@@ -2458,28 +2715,42 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
         }
 
         TSType::TSTypeQuery(type_query) => {
-            if let TSTypeQueryExprName::IdentifierReference(ident) = &type_query.expr_name {
-                let name = SharedString::from(ident.name.as_ref());
-                if !BUILTIN_TYPES.contains(name.as_ref()) {
-                    refs.insert(
-                        name.clone(),
-                        TypeReference {
-                            name,
-                            import_path: None,
-                        },
-                    );
+            match &type_query.expr_name {
+                TSTypeQueryExprName::IdentifierReference(ident) => {
+                    let name = SharedString::from(ident.name.as_ref());
+                    if !BUILTIN_TYPES.contains(name.as_ref()) {
+                        refs.insert(
+                            name.clone(),
+                            TypeReference {
+                                name,
+                                import_path: None,
+                            },
+                        );
+                    }
                 }
+                TSTypeQueryExprName::TSImportType(import_box) => {
+                    let import_type = import_box.as_ref();
+                    if let Some(qualifier) = &import_type.qualifier {
+                        let leaf = import_type_qualifier_leaf_name(qualifier);
+                        let name = SharedString::from(leaf);
+                        let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
+                        if !BUILTIN_TYPES.contains(name.as_ref()) {
+                            refs.insert(name.clone(), TypeReference { name, import_path });
+                        }
+                    }
+                }
+                TSTypeQueryExprName::QualifiedName(_)
+                | TSTypeQueryExprName::ThisExpression(_) => {}
             }
         }
 
         TSType::TSImportType(import_type) => {
             if let Some(qualifier) = &import_type.qualifier {
-                if let TSImportTypeQualifier::Identifier(ident) = qualifier {
-                    let name = SharedString::from(ident.name.as_ref());
-                    let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
-                    if !BUILTIN_TYPES.contains(name.as_ref()) {
-                        refs.insert(name.clone(), TypeReference { name, import_path });
-                    }
+                let leaf = import_type_qualifier_leaf_name(qualifier);
+                let name = SharedString::from(leaf);
+                let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
+                if !BUILTIN_TYPES.contains(name.as_ref()) {
+                    refs.insert(name.clone(), TypeReference { name, import_path });
                 }
             }
         }
@@ -2675,8 +2946,8 @@ fn module_export_name_to_string(name: &ModuleExportName<'_>) -> SharedString {
 
 fn property_key_to_string(key: &PropertyKey<'_>, source_text: &str) -> Option<SharedString> {
     match key {
-        // Match TS `getMemberName`: private fields (`#x`) are not PropertyName branches there,
-        // so we skip them rather than emitting `[#x]` rows the TS pipeline does not produce.
+        // Private fields aren’t stable export surface in .d.ts graphs; skip rather than inventing a
+        // string form that doesn’t correspond to a public property name.
         PropertyKey::PrivateIdentifier(_) => None,
         PropertyKey::StaticIdentifier(ident) => Some(SharedString::from(ident.name.as_ref())),
         PropertyKey::StringLiteral(string_lit) => {
@@ -2689,12 +2960,16 @@ fn property_key_to_string(key: &PropertyKey<'_>, source_text: &str) -> Option<Sh
         key if key.is_expression() => {
             let expr = key.as_expression().unwrap();
             match expr {
-                Expression::StringLiteral(s) => Some(SharedString::from(s.value.as_ref())),
-                Expression::NumericLiteral(n) => n
+                Expression::StringLiteral(str_lit) => {
+                    Some(SharedString::from(str_lit.value.as_ref()))
+                }
+                Expression::NumericLiteral(num_lit) => num_lit
                     .raw
                     .as_ref()
-                    .map(|v| SharedString::from(v.as_ref()))
-                    .or_else(|| Some(SharedString::from(n.value.to_string().as_ref()))),
+                    .map(|raw_text| SharedString::from(raw_text.as_ref()))
+                    .or_else(|| {
+                        Some(SharedString::from(num_lit.value.to_string().as_ref()))
+                    }),
                 _ => {
                     let span_text = get_span_text(source_text, expr.span());
                     if span_text.is_empty() {
@@ -3005,6 +3280,62 @@ mod tests {
     }
 
     #[test]
+    fn parse_ts_import_equals_require_records_module_specifier() {
+        let source =
+            "import ts = require(\"./typescript.js\");\nexport = ts;\n";
+        let result = parse_file_from_source("shim.d.ts", source);
+        assert!(
+            result.imports.iter().any(|import_row| {
+                import_row.name.as_ref() == "ts"
+                    && import_row.source.as_ref() == "./typescript.js"
+            }),
+            "imports: {:?}",
+            result.imports
+        );
+    }
+
+    #[test]
+    fn qualified_import_type_uses_leaf_qualifier_and_specifier() {
+        let source = r#"export type T = import("./dep").Inner.Type;"#;
+        let result = parse_file_from_source("test.d.ts", source);
+        let alias = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "T".into())
+            .unwrap();
+        let dep = alias
+            .dependencies
+            .iter()
+            .find(|dep| dep.name.as_ref() == "Type")
+            .expect("leaf name Type");
+        assert_eq!(
+            dep.import_path.as_ref().map(|import_path| import_path.as_ref()),
+            Some("./dep")
+        );
+    }
+
+    #[test]
+    fn triple_slash_after_block_comment_prolog() {
+        let source = r#"/**
+ * Long license banner must not hide following reference directives.
+ */
+// NOTE: prolog comment
+/// <reference path="./lib.d.ts" />
+
+export declare const ROOT: string;
+"#;
+        let result = parse_file_from_source("test.d.ts", source);
+        assert!(
+            result
+                .references
+                .iter()
+                .any(|reference| reference.as_ref() == "./lib.d.ts"),
+            "expected path reference after JSDoc banner, got {:?}",
+            result.references
+        );
+    }
+
+    #[test]
     fn parse_module_declare_global_members() {
         let source = r#"
             export interface AppState { initialized: boolean; }
@@ -3020,10 +3351,38 @@ mod tests {
         assert!(result
             .exports
             .iter()
-            .any(|e| e.name.as_ref() == "Window" && e.is_global_augmentation));
+            .any(|export_row| {
+                export_row.name.as_ref() == "Window" && export_row.is_global_augmentation
+            }));
         assert!(result
             .exports
             .iter()
-            .any(|e| e.name.as_ref() == "Window.__APP_STATE__" && e.is_global_augmentation));
+            .any(|export_row| {
+                export_row.name.as_ref() == "Window.__APP_STATE__"
+                    && export_row.is_global_augmentation
+            }));
+    }
+
+    /// Nested `global { }` under `declare module "…"` keeps a namespace row without setting
+    /// global-augmentation (otherwise the crawler filters it as a duplicate global shell).
+    #[test]
+    fn parse_global_block_inside_ambient_string_module() {
+        let source = r#"declare module "buffer" {
+    global {
+        interface BufferCtor {
+            alloc(size: number): ArrayBuffer;
+        }
+    }
+}"#;
+        let result = parse_file_from_source("buffer.buffer.d.ts", source);
+        let global_ns = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name.as_ref() == "global" && export_item.kind == SymbolKind::Namespace)
+            .expect("expected `global` namespace row from nested global block");
+        assert!(
+            !global_ns.is_global_augmentation,
+            "nested global under string module must not set is_global_augmentation on the wrapper"
+        );
     }
 }

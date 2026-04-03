@@ -717,6 +717,37 @@ fn is_declaration_file_path(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn resolve_bare_package_subpath_from_nested_project() {
+        let temp = tempfile::tempdir().unwrap();
+        let ws = temp.path().join("ws");
+        let from_file = ws.join("pkg/dist/consumer.d.ts");
+        fs::create_dir_all(from_file.parent().unwrap()).unwrap();
+        fs::write(&from_file, "export {}\n").unwrap();
+
+        let ts_pkg = ws.join("node_modules/typescript");
+        fs::create_dir_all(ts_pkg.join("lib")).unwrap();
+        fs::write(
+            ts_pkg.join("package.json"),
+            r#"{"name":"typescript","version":"0.0.0"}"#,
+        )
+        .unwrap();
+        fs::write(ts_pkg.join("lib/tsserverlibrary.d.ts"), "export {}\n").unwrap();
+
+        let paths =
+            resolve_module_specifier("typescript/lib/tsserverlibrary", from_file.to_str().unwrap());
+        assert!(
+            paths.iter().any(|candidate_path| {
+                let path_str = candidate_path.as_ref();
+                path_str.contains("tsserverlibrary.d.ts") && Path::new(path_str).is_file()
+            }),
+            "got {:?}",
+            paths
+        );
+    }
 
     #[test]
     fn version_range_matches_exact() {

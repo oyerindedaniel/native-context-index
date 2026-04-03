@@ -749,6 +749,42 @@ describe("Structural Stability & Resource Parsing", () => {
 });
 
 describe("Parser Expansion (Synthetic Members)", () => {
+  it("names export-default anonymous function as default (zod locale .d.ts shape)", () => {
+    const source = "export default function (): { localeError: unknown; };\n";
+    const sf = ts.createSourceFile("locale.d.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const { exports } = parseFileFromSource(sf);
+    const fn = exports.find(exportItem => exportItem.kindName === "FunctionDeclaration");
+    expect(fn?.name).toBe("default");
+  });
+
+  it("unwraps parenthesized intersection so (typeof C) & { … } expands members", () => {
+    const source = `
+      declare class InnerParen { fromClass(): void; }
+      export declare const ParenBox: (typeof InnerParen) & { merged(): void };
+    `;
+    const sf = ts.createSourceFile("paren.d.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const { exports } = parseFileFromSource(sf);
+    expect(exports.some((exportItem) => exportItem.name === "ParenBox.fromClass")).toBe(true);
+    expect(exports.some((exportItem) => exportItem.name === "ParenBox.merged")).toBe(true);
+  });
+
+  it("nested declare module string name uses literal text (not <unnamed>)", () => {
+    const source = `
+      export declare namespace Outer {
+        declare module "inner-mod" {
+          export interface InnerFace { x: number; }
+        }
+      }
+    `;
+    const sf = ts.createSourceFile("nested-mod.d.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const { exports } = parseFileFromSource(sf);
+    const modDecl = exports.find(
+      (exportItem) => exportItem.kindName === "ModuleDeclaration" && exportItem.name === "Outer.inner-mod"
+    );
+    expect(modDecl).toBeDefined();
+    expect(exports.some((exportItem) => exportItem.name === "<unnamed>")).toBe(false);
+  });
+
   it("Prototype Member Assignment: captures ad-hoc assignments via ExpressionStatement", () => {
     const fixturePath = path.join(FIXTURES_DIR, "prototype-member-assignment", "index.d.ts");
     const { exports } = parseFile(fixturePath);

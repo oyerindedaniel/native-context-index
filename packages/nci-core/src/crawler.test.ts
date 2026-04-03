@@ -131,6 +131,16 @@ describe("crawl", () => {
     expect(result.visitedFiles.length).toBe(3);
   });
 
+  it("discovers triple-slash path refs after a leading block comment banner", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "triple-slash-after-block-comment", "index.d.ts")
+    );
+    expect(result.visitedFiles.length).toBeGreaterThanOrEqual(2);
+    expect(
+      result.exports.some((symbol) => symbol.name === "fromReferenced")
+    ).toBe(true);
+  });
+
   it("passes dependencies through the crawl pipeline", () => {
     const result = crawl(
       path.join(FIXTURES_DIR, "deps-pkg", "index.d.ts")
@@ -222,6 +232,17 @@ describe("crawl", () => {
     const member = result.exports.find((exportItem) => exportItem.name === "ExpandedViaImport.n");
     expect(member).toBeDefined();
     expect(member!.definedIn).toContain("inline-import-type-remote-target.d.ts");
+  });
+
+  it("records import() module specifier for qualified namespace chains", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "inline-import-type", "index.d.ts")
+    );
+    const alias = result.exports.find((exportItem) => exportItem.name === "QualifiedImportChain");
+    expect(alias).toBeDefined();
+    const dep = alias!.dependencies!.find((ref) => ref.name === "Leaf");
+    expect(dep).toBeDefined();
+    expect(dep!.importPath).toBe("./chain.js");
   });
 
   it("should handle complex resolution (internal types and path normalization)", async () => {

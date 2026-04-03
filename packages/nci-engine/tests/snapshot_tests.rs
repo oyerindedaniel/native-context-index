@@ -75,7 +75,9 @@ fn normalise_graph(graph: &mut PackageGraph, fixture_dir: &Path) {
         symbol.dependencies = sorted_deps.into();
     }
 
-    graph.symbols.sort_by(|a, b| a.name.cmp(&b.name));
+    graph
+        .symbols
+        .sort_by(|left, right| left.name.cmp(&right.name));
 }
 
 fn build_fixture_graph(fixture_name: &str) -> PackageGraph {
@@ -115,19 +117,33 @@ fn load_oracle(fixture_name: &str) -> Option<serde_json::Value> {
 }
 
 fn normalise_oracle(oracle: &mut serde_json::Value) {
-    if let Some(symbols) = oracle.get_mut("symbols").and_then(|s| s.as_array_mut()) {
+    if let Some(symbols) = oracle
+        .get_mut("symbols")
+        .and_then(|symbols_node| symbols_node.as_array_mut())
+    {
         for sym in symbols.iter_mut() {
-            if let Some(deps) = sym.get_mut("dependencies").and_then(|d| d.as_array_mut()) {
-                deps.sort_by(|a, b| a.as_str().unwrap_or("").cmp(b.as_str().unwrap_or("")));
+            if let Some(deps) = sym
+                .get_mut("dependencies")
+                .and_then(|deps_node| deps_node.as_array_mut())
+            {
+                deps.sort_by(|left, right| {
+                    left.as_str().unwrap_or("").cmp(&right.as_str().unwrap_or(""))
+                });
             }
             if let Some(obj) = sym.as_object_mut() {
                 obj.remove("rawDependencies");
             }
         }
-        symbols.sort_by(|a, b| {
-            let a_name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            let b_name = b.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            a_name.cmp(b_name)
+        symbols.sort_by(|left_sym, right_sym| {
+            let left_name = left_sym
+                .get("name")
+                .and_then(|name_val| name_val.as_str())
+                .unwrap_or("");
+            let right_name = right_sym
+                .get("name")
+                .and_then(|name_val| name_val.as_str())
+                .unwrap_or("");
+            left_name.cmp(right_name)
         });
     }
 }
@@ -137,14 +153,26 @@ fn compare_symbol_names_and_counts(
     oracle: &serde_json::Value,
     fixture_name: &str,
 ) {
-    let oracle_symbols = oracle.get("symbols").and_then(|s| s.as_array()).unwrap();
+    let oracle_symbols = oracle
+        .get("symbols")
+        .and_then(|symbols_val| symbols_val.as_array())
+        .unwrap();
 
-    let mut rust_names: Vec<&str> = rust_graph.symbols.iter().map(|s| s.name.as_ref()).collect();
+    let mut rust_names: Vec<&str> = rust_graph
+        .symbols
+        .iter()
+        .map(|rust_symbol| rust_symbol.name.as_ref())
+        .collect();
     rust_names.sort();
 
     let mut ts_names: Vec<String> = oracle_symbols
         .iter()
-        .filter_map(|s| s.get("name").and_then(|n| n.as_str()).map(String::from))
+        .filter_map(|oracle_entry| {
+            oracle_entry
+                .get("name")
+                .and_then(|name_val| name_val.as_str())
+                .map(String::from)
+        })
         .collect();
     ts_names.sort();
 
@@ -167,16 +195,24 @@ fn compare_structural_properties(
     oracle: &serde_json::Value,
     fixture_name: &str,
 ) {
-    let oracle_symbols = oracle.get("symbols").and_then(|s| s.as_array()).unwrap();
+    let oracle_symbols = oracle
+        .get("symbols")
+        .and_then(|symbols_val| symbols_val.as_array())
+        .unwrap();
 
     let oracle_by_id: HashMap<&str, &serde_json::Value> = oracle_symbols
         .iter()
-        .filter_map(|s| s.get("id").and_then(|id| id.as_str()).map(|id| (id, s)))
+        .filter_map(|oracle_symbol| {
+            oracle_symbol
+                .get("id")
+                .and_then(|id_val| id_val.as_str())
+                .map(|symbol_id| (symbol_id, oracle_symbol))
+        })
         .collect();
 
     for rust_sym in &rust_graph.symbols {
         let ts_sym = match oracle_by_id.get::<str>(rust_sym.id.as_ref()) {
-            Some(s) => *s,
+            Some(oracle_row) => *oracle_row,
             None => {
                 panic!(
                     "[{fixture_name}] Symbol ID '{}' (name: {}) exists in Rust but not in TS oracle",
@@ -185,7 +221,10 @@ fn compare_structural_properties(
             }
         };
 
-        if let Some(ts_kind_name) = ts_sym.get("kindName").and_then(|k| k.as_str()) {
+        if let Some(ts_kind_name) = ts_sym
+            .get("kindName")
+            .and_then(|kind_field| kind_field.as_str())
+        {
             assert_eq!(
                 rust_sym.kind_name.as_ref(),
                 ts_kind_name,
@@ -195,7 +234,10 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_file_path) = ts_sym.get("filePath").and_then(|f| f.as_str()) {
+        if let Some(ts_file_path) = ts_sym
+            .get("filePath")
+            .and_then(|path_field| path_field.as_str())
+        {
             assert_eq!(
                 rust_sym.file_path.as_ref(),
                 ts_file_path,
@@ -204,7 +246,10 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_type_only) = ts_sym.get("isTypeOnly").and_then(|t| t.as_bool()) {
+        if let Some(ts_type_only) = ts_sym
+            .get("isTypeOnly")
+            .and_then(|flag| flag.as_bool())
+        {
             assert_eq!(
                 rust_sym.is_type_only, ts_type_only,
                 "[{fixture_name}] isTypeOnly mismatch for '{}'",
@@ -212,7 +257,10 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_space) = ts_sym.get("symbolSpace").and_then(|s| s.as_str()) {
+        if let Some(ts_space) = ts_sym
+            .get("symbolSpace")
+            .and_then(|space_field| space_field.as_str())
+        {
             let rust_space = match rust_sym.symbol_space {
                 nci_engine::types::SymbolSpace::Type => "type",
                 nci_engine::types::SymbolSpace::Value => "value",
@@ -224,14 +272,19 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_heritage) = ts_sym.get("heritage").and_then(|h| h.as_array()) {
-            let ts_heritage_strs: Vec<&str> =
-                ts_heritage.iter().filter_map(|h| h.as_str()).collect();
+        if let Some(ts_heritage) = ts_sym
+            .get("heritage")
+            .and_then(|heritage_field| heritage_field.as_array())
+        {
+            let ts_heritage_strs: Vec<&str> = ts_heritage
+                .iter()
+                .filter_map(|heritage_item| heritage_item.as_str())
+                .collect();
             assert_eq!(
                 rust_sym
                     .heritage
                     .iter()
-                    .map(|s| s.as_ref())
+                    .map(|name| name.as_ref())
                     .collect::<Vec<_>>(),
                 ts_heritage_strs,
                 "[{fixture_name}] Heritage mismatch for '{}'",
@@ -239,7 +292,10 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_deps) = ts_sym.get("dependencies").and_then(|d| d.as_array()) {
+        if let Some(ts_deps) = ts_sym
+            .get("dependencies")
+            .and_then(|deps_field| deps_field.as_array())
+        {
             assert_eq!(
                 rust_sym.dependencies.len(),
                 ts_deps.len(),
@@ -248,8 +304,10 @@ fn compare_structural_properties(
             );
         }
 
-        let ts_visibility = ts_sym.get("visibility").and_then(|v| v.as_str());
-        let rust_visibility = rust_sym.visibility.as_ref().map(|v| match v {
+        let ts_visibility = ts_sym
+            .get("visibility")
+            .and_then(|vis_field| vis_field.as_str());
+        let rust_visibility = rust_sym.visibility.as_ref().map(|visibility| match visibility {
             nci_engine::types::Visibility::Public => "public",
             nci_engine::types::Visibility::Internal => "internal",
             nci_engine::types::Visibility::Alpha => "alpha",
@@ -296,6 +354,10 @@ snapshot_test!(snapshot_circular_deps, "circular-deps");
 snapshot_test!(snapshot_deep_chain, "deep-chain");
 snapshot_test!(snapshot_wildcard_reexport, "wildcard-reexport");
 snapshot_test!(snapshot_triple_slash_refs, "triple-slash-refs");
+snapshot_test!(
+    snapshot_triple_slash_after_block_comment,
+    "triple-slash-after-block-comment"
+);
 snapshot_test!(snapshot_parser_edge_case, "parser-edge-case");
 snapshot_test!(snapshot_computed_properties, "computed-properties");
 snapshot_test!(snapshot_literal_export, "literal-export");
@@ -361,6 +423,16 @@ snapshot_test!(
     "namespace-export-method-overloads"
 );
 snapshot_test!(snapshot_private_class_field_skip, "private-class-field-skip");
+snapshot_test!(
+    snapshot_class_typeof_flat_members,
+    "class-typeof-flat-members"
+);
+snapshot_test!(snapshot_typeof_import_type_query, "typeof-import-type-query");
+snapshot_test!(
+    snapshot_parenthesized_intersection_expansion,
+    "parenthesized-intersection-expansion"
+);
+snapshot_test!(snapshot_dual_name_interface_const, "dual-name-interface-const");
 
 #[test]
 fn all_oracles_have_tests() {

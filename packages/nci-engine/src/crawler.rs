@@ -269,7 +269,7 @@ impl CrawlSession {
             let stack: Vec<&str> = self
                 .discovery_path_stack
                 .iter()
-                .map(|s| s.as_ref())
+                .map(|path| path.as_ref())
                 .collect();
             self.circular_refs.push(format!(
                 "{} -> {}",
@@ -706,6 +706,18 @@ impl CrawlSession {
 
 }
 
+/// Whether `target` is the same export-clause element as `export_entry`.
+/// The index stores clones, so identity uses these fields instead of pointer equality.
+fn is_same_export_clause_row(target: &ParsedExport, export_entry: &ParsedExport) -> bool {
+    target.name == export_entry.name
+        && target.kind == export_entry.kind
+        && target.source == export_entry.source
+        && target.original_name == export_entry.original_name
+        && target.is_wildcard == export_entry.is_wildcard
+        && target.is_namespace_export == export_entry.is_namespace_export
+        && target.signature == export_entry.signature
+}
+
 /// Resolves symbols that are locally assigned (e.g., `export { x as y }`
 /// or `export default x`).
 fn resolve_local_assignment(
@@ -725,18 +737,12 @@ fn resolve_local_assignment(
         None => return Vec::new(),
     };
 
-    // Only resolve to actual definitions, not other forwarding entries.
+    // One statement can list the same local binding twice (e.g. `Foo as Bar` and `Foo`). Resolving
+    // `Bar` looks up `Foo` and finds both the declaration and any other export rows for `Foo`;
+    // forwarding rows stay in play—only the clause currently being resolved is skipped.
     let actual_targets: Vec<&ParsedExport> = targets
         .iter()
-        .filter(|target| {
-            !matches!(
-                target.kind,
-                SymbolKind::ExportDeclaration
-                    | SymbolKind::ExportAssignment
-                    | SymbolKind::ImportEquals
-                    | SymbolKind::NamespaceExportDeclaration
-            )
-        })
+        .filter(|target| !is_same_export_clause_row(target, export_entry))
         .collect();
 
     if actual_targets.is_empty() {
@@ -815,6 +821,41 @@ mod tests {
         let file_path = dir.join(name);
         fs::write(&file_path, content).unwrap();
         normalize_path(&file_path)
+    }
+
+    /// `import x = require("...")` should pull the target `.d.ts` into the crawl like a normal import.
+    #[test]
+    fn crawl_follows_ts_import_equals_require() {
+        let temp_dir = TempDir::new().unwrap();
+        write_dts(
+            temp_dir.path(),
+            "impl.d.ts",
+            "export declare function fromImpl(): void;",
+        );
+        let entry = write_dts(
+            temp_dir.path(),
+            "entry.d.ts",
+            "import bundle = require(\"./impl.js\");\nexport = bundle;",
+        );
+        let result = crawl(&[entry], None);
+        assert!(
+            result.visited_files.len() >= 2,
+            "expected impl pulled in via import equals, visited {:?}",
+            result.visited_files
+        );
+        assert!(
+            result
+                .visited_files
+                .iter()
+                .any(|visited_path| {
+                    visited_path
+                        .as_ref()
+                        .to_ascii_lowercase()
+                        .contains("impl.d.ts")
+                }),
+            "visited {:?}",
+            result.visited_files
+        );
     }
 
     #[test]
@@ -1003,5 +1044,70 @@ mod tests {
             .find(|symbol| symbol.name.as_ref() == "internalHelper");
         assert!(internal_sym.is_some());
         assert!(internal_sym.unwrap().is_internal);
+    }
+
+    /// Crawl must retain the inner `global` namespace row (not only `global.*` members).
+    #[test]
+    fn crawl_keeps_global_namespace_inside_ambient_module_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let entry = write_dts(
+            temp_dir.path(),
+            "buffer.buffer.d.ts",
+            r#"declare module "buffer" {
+    global {
+        interface BufferCtor { x: number; }
+    }
+}"#,
+        );
+        let result = crawl(&[entry], None);
+        assert!(
+            result.exports.iter().any(|symbol| {
+                symbol.name.as_ref() == "global" && symbol.kind == SymbolKind::Namespace
+            }),
+            "missing nested global module row; got {:?}",
+            result
+                .exports
+                .iter()
+                .map(|symbol| (symbol.name.as_ref(), symbol.kind))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// Duplicate local names in one export list (`X as Alias` and `X`) yield `Alias` as both the
+    /// resolved declaration and an `ExportDeclaration` forwarder.
+    #[test]
+    fn crawl_duplicate_export_list_binding_yields_export_declaration_alias_row() {
+        let temp_dir = TempDir::new().unwrap();
+        let entry = write_dts(
+            temp_dir.path(),
+            "index.d.ts",
+            "declare class Agent {}\nexport { Agent as Experimental_Agent, Agent };",
+        );
+
+        let result = crawl(&[entry], None);
+
+        let alias_class = result
+            .exports
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "Experimental_Agent" && symbol.kind == SymbolKind::Class);
+        let alias_forward = result.exports.iter().find(|symbol| {
+            symbol.name.as_ref() == "Experimental_Agent"
+                && symbol.kind == SymbolKind::ExportDeclaration
+        });
+        assert!(
+            alias_class.is_some() && alias_forward.is_some(),
+            "expected Class + ExportDeclaration for Experimental_Agent, got {:?}",
+            result
+                .exports
+                .iter()
+                .filter(|export_symbol| export_symbol.name.as_ref() == "Experimental_Agent")
+                .map(|export_symbol| {
+                    (
+                        export_symbol.kind,
+                        export_symbol.signature.as_deref(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
     }
 }

@@ -45,10 +45,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Scanning node_modules...\n");
     let wall_start = Instant::now();
 
+    // Same resolution order as the JS demo: repo → `packages/nci-core` → this crate so pnpm
+    // hoists merge identically; manifest-dir paths stay correct when CWD is the repo root.
+    let engine_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scan_paths = [
-        PathBuf::from("../../node_modules"),
-        PathBuf::from("../nci-core/node_modules"),
-        PathBuf::from("node_modules"),
+        engine_dir.join("../..").join("node_modules"),
+        engine_dir.join("..").join("nci-core").join("node_modules"),
+        engine_dir.join("node_modules"),
     ];
 
     let mut discovered_packages = Vec::new();

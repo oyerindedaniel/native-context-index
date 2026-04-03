@@ -283,8 +283,17 @@ pub fn build_package_graph(
             .entry(symbol_node.name.clone())
             .or_default()
             .push(symbol_node.id.clone());
+    }
 
-        if !symbol_node.is_internal || !name_to_id.contains_key(symbol_node.name.as_ref()) {
+    // must resolve heritage on the class/interface, not the value. Prefer type declarations, then backfill.
+    name_to_id.clear();
+    for symbol_node in &symbols {
+        if matches!(symbol_node.kind, SymbolKind::Class | SymbolKind::Interface) {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols {
+        if !name_to_id.contains_key(symbol_node.name.as_ref()) {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
     }
