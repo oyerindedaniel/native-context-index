@@ -132,6 +132,27 @@ describe("buildPackageGraph", () => {
     expect(Array.isArray(symbol!.dependencies)).toBe(true);
   });
 
+  it("resolves import * as namespace qualified types (local, peer path, npm stub)", () => {
+    const graph = buildPackageGraph(makePackageInfo("qualified-namespace-deps"));
+    const localNs = graph.symbols.find((symbol) => symbol.name === "localNs");
+    const peerNs = graph.symbols.find((symbol) => symbol.name === "peerNs");
+    const unresolvedExt = graph.symbols.find((symbol) => symbol.name === "unresolvedExt");
+    expect(localNs?.dependencies).toEqual(
+      expect.arrayContaining([
+        "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions",
+        "qualified-namespace-deps@1.0.0::shim.d.ts::Output",
+        "qualified-namespace-deps@1.0.0::LocalResult",
+      ])
+    );
+    expect(peerNs?.dependencies).toEqual(
+      expect.arrayContaining([
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/index.d.ts::PeerOpts",
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/index.d.ts::PeerOut",
+      ])
+    );
+    expect(unresolvedExt?.dependencies).toContain("npm::@external/types::InvokeOutputOptions");
+  });
+
   it("populates dependencies with resolved symbol IDs", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deps-pkg")

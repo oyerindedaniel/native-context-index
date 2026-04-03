@@ -303,6 +303,8 @@ pub fn build_package_graph(
 
     let mut normalized_abs_cache: HashMap<SharedString, SharedString> = HashMap::new();
     let mut closure_cache: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
+    let mut module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>> =
+        HashMap::new();
 
     for symbol_node in &mut symbols {
         if symbol_node.raw_dependencies.is_empty() {
@@ -311,14 +313,32 @@ pub fn build_package_graph(
 
         let mut resolved_ids: HashSet<SharedString> = HashSet::new();
 
-        let abs_lookup = format!("{}/{}", package_dir_str, symbol_node.file_path);
-        let abs_lookup_norm = abs_lookup.replace('\\', "/");
+        // Must match crawler import-map keys (canonical paths), not `dir + "/" + rel`.
+        let abs_lookup = normalized_abs_cache
+            .entry(symbol_node.file_path.clone())
+            .or_insert_with(|| {
+                normalize_path(
+                    &Path::new(package_dir_str).join(symbol_node.file_path.as_ref()),
+                )
+            })
+            .clone();
+        let abs_lookup_str: &str = abs_lookup.as_ref();
 
         for raw_dep in symbol_node.raw_dependencies.iter() {
+            let namespace_qual = raw_dep
+                .import_path
+                .is_none()
+                .then(|| split_import_namespace_member(raw_dep.name.as_ref()))
+                .flatten();
+
             let mut target_ids: Vec<SharedString> = Vec::new();
 
             if let Some(import_path) = &raw_dep.import_path {
-                let abs_paths = resolve_module_specifier(import_path, &abs_lookup);
+                let cache_key = (symbol_node.file_path.clone(), import_path.clone());
+                let abs_paths = module_specifier_cache
+                    .entry(cache_key)
+                    .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
+                    .clone();
                 if !abs_paths.is_empty() {
                     let rel_path =
                         make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir.as_str());
@@ -340,17 +360,16 @@ pub fn build_package_graph(
                 }
 
                 if target_ids.is_empty() {
-                    if let Some(file_imports) =
-                        all_imports_per_file.get::<str>(abs_lookup_norm.as_str())
-                    {
+                    if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
                         if let Some(matching_import) = file_imports
                             .iter()
                             .find(|imported| imported.name == raw_dep.name)
                         {
-                            let abs_source_paths = resolve_module_specifier(
-                                &matching_import.source,
-                                &abs_lookup,
-                            );
+                            let source_cache_key = (symbol_node.file_path.clone(), matching_import.source.clone());
+                            let abs_source_paths = module_specifier_cache
+                                .entry(source_cache_key)
+                                .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
+                                .clone();
                             if !abs_source_paths.is_empty() {
                                 let rel_source_path = make_relative(
                                     &abs_source_paths[0],
@@ -371,19 +390,40 @@ pub fn build_package_graph(
                     }
                 }
 
+                if target_ids.is_empty() {
+                    if let (Some(file_imports), Some((qualifier, member_path))) =
+                        (all_imports_per_file.get(abs_lookup.as_ref()), namespace_qual)
+                    {
+                        if let Some(ns_import) = file_imports
+                            .iter()
+                            .find(|imported| imported.name.as_ref() == qualifier)
+                        {
+                            let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
+                            let abs_source_paths = module_specifier_cache
+                                .entry(ns_cache_key)
+                                .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
+                                .clone();
+                            if !abs_source_paths.is_empty() {
+                                let rel_source_path = make_relative(
+                                    &abs_source_paths[0],
+                                    package_dir_str,
+                                    normalized_pkg_dir.as_str(),
+                                );
+                                let import_key: SharedString =
+                                    format!("{}::{}", rel_source_path, member_path).into();
+                                if let Some(ids) = file_local_to_ids.get(&import_key) {
+                                    target_ids.extend(ids.iter().cloned());
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if target_ids.is_empty() && has_ref_edges {
                     let closure = closure_cache
                         .entry(symbol_node.file_path.clone())
                         .or_insert_with(|| {
-                            let symbol_abs = normalized_abs_cache
-                                .entry(symbol_node.file_path.clone())
-                                .or_insert_with(|| {
-                                    normalize_path(Path::new(
-                                        &Path::new(package_dir_str)
-                                            .join(symbol_node.file_path.as_ref()),
-                                    ))
-                                })
-                                .clone();
+                            let symbol_abs = abs_lookup.clone();
                             triple_slash_reachable(symbol_abs, &triple_slash_edges)
                         })
                         .clone();
@@ -402,6 +442,15 @@ pub fn build_package_graph(
                         if let Some(ids) = file_local_to_ids.get(&closure_lookup_key) {
                             for symbol_id in ids {
                                 from_closure.insert(symbol_id.clone());
+                            }
+                        }
+                        if let Some((_qualifier, member_path)) = namespace_qual {
+                            let member_key: SharedString =
+                                format!("{}::{}", rel, member_path).into();
+                            if let Some(ids) = file_local_to_ids.get(&member_key) {
+                                for symbol_id in ids {
+                                    from_closure.insert(symbol_id.clone());
+                                }
                             }
                         }
                     }
@@ -425,29 +474,50 @@ pub fn build_package_graph(
                 let import_path = raw_dep.import_path.as_deref();
 
                 if let Some(path) = import_path {
-                    if let Some(ext_id) =
-                        resolve_external_dep_id(path, &raw_dep.name, protocol_regex)
+                    if let Some(ext_id) = resolve_external_dep_id(path, raw_dep.name.as_ref(), protocol_regex)
                     {
                         resolved_ids.insert(ext_id.into());
+                    } else if let Some(stub) = try_external_module_stub_id(
+                        path,
+                        raw_dep.name.as_ref(),
+                        protocol_regex,
+                    ) {
+                        resolved_ids.insert(stub.into());
                     }
-                } else {
-                    if let Some(file_imports) =
-                        all_imports_per_file.get::<str>(abs_lookup_norm.as_str())
+                } else if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
+                    if let Some(matching_import) = file_imports
+                        .iter()
+                        .find(|imported| imported.name == raw_dep.name)
                     {
-                        if let Some(matching_import) = file_imports
+                        let original_name = matching_import
+                            .original_name
+                            .as_deref()
+                            .unwrap_or(matching_import.name.as_ref());
+                        if let Some(ext_id) = resolve_external_dep_id(
+                            matching_import.source.as_ref(),
+                            original_name,
+                            protocol_regex,
+                        ) {
+                            resolved_ids.insert(ext_id.into());
+                        } else if let Some(stub) = try_external_module_stub_id(
+                            matching_import.source.as_ref(),
+                            original_name,
+                            protocol_regex,
+                        ) {
+                            resolved_ids.insert(stub.into());
+                        }
+                    }
+                    if let Some((qualifier, member_path)) = namespace_qual {
+                        if let Some(ns_import) = file_imports
                             .iter()
-                            .find(|imported| imported.name == raw_dep.name)
+                            .find(|imported| imported.name.as_ref() == qualifier)
                         {
-                            let original_name = matching_import
-                                .original_name
-                                .as_deref()
-                                .unwrap_or(&matching_import.name);
-                            if let Some(ext_id) = resolve_external_dep_id(
-                                &matching_import.source,
-                                original_name,
+                            if let Some(stub) = try_external_module_stub_id(
+                                ns_import.source.as_ref(),
+                                member_path,
                                 protocol_regex,
                             ) {
-                                resolved_ids.insert(ext_id.into());
+                                resolved_ids.insert(stub.into());
                             }
                         }
                     }
@@ -531,6 +601,34 @@ fn resolve_external_dep_id(source: &str, name: &str, protocol_regex: &Regex) -> 
     };
 
     Some(format!("{}::{}::{}", protocol, resolved_source, name))
+}
+
+/// `foo.bar` with `import * as foo` → `("foo", "bar")`; nested `foo.bar.baz` → `("foo", "bar.baz")`.
+fn split_import_namespace_member(qualified_name: &str) -> Option<(&str, &str)> {
+    let dot = qualified_name.find('.')?;
+    if dot == 0 || dot + 1 >= qualified_name.len() {
+        return None;
+    }
+    Some((&qualified_name[..dot], &qualified_name[dot + 1..]))
+}
+
+/// Stable edge when the target module is not part of this package graph (no extra crawl).
+fn try_external_module_stub_id(
+    specifier: &str,
+    member: &str,
+    protocol_regex: &Regex,
+) -> Option<String> {
+    if let Some(id) = resolve_external_dep_id(specifier, member, protocol_regex) {
+        return Some(id);
+    }
+    if specifier.starts_with('.') || specifier.starts_with('/') {
+        return None;
+    }
+    let bytes = specifier.as_bytes();
+    if bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
+        return None;
+    }
+    Some(format!("npm::{specifier}::{member}"))
 }
 
 fn parent_name_for_dotted_member(name: &str) -> Option<String> {

@@ -376,6 +376,10 @@ snapshot_test!(snapshot_import_cases, "import-cases");
 snapshot_test!(snapshot_merged_symbols, "merged-symbols");
 snapshot_test!(snapshot_name_collision, "name-collision");
 snapshot_test!(snapshot_deps_pkg, "deps-pkg");
+snapshot_test!(
+    snapshot_qualified_namespace_deps,
+    "qualified-namespace-deps"
+);
 snapshot_test!(snapshot_inline_import_type, "inline-import-type");
 snapshot_test!(snapshot_class_statics, "class-statics");
 snapshot_test!(snapshot_global_augmentation, "global-augmentation");

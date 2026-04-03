@@ -333,12 +333,36 @@ export function buildPackageGraph(
     return `${protocol}::${source}::${depName}`;
   }
 
+  /** `Foo.Bar.Baz` with `import * as Foo` → qualifier `Foo`, member path `Bar.Baz`. */
+  function splitImportNamespaceMember(qualifiedName: string): { qualifier: string; memberPath: string } | null {
+    const dot = qualifiedName.indexOf(".");
+    if (dot <= 0 || dot === qualifiedName.length - 1) return null;
+    return { qualifier: qualifiedName.slice(0, dot), memberPath: qualifiedName.slice(dot + 1) };
+  }
+
+  /**
+   * Edge id for a dependency that is not indexed in this package graph: `npm::specifier::memberPath`.
+   * Relative specifiers return null (caller resolves via visited files / imports only).
+   */
+  function resolveExternalModuleStubId(specifier: string, memberName: string): string | null {
+    const proto = resolveProtocol(specifier, memberName);
+    if (proto) return proto;
+    if (specifier.startsWith(".") || specifier.startsWith("/")) return null;
+    if (/^[a-zA-Z]:[\\/]/.test(specifier)) return null;
+    return `npm::${specifier}::${memberName}`;
+  }
+
+  function isExternalDependencyStub(symbolId: string): boolean {
+    return symbolId.startsWith("npm::") || symbolId.startsWith("node::");
+  }
+
   for (const symbolNode of symbols) {
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();
       const symAbsPath = getCachedAbsPath(symbolNode.filePath);
 
       for (const rawDep of symbolNode.rawDependencies) {
+        const namespaceQual = !rawDep.importPath ? splitImportNamespaceMember(rawDep.name) : null;
         let targetIds: string[] = [];
 
         if (rawDep.importPath) {
@@ -363,6 +387,17 @@ export function buildPackageGraph(
               }
             }
           }
+          if (targetIds.length === 0 && namespaceQual) {
+            const importMap = getImportsByName(symAbsPath);
+            const nsImport = importMap.get(namespaceQual.qualifier);
+            if (nsImport) {
+              const absSourcePaths = getCachedModuleSpecifier(nsImport.source, symbolNode.filePath);
+              if (absSourcePaths.length > 0) {
+                const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
+                targetIds = fileLocalToIds.get(`${relSourcePath}::${namespaceQual.memberPath}`) || [];
+              }
+            }
+          }
           if (targetIds.length === 0 && hasRefEdges) {
             const closure = getCachedClosure(symbolNode.filePath);
             const fromClosure = new Set<string>();
@@ -372,6 +407,11 @@ export function buildPackageGraph(
               for (const symbolId of fileLocalToIds.get(`${rel}::${rawDep.name}`) || []) {
                 fromClosure.add(symbolId);
               }
+              if (namespaceQual) {
+                for (const symbolId of fileLocalToIds.get(`${rel}::${namespaceQual.memberPath}`) || []) {
+                  fromClosure.add(symbolId);
+                }
+              }
             }
             targetIds = [...fromClosure];
           }
@@ -380,11 +420,13 @@ export function buildPackageGraph(
           }
         }
         if (targetIds.length > 0) {
-          targetIds = targetIds.filter((symbolId) =>
-            kindMatchesResolutionHint(
-              idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
-              rawDep.resolutionHint
-            )
+          targetIds = targetIds.filter(
+            (symbolId) =>
+              isExternalDependencyStub(symbolId) ||
+              kindMatchesResolutionHint(
+                idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
+                rawDep.resolutionHint
+              )
           );
         }
 
@@ -400,12 +442,30 @@ export function buildPackageGraph(
           if (rawDep.importPath) {
             const resolved = resolveProtocol(rawDep.importPath, rawDep.name);
             if (resolved) resolvedIds.add(resolved);
+            else {
+              const stub = resolveExternalModuleStubId(rawDep.importPath, rawDep.name);
+              if (stub) resolvedIds.add(stub);
+            }
           } else {
             const importMap = getImportsByName(symAbsPath);
             const matchingImport = importMap.get(rawDep.name);
             if (matchingImport) {
               const resolved = resolveProtocol(matchingImport.source, matchingImport.originalName || rawDep.name);
               if (resolved) resolvedIds.add(resolved);
+              else {
+                const stub = resolveExternalModuleStubId(
+                  matchingImport.source,
+                  matchingImport.originalName || rawDep.name
+                );
+                if (stub) resolvedIds.add(stub);
+              }
+            }
+            if (namespaceQual) {
+              const nsImport = importMap.get(namespaceQual.qualifier);
+              if (nsImport) {
+                const stub = resolveExternalModuleStubId(nsImport.source, namespaceQual.memberPath);
+                if (stub) resolvedIds.add(stub);
+              }
             }
           }
         }
