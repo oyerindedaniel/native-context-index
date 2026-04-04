@@ -397,8 +397,8 @@ fn extract_triple_slash_directives(source_text: &str) -> (Vec<SharedString>, Vec
     let mut references = Vec::new();
     let mut type_references = Vec::new();
 
-    let path_re = &*TRIPLE_SLASH_PATH_RE;
-    let types_re = &*TRIPLE_SLASH_TYPES_RE;
+    let path_regex = &*TRIPLE_SLASH_PATH_RE;
+    let types_regex = &*TRIPLE_SLASH_TYPES_RE;
     let mut in_block_comment = false;
 
     for line in source_text.lines() {
@@ -435,11 +435,11 @@ fn extract_triple_slash_directives(source_text: &str) -> (Vec<SharedString>, Vec
             break;
         }
 
-        if let Some(caps) = path_re.captures(trimmed) {
+        if let Some(caps) = path_regex.captures(trimmed) {
             if let Some(path) = caps.get(1) {
                 references.push(SharedString::from(path.as_str()));
             }
-        } else if let Some(caps) = types_re.captures(trimmed) {
+        } else if let Some(caps) = types_regex.captures(trimmed) {
             if let Some(types) = caps.get(1) {
                 type_references.push(SharedString::from(types.as_str()));
             }
@@ -527,7 +527,7 @@ fn extract_export_named<'a>(
         .as_ref()
         .map(|source_lit| SharedString::from(source_lit.value.as_ref()));
 
-    // Case 1: Re-export specifiers (export { A, B } from '...')
+    // Re-export specifiers (export { A, B } from '...')
     if !export_named.specifiers.is_empty() {
         let is_type_only = export_named.export_kind.is_type();
 
@@ -577,7 +577,7 @@ fn extract_export_named<'a>(
         return;
     }
 
-    // Case 2: Exported declaration (export function foo() {}, export class Bar {}, etc.)
+    // Exported declaration (export function foo() {}, export class Bar {}, etc.)
     if let Some(declaration) = &export_named.declaration {
         let decl_exports = extract_declaration(
             declaration,
@@ -1980,11 +1980,11 @@ fn import_type_qualifier_segments<'a>(
     qualifier: &'a TSImportTypeQualifier<'a>,
 ) -> Vec<&'a str> {
     match qualifier {
-        TSImportTypeQualifier::Identifier(ident) => vec![ident.name.as_ref()],
-        TSImportTypeQualifier::QualifiedName(qn) => {
-            let mut segs = import_type_qualifier_segments(&qn.left);
-            segs.push(qn.right.name.as_ref());
-            segs
+        TSImportTypeQualifier::Identifier(identifier) => vec![identifier.name.as_ref()],
+        TSImportTypeQualifier::QualifiedName(qualified_name) => {
+            let mut segments = import_type_qualifier_segments(&qualified_name.left);
+            segments.push(qualified_name.right.name.as_ref());
+            segments
         }
     }
 }
@@ -2005,20 +2005,26 @@ fn expand_ts_import_type_members<'a>(
     let Some(qualifier) = import_type.qualifier.as_ref() else {
         return;
     };
-    let spec = import_type.source.value.as_str();
-    let segs = import_type_qualifier_segments(qualifier);
-    let lookup_name = *segs.last().unwrap_or(&"");
-    let key = SharedString::from(format!("import:{spec}::{}", segs.join(".")).as_ref());
+    let module_specifier = import_type.source.value.as_str();
+    let qualifier_segments = import_type_qualifier_segments(qualifier);
+    let lookup_name = *qualifier_segments.last().unwrap_or(&"");
+    let key = SharedString::from(
+        format!(
+            "import:{module_specifier}::{}",
+            qualifier_segments.join(".")
+        )
+        .as_ref(),
+    );
     let was_new = visited.insert(key.clone());
     if !was_new {
         return;
     }
-    let paths = resolve_module_specifier(spec, current_file);
+    let paths = resolve_module_specifier(module_specifier, current_file);
     let Some(target_path) = paths.first() else {
         visited.remove(&key);
         return;
     };
-    if target_path.as_ref() == spec {
+    if target_path.as_ref() == module_specifier {
         visited.remove(&key);
         return;
     }

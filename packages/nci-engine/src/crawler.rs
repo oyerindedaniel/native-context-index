@@ -300,8 +300,8 @@ impl CrawlSession {
         if self.visited.contains(&normalized_path) {
             return;
         }
-        self.visited.insert(normalized_path.clone());
 
+        self.visited.insert(normalized_path.clone());
         self.discovery_path_set.insert(normalized_path.clone());
         self.discovery_path_stack.push(normalized_path.clone());
 
