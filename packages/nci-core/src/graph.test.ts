@@ -146,8 +146,14 @@ describe("buildPackageGraph", () => {
     );
     expect(peerNs?.dependencies).toEqual(
       expect.arrayContaining([
-        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/index.d.ts::PeerOpts",
-        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/index.d.ts::PeerOut",
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts",
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut",
+      ])
+    );
+    const peerBarrelType = graph.symbols.find((symbol) => symbol.name === "peerBarrelType");
+    expect(peerBarrelType?.dependencies).toEqual(
+      expect.arrayContaining([
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::Box",
       ])
     );
     expect(unresolvedExt?.dependencies).toContain("npm::@external/types::InvokeOutputOptions");

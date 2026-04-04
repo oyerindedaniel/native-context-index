@@ -253,6 +253,11 @@ export function buildPackageGraph(
     }
   }
 
+  const idToFilePath = new Map<string, string>();
+  for (const symbolNode of symbols) {
+    idToFilePath.set(symbolNode.id, symbolNode.filePath);
+  }
+
   if (profiling) {
     profileLog("assignIds", performance.now() - phaseStart);
     phaseStart = performance.now();
@@ -364,6 +369,7 @@ export function buildPackageGraph(
       for (const rawDep of symbolNode.rawDependencies) {
         const namespaceQual = !rawDep.importPath ? splitImportNamespaceMember(rawDep.name) : null;
         let targetIds: string[] = [];
+        const namespaceFallbackRoots: string[] = [];
 
         if (rawDep.importPath) {
           const absPaths = getCachedModuleSpecifier(rawDep.importPath, symbolNode.filePath);
@@ -372,6 +378,7 @@ export function buildPackageGraph(
             targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
           }
         } else {
+          let namespaceTargetFilesResolved = false;
           targetIds = fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
 
           if (targetIds.length === 0) {
@@ -392,9 +399,16 @@ export function buildPackageGraph(
             const nsImport = importMap.get(namespaceQual.qualifier);
             if (nsImport) {
               const absSourcePaths = getCachedModuleSpecifier(nsImport.source, symbolNode.filePath);
-              if (absSourcePaths.length > 0) {
-                const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
-                targetIds = fileLocalToIds.get(`${relSourcePath}::${namespaceQual.memberPath}`) || [];
+              namespaceTargetFilesResolved = absSourcePaths.length > 0;
+              for (const resolvedAbsPath of absSourcePaths) {
+                const relativeForRoot = makeRelative(resolvedAbsPath, packageInfo.dir);
+                namespaceFallbackRoots.push(path.posix.dirname(relativeForRoot));
+              }
+              for (const resolvedAbsPath of absSourcePaths) {
+                const relSourcePath = makeRelative(resolvedAbsPath, packageInfo.dir);
+                for (const symbolId of fileLocalToIds.get(`${relSourcePath}::${namespaceQual.memberPath}`) || []) {
+                  targetIds.push(symbolId);
+                }
               }
             }
           }
@@ -417,6 +431,27 @@ export function buildPackageGraph(
           }
           if (targetIds.length === 0) {
             targetIds = nameToIds.get(rawDep.name) || [];
+          }
+          if (targetIds.length === 0 && namespaceQual && namespaceTargetFilesResolved) {
+            let candidates = nameToIds.get(namespaceQual.memberPath) || [];
+            const skipNamespaceRootFilter =
+              namespaceFallbackRoots.length === 0 ||
+              namespaceFallbackRoots.some(
+                (namespaceRootDir) => namespaceRootDir === "." || namespaceRootDir === ""
+              );
+            if (!skipNamespaceRootFilter) {
+              const distinctNamespaceRoots = [...new Set(namespaceFallbackRoots)];
+              candidates = candidates.filter((candidateId) => {
+                const definingFilePath = idToFilePath.get(candidateId);
+                if (!definingFilePath) return false;
+                return distinctNamespaceRoots.some(
+                  (namespaceRootDir) =>
+                    definingFilePath === namespaceRootDir ||
+                    definingFilePath.startsWith(`${namespaceRootDir}/`)
+                );
+              });
+            }
+            targetIds = candidates;
           }
         }
         if (targetIds.length > 0) {

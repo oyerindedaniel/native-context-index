@@ -19,6 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output_path = String::from("nci-report-rust.json");
     let mut use_sequential = false;
     let mut skip_write = false;
+    let mut pretty_json = false;
 
     let mut current_index = 1;
     while current_index < args.len() {
@@ -36,6 +37,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--skip-write" => {
                 skip_write = true;
+            }
+            "--pretty" => {
+                pretty_json = true;
             }
             _ => {}
         }
@@ -169,7 +173,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "packages": graphs,
         });
 
-        fs::write(&output_path, serde_json::to_string_pretty(&report_data)?)?;
+        let json_output = if pretty_json {
+            serde_json::to_string_pretty(&report_data)?
+        } else {
+            serde_json::to_string(&report_data)?
+        };
+        fs::write(&output_path, json_output)?;
         println!("\n💾 Report saved to: {}", output_path);
     }
 

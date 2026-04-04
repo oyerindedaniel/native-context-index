@@ -226,6 +226,10 @@ struct CrawlSession {
     /// Canonical filesystem path → normalized absolute path string (see `normalize_path_with_cache`).
     path_norm_cache: HashMap<PathBuf, SharedString>,
 
+    /// `(specifier, from_file)` → resolved absolute paths; avoids repeated filesystem walks,
+    /// package.json reads, and `canonicalize` calls for the same resolution.
+    module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>>,
+
     /// Maximum depth for re-export following.
     max_depth: usize,
 }
@@ -246,8 +250,22 @@ impl CrawlSession {
             resolution_path: HashSet::new(),
             resolution_cache: HashMap::new(),
             path_norm_cache: HashMap::new(),
+            module_specifier_cache: HashMap::new(),
             max_depth,
         }
+    }
+
+    /// Cached wrapper around [`resolve_module_specifier`].  Avoids repeated
+    /// `canonicalize` + `find_package_dir` + `read_to_string(package.json)` for
+    /// the same `(specifier, from_file)` pair across discovery and resolution.
+    fn cached_resolve(&mut self, specifier: &str, from_file: &str) -> Vec<SharedString> {
+        let key = (SharedString::from(specifier), SharedString::from(from_file));
+        if let Some(cached) = self.module_specifier_cache.get(&key) {
+            return cached.clone();
+        }
+        let result = resolve_module_specifier(specifier, from_file);
+        self.module_specifier_cache.insert(key, result.clone());
+        result
     }
 
     /// Recursively discovers all files reachable from an entry point.
@@ -310,7 +328,7 @@ impl CrawlSession {
             .insert(normalized_path.clone(), parse_result.is_external_module);
 
         for reference in parse_result.references.iter() {
-            let resolved_paths = resolve_module_specifier(reference.as_ref(), &normalized_path);
+            let resolved_paths = self.cached_resolve(reference.as_ref(), &normalized_path);
             if !resolved_paths.is_empty() {
                 for ref_path in &resolved_paths {
                     let from_k = normalized_path.clone();
@@ -343,7 +361,7 @@ impl CrawlSession {
 
         for export_entry in parse_result.exports.iter() {
             if let Some(source) = &export_entry.source {
-                let source_paths = resolve_module_specifier(source.as_ref(), &normalized_path);
+                let source_paths = self.cached_resolve(source.as_ref(), &normalized_path);
                 for source_path in &source_paths {
                     self.discover_files(source_path, depth + 1);
                 }
@@ -352,7 +370,7 @@ impl CrawlSession {
 
         for import_entry in parse_result.imports.iter() {
             let imported_paths =
-                resolve_module_specifier(import_entry.source.as_ref(), &normalized_path);
+                self.cached_resolve(import_entry.source.as_ref(), &normalized_path);
             for imported_path in &imported_paths {
                 self.discover_files(imported_path, depth + 1);
             }
@@ -361,7 +379,7 @@ impl CrawlSession {
         for export_entry in parse_result.exports.iter() {
             for dep in export_entry.dependencies.iter() {
                 if let Some(spec) = dep.import_path.as_ref() {
-                    let dep_paths = resolve_module_specifier(spec.as_ref(), &normalized_path);
+                    let dep_paths = self.cached_resolve(spec.as_ref(), &normalized_path);
                     for dep_path in &dep_paths {
                         if dep_path.as_ref() != spec.as_ref() {
                             self.discover_files(dep_path, depth + 1);
@@ -422,7 +440,7 @@ impl CrawlSession {
             .unwrap_or_default();
 
         for reference in &triple_slash_refs {
-            let resolved_paths = resolve_module_specifier(reference.as_ref(), &normalized_path);
+            let resolved_paths = self.cached_resolve(reference.as_ref(), &normalized_path);
             let ref_paths: Vec<SharedString> = if !resolved_paths.is_empty() {
                 resolved_paths
             } else {
@@ -591,7 +609,7 @@ impl CrawlSession {
             None => return results,
         };
 
-        let source_paths = resolve_module_specifier(source.as_ref(), current_file);
+        let source_paths = self.cached_resolve(source.as_ref(), current_file);
 
         if source_paths.is_empty() {
             // Unresolvable source — create a stub symbol if not wildcard

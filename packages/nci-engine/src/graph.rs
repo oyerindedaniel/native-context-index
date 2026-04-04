@@ -16,6 +16,26 @@ use crate::types::{
     Visibility,
 };
 
+/// Parent directory of a package-relative path (already forward-slash normalized by `make_relative`).
+/// Returns `"."` for root-level files.
+fn rel_parent_dir(relative_path: &str) -> SharedString {
+    match relative_path.rfind('/') {
+        Some(pos) if pos > 0 => SharedString::from(&relative_path[..pos]),
+        _ => SharedString::from("."),
+    }
+}
+
+fn file_path_under_namespace_root(file_path: &str, namespace_root: &str) -> bool {
+    if file_path == namespace_root {
+        return true;
+    }
+    if file_path.len() <= namespace_root.len() {
+        return false;
+    }
+    file_path.as_bytes().get(namespace_root.len()) == Some(&b'/')
+        && file_path.starts_with(namespace_root)
+}
+
 fn triple_slash_reachable(
     start: SharedString,
     edges: &HashMap<SharedString, Vec<SharedString>>,
@@ -298,6 +318,12 @@ pub fn build_package_graph(
         }
     }
 
+    let mut id_to_file_path: HashMap<SharedString, SharedString> =
+        HashMap::with_capacity(symbols.len().min(65536));
+    for symbol_node in &symbols {
+        id_to_file_path.insert(symbol_node.id.clone(), symbol_node.file_path.clone());
+    }
+
     let protocol_regex = &*PROTOCOL_REGEX;
     let has_ref_edges = !triple_slash_edges.is_empty();
 
@@ -332,6 +358,7 @@ pub fn build_package_graph(
                 .flatten();
 
             let mut target_ids: Vec<SharedString> = Vec::new();
+            let mut namespace_fallback_roots: Vec<SharedString> = Vec::new();
 
             if let Some(import_path) = &raw_dep.import_path {
                 let cache_key = (symbol_node.file_path.clone(), import_path.clone());
@@ -349,6 +376,11 @@ pub fn build_package_graph(
                     }
                 }
             } else {
+                // `ns.Member`: set true when `import * as ns` resolved to at least one file.
+                // Gates package-wide `name_to_ids.get(Member)` so a missing package cannot
+                // collide with unrelated homonyms (e.g. local shim types).
+                let mut namespace_target_files_resolved = false;
+
                 let key: SharedString = format!(
                     "{}::{}",
                     symbol_node.file_path.as_ref(),
@@ -403,9 +435,20 @@ pub fn build_package_graph(
                                 .entry(ns_cache_key)
                                 .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
                                 .clone();
-                            if !abs_source_paths.is_empty() {
+                            namespace_target_files_resolved = !abs_source_paths.is_empty();
+                            namespace_fallback_roots.clear();
+                            for abs_sp in &abs_source_paths {
                                 let rel_source_path = make_relative(
-                                    &abs_source_paths[0],
+                                    abs_sp.as_ref(),
+                                    package_dir_str,
+                                    normalized_pkg_dir.as_str(),
+                                );
+                                namespace_fallback_roots
+                                    .push(rel_parent_dir(rel_source_path.as_ref()));
+                            }
+                            for abs_sp in &abs_source_paths {
+                                let rel_source_path = make_relative(
+                                    abs_sp.as_ref(),
                                     package_dir_str,
                                     normalized_pkg_dir.as_str(),
                                 );
@@ -460,6 +503,38 @@ pub fn build_package_graph(
                 if target_ids.is_empty() {
                     if let Some(ids) = name_to_ids.get(&raw_dep.name) {
                         target_ids.extend(ids.iter().cloned());
+                    }
+                }
+                // Qualified `ns.Member`: package index is keyed by `Member`, not `ns.Member`.
+                // Barrel files (`index.d.ts`) also won't have `Member` rows when the symbol
+                // lives in `./output.d.ts` etc., so file-local lookup may miss despite a crawl.
+                if target_ids.is_empty() && namespace_target_files_resolved {
+                    if let Some((_, member_path)) = namespace_qual {
+                        let member_key: SharedString = SharedString::from(member_path);
+                        if let Some(ids) = name_to_ids.get(&member_key) {
+                            let skip_namespace_root_filter = namespace_fallback_roots.is_empty()
+                                || namespace_fallback_roots.iter().any(|root_path| {
+                                    root_path.as_ref() == "." || root_path.as_ref().is_empty()
+                                });
+                            if skip_namespace_root_filter {
+                                target_ids.extend(ids.iter().cloned());
+                            } else {
+                                let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
+                                    .iter()
+                                    .map(|root_path| root_path.as_ref())
+                                    .collect();
+                                for symbol_id in ids {
+                                    if let Some(stored_path) = id_to_file_path.get(symbol_id) {
+                                        let defining_path = stored_path.as_ref();
+                                        if distinct_namespace_roots.iter().any(|&namespace_root| {
+                                            file_path_under_namespace_root(defining_path, namespace_root)
+                                        }) {
+                                            target_ids.push(symbol_id.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
