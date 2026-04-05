@@ -101,6 +101,7 @@ interface PackageReport {
   totalSymbols: number;
   totalFiles: number;
   crawlDurationMs: number;
+  buildDurationMs: number;
   graph: PackageGraph;
 }
 
@@ -120,10 +121,13 @@ for (const pkg of packagesToIndex) {
       totalSymbols: graph.totalSymbols,
       totalFiles: graph.totalFiles,
       crawlDurationMs: Math.round(graph.crawlDurationMs),
+      buildDurationMs: Math.round(graph.buildDurationMs),
       graph,
     });
 
-    console.log(` ${graph.totalSymbols} symbols, ${graph.totalFiles} files (${Math.round(graph.crawlDurationMs)}ms)`);
+    console.log(
+      ` ${graph.totalSymbols} symbols, ${graph.totalFiles} files (crawl ${Math.round(graph.crawlDurationMs)}ms build ${Math.round(graph.buildDurationMs)}ms)`,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     errors.push({ name: pkg.name, error: message });
@@ -144,16 +148,24 @@ console.log(`   Total symbols:   ${reports.reduce((sum, report) => sum + report.
 console.log(`   Total files:     ${reports.reduce((sum, report) => sum + report.totalFiles, 0)}`);
 console.log(`   Graph time:      ${totalTime}ms\n`);
 
-console.log("   " + "Package".padEnd(40) + "Symbols".padStart(9) + "Files".padStart(7) + "Time".padStart(8));
-console.log("   " + "─".repeat(64));
+console.log(
+  "   " +
+    "Package".padEnd(36) +
+    "Symbols".padStart(9) +
+    "Files".padStart(7) +
+    "Crawl".padStart(8) +
+    "Build".padStart(8),
+);
+console.log("   " + "─".repeat(76));
 
 for (const report of reports.sort((a, b) => b.totalSymbols - a.totalSymbols)) {
   console.log(
     "   " +
-    report.name.padEnd(40) +
-    String(report.totalSymbols).padStart(9) +
-    String(report.totalFiles).padStart(7) +
-    `${report.crawlDurationMs}ms`.padStart(8)
+      report.name.padEnd(36) +
+      String(report.totalSymbols).padStart(9) +
+      String(report.totalFiles).padStart(7) +
+      `${report.crawlDurationMs}ms`.padStart(8) +
+      `${report.buildDurationMs}ms`.padStart(8),
   );
 }
 

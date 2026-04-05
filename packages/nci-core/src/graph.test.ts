@@ -30,6 +30,7 @@ describe("buildPackageGraph", () => {
     expect(graph.totalSymbols).toBeGreaterThan(0);
     expect(graph.totalFiles).toBe(1);
     expect(graph.crawlDurationMs).toBeGreaterThanOrEqual(0);
+    expect(graph.buildDurationMs).toBeGreaterThanOrEqual(0);
 
     const ids = graph.symbols.map((symbol) => symbol.id);
     expect(ids).toContain("simple-export@1.0.0::Config");

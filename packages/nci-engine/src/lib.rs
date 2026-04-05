@@ -4,7 +4,6 @@ pub mod dedupe;
 pub mod crawler;
 pub mod filter;
 pub mod graph;
-pub mod hash;
 pub mod parser;
 pub mod pipeline;
 pub mod resolver;

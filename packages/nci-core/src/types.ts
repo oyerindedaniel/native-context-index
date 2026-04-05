@@ -265,6 +265,8 @@ export interface PackageGraph {
   totalSymbols: number;
   /** Total files crawled */
   totalFiles: number;
-  /** Time taken to crawl in milliseconds */
+  /** Wall time for `crawl()` only: parse, file discovery, export resolution (ms) */
   crawlDurationMs: number;
+  /** Wall time for entry resolution + merge + dependency IDs + inheritance flatten (ms) */
+  buildDurationMs: number;
 }

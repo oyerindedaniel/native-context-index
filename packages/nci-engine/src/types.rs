@@ -476,10 +476,6 @@ pub struct SymbolNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<SharedString>,
 
-    /// SHA-256 (hex) of [`Self::signature`].
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub signature_hash: Option<SharedString>,
-
     /// JSDoc comment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub js_doc: Option<SharedString>,
@@ -563,12 +559,25 @@ pub struct PackageGraph {
     /// Total files crawled.
     pub total_files: usize,
 
-    /// Time taken to crawl in milliseconds.
+    /// Wall time for [`crate::crawler::crawl`] only (parse + discovery + export resolution).
     #[serde(
         serialize_with = "serialize_duration_as_int",
         deserialize_with = "deserialize_duration_from_int"
     )]
     pub crawl_duration_ms: f64,
+
+    /// Wall time for everything else in [`crate::graph::build_package_graph`]: types entry
+    /// resolution, merge → symbol nodes, dependency ID resolution, inheritance flatten.
+    #[serde(
+        default = "default_zero_f64",
+        serialize_with = "serialize_duration_as_int",
+        deserialize_with = "deserialize_duration_from_int"
+    )]
+    pub build_duration_ms: f64,
+}
+
+fn default_zero_f64() -> f64 {
+    0.0
 }
 
 fn serialize_duration_as_int<S>(val: &f64, serializer: S) -> Result<S::Ok, S::Error>

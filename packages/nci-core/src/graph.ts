@@ -22,10 +22,12 @@ export function buildPackageGraph(
   const startTime = performance.now();
   let phaseStart = startTime;
 
+  const entryStart = performance.now();
   const entry = resolveTypesEntry(packageInfo.dir);
+  const entryResolutionMs = performance.now() - entryStart;
 
   if (profiling) {
-    profileLog("resolveTypesEntry", performance.now() - phaseStart);
+    profileLog("resolveTypesEntry", entryResolutionMs);
     profileStat("typesEntries", entry.typesEntries.length);
     phaseStart = performance.now();
   }
@@ -37,18 +39,23 @@ export function buildPackageGraph(
       symbols: [],
       totalSymbols: 0,
       totalFiles: 0,
-      crawlDurationMs: performance.now() - startTime,
+      crawlDurationMs: 0,
+      buildDurationMs: entryResolutionMs,
     };
   }
 
+  const crawlPhaseStart = performance.now();
   const crawlResult = crawl(entry.typesEntries, crawlOptions);
+  const crawlDurationMs = performance.now() - crawlPhaseStart;
 
   if (profiling) {
-    profileLog("crawl", performance.now() - phaseStart);
+    profileLog("crawl", crawlDurationMs);
     profileStat("resolvedSymbols (from crawl)", crawlResult.exports.length);
     profileStat("visitedFiles", crawlResult.visitedFiles.length);
     phaseStart = performance.now();
   }
+
+  const graphAssemblyStart = performance.now();
 
   const allSymbols = crawlResult.exports;
   const allImportsPerFile = crawlResult.imports;
@@ -529,13 +536,17 @@ export function buildPackageGraph(
     profileLog("buildPackageGraph total", performance.now() - startTime);
   }
 
+  const graphAssemblyMs = performance.now() - graphAssemblyStart;
+  const buildDurationMs = entryResolutionMs + graphAssemblyMs;
+
   const result: PackageGraph = {
     package: packageInfo.name,
     version: packageInfo.version,
     symbols,
     totalSymbols: symbols.length,
     totalFiles: visited.size,
-    crawlDurationMs: performance.now() - startTime,
+    crawlDurationMs,
+    buildDurationMs,
   };
 
   return result;

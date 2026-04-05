@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS packages (
     total_symbols INTEGER NOT NULL,
     total_files INTEGER NOT NULL,
     crawl_duration_ms INTEGER NOT NULL,
+    build_duration_ms INTEGER NOT NULL,
     indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
     engine_version TEXT NOT NULL,
     UNIQUE(name, version)
@@ -39,7 +40,6 @@ CREATE TABLE IF NOT EXISTS symbols (
     kind_name TEXT NOT NULL,
     file_path TEXT NOT NULL,
     signature TEXT,
-    signature_hash TEXT,
     js_doc TEXT,
     is_type_only INTEGER NOT NULL DEFAULT 0,
     symbol_space TEXT NOT NULL DEFAULT 'value',
@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS symbols (
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_package ON symbols(package_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
-CREATE INDEX IF NOT EXISTS idx_symbols_signature_hash ON symbols(signature_hash);
 
 CREATE TABLE IF NOT EXISTS symbol_dependencies (
     from_symbol_id INTEGER NOT NULL REFERENCES symbols(symbol_id) ON DELETE CASCADE,

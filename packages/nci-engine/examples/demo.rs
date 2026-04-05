@@ -163,39 +163,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             GraphSource::Cached => "cached",
             GraphSource::Crawled => "crawled",
         };
-        let display_build_ms = match result.source {
-            GraphSource::Cached => 0.0,
-            GraphSource::Crawled => result.graph.crawl_duration_ms,
-        };
         println!(
-            "   {} — {} symbols, {} files ({:.1}ms) [{}]",
+            "   {} — {} symbols, {} files | crawl {:.1}ms build {:.1}ms [{}]",
             result.graph.package,
             result.graph.total_symbols,
             result.graph.total_files,
-            display_build_ms,
+            result.graph.crawl_duration_ms,
+            result.graph.build_duration_ms,
             source_tag
         );
     }
 
-    let crawled_sum_ms: f64 = indexed_results
+    let crawled_crawl_sum_ms: f64 = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
         .map(|result| result.graph.crawl_duration_ms)
         .sum();
-    let crawled_max_ms = indexed_results
+    let crawled_build_sum_ms: f64 = indexed_results
+        .iter()
+        .filter(|result| result.source == GraphSource::Crawled)
+        .map(|result| result.graph.build_duration_ms)
+        .sum();
+    let crawled_crawl_max_ms = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
         .map(|result| result.graph.crawl_duration_ms)
         .fold(0.0f64, f64::max);
-    let crawled_sum_display = if crawled_count == 0 {
+    let crawled_build_max_ms = indexed_results
+        .iter()
+        .filter(|result| result.source == GraphSource::Crawled)
+        .map(|result| result.graph.build_duration_ms)
+        .fold(0.0f64, f64::max);
+    let crawled_crawl_sum_display = if crawled_count == 0 {
         0.0
     } else {
-        crawled_sum_ms
+        crawled_crawl_sum_ms
     };
-    let crawled_max_display = if crawled_count == 0 {
+    let crawled_build_sum_display = if crawled_count == 0 {
         0.0
     } else {
-        crawled_max_ms
+        crawled_build_sum_ms
+    };
+    let crawled_crawl_max_display = if crawled_count == 0 {
+        0.0
+    } else {
+        crawled_crawl_max_ms
+    };
+    let crawled_build_max_display = if crawled_count == 0 {
+        0.0
+    } else {
+        crawled_build_max_ms
     };
 
     indexed_results.sort_by(|result_a, result_b| result_b.graph.total_symbols.cmp(&result_a.graph.total_symbols));
@@ -214,31 +231,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!(
-        "\n   {:<40} {:>8} {:>9} {:>7} {:>10}",
-        "Package", "Source", "Symbols", "Files", "Crawl ms"
+        "\n   {:<36} {:>8} {:>9} {:>7} {:>10} {:>10}",
+        "Package", "Source", "Symbols", "Files", "Crawl ms", "Build ms"
     );
-    println!("   {}", "─".repeat(78));
+    println!("   {}", "─".repeat(96));
 
     for result in &indexed_results {
         let source_tag = match result.source {
             GraphSource::Cached => "cached",
             GraphSource::Crawled => "crawled",
         };
-        let display_build_ms = match result.source {
-            GraphSource::Cached => 0.0,
-            GraphSource::Crawled => result.graph.crawl_duration_ms,
-        };
         println!(
-            "   {: <40} {: >8} {: >9} {: >7} {: >10.1}ms",
+            "   {: <36} {: >8} {: >9} {: >7} {: >9.1} {: >9.1}",
             result.graph.package,
             source_tag,
             result.graph.total_symbols,
             result.graph.total_files,
-            display_build_ms
+            result.graph.crawl_duration_ms,
+            result.graph.build_duration_ms
         );
     }
     println!(
-        "   Crawl ms: crawl duration for this run when the package was crawled; 0 when the graph was loaded from cache (SQLite read time is included in index_packages wall, not here)."
+        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Values come from the graph (SQLite when cached)."
     );
 
     let export_wall_ms = if skip_write {
@@ -259,8 +273,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "timingsMs": {
                 "scanDedupe": (scan_dedupe_duration.as_secs_f64() * 1000.0).round() as u64,
                 "indexPackagesWall": (index_wall_ms).round() as u64,
-                "crawledSumMs": (crawled_sum_display).round() as u64,
-                "crawledMaxMs": (crawled_max_display).round() as u64,
+                "crawledCrawlSumMs": (crawled_crawl_sum_display).round() as u64,
+                "crawledBuildSumMs": (crawled_build_sum_display).round() as u64,
+                "crawledCrawlMaxMs": (crawled_crawl_max_display).round() as u64,
+                "crawledBuildMaxMs": (crawled_build_max_display).round() as u64,
             },
             "totalPackages": indexed_results.len(),
             "cachedCount": cached_count,
@@ -293,17 +309,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "   {:<52} {:>12.1}",
-        "index_packages (crawl + cache read/write)", index_wall_ms
+        "index_packages (wall: parallel index + SQLite)", index_wall_ms
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Σ crawled-only packages (CPU, excludes cache hits)",
-        crawled_sum_display
+        "Σ crawl ms (crawled pkgs only, CPU crawler)",
+        crawled_crawl_sum_display
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Max single crawled package (parallel floor)",
-        crawled_max_display
+        "Σ build ms (crawled pkgs only, graph assembly)",
+        crawled_build_sum_display
+    );
+    println!(
+        "   {:<52} {:>12.1}",
+        "Max crawl ms (single crawled package)",
+        crawled_crawl_max_display
+    );
+    println!(
+        "   {:<52} {:>12.1}",
+        "Max build ms (single crawled package)",
+        crawled_build_max_display
     );
     println!(
         "   {:<52} {:>12.1}",

@@ -235,6 +235,7 @@ describe("real-library pipeline (all packages)", () => {
     expect(typeof graph.totalSymbols).toBe("number");
     expect(typeof graph.totalFiles).toBe("number");
     expect(typeof graph.crawlDurationMs).toBe("number");
+    expect(typeof graph.buildDurationMs).toBe("number");
     expect(graph.totalSymbols).toBe(graph.symbols.length);
 
     for (const symbolNode of graph.symbols) {
@@ -280,7 +281,7 @@ describe("real-library pipeline (all packages)", () => {
           name: pkg.name,
           symbols: graph.totalSymbols,
           files: graph.totalFiles,
-          ms: Math.round(graph.crawlDurationMs),
+          ms: Math.round(graph.crawlDurationMs + graph.buildDurationMs),
           hasTypes: graph.totalSymbols > 0,
         });
       } catch (err) {

@@ -10,7 +10,6 @@ static PROTOCOL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+)
 use crate::constants::NODE_BUILTINS;
 use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
-use crate::hash::sha256_hex;
 use crate::resolver::{normalize_path, resolve_module_specifier, resolve_types_entry};
 use crate::types::{
     PackageEntry, PackageGraph, PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode,
@@ -63,8 +62,7 @@ pub fn build_package_graph(
     package_info: &PackageInfo,
     crawl_options: Option<CrawlOptions>,
 ) -> PackageGraph {
-    let start = Instant::now();
-
+    let entry_phase_start = Instant::now();
     let entry = resolve_types_entry(Path::new(package_info.dir.as_ref())).unwrap_or_else(|_| {
         PackageEntry {
             name: package_info.name.clone(),
@@ -73,6 +71,7 @@ pub fn build_package_graph(
             subpaths: HashMap::new(),
         }
     });
+    let entry_resolution_ms = entry_phase_start.elapsed().as_secs_f64() * 1000.0;
 
     if entry.types_entries.is_empty() {
         return PackageGraph {
@@ -81,11 +80,16 @@ pub fn build_package_graph(
             symbols: Vec::new(),
             total_symbols: 0,
             total_files: 0,
-            crawl_duration_ms: start.elapsed().as_secs_f64() * 1000.0,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: entry_resolution_ms,
         };
     }
 
+    let crawl_phase_start = Instant::now();
     let crawl_result = crawl(&entry.types_entries, crawl_options);
+    let crawl_duration_ms = crawl_phase_start.elapsed().as_secs_f64() * 1000.0;
+
+    let graph_assembly_phase_start = Instant::now();
 
     let all_symbols = crawl_result.exports;
     let all_imports_per_file = crawl_result.imports;
@@ -208,7 +212,6 @@ pub fn build_package_graph(
                 file_path: symbol_file_path,
                 additional_files: None,
                 signature: resolved.signature.clone(),
-                signature_hash: None,
                 js_doc: resolved.js_doc.clone(),
                 is_type_only: resolved.is_type_only,
                 symbol_space: resolved.symbol_space,
@@ -616,7 +619,8 @@ pub fn build_package_graph(
         &package_info.version,
     );
 
-    apply_signature_hashes(&mut symbols);
+    let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
+    let build_duration_ms = entry_resolution_ms + graph_assembly_ms;
 
     let total_symbols = symbols.len();
     let total_files = visited.len();
@@ -627,7 +631,8 @@ pub fn build_package_graph(
         symbols,
         total_symbols,
         total_files,
-        crawl_duration_ms: start.elapsed().as_secs_f64() * 1000.0,
+        crawl_duration_ms,
+        build_duration_ms,
     }
 }
 
@@ -726,15 +731,6 @@ fn parent_name_for_dotted_member(name: &str) -> Option<String> {
     }
     name.rfind('.')
         .map(|last_dot_index| name[..last_dot_index].to_string())
-}
-
-fn apply_signature_hashes(symbol_nodes: &mut [SymbolNode]) {
-    for symbol_node in symbol_nodes {
-        symbol_node.signature_hash = symbol_node
-            .signature
-            .as_ref()
-            .map(|signature| SharedString::from(sha256_hex(signature.as_ref()).as_str()));
-    }
 }
 
 /// Resolves `extends` / `implements` text to a declared parent name for member lookup and `name_to_id`.

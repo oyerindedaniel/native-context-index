@@ -59,6 +59,7 @@ function normaliseGraph(graph: PackageGraph, fixtureDir: string): PackageGraph {
       rawDependencies: undefined,
     })),
     crawlDurationMs: 0,
+    buildDurationMs: 0,
   };
 }
 

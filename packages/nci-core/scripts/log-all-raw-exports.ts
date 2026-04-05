@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   const graph = buildPackageGraph(info);
 
   console.error(
-    `[nci] done: ${graph.symbols.length} symbols, ${graph.totalFiles} files, ${graph.crawlDurationMs.toFixed(1)}ms`
+    `[nci] done: ${graph.symbols.length} symbols, ${graph.totalFiles} files, crawl ${graph.crawlDurationMs.toFixed(1)}ms build ${graph.buildDurationMs.toFixed(1)}ms`
   );
 }
 

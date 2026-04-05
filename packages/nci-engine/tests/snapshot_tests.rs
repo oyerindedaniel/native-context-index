@@ -44,6 +44,7 @@ fn oracle_dir() -> PathBuf {
 
 fn normalise_graph(graph: &mut PackageGraph, fixture_dir: &Path) {
     graph.crawl_duration_ms = 0.0;
+    graph.build_duration_ms = 0.0;
 
     let fixture_dir_str = fixture_dir.to_string_lossy().replace('\\', "/");
 

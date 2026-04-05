@@ -138,10 +138,10 @@ impl NciDatabase {
     }
 
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
-        let (package_id, stored_total_symbols, stored_total_files, crawl_ms) = match self
+        let (package_id, stored_total_symbols, stored_total_files, crawl_ms, build_ms) = match self
             .connection
             .query_row(
-                "SELECT package_id, total_symbols, total_files, crawl_duration_ms
+                "SELECT package_id, total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
                  WHERE name = ?1 AND version = ?2 AND engine_version = ?3",
                 rusqlite::params![
@@ -155,6 +155,7 @@ impl NciDatabase {
                         package_row.get::<_, i64>(1)?,
                         package_row.get::<_, i64>(2)?,
                         package_row.get::<_, i64>(3)?,
+                        package_row.get::<_, i64>(4)?,
                     ))
                 },
             ) {
@@ -196,7 +197,7 @@ impl NciDatabase {
         let mut symbol_stmt = self
             .connection
             .prepare(
-                "SELECT symbol_id, id, name, kind, kind_name, file_path, signature, signature_hash,
+                "SELECT symbol_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated,
                         visibility, since, is_internal, is_global_augmentation, is_inherited, inherited_from
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
@@ -214,17 +215,16 @@ impl NciDatabase {
                     symbol_row.get::<_, String>(5)?,
                     symbol_row.get::<_, Option<String>>(6)?,
                     symbol_row.get::<_, Option<String>>(7)?,
-                    symbol_row.get::<_, Option<String>>(8)?,
-                    symbol_row.get::<_, i64>(9)?,
-                    symbol_row.get::<_, String>(10)?,
+                    symbol_row.get::<_, i64>(8)?,
+                    symbol_row.get::<_, String>(9)?,
+                    symbol_row.get::<_, Option<String>>(10)?,
                     symbol_row.get::<_, Option<String>>(11)?,
                     symbol_row.get::<_, Option<String>>(12)?,
                     symbol_row.get::<_, Option<String>>(13)?,
-                    symbol_row.get::<_, Option<String>>(14)?,
+                    symbol_row.get::<_, i64>(14)?,
                     symbol_row.get::<_, i64>(15)?,
                     symbol_row.get::<_, i64>(16)?,
-                    symbol_row.get::<_, i64>(17)?,
-                    symbol_row.get::<_, Option<String>>(18)?,
+                    symbol_row.get::<_, Option<String>>(17)?,
                 ))
             })
             .ok()?;
@@ -242,7 +242,6 @@ impl NciDatabase {
                 kind_name_text,
                 file_path_text,
                 signature_opt,
-                signature_hash_opt,
                 js_doc_opt,
                 is_type_only_int,
                 symbol_space_text,
@@ -306,7 +305,6 @@ impl NciDatabase {
                 file_path: SharedString::from(file_path_text),
                 additional_files,
                 signature: signature_opt.map(SharedString::from),
-                signature_hash: signature_hash_opt.map(SharedString::from),
                 js_doc: js_doc_opt.map(SharedString::from),
                 is_type_only: is_type_only_int != 0,
                 symbol_space,
@@ -334,6 +332,7 @@ impl NciDatabase {
             total_symbols: stored_total_symbols as usize,
             total_files: stored_total_files as usize,
             crawl_duration_ms: crawl_ms as f64,
+            build_duration_ms: build_ms as f64,
         })
     }
 
@@ -352,15 +351,17 @@ impl NciDatabase {
         )?;
 
         let crawl_ms = graph.crawl_duration_ms as i64;
+        let build_ms = graph.build_duration_ms as i64;
         transaction.execute(
-            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, engine_version)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, engine_version)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![
                 package_info.name.as_ref(),
                 package_info.version.as_ref(),
                 graph.total_symbols as i64,
                 graph.total_files as i64,
                 crawl_ms,
+                build_ms,
                 NCI_ENGINE_VERSION,
             ],
         )?;
@@ -370,10 +371,10 @@ impl NciDatabase {
         {
             let mut insert_symbol = transaction.prepare(
                 "INSERT OR REPLACE INTO symbols (
-                package_id, id, name, kind, kind_name, file_path, signature, signature_hash,
+                package_id, id, name, kind, kind_name, file_path, signature,
                 js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
                 since, is_internal, is_global_augmentation, is_inherited, inherited_from
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             )?;
 
             let mut insert_dependency = transaction.prepare(
@@ -408,7 +409,6 @@ impl NciDatabase {
                     symbol_node.kind_name.as_ref(),
                     symbol_node.file_path.as_ref(),
                     symbol_node.signature.as_ref().map(|value| value.as_ref()),
-                    symbol_node.signature_hash.as_ref().map(|value| value.as_ref()),
                     symbol_node.js_doc.as_ref().map(|value| value.as_ref()),
                     if symbol_node.is_type_only { 1i64 } else { 0i64 },
                     symbol_space_text,
@@ -528,7 +528,7 @@ impl NciDatabase {
         let row_opt = self
             .connection
             .query_row(
-                "SELECT package_id, id, name, kind, kind_name, file_path, signature, signature_hash,
+                "SELECT package_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
                         since, is_internal, is_global_augmentation, is_inherited, inherited_from
                  FROM symbols WHERE symbol_id = ?1",
@@ -543,17 +543,16 @@ impl NciDatabase {
                         symbol_row.get::<_, String>(5)?,
                         symbol_row.get::<_, Option<String>>(6)?,
                         symbol_row.get::<_, Option<String>>(7)?,
-                        symbol_row.get::<_, Option<String>>(8)?,
-                        symbol_row.get::<_, i64>(9)?,
-                        symbol_row.get::<_, String>(10)?,
+                        symbol_row.get::<_, i64>(8)?,
+                        symbol_row.get::<_, String>(9)?,
+                        symbol_row.get::<_, Option<String>>(10)?,
                         symbol_row.get::<_, Option<String>>(11)?,
                         symbol_row.get::<_, Option<String>>(12)?,
                         symbol_row.get::<_, Option<String>>(13)?,
-                        symbol_row.get::<_, Option<String>>(14)?,
+                        symbol_row.get::<_, i64>(14)?,
                         symbol_row.get::<_, i64>(15)?,
                         symbol_row.get::<_, i64>(16)?,
-                        symbol_row.get::<_, i64>(17)?,
-                        symbol_row.get::<_, Option<String>>(18)?,
+                        symbol_row.get::<_, Option<String>>(17)?,
                     ))
                 },
             )
@@ -567,7 +566,6 @@ impl NciDatabase {
             kind_name_text,
             file_path_text,
             signature_opt,
-            signature_hash_opt,
             js_doc_opt,
             is_type_only_int,
             symbol_space_text,
@@ -700,7 +698,6 @@ impl NciDatabase {
             file_path: SharedString::from(file_path_text),
             additional_files,
             signature: signature_opt.map(SharedString::from),
-            signature_hash: signature_hash_opt.map(SharedString::from),
             js_doc: js_doc_opt.map(SharedString::from),
             is_type_only: is_type_only_int != 0,
             symbol_space,
@@ -874,7 +871,6 @@ mod tests {
             file_path: SharedString::from("index.d.ts"),
             additional_files: None,
             signature: Some(SharedString::from("declare function demo(): void")),
-            signature_hash: None,
             js_doc: Some(SharedString::from("Hello world token")),
             is_type_only: false,
             symbol_space: SymbolSpace::Value,
@@ -915,6 +911,7 @@ mod tests {
             total_symbols: 1,
             total_files: 3,
             crawl_duration_ms: 12.5,
+            build_duration_ms: 7.0,
         };
 
         database.save_package(&package_info, &graph).expect("save");
@@ -924,6 +921,8 @@ mod tests {
         assert_eq!(loaded.symbols.len(), 1);
         assert_eq!(loaded.symbols[0].name.as_ref(), "demo");
         assert_eq!(loaded.total_files, 3);
+        assert_eq!(loaded.crawl_duration_ms, 12.0);
+        assert_eq!(loaded.build_duration_ms, 7.0);
     }
 
     #[test]
@@ -943,6 +942,7 @@ mod tests {
             total_symbols: 1,
             total_files: 1,
             crawl_duration_ms: 1.0,
+            build_duration_ms: 1.0,
         };
         database.save_package(&package_info, &graph).expect("save");
         let hits = database.find_symbols_fts("Hello", 10).expect("fts");
@@ -983,6 +983,7 @@ mod tests {
             total_symbols: 1,
             total_files: 1,
             crawl_duration_ms: 1.0,
+            build_duration_ms: 1.0,
         };
         database.save_package(&package_info, &graph).expect("save");
 
@@ -1019,6 +1020,7 @@ mod tests {
             total_symbols: 1,
             total_files: 1,
             crawl_duration_ms: 1.0,
+            build_duration_ms: 1.0,
         };
         database.save_package(&package_info, &graph).expect("save");
         assert!(database.has_cached_package(&package_info, NCI_ENGINE_VERSION));
