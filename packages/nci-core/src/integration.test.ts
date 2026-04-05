@@ -180,7 +180,9 @@ describe("integration", () => {
     expect(names).toContain("helperB");
     expect(names).toContain("HelperBResult");
 
-    expect(graph.totalSymbols).toBe(8);
+    // Includes public API symbols plus property members on exported interfaces/types
+    // (e.g. RootConfig.name, HelperBResult.value, HelperAOptions.verbose).
+    expect(graph.totalSymbols).toBe(9);
     expect(graph.totalFiles).toBe(3);
   });
 

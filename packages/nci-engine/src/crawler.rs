@@ -24,6 +24,8 @@ pub struct CrawlOptions {
     pub max_hops: usize,
     /// When `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
+    /// When true, resolve `SymbolNode` dependency ids in parallel during graph build (Rayon + DashMap).
+    pub parallel_resolve_deps: bool,
 }
 
 impl Default for CrawlOptions {
@@ -31,6 +33,7 @@ impl Default for CrawlOptions {
         Self {
             max_hops: DEFAULT_MAX_HOPS,
             profile_as: None,
+            parallel_resolve_deps: true,
         }
     }
 }
@@ -101,13 +104,13 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     visited_files.sort_by(|path_a, path_b| path_a.cmp(path_b));
     let internal_start = Instant::now();
     for file in &visited_files {
-        let exports = match session.raw_exports.get(file) {
-            Some(exports) => exports.clone(),
-            None => continue,
+        let Some(exports_slice) = session.raw_exports.get(file) else {
+            continue;
         };
-        let exports = prefer_inner_decl_over_export_default_wrapper(exports);
+        let preferred_indices = preferred_inner_export_indices(exports_slice.as_slice());
 
-        for export_entry in &exports {
+        for export_idx in preferred_indices {
+            let export_entry = &exports_slice[export_idx];
             if export_entry.is_wildcard || export_entry.name.is_empty() {
                 continue;
             }
@@ -178,28 +181,37 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     }
 }
 
-fn prefer_inner_decl_over_export_default_wrapper(exports: Vec<ParsedExport>) -> Vec<ParsedExport> {
-    let mut grouped: HashMap<String, Vec<ParsedExport>> =
+/// Returns export indices in the same merge order as the previous implementation that preferred
+/// inner declarations over `export default` wrappers for class/function/interface/type/enum/alias
+/// symbols when both explicit and non-explicit exports exist in a group—without cloning the full
+/// export list for every file.
+fn preferred_inner_export_indices(exports: &[ParsedExport]) -> Vec<usize> {
+    let mut grouped: HashMap<String, Vec<usize>> =
         HashMap::with_capacity(exports.len().min(256));
-    for export in exports {
-        let kind = export.kind;
-        grouped
-            .entry(format!("{}::{}", export.name.as_ref(), kind.numeric_kind()))
-            .or_default()
-            .push(export);
+    for (export_index, export) in exports.iter().enumerate() {
+        let key = format!(
+            "{}::{}",
+            export.name.as_ref(),
+            export.kind.numeric_kind()
+        );
+        grouped.entry(key).or_default().push(export_index);
     }
 
     let mut sorted_group_keys: Vec<String> = grouped.keys().cloned().collect();
     sorted_group_keys.sort();
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(exports.len());
     for group_key in sorted_group_keys {
-        let mut group = grouped
+        let mut indices = grouped
             .remove(&group_key)
             .expect("group key was collected from the same map");
-        let kind = group[0].kind;
-        let has_non_explicit = group.iter().any(|entry| !entry.is_explicit_export);
-        let has_explicit = group.iter().any(|entry| entry.is_explicit_export);
+        let kind = exports[indices[0]].kind;
+        let has_non_explicit = indices
+            .iter()
+            .any(|&export_index| !exports[export_index].is_explicit_export);
+        let has_explicit = indices
+            .iter()
+            .any(|&export_index| exports[export_index].is_explicit_export);
         let keep_non_explicit_only = has_non_explicit
             && has_explicit
             && matches!(
@@ -212,9 +224,9 @@ fn prefer_inner_decl_over_export_default_wrapper(exports: Vec<ParsedExport>) -> 
             );
 
         if keep_non_explicit_only {
-            group.retain(|entry| !entry.is_explicit_export);
+            indices.retain(|&export_index| !exports[export_index].is_explicit_export);
         }
-        out.extend(group);
+        out.extend(indices);
     }
     out
 }

@@ -3,7 +3,9 @@ use std::path::Path;
 use std::sync::LazyLock;
 use std::time::Instant;
 
+use dashmap::DashMap;
 use regex::Regex;
+use rayon::prelude::*;
 
 static PROTOCOL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+):(.*)$").unwrap());
 
@@ -13,8 +15,8 @@ use crate::dedupe::normalize_signature;
 use crate::profile;
 use crate::resolver::{normalize_path, resolve_module_specifier, resolve_types_entry};
 use crate::types::{
-    PackageEntry, PackageGraph, PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode,
-    Visibility,
+    PackageEntry, PackageGraph, PackageInfo, ParsedImport, SharedString, SharedVec, SymbolKind,
+    SymbolNode, Visibility,
 };
 
 /// Parent directory of a package-relative path (already forward-slash normalized by `make_relative`).
@@ -63,10 +65,327 @@ fn triple_slash_reachable(
     out
 }
 
+fn dash_norm_abs(
+    cache: &DashMap<SharedString, SharedString>,
+    file_path: &SharedString,
+    package_dir_str: &str,
+) -> SharedString {
+    if let Some(entry) = cache.get(file_path) {
+        return entry.value().clone();
+    }
+    let normalized_abs = normalize_path(&Path::new(package_dir_str).join(file_path.as_ref()));
+    cache.insert(file_path.clone(), normalized_abs.clone());
+    normalized_abs
+}
+
+fn dash_module_paths(
+    cache: &DashMap<(SharedString, SharedString), Vec<SharedString>>,
+    key: (SharedString, SharedString),
+    abs_lookup_str: &str,
+) -> Vec<SharedString> {
+    if let Some(entry) = cache.get(&key) {
+        return entry.value().clone();
+    }
+    let resolved_paths = resolve_module_specifier(key.1.as_ref(), abs_lookup_str);
+    cache.insert(key, resolved_paths.clone());
+    resolved_paths
+}
+
+fn dash_triple_closure(
+    cache: &DashMap<SharedString, Vec<SharedString>>,
+    file_rel: &SharedString,
+    abs: SharedString,
+    edges: &HashMap<SharedString, Vec<SharedString>>,
+) -> Vec<SharedString> {
+    if let Some(entry) = cache.get(file_rel) {
+        return entry.value().clone();
+    }
+    let reachable_files = triple_slash_reachable(abs, edges);
+    cache.insert(file_rel.clone(), reachable_files.clone());
+    reachable_files
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_dependency_ids_for_symbol(
+    symbol_node: &SymbolNode,
+    package_dir_str: &str,
+    normalized_pkg_dir: &str,
+    normalized_abs_cache: &DashMap<SharedString, SharedString>,
+    module_specifier_cache: &DashMap<(SharedString, SharedString), Vec<SharedString>>,
+    closure_cache: &DashMap<SharedString, Vec<SharedString>>,
+    file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    name_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    id_to_file_path: &HashMap<SharedString, SharedString>,
+    all_imports_per_file: &HashMap<SharedString, Vec<ParsedImport>>,
+    triple_slash_edges: &HashMap<SharedString, Vec<SharedString>>,
+    has_ref_edges: bool,
+    protocol_regex: &Regex,
+) -> Vec<SharedString> {
+    let abs_lookup = dash_norm_abs(normalized_abs_cache, &symbol_node.file_path, package_dir_str);
+    let abs_lookup_str: &str = abs_lookup.as_ref();
+
+    let dep_count = symbol_node.raw_dependencies.len();
+    let mut resolved_ids: HashSet<SharedString> = HashSet::with_capacity(dep_count.saturating_mul(2));
+    let mut target_ids: Vec<SharedString> = Vec::with_capacity(8);
+    let mut namespace_fallback_roots: Vec<SharedString> = Vec::with_capacity(4);
+
+    for raw_dep in symbol_node.raw_dependencies.iter() {
+        let namespace_qual = raw_dep
+            .import_path
+            .is_none()
+            .then(|| split_import_namespace_member(raw_dep.name.as_ref()))
+            .flatten();
+
+        target_ids.clear();
+        namespace_fallback_roots.clear();
+
+        if let Some(import_path) = &raw_dep.import_path {
+            let cache_key = (symbol_node.file_path.clone(), import_path.clone());
+            let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
+            if !abs_paths.is_empty() {
+                let rel_path =
+                    make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir);
+                let key: SharedString =
+                    format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
+                if let Some(ids) = file_local_to_ids.get(&key) {
+                    target_ids.extend(ids.iter().cloned());
+                }
+            }
+        } else {
+            let mut namespace_target_files_resolved = false;
+
+            let key: SharedString = format!(
+                "{}::{}",
+                symbol_node.file_path.as_ref(),
+                raw_dep.name.as_ref()
+            )
+            .into();
+            if let Some(ids) = file_local_to_ids.get(&key) {
+                target_ids.extend(ids.iter().cloned());
+            }
+
+            if target_ids.is_empty() {
+                if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
+                    if let Some(matching_import) = file_imports
+                        .iter()
+                        .find(|import_entry| import_entry.name == raw_dep.name)
+                    {
+                        let source_cache_key = (
+                            symbol_node.file_path.clone(),
+                            matching_import.source.clone(),
+                        );
+                        let abs_source_paths =
+                            dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
+                        if !abs_source_paths.is_empty() {
+                            let rel_source_path = make_relative(
+                                &abs_source_paths[0],
+                                package_dir_str,
+                                normalized_pkg_dir,
+                            );
+                            let original_name = matching_import
+                                .original_name
+                                .as_deref()
+                                .unwrap_or(&matching_import.name);
+                            let import_key: SharedString =
+                                format!("{}::{}", rel_source_path, original_name).into();
+                            if let Some(ids) = file_local_to_ids.get(&import_key) {
+                                target_ids.extend(ids.iter().cloned());
+                            }
+                        }
+                    }
+                }
+            }
+
+            if target_ids.is_empty() {
+                if let (Some(file_imports), Some((qualifier, member_path))) = (
+                    all_imports_per_file.get(abs_lookup.as_ref()),
+                    namespace_qual,
+                ) {
+                    if let Some(ns_import) = file_imports
+                        .iter()
+                        .find(|import_entry| import_entry.name.as_ref() == qualifier)
+                    {
+                        let ns_cache_key =
+                            (symbol_node.file_path.clone(), ns_import.source.clone());
+                        let abs_source_paths =
+                            dash_module_paths(module_specifier_cache, ns_cache_key, abs_lookup_str);
+                        namespace_target_files_resolved = !abs_source_paths.is_empty();
+                        namespace_fallback_roots.clear();
+                        for absolute_source_path in &abs_source_paths {
+                            let rel_source_path = make_relative(
+                                absolute_source_path.as_ref(),
+                                package_dir_str,
+                                normalized_pkg_dir,
+                            );
+                            namespace_fallback_roots
+                                .push(rel_parent_dir(rel_source_path.as_ref()));
+                        }
+                        for absolute_source_path in &abs_source_paths {
+                            let rel_source_path = make_relative(
+                                absolute_source_path.as_ref(),
+                                package_dir_str,
+                                normalized_pkg_dir,
+                            );
+                            let import_key: SharedString =
+                                format!("{}::{}", rel_source_path, member_path).into();
+                            if let Some(ids) = file_local_to_ids.get(&import_key) {
+                                target_ids.extend(ids.iter().cloned());
+                            }
+                        }
+                    }
+                }
+            }
+
+            if target_ids.is_empty() && has_ref_edges {
+                let closure = dash_triple_closure(
+                    closure_cache,
+                    &symbol_node.file_path,
+                    abs_lookup.clone(),
+                    triple_slash_edges,
+                );
+                let mut from_closure: HashSet<SharedString> = HashSet::new();
+                for reachable_abs in closure {
+                    let relative_file_path = make_relative(
+                        reachable_abs.as_ref(),
+                        package_dir_str,
+                        normalized_pkg_dir,
+                    );
+                    if relative_file_path == symbol_node.file_path.as_ref() {
+                        continue;
+                    }
+                    let closure_lookup_key: SharedString =
+                        format!("{}::{}", relative_file_path, raw_dep.name.as_ref()).into();
+                    if let Some(ids) = file_local_to_ids.get(&closure_lookup_key) {
+                        for symbol_id in ids {
+                            from_closure.insert(symbol_id.clone());
+                        }
+                    }
+                    if let Some((_qualifier, member_path)) = namespace_qual {
+                        let member_key: SharedString =
+                            format!("{}::{}", relative_file_path, member_path).into();
+                        if let Some(ids) = file_local_to_ids.get(&member_key) {
+                            for symbol_id in ids {
+                                from_closure.insert(symbol_id.clone());
+                            }
+                        }
+                    }
+                }
+                target_ids.extend(from_closure.into_iter());
+            }
+
+            if target_ids.is_empty() {
+                if let Some(ids) = name_to_ids.get(&raw_dep.name) {
+                    target_ids.extend(ids.iter().cloned());
+                }
+            }
+            if target_ids.is_empty() && namespace_target_files_resolved {
+                if let Some((_, member_path)) = namespace_qual {
+                    let member_key: SharedString = SharedString::from(member_path);
+                    if let Some(ids) = name_to_ids.get(&member_key) {
+                        let skip_namespace_root_filter = namespace_fallback_roots.is_empty()
+                            || namespace_fallback_roots.iter().any(|root_path| {
+                                root_path.as_ref() == "." || root_path.as_ref().is_empty()
+                            });
+                        if skip_namespace_root_filter {
+                            target_ids.extend(ids.iter().cloned());
+                        } else {
+                            let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
+                                .iter()
+                                .map(|root_path| root_path.as_ref())
+                                .collect();
+                            for symbol_id in ids {
+                                if let Some(stored_path) = id_to_file_path.get(symbol_id) {
+                                    let defining_path = stored_path.as_ref();
+                                    if distinct_namespace_roots.iter().any(|&namespace_root| {
+                                        file_path_under_namespace_root(
+                                            defining_path,
+                                            namespace_root,
+                                        )
+                                    }) {
+                                        target_ids.push(symbol_id.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        target_ids.retain(|symbol_id| symbol_id.as_ref() != symbol_node.id.as_ref());
+
+        if !target_ids.is_empty() {
+            for symbol_id in target_ids.drain(..) {
+                resolved_ids.insert(symbol_id);
+            }
+        } else {
+            let import_path = raw_dep.import_path.as_deref();
+
+            if let Some(path) = import_path {
+                if let Some(ext_id) =
+                    resolve_external_dep_id(path, raw_dep.name.as_ref(), protocol_regex)
+                {
+                    resolved_ids.insert(ext_id.into());
+                } else if let Some(stub) =
+                    try_external_module_stub_id(path, raw_dep.name.as_ref(), protocol_regex)
+                {
+                    resolved_ids.insert(stub.into());
+                }
+            } else if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
+                if let Some(matching_import) = file_imports
+                    .iter()
+                    .find(|import_entry| import_entry.name == raw_dep.name)
+                {
+                    let original_name = matching_import
+                        .original_name
+                        .as_deref()
+                        .unwrap_or(matching_import.name.as_ref());
+                    if let Some(ext_id) = resolve_external_dep_id(
+                        matching_import.source.as_ref(),
+                        original_name,
+                        protocol_regex,
+                    ) {
+                        resolved_ids.insert(ext_id.into());
+                    } else if let Some(stub) = try_external_module_stub_id(
+                        matching_import.source.as_ref(),
+                        original_name,
+                        protocol_regex,
+                    ) {
+                        resolved_ids.insert(stub.into());
+                    }
+                }
+                if let Some((qualifier, member_path)) = namespace_qual {
+                    if let Some(ns_import) = file_imports
+                        .iter()
+                        .find(|import_entry| import_entry.name.as_ref() == qualifier)
+                    {
+                        if let Some(stub) = try_external_module_stub_id(
+                            ns_import.source.as_ref(),
+                            member_path,
+                            protocol_regex,
+                        ) {
+                            resolved_ids.insert(stub.into());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut resolved_ids_vec: Vec<SharedString> = resolved_ids.into_iter().collect();
+    resolved_ids_vec.sort();
+    resolved_ids_vec
+}
+
 pub fn build_package_graph(
     package_info: &PackageInfo,
     crawl_options: Option<CrawlOptions>,
 ) -> PackageGraph {
+    let parallel_resolve_deps = crawl_options
+        .as_ref()
+        .map(|options| options.parallel_resolve_deps)
+        .unwrap_or(true);
+
     let entry_phase_start = Instant::now();
     let entry = resolve_types_entry(Path::new(package_info.dir.as_ref())).unwrap_or_else(|_| {
         PackageEntry {
@@ -356,294 +675,64 @@ pub fn build_package_graph(
     let has_ref_edges = !triple_slash_edges.is_empty();
 
     let resolve_deps_phase_start = Instant::now();
-    let mut normalized_abs_cache: HashMap<SharedString, SharedString> = HashMap::new();
-    let mut closure_cache: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
-    let mut module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>> =
-        HashMap::new();
+    let normalized_abs_cache: DashMap<SharedString, SharedString> = DashMap::new();
+    let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
+    let module_specifier_cache: DashMap<(SharedString, SharedString), Vec<SharedString>> =
+        DashMap::new();
 
-    for symbol_node in &mut symbols {
-        if symbol_node.raw_dependencies.is_empty() {
-            continue;
-        }
-
-        let mut resolved_ids: HashSet<SharedString> = HashSet::new();
-
-        // Must match crawler import-map keys (canonical paths), not `dir + "/" + rel`.
-        let abs_lookup = normalized_abs_cache
-            .entry(symbol_node.file_path.clone())
-            .or_insert_with(|| {
-                normalize_path(&Path::new(package_dir_str).join(symbol_node.file_path.as_ref()))
+    if parallel_resolve_deps {
+        let indexed: Vec<(usize, Vec<SharedString>)> = symbols
+            .iter()
+            .enumerate()
+            .filter(|(_symbol_index, symbol_node)| !symbol_node.raw_dependencies.is_empty())
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .map(|(symbol_index, symbol_node)| {
+                let deps = resolve_dependency_ids_for_symbol(
+                    symbol_node,
+                    package_dir_str,
+                    normalized_pkg_dir.as_str(),
+                    &normalized_abs_cache,
+                    &module_specifier_cache,
+                    &closure_cache,
+                    &file_local_to_ids,
+                    &name_to_ids,
+                    &id_to_file_path,
+                    &all_imports_per_file,
+                    &triple_slash_edges,
+                    has_ref_edges,
+                    protocol_regex,
+                );
+                (symbol_index, deps)
             })
-            .clone();
-        let abs_lookup_str: &str = abs_lookup.as_ref();
-
-        for raw_dep in symbol_node.raw_dependencies.iter() {
-            let namespace_qual = raw_dep
-                .import_path
-                .is_none()
-                .then(|| split_import_namespace_member(raw_dep.name.as_ref()))
-                .flatten();
-
-            let mut target_ids: Vec<SharedString> = Vec::new();
-            let mut namespace_fallback_roots: Vec<SharedString> = Vec::new();
-
-            if let Some(import_path) = &raw_dep.import_path {
-                let cache_key = (symbol_node.file_path.clone(), import_path.clone());
-                let abs_paths = module_specifier_cache
-                    .entry(cache_key)
-                    .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
-                    .clone();
-                if !abs_paths.is_empty() {
-                    let rel_path =
-                        make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir.as_str());
-                    let key: SharedString =
-                        format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
-                    if let Some(ids) = file_local_to_ids.get(&key) {
-                        target_ids.extend(ids.iter().cloned());
-                    }
-                }
-            } else {
-                // `ns.Member`: set true when `import * as ns` resolved to at least one file.
-                // Gates package-wide `name_to_ids.get(Member)` so a missing package cannot
-                // collide with unrelated homonyms (e.g. local shim types).
-                let mut namespace_target_files_resolved = false;
-
-                let key: SharedString = format!(
-                    "{}::{}",
-                    symbol_node.file_path.as_ref(),
-                    raw_dep.name.as_ref()
-                )
-                .into();
-                if let Some(ids) = file_local_to_ids.get(&key) {
-                    target_ids.extend(ids.iter().cloned());
-                }
-
-                if target_ids.is_empty() {
-                    if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
-                        if let Some(matching_import) = file_imports
-                            .iter()
-                            .find(|imported| imported.name == raw_dep.name)
-                        {
-                            let source_cache_key = (
-                                symbol_node.file_path.clone(),
-                                matching_import.source.clone(),
-                            );
-                            let abs_source_paths = module_specifier_cache
-                                .entry(source_cache_key)
-                                .or_insert_with_key(|k| {
-                                    resolve_module_specifier(&k.1, abs_lookup_str)
-                                })
-                                .clone();
-                            if !abs_source_paths.is_empty() {
-                                let rel_source_path = make_relative(
-                                    &abs_source_paths[0],
-                                    package_dir_str,
-                                    normalized_pkg_dir.as_str(),
-                                );
-                                let original_name = matching_import
-                                    .original_name
-                                    .as_deref()
-                                    .unwrap_or(&matching_import.name);
-                                let import_key: SharedString =
-                                    format!("{}::{}", rel_source_path, original_name).into();
-                                if let Some(ids) = file_local_to_ids.get(&import_key) {
-                                    target_ids.extend(ids.iter().cloned());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if target_ids.is_empty() {
-                    if let (Some(file_imports), Some((qualifier, member_path))) = (
-                        all_imports_per_file.get(abs_lookup.as_ref()),
-                        namespace_qual,
-                    ) {
-                        if let Some(ns_import) = file_imports
-                            .iter()
-                            .find(|imported| imported.name.as_ref() == qualifier)
-                        {
-                            let ns_cache_key =
-                                (symbol_node.file_path.clone(), ns_import.source.clone());
-                            let abs_source_paths = module_specifier_cache
-                                .entry(ns_cache_key)
-                                .or_insert_with_key(|k| {
-                                    resolve_module_specifier(&k.1, abs_lookup_str)
-                                })
-                                .clone();
-                            namespace_target_files_resolved = !abs_source_paths.is_empty();
-                            namespace_fallback_roots.clear();
-                            for abs_sp in &abs_source_paths {
-                                let rel_source_path = make_relative(
-                                    abs_sp.as_ref(),
-                                    package_dir_str,
-                                    normalized_pkg_dir.as_str(),
-                                );
-                                namespace_fallback_roots
-                                    .push(rel_parent_dir(rel_source_path.as_ref()));
-                            }
-                            for abs_sp in &abs_source_paths {
-                                let rel_source_path = make_relative(
-                                    abs_sp.as_ref(),
-                                    package_dir_str,
-                                    normalized_pkg_dir.as_str(),
-                                );
-                                let import_key: SharedString =
-                                    format!("{}::{}", rel_source_path, member_path).into();
-                                if let Some(ids) = file_local_to_ids.get(&import_key) {
-                                    target_ids.extend(ids.iter().cloned());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if target_ids.is_empty() && has_ref_edges {
-                    let closure = closure_cache
-                        .entry(symbol_node.file_path.clone())
-                        .or_insert_with(|| {
-                            let symbol_abs = abs_lookup.clone();
-                            triple_slash_reachable(symbol_abs, &triple_slash_edges)
-                        })
-                        .clone();
-                    let mut from_closure: HashSet<SharedString> = HashSet::new();
-                    for reachable_abs in closure {
-                        let rel = make_relative(
-                            reachable_abs.as_ref(),
-                            package_dir_str,
-                            normalized_pkg_dir.as_str(),
-                        );
-                        if rel == symbol_node.file_path.as_ref() {
-                            continue;
-                        }
-                        let closure_lookup_key: SharedString =
-                            format!("{}::{}", rel, raw_dep.name.as_ref()).into();
-                        if let Some(ids) = file_local_to_ids.get(&closure_lookup_key) {
-                            for symbol_id in ids {
-                                from_closure.insert(symbol_id.clone());
-                            }
-                        }
-                        if let Some((_qualifier, member_path)) = namespace_qual {
-                            let member_key: SharedString =
-                                format!("{}::{}", rel, member_path).into();
-                            if let Some(ids) = file_local_to_ids.get(&member_key) {
-                                for symbol_id in ids {
-                                    from_closure.insert(symbol_id.clone());
-                                }
-                            }
-                        }
-                    }
-                    target_ids.extend(from_closure.into_iter());
-                }
-
-                if target_ids.is_empty() {
-                    if let Some(ids) = name_to_ids.get(&raw_dep.name) {
-                        target_ids.extend(ids.iter().cloned());
-                    }
-                }
-                // Qualified `ns.Member`: package index is keyed by `Member`, not `ns.Member`.
-                // Barrel files (`index.d.ts`) also won't have `Member` rows when the symbol
-                // lives in `./output.d.ts` etc., so file-local lookup may miss despite a crawl.
-                if target_ids.is_empty() && namespace_target_files_resolved {
-                    if let Some((_, member_path)) = namespace_qual {
-                        let member_key: SharedString = SharedString::from(member_path);
-                        if let Some(ids) = name_to_ids.get(&member_key) {
-                            let skip_namespace_root_filter = namespace_fallback_roots.is_empty()
-                                || namespace_fallback_roots.iter().any(|root_path| {
-                                    root_path.as_ref() == "." || root_path.as_ref().is_empty()
-                                });
-                            if skip_namespace_root_filter {
-                                target_ids.extend(ids.iter().cloned());
-                            } else {
-                                let distinct_namespace_roots: HashSet<&str> =
-                                    namespace_fallback_roots
-                                        .iter()
-                                        .map(|root_path| root_path.as_ref())
-                                        .collect();
-                                for symbol_id in ids {
-                                    if let Some(stored_path) = id_to_file_path.get(symbol_id) {
-                                        let defining_path = stored_path.as_ref();
-                                        if distinct_namespace_roots.iter().any(|&namespace_root| {
-                                            file_path_under_namespace_root(
-                                                defining_path,
-                                                namespace_root,
-                                            )
-                                        }) {
-                                            target_ids.push(symbol_id.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            target_ids.retain(|symbol_id| symbol_id.as_ref() != symbol_node.id.as_ref());
-
-            if !target_ids.is_empty() {
-                for symbol_id in target_ids {
-                    resolved_ids.insert(symbol_id);
-                }
-            } else {
-                let import_path = raw_dep.import_path.as_deref();
-
-                if let Some(path) = import_path {
-                    if let Some(ext_id) =
-                        resolve_external_dep_id(path, raw_dep.name.as_ref(), protocol_regex)
-                    {
-                        resolved_ids.insert(ext_id.into());
-                    } else if let Some(stub) =
-                        try_external_module_stub_id(path, raw_dep.name.as_ref(), protocol_regex)
-                    {
-                        resolved_ids.insert(stub.into());
-                    }
-                } else if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
-                    if let Some(matching_import) = file_imports
-                        .iter()
-                        .find(|imported| imported.name == raw_dep.name)
-                    {
-                        let original_name = matching_import
-                            .original_name
-                            .as_deref()
-                            .unwrap_or(matching_import.name.as_ref());
-                        if let Some(ext_id) = resolve_external_dep_id(
-                            matching_import.source.as_ref(),
-                            original_name,
-                            protocol_regex,
-                        ) {
-                            resolved_ids.insert(ext_id.into());
-                        } else if let Some(stub) = try_external_module_stub_id(
-                            matching_import.source.as_ref(),
-                            original_name,
-                            protocol_regex,
-                        ) {
-                            resolved_ids.insert(stub.into());
-                        }
-                    }
-                    if let Some((qualifier, member_path)) = namespace_qual {
-                        if let Some(ns_import) = file_imports
-                            .iter()
-                            .find(|imported| imported.name.as_ref() == qualifier)
-                        {
-                            if let Some(stub) = try_external_module_stub_id(
-                                ns_import.source.as_ref(),
-                                member_path,
-                                protocol_regex,
-                            ) {
-                                resolved_ids.insert(stub.into());
-                            }
-                        }
-                    }
-                }
-            }
+            .collect();
+        for (symbol_index, deps) in indexed {
+            symbols[symbol_index].dependencies = SharedVec::from(deps);
+            symbols[symbol_index].raw_dependencies.clear();
         }
-
-        let mut resolved_ids_vec: Vec<SharedString> = resolved_ids.into_iter().collect();
-        resolved_ids_vec.sort();
-
-        symbol_node.dependencies = SharedVec::from(resolved_ids_vec);
-        symbol_node.raw_dependencies.clear();
+    } else {
+        for symbol_node in &mut symbols {
+            if symbol_node.raw_dependencies.is_empty() {
+                continue;
+            }
+            let deps = resolve_dependency_ids_for_symbol(
+                symbol_node,
+                package_dir_str,
+                normalized_pkg_dir.as_str(),
+                &normalized_abs_cache,
+                &module_specifier_cache,
+                &closure_cache,
+                &file_local_to_ids,
+                &name_to_ids,
+                &id_to_file_path,
+                &all_imports_per_file,
+                &triple_slash_edges,
+                has_ref_edges,
+                protocol_regex,
+            );
+            symbol_node.dependencies = SharedVec::from(deps);
+            symbol_node.raw_dependencies.clear();
+        }
     }
     profile::profile_log(
         &graph_profile_label(&package_info.name, "graph.resolve_deps"),

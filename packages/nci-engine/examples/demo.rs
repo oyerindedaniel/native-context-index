@@ -4,9 +4,11 @@
 //!
 //! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (serialize package indexing),
 //! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (`NCI_PROFILE=1`),
-//! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling).
+//! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling),
+//! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing).
 //!
 //! Env: `NCI_INDEX_NO_CACHE=1` is the same as `--no-package-cache` (handy when you cannot pass flags).
+//! `NCI_PARALLEL_RESOLVE_DEPS=0` is the same as `--no-parallel-resolve-deps`.
 //!
 //! # Diagnostics
 //!
@@ -28,6 +30,13 @@ use nci_engine::pipeline::{
     GraphSource, IndexOptions, dedupe_packages_by_canonical_dir, index_packages,
 };
 use nci_engine::scanner::scan_packages;
+
+fn load_engine_dotenv(engine_dir: &std::path::Path) {
+    let path = engine_dir.join(".env");
+    if path.is_file() {
+        let _ = dotenvy::from_path(path);
+    }
+}
 
 fn try_init_tracing_from_env() {
     static INIT: OnceLock<()> = OnceLock::new();
@@ -55,6 +64,10 @@ fn try_init_tracing_from_env() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let engine_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = engine_dir.join("../..");
+    load_engine_dotenv(&engine_dir);
+
     let args: Vec<String> = env::args().collect();
     let mut target_packages_args: Vec<String> = Vec::new();
     let mut output_path = String::from("nci-report-rust.json");
@@ -63,6 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pretty_json = false;
     let mut profile_phases = false;
     let mut no_package_cache = false;
+    let mut no_parallel_resolve_deps = false;
 
     let mut current_index = 1;
     while current_index < args.len() {
@@ -90,6 +104,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--no-package-cache" => {
                 no_package_cache = true;
             }
+            "--no-parallel-resolve-deps" => {
+                no_parallel_resolve_deps = true;
+            }
             _ => {}
         }
         current_index += 1;
@@ -100,6 +117,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(false)
     {
         no_package_cache = true;
+    }
+    if let Ok(raw) = env::var("NCI_PARALLEL_RESOLVE_DEPS") {
+        let lower = raw.to_lowercase();
+        if lower == "0" || lower == "false" || lower == "off" {
+            no_parallel_resolve_deps = true;
+        }
     }
 
     if profile_phases {
@@ -115,9 +138,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Same resolution order as the JS demo: repo → `packages/nci-core` → this crate so pnpm
     // hoists merge identically; manifest-dir paths stay correct when CWD is the repo root.
-    let engine_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scan_paths = [
-        engine_dir.join("../..").join("node_modules"),
+        repo_root.join("node_modules"),
         engine_dir.join("..").join("nci-core").join("node_modules"),
         engine_dir.join("node_modules"),
     ];
@@ -154,12 +176,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let scan_dedupe_duration = wall_start.elapsed();
 
-    let project_root = engine_dir.join("../..");
     let index_options = Some(IndexOptions {
         max_hops: 10,
         parallel: !use_sequential,
-        project_root: Some(project_root),
+        project_root: Some(repo_root.clone()),
         enable_package_cache: !no_package_cache,
+        parallel_resolve_deps: !no_parallel_resolve_deps,
         ..Default::default()
     });
 
@@ -267,6 +289,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     );
     println!(
+        "   Resolve deps:    {}",
+        if no_parallel_resolve_deps {
+            "sequential"
+        } else {
+            "parallel"
+        }
+    );
+    println!(
         "   Total packages:  {} ({} cached, {} crawled)",
         indexed_results.len(),
         cached_count,
@@ -328,6 +358,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let report_data = serde_json::json!({
             "generatedAt": "now",
             "indexMode": mode_label,
+            "parallelResolveDeps": !no_parallel_resolve_deps,
             "timingsMs": {
                 "scanDedupe": (scan_dedupe_duration.as_secs_f64() * 1000.0).round() as u64,
                 "indexPackagesWall": (index_wall_ms).round() as u64,

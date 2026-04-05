@@ -23,6 +23,7 @@ tracing = "0.1"
 dashmap = "6.1.0"
 
 [dev-dependencies]
+dotenvy = "0.15.7"
 insta = { version = "1.46.3", features = ["json"] }
 tempfile = "3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -35,6 +35,9 @@ pub struct IndexOptions {
 
     /// Package-name filtering (ignore patterns, dep sections, CLI globs).
     pub filter: FilterConfig,
+
+    /// Parallel symbol dependency resolution in graph build (see [`crate::crawler::CrawlOptions`]).
+    pub parallel_resolve_deps: bool,
 }
 
 impl Default for IndexOptions {
@@ -46,6 +49,7 @@ impl Default for IndexOptions {
             db_path: None,
             project_root: None,
             filter: FilterConfig::default(),
+            parallel_resolve_deps: true,
         }
     }
 }
@@ -124,6 +128,7 @@ pub fn index_packages(
             } else {
                 None
             },
+            parallel_resolve_deps: index_opts.parallel_resolve_deps,
         })
     };
 
