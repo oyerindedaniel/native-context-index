@@ -113,7 +113,7 @@ for (const pkg of packagesToIndex) {
   process.stdout.write(`   ${pkg.name}...`);
 
   try {
-    const graph = buildPackageGraph(pkg, { maxDepth: 10 });
+    const graph = buildPackageGraph(pkg, { maxHops: 10 });
 
     reports.push({
       name: pkg.name,

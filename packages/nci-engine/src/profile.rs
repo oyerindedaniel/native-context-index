@@ -4,7 +4,7 @@ use std::io::Write;
 
 const NCI_PROFILE: &str = "NCI_PROFILE";
 
-/// True when phase-level timing should be printed to stderr (same env as TypeScript).
+/// True when phase-level timing should be printed to stderr.
 pub fn phases_enabled() -> bool {
     std::env::var(NCI_PROFILE)
         .map(|value| value == "1")
@@ -16,7 +16,8 @@ pub fn profile_log(label: &str, ms: f64) {
     if !phases_enabled() {
         return;
     }
-    let _ = writeln!(std::io::stderr(), "  [profile] {:<24} {:.1}ms", label, ms);
+    let mut stderr = std::io::stderr().lock();
+    let _ = writeln!(stderr, "  [profile] {:<24} {:.1}ms", label, ms);
 }
 
 /// Log a non-timing value when profiling is enabled.
@@ -24,5 +25,6 @@ pub fn profile_stat(label: &str, value: impl std::fmt::Display) {
     if !phases_enabled() {
         return;
     }
-    let _ = writeln!(std::io::stderr(), "  [profile] {:<24} {}", label, value);
+    let mut stderr = std::io::stderr().lock();
+    let _ = writeln!(stderr, "  [profile] {:<24} {}", label, value);
 }

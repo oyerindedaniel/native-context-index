@@ -1,7 +1,7 @@
 use phf::phf_set;
 
-/// The default maximum recursion depth for crawling re-exports.
-pub const DEFAULT_MAX_DEPTH: usize = 10;
+/// Default cap on discovery edges from each package entry (`0` = entry files only).
+pub const DEFAULT_MAX_HOPS: usize = 10;
 
 /// The maximum recursion depth for complex type expansion (Object Spreads & Mixins).
 pub const MAX_RECURSION_DEPTH: usize = 10;
@@ -106,8 +106,7 @@ mod tests {
 
     #[test]
     fn recursion_caps_stay_in_sync() {
-        // `DEFAULT_MAX_DEPTH` (crawl) and `MAX_RECURSION_DEPTH` (type expansion) both cap at 10.
-        assert_eq!(DEFAULT_MAX_DEPTH, 10);
+        assert_eq!(DEFAULT_MAX_HOPS, 10);
         assert_eq!(MAX_RECURSION_DEPTH, 10);
     }
 }

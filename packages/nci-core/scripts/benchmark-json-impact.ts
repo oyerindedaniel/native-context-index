@@ -80,7 +80,7 @@ if (pkgName) {
 console.log(`Package: ${info.name}@${info.version}`);
 
 const buildStart = performance.now();
-const graph = buildPackageGraph(info, { maxDepth: 10 });
+const graph = buildPackageGraph(info, { maxHops: 10 });
 const buildMillis = Math.round(performance.now() - buildStart);
 console.log(`buildPackageGraph: ${buildMillis}ms | symbols=${graph.totalSymbols} files=${graph.totalFiles}`);
 

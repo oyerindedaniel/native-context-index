@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
+use dashmap::DashMap;
 use regex::Regex;
 
 static VERSION_RANGE_REGEX: LazyLock<Regex> =
@@ -690,6 +691,22 @@ pub fn normalize_path(file_path: &Path) -> SharedString {
 /// Like [`normalize_path`], but reuses prior canonicalizations in `cache` (same `PathBuf` key).
 pub fn normalize_path_with_cache(
     cache: &mut HashMap<PathBuf, SharedString>,
+    file_path: &Path,
+) -> SharedString {
+    let canonical = file_path
+        .canonicalize()
+        .unwrap_or_else(|_| file_path.to_path_buf());
+    if let Some(cached) = cache.get(&canonical) {
+        return cached.clone();
+    }
+    let result = normalize_path_from_canonical(&canonical);
+    cache.insert(canonical, result.clone());
+    result
+}
+
+/// Like [`normalize_path_with_cache`], but the cache is a [`DashMap`].
+pub fn normalize_path_with_dashmap(
+    cache: &DashMap<PathBuf, SharedString>,
     file_path: &Path,
 ) -> SharedString {
     let canonical = file_path

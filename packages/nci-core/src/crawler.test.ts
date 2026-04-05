@@ -83,7 +83,7 @@ describe("crawl", () => {
   it("respects the max depth limit", () => {
     const result = crawl(
       path.join(FIXTURES_DIR, "deep-chain", "index.d.ts"),
-      { maxDepth: 1 }
+      { maxHops: 1 }
     );
 
     const names = result.exports.map((exportItem) => exportItem.name);
@@ -389,7 +389,7 @@ describe("crawl", () => {
   describe("Deep Symbol Resolution (Cross-Package)", () => {
     it("resolves symbols through multiple external package re-exports", () => {
       const entryFile = path.join(FIXTURES_DIR, "cross-package-resolution", "meta-package", "index.d.ts");
-      const result = crawl(entryFile, { maxDepth: 5 });
+      const result = crawl(entryFile, { maxHops: 5 });
 
       expect(result.visitedFiles.length).toBe(3);
       

@@ -34,7 +34,7 @@ try {
   );
 
   const entryFile = path.join(mainPkgDir, "index.d.ts");
-  const crawlResult = crawl(entryFile, { maxDepth: 5 });
+  const crawlResult = crawl(entryFile, { maxHops: 5 });
 
   const sharedTypeSymbols = crawlResult.exports.filter(
     (symbolEntry) => symbolEntry.name === "SharedType"

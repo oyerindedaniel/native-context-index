@@ -275,7 +275,7 @@ describe("real-library pipeline (all packages)", () => {
 
     for (const pkg of allPackages) {
       try {
-        const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+        const graph = buildPackageGraph(pkg, { maxHops: 3 });
         validateGraph(graph);
         results.push({
           name: pkg.name,
@@ -325,7 +325,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@types/node");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 2 });
+    const graph = buildPackageGraph(pkg, { maxHops: 2 });
     validateGraph(graph);
     expect(graph.totalSymbols).toBeGreaterThan(0);
     expect(graph.totalFiles).toBeGreaterThan(1);
@@ -342,7 +342,7 @@ describe("real-library pipeline (all packages)", () => {
     console.log(`\n   typescript: entries=${entry.typesEntries.length}`);
 
     if (entry.typesEntries.length > 0) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 2 });
+      const graph = buildPackageGraph(pkg, { maxHops: 2 });
       validateGraph(graph);
       console.log(`   typescript: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -354,7 +354,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/types");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`\n   @typescript-eslint/types: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
@@ -365,7 +365,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/utils");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`\n   @typescript-eslint/utils: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
@@ -376,7 +376,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/scope-manager");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`\n   @typescript-eslint/scope-manager: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
@@ -389,7 +389,7 @@ describe("real-library pipeline (all packages)", () => {
 
     const entry = resolveTypesEntry(pkg.dir);
     if (entry.typesEntries.length > 0) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+      const graph = buildPackageGraph(pkg, { maxHops: 3 });
       validateGraph(graph);
       console.log(`\n   eslint: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -403,7 +403,7 @@ describe("real-library pipeline (all packages)", () => {
 
     const entry = resolveTypesEntry(pkg.dir);
     if (entry.typesEntries.length > 0) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+      const graph = buildPackageGraph(pkg, { maxHops: 3 });
       validateGraph(graph);
       console.log(`\n   prettier: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -417,7 +417,7 @@ describe("real-library pipeline (all packages)", () => {
 
     const entry = resolveTypesEntry(pkg.dir);
     if (entry.typesEntries.length > 0) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+      const graph = buildPackageGraph(pkg, { maxHops: 3 });
       validateGraph(graph);
       console.log(`\n   vitest: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -429,7 +429,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/parser");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`\n   @typescript-eslint/parser: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
@@ -440,7 +440,7 @@ describe("real-library pipeline (all packages)", () => {
     const pkg = allPkgs.find((candidate) => candidate.name === "@typescript-eslint/typescript-estree");
     if (!pkg) return;
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`\n   @typescript-eslint/typescript-estree: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
   });
@@ -452,7 +452,7 @@ describe("real-library pipeline (all packages)", () => {
 
     console.log(`\n   Found ${eslintPkgs.length} @eslint/* packages`);
     for (const pkg of eslintPkgs) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 2 });
+      const graph = buildPackageGraph(pkg, { maxHops: 2 });
       validateGraph(graph);
       console.log(`   ${pkg.name}: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -465,7 +465,7 @@ describe("real-library pipeline (all packages)", () => {
 
     console.log(`\n   Found ${plugins.length} eslint-plugin-* packages`);
     for (const pkg of plugins) {
-      const graph = buildPackageGraph(pkg, { maxDepth: 2 });
+      const graph = buildPackageGraph(pkg, { maxHops: 2 });
       validateGraph(graph);
       console.log(`   ${pkg.name}: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
     }
@@ -488,7 +488,7 @@ describe("real-library pipeline (all packages)", () => {
     const entry = resolveTypesEntry(pkg.dir);
     console.log(`\n   effect: entries=${entry.typesEntries.length}`);
 
-    const graph = buildPackageGraph(pkg, { maxDepth: 3 });
+    const graph = buildPackageGraph(pkg, { maxHops: 3 });
     validateGraph(graph);
     console.log(`   effect: ${graph.totalSymbols} symbols, ${graph.totalFiles} files`);
 

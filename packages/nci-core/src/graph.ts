@@ -666,7 +666,7 @@ function flattenInheritedMembers(
   }
 }
 
-/** BFS closure of files reachable from `startAbs` via direct `/// <reference path` edges. */
+/** All declaration files reachable from `startAbs` by following only `/// <reference path` edges. */
 function tripleSlashReferenceClosure(startAbs: string, edges: Record<string, string[]>): string[] {
   const visited = new Set<string>();
   const queue: string[] = [startAbs];

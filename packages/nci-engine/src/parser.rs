@@ -16,7 +16,7 @@ static TRIPLE_SLASH_PATH_RE: LazyLock<Regex> =
 static TRIPLE_SLASH_TYPES_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"///\s*<reference\s+types\s*=\s*"([^"]+)"\s*/>"#).unwrap());
 
-use crate::constants::{BUILTIN_TYPES, VISIBILITY_TAGS};
+use crate::constants::{BUILTIN_TYPES, MAX_RECURSION_DEPTH, VISIBILITY_TAGS};
 use crate::resolver::{normalize_path, resolve_module_specifier};
 use crate::types::{
     Deprecation, ParsedExport, ParsedImport, SharedString, SharedVec, SymbolKind, SymbolSpace,
@@ -2105,7 +2105,7 @@ fn extract_complex_type_members<'a>(
     depth: usize,
     definition_site: Option<SharedString>,
 ) {
-    if depth > 10 {
+    if depth > MAX_RECURSION_DEPTH {
         return;
     }
     match ts_type {
@@ -2319,7 +2319,7 @@ fn extract_type_literal_members<'a>(
     depth: usize,
     definition_site: Option<SharedString>,
 ) {
-    if depth > 10 {
+    if depth > MAX_RECURSION_DEPTH {
         return;
     }
     for member in members {

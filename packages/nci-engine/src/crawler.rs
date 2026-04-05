@@ -1,28 +1,35 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::constants::DEFAULT_MAX_DEPTH;
+use dashmap::DashMap;
+use rayon::prelude::*;
+
+use crate::constants::DEFAULT_MAX_HOPS;
 use crate::dedupe::symbol_dedupe_key;
 use crate::parser;
+use crate::parser::ParseResult;
 use crate::profile;
-use crate::resolver::{normalize_path, normalize_path_with_cache, resolve_module_specifier};
+use crate::resolver::{
+    normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
+};
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
 };
 
 #[derive(Debug, Clone)]
 pub struct CrawlOptions {
-    pub max_depth: usize,
-    /// When `NCI_PROFILE=1`, timings include this package name (parallel `index_packages`).
+    /// Upper bound on unweighted discovery edges from each package entry (`0` = entry files only).
+    pub max_hops: usize,
+    /// When `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
 }
 
 impl Default for CrawlOptions {
     fn default() -> Self {
         Self {
-            max_depth: DEFAULT_MAX_DEPTH,
+            max_hops: DEFAULT_MAX_HOPS,
             profile_as: None,
         }
     }
@@ -38,14 +45,12 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         }
     };
 
-    let mut session = CrawlSession::new(crawl_options.max_depth);
+    let mut session = CrawlSession::new(crawl_options.max_hops);
 
     let primary_entry = entry_file_paths.first().cloned().unwrap_or_default();
 
     let discover_start = Instant::now();
-    for entry_path in entry_file_paths {
-        session.discover_files(entry_path, 0);
-    }
+    session.discover_linked_files(entry_file_paths);
     profile::profile_log(
         &profile_label("crawl.discover"),
         discover_start.elapsed().as_secs_f64() * 1000.0,
@@ -60,8 +65,7 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let unique_entries: Vec<&SharedString> = entry_file_paths
         .iter()
         .filter(|path| {
-            let norm =
-                normalize_path_with_cache(&mut session.path_norm_cache, Path::new(path.as_ref()));
+            let norm = session.norm_path(Path::new(path.as_ref()));
             seen_entries.insert(norm)
         })
         .collect();
@@ -219,7 +223,7 @@ struct CrawlSession {
     /// Files we've already visited (prevents re-parsing).
     visited: HashSet<SharedString>,
 
-    /// Circular reference chains detected during discovery.
+    /// Skipped discovery edges `from -> to` where `to` was already discovered (sorted).
     circular_refs: Vec<String>,
 
     /// Package names from `/// <reference types="..." />` directives.
@@ -240,31 +244,24 @@ struct CrawlSession {
     /// Whether each parsed file is an external module.
     file_is_external_module: HashMap<SharedString, bool>,
 
-    /// Path set for circular detection during discovery (DFS ancestry).
-    discovery_path_set: HashSet<SharedString>,
-
-    /// Path stack for circular detection during discovery.
-    discovery_path_stack: Vec<SharedString>,
-
     /// Path set for circular detection during resolution.
     resolution_path: HashSet<SharedString>,
 
     /// Cache of resolved symbols per file.
     resolution_cache: HashMap<SharedString, Arc<Vec<ResolvedSymbol>>>,
 
-    /// Canonical filesystem path → normalized absolute path string (see `normalize_path_with_cache`).
-    path_norm_cache: HashMap<PathBuf, SharedString>,
+    /// Canonical `PathBuf` → normalized absolute path string.
+    path_norm_cache: DashMap<PathBuf, SharedString>,
 
-    /// `(specifier, from_file)` → resolved absolute paths; avoids repeated filesystem walks,
-    /// package.json reads, and `canonicalize` calls for the same resolution.
-    module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>>,
+    /// `(specifier, from_file)` → candidate absolute declaration paths from `resolve_module_specifier`.
+    module_specifier_cache: DashMap<(SharedString, SharedString), Vec<SharedString>>,
 
-    /// Maximum depth for re-export following.
-    max_depth: usize,
+    /// Same bound as [`CrawlOptions::max_hops`] for this session.
+    max_hops: usize,
 }
 
 impl CrawlSession {
-    fn new(max_depth: usize) -> Self {
+    fn new(max_hops: usize) -> Self {
         Self {
             visited: HashSet::new(),
             circular_refs: Vec::new(),
@@ -274,20 +271,21 @@ impl CrawlSession {
             raw_imports: HashMap::new(),
             raw_references: HashMap::new(),
             file_is_external_module: HashMap::new(),
-            discovery_path_set: HashSet::new(),
-            discovery_path_stack: Vec::new(),
             resolution_path: HashSet::new(),
             resolution_cache: HashMap::new(),
-            path_norm_cache: HashMap::new(),
-            module_specifier_cache: HashMap::new(),
-            max_depth,
+            path_norm_cache: DashMap::new(),
+            module_specifier_cache: DashMap::new(),
+            max_hops,
         }
     }
 
-    /// Cached wrapper around [`resolve_module_specifier`].  Avoids repeated
-    /// `canonicalize` + `find_package_dir` + `read_to_string(package.json)` for
-    /// the same `(specifier, from_file)` pair across discovery and resolution.
-    fn cached_resolve(&mut self, specifier: &str, from_file: &str) -> Vec<SharedString> {
+    #[inline]
+    fn norm_path(&self, file_path: &Path) -> SharedString {
+        normalize_path_with_dashmap(&self.path_norm_cache, file_path)
+    }
+
+    /// Cached wrapper around [`resolve_module_specifier`].
+    fn cached_resolve(&self, specifier: &str, from_file: &str) -> Vec<SharedString> {
         let key = (SharedString::from(specifier), SharedString::from(from_file));
         if let Some(cached) = self.module_specifier_cache.get(&key) {
             return cached.clone();
@@ -297,129 +295,171 @@ impl CrawlSession {
         result
     }
 
-    /// Recursively discovers all files reachable from an entry point.
-    /// Scans re-exports, imports, and triple-slash references.
-    fn discover_files(&mut self, file_path: &SharedString, depth: usize) {
-        let normalized_path =
-            normalize_path_with_cache(&mut self.path_norm_cache, Path::new(file_path.as_ref()));
+    /// Walks re-export / import / triple-slash / dependency edges from entries up to `max_hops`.
+    fn discover_linked_files(&mut self, entry_paths: &[SharedString]) {
+        let mut hop: HashMap<SharedString, usize> = HashMap::new();
+        let mut circular_acc: BTreeSet<String> = BTreeSet::new();
+        let mut current_layer: Vec<SharedString> = Vec::new();
 
-        if depth > self.max_depth {
-            return;
-        }
-
-        if !Path::new(normalized_path.as_ref()).exists() {
-            return;
-        }
-
-        // Circular detection during discovery (DFS ancestry)
-        if self.discovery_path_set.contains(&normalized_path) {
-            let stack: Vec<&str> = self
-                .discovery_path_stack
-                .iter()
-                .map(|path| path.as_ref())
-                .collect();
-            self.circular_refs.push(format!(
-                "{} -> {}",
-                stack.join(" -> "),
-                normalized_path.as_ref()
-            ));
-            return;
-        }
-
-        if self.visited.contains(&normalized_path) {
-            return;
-        }
-
-        self.visited.insert(normalized_path.clone());
-        self.discovery_path_set.insert(normalized_path.clone());
-        self.discovery_path_stack.push(normalized_path.clone());
-
-        let parse_result = match parser::parse_file(&normalized_path) {
-            Some(result) => result,
-            None => {
-                self.discovery_path_stack.pop();
-                self.discovery_path_set.remove(&normalized_path);
-                return;
+        for entry_path in entry_paths {
+            let normalized_entry = self.norm_path(Path::new(entry_path.as_ref()));
+            if !Path::new(normalized_entry.as_ref()).exists() {
+                continue;
             }
-        };
+            if hop.insert(normalized_entry.clone(), 0).is_none() {
+                self.visited.insert(normalized_entry.clone());
+                current_layer.push(normalized_entry);
+            }
+        }
+        current_layer.sort();
+        current_layer.dedup();
 
-        for package in parse_result.type_references.iter() {
-            self.type_ref_packages.insert(package.clone());
+        while !current_layer.is_empty() {
+            let parsed: Vec<(SharedString, Option<ParseResult>)> = current_layer
+                .par_iter()
+                .map(|declaration_path| {
+                    let parse_result = parser::parse_file(declaration_path.as_ref());
+                    (declaration_path.clone(), parse_result)
+                })
+                .collect();
+
+            let mut parsed_sorted = parsed;
+            parsed_sorted.sort_by(|pair_left, pair_right| pair_left.0.cmp(&pair_right.0));
+
+            let mut next_layer: Vec<SharedString> = Vec::new();
+
+            for (normalized_path, maybe_pr) in parsed_sorted {
+                let from_hop = hop[&normalized_path];
+                let Some(parse_result) = maybe_pr else {
+                    continue;
+                };
+
+                for package in parse_result.type_references.iter() {
+                    self.type_ref_packages.insert(package.clone());
+                }
+                self.raw_exports.insert(
+                    normalized_path.clone(),
+                    parse_result.exports.iter().cloned().collect(),
+                );
+                self.raw_imports.insert(
+                    normalized_path.clone(),
+                    parse_result.imports.iter().cloned().collect(),
+                );
+                self.raw_references.insert(
+                    normalized_path.clone(),
+                    parse_result.references.iter().cloned().collect(),
+                );
+                self.file_is_external_module.insert(
+                    normalized_path.clone(),
+                    parse_result.is_external_module,
+                );
+
+                let (triple_edges, mut targets) =
+                    self.enumerate_discovery_edges(&normalized_path, &parse_result);
+                for (referrer_path, referenced_path) in triple_edges {
+                    self.triple_slash_ref_targets
+                        .entry(referrer_path)
+                        .or_default()
+                        .insert(referenced_path);
+                }
+
+                targets.sort();
+                targets.dedup();
+                let candidate_hop = from_hop + 1;
+                if candidate_hop > self.max_hops {
+                    continue;
+                }
+                for target_path in targets {
+                    if !Path::new(target_path.as_ref()).exists() {
+                        continue;
+                    }
+                    if hop.contains_key(&target_path) {
+                        circular_acc.insert(format!(
+                            "{} -> {}",
+                            normalized_path.as_ref(),
+                            target_path.as_ref()
+                        ));
+                        continue;
+                    }
+                    hop.insert(target_path.clone(), candidate_hop);
+                    self.visited.insert(target_path.clone());
+                    next_layer.push(target_path);
+                }
+            }
+
+            next_layer.sort();
+            next_layer.dedup();
+            current_layer = next_layer;
         }
 
-        self.raw_exports
-            .insert(normalized_path.clone(), parse_result.exports.to_vec());
-        self.raw_imports
-            .insert(normalized_path.clone(), parse_result.imports.to_vec());
-        self.raw_references
-            .insert(normalized_path.clone(), parse_result.references.to_vec());
-        self.file_is_external_module
-            .insert(normalized_path.clone(), parse_result.is_external_module);
+        self.circular_refs = circular_acc.into_iter().collect();
+    }
+
+    /// Triple-slash reference edges plus targets from export `source`, imports, and dependency specifiers.
+    fn enumerate_discovery_edges(
+        &self,
+        normalized_path: &SharedString,
+        parse_result: &ParseResult,
+    ) -> (Vec<(SharedString, SharedString)>, Vec<SharedString>) {
+        let mut triple_edges = Vec::new();
+        let mut targets = Vec::new();
 
         for reference in parse_result.references.iter() {
-            let resolved_paths = self.cached_resolve(reference.as_ref(), &normalized_path);
+            let resolved_paths = self.cached_resolve(reference.as_ref(), normalized_path.as_ref());
             if !resolved_paths.is_empty() {
                 for ref_path in &resolved_paths {
-                    let from_k = normalized_path.clone();
-                    let to_k = normalize_path_with_cache(
-                        &mut self.path_norm_cache,
-                        Path::new(ref_path.as_ref()),
-                    );
-                    self.triple_slash_ref_targets
-                        .entry(from_k)
-                        .or_default()
-                        .insert(to_k);
-                    self.discover_files(ref_path, depth + 1);
+                    let referenced = self.norm_path(Path::new(ref_path.as_ref()));
+                    triple_edges.push((normalized_path.clone(), referenced.clone()));
+                    targets.push(referenced);
                 }
-            } else {
-                let ref_path = resolve_triple_slash_ref(reference.as_ref(), &normalized_path);
-                if let Some(ref_path) = ref_path {
-                    let from_k = normalized_path.clone();
-                    let to_k = normalize_path_with_cache(
-                        &mut self.path_norm_cache,
-                        Path::new(ref_path.as_ref()),
-                    );
-                    self.triple_slash_ref_targets
-                        .entry(from_k)
-                        .or_default()
-                        .insert(to_k);
-                    self.discover_files(&ref_path, depth + 1);
-                }
+            } else if let Some(ref_path) =
+                resolve_triple_slash_ref(reference.as_ref(), normalized_path)
+            {
+                let referenced = self.norm_path(Path::new(ref_path.as_ref()));
+                triple_edges.push((normalized_path.clone(), referenced.clone()));
+                targets.push(referenced);
             }
         }
 
         for export_entry in parse_result.exports.iter() {
             if let Some(source) = &export_entry.source {
-                let source_paths = self.cached_resolve(source.as_ref(), &normalized_path);
+                let source_paths = self.cached_resolve(source.as_ref(), normalized_path.as_ref());
                 for source_path in &source_paths {
-                    self.discover_files(source_path, depth + 1);
+                    targets.push(self.norm_path(Path::new(source_path.as_ref())));
                 }
             }
         }
 
         for import_entry in parse_result.imports.iter() {
             let imported_paths =
-                self.cached_resolve(import_entry.source.as_ref(), &normalized_path);
+                self.cached_resolve(import_entry.source.as_ref(), normalized_path.as_ref());
             for imported_path in &imported_paths {
-                self.discover_files(imported_path, depth + 1);
+                targets.push(self.norm_path(Path::new(imported_path.as_ref())));
             }
         }
 
         for export_entry in parse_result.exports.iter() {
-            for dep in export_entry.dependencies.iter() {
-                if let Some(spec) = dep.import_path.as_ref() {
-                    let dep_paths = self.cached_resolve(spec.as_ref(), &normalized_path);
+            for dependency in export_entry.dependencies.iter() {
+                if let Some(import_specifier) = dependency.import_path.as_ref() {
+                    let dep_paths =
+                        self.cached_resolve(import_specifier.as_ref(), normalized_path.as_ref());
                     for dep_path in &dep_paths {
-                        if dep_path.as_ref() != spec.as_ref() {
-                            self.discover_files(dep_path, depth + 1);
+                        if dep_path.as_ref() != import_specifier.as_ref() {
+                            targets.push(self.norm_path(Path::new(dep_path.as_ref())));
                         }
                     }
                 }
             }
         }
 
-        self.discovery_path_stack.pop();
-        self.discovery_path_set.remove(&normalized_path);
+        triple_edges.sort_by(|(from_left, to_left), (from_right, to_right)| {
+            from_left
+                .cmp(from_right)
+                .then_with(|| to_left.cmp(to_right))
+        });
+        targets.sort();
+        targets.dedup();
+        (triple_edges, targets)
     }
 
     /// Resolves all public symbols from a file by following its export chain.
@@ -429,10 +469,9 @@ impl CrawlSession {
         depth: usize,
         name_prefix: &str,
     ) -> Arc<Vec<ResolvedSymbol>> {
-        let normalized_path =
-            normalize_path_with_cache(&mut self.path_norm_cache, Path::new(file_path.as_ref()));
+        let normalized_path = self.norm_path(Path::new(file_path.as_ref()));
 
-        if depth > self.max_depth || self.resolution_path.contains(&normalized_path) {
+        if depth > self.max_hops || self.resolution_path.contains(&normalized_path) {
             return Arc::new(Vec::new());
         }
 
@@ -470,7 +509,7 @@ impl CrawlSession {
             .unwrap_or_default();
 
         for reference in &triple_slash_refs {
-            let resolved_paths = self.cached_resolve(reference.as_ref(), &normalized_path);
+            let resolved_paths = self.cached_resolve(reference.as_ref(), normalized_path.as_ref());
             let ref_paths: Vec<SharedString> = if !resolved_paths.is_empty() {
                 resolved_paths
             } else {
@@ -638,7 +677,7 @@ impl CrawlSession {
             None => return results,
         };
 
-        let source_paths = self.cached_resolve(source.as_ref(), current_file);
+        let source_paths = self.cached_resolve(source.as_ref(), current_file.as_ref());
 
         if source_paths.is_empty() {
             // Unresolvable source — create a stub symbol if not wildcard
@@ -734,10 +773,7 @@ impl CrawlSession {
                 }
             } else {
                 // Target not found in nested — create a stub from the first source
-                let defined_in = normalize_path_with_cache(
-                    &mut self.path_norm_cache,
-                    Path::new(source_paths[0].as_ref()),
-                );
+                let defined_in = self.norm_path(Path::new(source_paths[0].as_ref()));
                 results.push(ResolvedSymbol {
                     name: SharedString::from(full_name.as_ref()),
                     defined_in,
@@ -973,7 +1009,7 @@ mod tests {
     }
 
     #[test]
-    fn crawl_respects_depth_limit() {
+    fn crawl_respects_max_hops_zero() {
         let temp_dir = TempDir::new().unwrap();
 
         write_dts(
@@ -991,13 +1027,12 @@ mod tests {
         let result = crawl(
             &[entry],
             Some(CrawlOptions {
-                max_depth: 0,
+                max_hops: 0,
                 ..Default::default()
             }),
         );
 
-        // With max_depth=0, we should only parse the entry file, not follow re-exports
-        // The deepFunc should not be fully resolved
+        // max_hops = 0: only the entry file is read; re-export target is not visited.
         assert!(result.visited_files.len() <= 1);
     }
 

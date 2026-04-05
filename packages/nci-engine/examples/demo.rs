@@ -1,8 +1,8 @@
 //! Full-workspace demo: merges repo / `nci-core` / `nci-engine` `node_modules`, dedupes by
 //! canonical package directory, then indexes with [`nci_engine::pipeline::index_packages`]
-//! (parallel Rayon by default).
+//! (concurrent per package unless `--sequential`).
 //!
-//! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (disable parallelism),
+//! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (serialize package indexing),
 //! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (`NCI_PROFILE=1`),
 //! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling).
 //!
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let project_root = engine_dir.join("../..");
     let index_options = Some(IndexOptions {
-        max_depth: 10,
+        max_hops: 10,
         parallel: !use_sequential,
         project_root: Some(project_root),
         enable_package_cache: !no_package_cache,

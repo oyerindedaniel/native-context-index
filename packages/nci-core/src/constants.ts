@@ -1,7 +1,11 @@
 import ts from "typescript";
 
-/** The default maximum recursion depth for crawling re-exports. */
-export const DEFAULT_MAX_DEPTH = 10;
+/** Default cap on discovery edges from each package entry. */
+export const DEFAULT_MAX_HOPS = 10;
+
+/** The maximum recursion depth for complex type expansion (Object Spreads & Mixins) */
+export const MAX_RECURSION_DEPTH = 10;
+
 
 /** Built-in type names that should NOT be treated as dependencies */
 export const BUILTIN_TYPES = new Set([
@@ -46,5 +50,3 @@ export const DECLARATION_KINDS = new Set<ts.SyntaxKind>([
   ts.SyntaxKind.VariableStatement,
 ]);
 
-/** The maximum recursion depth for complex type expansion (Object Spreads & Mixins) */
-export const MAX_RECURSION_DEPTH = 10;

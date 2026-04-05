@@ -4,13 +4,13 @@ import ts from "typescript";
 import { parseFile } from "./parser.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
-import { DEFAULT_MAX_DEPTH } from "./constants.js";
+import { DEFAULT_MAX_HOPS } from "./constants.js";
 import { normalizeSignature, symbolDedupeKey } from "./dedupe.js";
 import { nciProfileEnabled, profileLog, profileStat } from "./nci-log-flags.js";
 
 export interface CrawlOptions {
-  /** Maximum depth for following re-exports (default: 10) */
-  maxDepth?: number;
+  /** Upper bound on discovery edges from each package entry (default 10). */
+  maxHops?: number;
 }
 
 /** Crawl one or more .d.ts files, following all re-exports recursively. */
@@ -18,7 +18,7 @@ export function crawl(
   entryFilePaths: string | string[],
   options: CrawlOptions = {}
 ): CrawlResult {
-  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const maxHops = options.maxHops ?? DEFAULT_MAX_HOPS;
   const visited = new Set<string>();
   const circularRefs: string[] = [];
   const resolvedSymbols: ResolvedSymbol[] = [];
@@ -29,8 +29,6 @@ export function crawl(
   const allRawReferences = new Map<string, string[]>();
   const tripleSlashRefTargets = new Map<string, Set<string>>();
   const fileIsExternalModule = new Map<string, boolean>();
-  const discoveryPathSet = new Set<string>();
-  const discoveryPathStack: string[] = [];
   const resolutionPath = new Set<string>();
   const resolutionCache = new Map<string, ResolvedSymbol[]>();
 
@@ -51,11 +49,9 @@ export function crawl(
   }
 
   const discoveryStart = performance.now();
-  for (const entryPath of entries) {
-    discoverFiles(entryPath, 0);
-  }
+  discoverLinkedFiles();
   if (crawlProfiling) {
-    profileLog("  crawl:discoverFiles", performance.now() - discoveryStart);
+    profileLog("  crawl:discover", performance.now() - discoveryStart);
     profileStat("  crawl:filesDiscovered", visited.size);
   }
 
@@ -167,96 +163,105 @@ export function crawl(
     left < right ? -1 : left > right ? 1 : 0
   );
 
-  return {
-    filePath: primaryEntry,
-    exports: resolvedSymbols,
-    imports: Object.fromEntries(importsSorted),
-    visitedFiles: [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
-    typeReferencePackages: [...typeRefPackages].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
-    circularRefs,
-    tripleSlashReferenceTargets,
-  };
+  function discoverLinkedFiles(): void {
+    const hop = new Map<string, number>();
+    let layer: string[] = [];
 
-/** Discover files reachable from an entry point. */
-  function discoverFiles(filePath: string, depth: number): void {
-    const normalizedPath = normalizePath(filePath);
-  
-    if (depth > maxDepth) return;
-    if (!fs.existsSync(normalizedPath)) return;
-
-    if (discoveryPathSet.has(normalizedPath)) {
-      circularRefs.push([...discoveryPathStack, normalizedPath].join(" -> "));
-      return;
-    }
-
-    if (visited.has(normalizedPath)) return;
-    visited.add(normalizedPath);
-    discoveryPathSet.add(normalizedPath);
-    discoveryPathStack.push(normalizedPath);
-
-    const {
-      exports: exportEntries,
-      imports: importEntries,
-      references: tripleSlashRefs,
-      typeReferences: typeRefDirectives,
-      isExternalModule: isExtMod,
-    } = parseFile(normalizedPath);
-
-    for (const pkg of typeRefDirectives) typeRefPackages.add(pkg);
-    allRawExports.set(normalizedPath, exportEntries);
-    allRawImports.set(normalizedPath, importEntries);
-    allRawReferences.set(normalizedPath, tripleSlashRefs);
-    fileIsExternalModule.set(normalizedPath, isExtMod);
-
-    for (const reference of tripleSlashRefs) {
-      const resolvedPaths = resolveModuleSpecifier(reference, normalizedPath);
-      if (resolvedPaths.length > 0) {
-        for (const refPath of resolvedPaths) {
-          recordTripleSlashEdge(normalizedPath, refPath);
-          discoverFiles(refPath, depth + 1);
-        }
-      } else {
-        const refPath = resolveTripleSlashRef(reference, normalizedPath);
-        if (refPath) {
-          recordTripleSlashEdge(normalizedPath, refPath);
-          discoverFiles(refPath, depth + 1);
-        }
+    for (const entryPath of entries) {
+      const normalizedEntry = normalizePath(entryPath);
+      if (!fs.existsSync(normalizedEntry)) continue;
+      if (!hop.has(normalizedEntry)) {
+        hop.set(normalizedEntry, 0);
+        visited.add(normalizedEntry);
+        layer.push(normalizedEntry);
       }
     }
+    layer = [...new Set(layer)].sort();
 
-    for (const exportEntry of exportEntries) {
-      if (exportEntry.source) {
-        const sourcePaths = resolveModuleSpecifier(exportEntry.source, normalizedPath);
-        for (const sourcePath of sourcePaths) {
-          discoverFiles(sourcePath, depth + 1);
+    while (layer.length > 0) {
+      const next = new Set<string>();
+      for (const normalizedPath of layer) {
+        const fromHop = hop.get(normalizedPath)!;
+        if (!fs.existsSync(normalizedPath)) continue;
+
+        const tryEnqueue = (absPath: string): void => {
+          if (fromHop >= maxHops) return;
+          const normalizedTarget = normalizePath(absPath);
+          if (!fs.existsSync(normalizedTarget)) return;
+          if (hop.has(normalizedTarget)) {
+            circularRefs.push(`${normalizedPath} -> ${normalizedTarget}`);
+          } else {
+            hop.set(normalizedTarget, fromHop + 1);
+            visited.add(normalizedTarget);
+            next.add(normalizedTarget);
+          }
+        };
+
+        const {
+          exports: exportEntries,
+          imports: importEntries,
+          references: tripleSlashRefs,
+          typeReferences: typeRefDirectives,
+          isExternalModule,
+        } = parseFile(normalizedPath);
+
+        for (const typeRefPackage of typeRefDirectives) {
+          typeRefPackages.add(typeRefPackage);
         }
-      }
-    }
+        allRawExports.set(normalizedPath, exportEntries);
+        allRawImports.set(normalizedPath, importEntries);
+        allRawReferences.set(normalizedPath, tripleSlashRefs);
+        fileIsExternalModule.set(normalizedPath, isExternalModule);
 
-    for (const importEntry of importEntries) {
-      if (importEntry.source) {
-        const importedPaths = resolveModuleSpecifier(importEntry.source, normalizedPath);
-        for (const importedPath of importedPaths) {
-          discoverFiles(importedPath, depth + 1);
+        for (const reference of tripleSlashRefs) {
+          const resolvedPaths = resolveModuleSpecifier(reference, normalizedPath);
+          if (resolvedPaths.length > 0) {
+            for (const refPath of resolvedPaths) {
+              recordTripleSlashEdge(normalizedPath, refPath);
+              tryEnqueue(refPath);
+            }
+          } else {
+            const refPath = resolveTripleSlashRef(reference, normalizedPath);
+            if (refPath) {
+              recordTripleSlashEdge(normalizedPath, refPath);
+              tryEnqueue(refPath);
+            }
+          }
         }
-      }
-    }
 
-    for (const exportEntry of exportEntries) {
-      if (!exportEntry.dependencies) continue;
-      for (const dep of exportEntry.dependencies) {
-        if (!dep.importPath) continue;
-        const depPaths = resolveModuleSpecifier(dep.importPath, normalizedPath);
-        for (const depPath of depPaths) {
-          if (depPath !== dep.importPath) {
-            discoverFiles(depPath, depth + 1);
+        for (const exportEntry of exportEntries) {
+          if (exportEntry.source) {
+            const sourcePaths = resolveModuleSpecifier(exportEntry.source, normalizedPath);
+            for (const sourcePath of sourcePaths) {
+              tryEnqueue(sourcePath);
+            }
+          }
+        }
+
+        for (const importEntry of importEntries) {
+          if (importEntry.source) {
+            const importedPaths = resolveModuleSpecifier(importEntry.source, normalizedPath);
+            for (const importedPath of importedPaths) {
+              tryEnqueue(importedPath);
+            }
+          }
+        }
+
+        for (const exportEntry of exportEntries) {
+          if (!exportEntry.dependencies) continue;
+          for (const dependency of exportEntry.dependencies) {
+            if (!dependency.importPath) continue;
+            const depPaths = resolveModuleSpecifier(dependency.importPath, normalizedPath);
+            for (const depPath of depPaths) {
+              if (depPath !== dependency.importPath) {
+                tryEnqueue(depPath);
+              }
+            }
           }
         }
       }
+      layer = [...next].sort();
     }
-
-    discoveryPathStack.pop();
-    discoveryPathSet.delete(normalizedPath);
   }
 
 /** Resolve all public symbols from a file by following its export chain. */
@@ -266,7 +271,7 @@ export function crawl(
     namePrefix: string = ""
   ): ResolvedSymbol[] {
     const normalizedPath = normalizePath(filePath);
-    if (depth > maxDepth || resolutionPath.has(normalizedPath)) return [];
+    if (depth > maxHops || resolutionPath.has(normalizedPath)) return [];
 
     if (!namePrefix && resolutionCache.has(normalizedPath)) {
       if (crawlProfiling) profileResolveFileCacheHits++;
@@ -579,6 +584,16 @@ export function crawl(
 
     return results;
   }
+
+  return {
+    filePath: primaryEntry,
+    exports: resolvedSymbols,
+    imports: Object.fromEntries(importsSorted),
+    visitedFiles: [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    typeReferencePackages: [...typeRefPackages].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    circularRefs: [...new Set(circularRefs)].sort((a, b) => a.localeCompare(b)),
+    tripleSlashReferenceTargets,
+  };
 }
 
 /** Resolve a triple-slash reference path relative to the current file. */

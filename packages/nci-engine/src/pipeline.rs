@@ -16,8 +16,8 @@ use crate::types::{PackageGraph, PackageInfo};
 
 #[derive(Debug, Clone)]
 pub struct IndexOptions {
-    /// Maximum depth for following re-exports within each package (default: 10).
-    pub max_depth: usize,
+    /// Upper bound on discovery edges from each package entry (default: 10).
+    pub max_hops: usize,
 
     /// Whether to run in parallel (default: true).
     /// Set to false for deterministic output ordering in tests.
@@ -40,7 +40,7 @@ pub struct IndexOptions {
 impl Default for IndexOptions {
     fn default() -> Self {
         Self {
-            max_depth: crate::constants::DEFAULT_MAX_DEPTH,
+            max_hops: crate::constants::DEFAULT_MAX_HOPS,
             parallel: true,
             enable_package_cache: true,
             db_path: None,
@@ -118,7 +118,7 @@ pub fn index_packages(
     let index_opts = options.unwrap_or_default();
     let crawl_options_factory = |package: &PackageInfo| {
         Some(CrawlOptions {
-            max_depth: index_opts.max_depth,
+            max_hops: index_opts.max_hops,
             profile_as: if crate::profile::phases_enabled() {
                 Some(package.name.clone())
             } else {
