@@ -5,9 +5,9 @@
  * processing — otherwise it creates duplicate synthetic IDs.
  *
  * Flattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name
- * `shared`, so heritage emits one row `Composite.shared` (type-side,
- * inheritedFrom Trait). `baseOnly` exists only on `Base`, so you still get
- * `Composite.prototype.baseOnly` (value-side). There is intentionally no
+ * `shared`, so heritage emits one row `Composite.shared` (type-side) whose
+ * `inheritedFromSources` lists both parent symbol ids (sorted). `baseOnly` exists only on
+ * `Base`, so you still get `Composite.prototype.baseOnly` (value-side). There is intentionally no
  * `Composite.prototype.shared` row in addition to `Composite.shared`.
  */
 
@@ -33,8 +33,8 @@ export declare class Composite extends Base {
 
 /**
  * Type-position `Composite`: merged symbol resolution shows up in this symbol's `dependencies[]`.
- * (Contrast: `Composite.shared` is flattened once from the interface side — `Trait.shared` — not
- * `Composite.prototype.shared` from `Base`.)
+ * (`Composite.shared` is a single flattened row; `inheritedFromSources` includes both
+ * `Trait.shared` and `Base.prototype.shared`.)
  */
 export declare function bridgeComposite(instance: Composite): Composite;
 

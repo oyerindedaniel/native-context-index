@@ -6,4 +6,5 @@
 export declare function crossFileMergedFn(value: string): void;
 
 import { crossFileMergedFn as crossFileMergedFnFromExtra } from "./extra-overloads.js";
-export { crossFileMergedFnFromExtra as crossFileMergedFn };
+
+export { crossFileMergedFnFromExtra };

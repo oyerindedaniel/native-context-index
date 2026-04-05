@@ -193,12 +193,21 @@ impl NciDatabase {
 
         let decorator_map = self.bulk_load_decorators(package_id);
 
+        let inherited_map = self.bulk_load_string_junction(
+            "SELECT symbol_inherited_from_sources.symbol_id, source_symbol_id_text
+             FROM symbol_inherited_from_sources
+             JOIN symbols ON symbols.symbol_id = symbol_inherited_from_sources.symbol_id
+             WHERE symbols.package_id = ?1
+             ORDER BY symbol_inherited_from_sources.symbol_id, source_symbol_id_text",
+            package_id,
+        );
+
         let mut symbol_stmt = self
             .connection
             .prepare(
                 "SELECT symbol_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated,
-                        visibility, since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
+                        visibility, since, is_internal, is_global_augmentation, is_inherited
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -223,7 +232,6 @@ impl NciDatabase {
                     symbol_row.get::<_, i64>(14)?,
                     symbol_row.get::<_, i64>(15)?,
                     symbol_row.get::<_, i64>(16)?,
-                    symbol_row.get::<_, Option<String>>(17)?,
                 ))
             })
             .ok()?;
@@ -251,7 +259,6 @@ impl NciDatabase {
                 is_internal_int,
                 is_global_augmentation_int,
                 is_inherited_int,
-                inherited_from_sources_json,
             ) = row_result;
 
             let dependencies = SharedVec::from(
@@ -316,8 +323,12 @@ impl NciDatabase {
                 is_global_augmentation: is_global_augmentation_int != 0,
                 decorators,
                 is_inherited: is_inherited_int != 0,
-                inherited_from_sources: inherited_from_sources_from_json_column(
-                    inherited_from_sources_json,
+                inherited_from_sources: SharedVec::from(
+                    inherited_map
+                        .get(&symbol_row_id)
+                        .unwrap_or(&empty_string_vec)
+                        .clone()
+                        .into_boxed_slice(),
                 ),
                 heritage,
                 modifiers,
@@ -374,8 +385,12 @@ impl NciDatabase {
                 "INSERT OR REPLACE INTO symbols (
                 package_id, id, name, kind, kind_name, file_path, signature,
                 js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+                since, is_internal, is_global_augmentation, is_inherited
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+            )?;
+
+            let mut insert_inherited = transaction.prepare(
+                "INSERT OR IGNORE INTO symbol_inherited_from_sources (symbol_id, source_symbol_id_text) VALUES (?1, ?2)",
             )?;
 
             let mut insert_dependency = transaction.prepare(
@@ -424,11 +439,16 @@ impl NciDatabase {
                         0i64
                     },
                     if symbol_node.is_inherited { 1i64 } else { 0i64 },
-                    inherited_from_sources_to_json_column(&symbol_node.inherited_from_sources)
-                        .as_deref(),
                 ])?;
 
                 let symbol_row_id = transaction.last_insert_rowid();
+
+                for source_id in symbol_node.inherited_from_sources.iter() {
+                    insert_inherited.execute(rusqlite::params![
+                        symbol_row_id,
+                        source_id.as_ref(),
+                    ])?;
+                }
 
                 for dependency_id in symbol_node.dependencies.iter() {
                     insert_dependency
@@ -526,7 +546,7 @@ impl NciDatabase {
             .query_row(
                 "SELECT package_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                        since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
+                        since, is_internal, is_global_augmentation, is_inherited
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -548,7 +568,6 @@ impl NciDatabase {
                         symbol_row.get::<_, i64>(14)?,
                         symbol_row.get::<_, i64>(15)?,
                         symbol_row.get::<_, i64>(16)?,
-                        symbol_row.get::<_, Option<String>>(17)?,
                     ))
                 },
             )
@@ -572,7 +591,6 @@ impl NciDatabase {
             is_internal_int,
             is_global_augmentation_int,
             is_inherited_int,
-            inherited_from_sources_json,
         )) = row_opt
         else {
             return Ok(None);
@@ -681,6 +699,21 @@ impl NciDatabase {
             SharedVec::from(dec_vec.into_boxed_slice())
         };
 
+        let inherited_from_sources: SharedVec<SharedString> = {
+            let mut inherited_vec: Vec<SharedString> = Vec::new();
+            let mut inherited_stmt = self.connection.prepare(
+                "SELECT source_symbol_id_text FROM symbol_inherited_from_sources
+                 WHERE symbol_id = ?1 ORDER BY source_symbol_id_text",
+            )?;
+            let rows = inherited_stmt.query_map([symbol_row_id], |junction_row| {
+                junction_row.get::<_, String>(0)
+            })?;
+            for inherited_text in rows.flatten() {
+                inherited_vec.push(SharedString::from(inherited_text));
+            }
+            SharedVec::from(inherited_vec.into_boxed_slice())
+        };
+
         let deprecated = deprecated_opt.and_then(parse_deprecated_from_db);
         let visibility = visibility_opt.and_then(parse_visibility_from_db);
         let symbol_space =
@@ -707,9 +740,7 @@ impl NciDatabase {
             is_global_augmentation: is_global_augmentation_int != 0,
             decorators,
             is_inherited: is_inherited_int != 0,
-            inherited_from_sources: inherited_from_sources_from_json_column(
-                inherited_from_sources_json,
-            ),
+            inherited_from_sources,
             heritage,
             modifiers,
             dep_dedupe_keys: None,
@@ -851,32 +882,6 @@ fn parse_symbol_space_from_db(text: &str) -> Option<SymbolSpace> {
     }
 }
 
-/// Serializes [`SymbolNode::inherited_from_sources`] to JSON `["id1","id2"]` for `symbols.inherited_from_sources` (schema v1).
-fn inherited_from_sources_to_json_column(sources: &SharedVec<SharedString>) -> Option<String> {
-    if sources.is_empty() {
-        return None;
-    }
-    let ids: Vec<&str> = sources.iter().map(|symbol_id| symbol_id.as_ref()).collect();
-    serde_json::to_string(&ids).ok()
-}
-
-/// Deserializes JSON array only; missing, empty, or invalid values yield an empty list (re-index after schema/format changes).
-fn inherited_from_sources_from_json_column(raw: Option<String>) -> SharedVec<SharedString> {
-    let Some(text) = raw.filter(|column| !column.is_empty()) else {
-        return SharedVec::from(Vec::<SharedString>::new().into_boxed_slice());
-    };
-    let Ok(parsed) = serde_json::from_str::<Vec<String>>(&text) else {
-        return SharedVec::from(Vec::<SharedString>::new().into_boxed_slice());
-    };
-    SharedVec::from(
-        parsed
-            .into_iter()
-            .map(SharedString::from)
-            .collect::<Vec<_>>()
-            .into_boxed_slice(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -949,7 +954,7 @@ mod tests {
     }
 
     #[test]
-    fn inherited_from_sources_json_roundtrip() {
+    fn inherited_from_sources_junction_roundtrip() {
         let temp = tempfile::tempdir().expect("tempdir");
         let db_path = temp.path().join("inherited.sqlite");
         let mut database = NciDatabase::open(&db_path).expect("open");
@@ -992,8 +997,8 @@ mod tests {
         assert_eq!(
             loaded_sources,
             vec![
-                "demo-pkg@1.0.0::Trait.x",
                 "demo-pkg@1.0.0::Base.prototype.x",
+                "demo-pkg@1.0.0::Trait.x",
             ]
         );
     }

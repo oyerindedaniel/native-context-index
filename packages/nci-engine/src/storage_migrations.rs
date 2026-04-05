@@ -1,6 +1,5 @@
 //! Versioned DDL for `NciDatabase`.
 //! [`Migration::version`] values. [`SCHEMA_VERSION`] is always the last migration’s version.
-
 use rusqlite::{Connection, OptionalExtension};
 
 pub(crate) const META_SCHEMA_KEY: &str = "schema_version";
@@ -50,7 +49,6 @@ CREATE TABLE IF NOT EXISTS symbols (
     is_internal INTEGER NOT NULL DEFAULT 0,
     is_global_augmentation INTEGER NOT NULL DEFAULT 0,
     is_inherited INTEGER NOT NULL DEFAULT 0,
-    inherited_from_sources TEXT,
     UNIQUE(package_id, id)
 );
 
@@ -63,6 +61,15 @@ CREATE TABLE IF NOT EXISTS symbol_dependencies (
     to_symbol_id_text TEXT NOT NULL,
     PRIMARY KEY(from_symbol_id, to_symbol_id_text)
 );
+
+CREATE TABLE IF NOT EXISTS symbol_inherited_from_sources (
+    symbol_id INTEGER NOT NULL REFERENCES symbols(symbol_id) ON DELETE CASCADE,
+    source_symbol_id_text TEXT NOT NULL,
+    PRIMARY KEY(symbol_id, source_symbol_id_text)
+);
+
+CREATE INDEX IF NOT EXISTS idx_symbol_inherited_from_sources_source
+    ON symbol_inherited_from_sources(source_symbol_id_text);
 
 CREATE TABLE IF NOT EXISTS symbol_additional_files (
     symbol_id INTEGER NOT NULL REFERENCES symbols(symbol_id) ON DELETE CASCADE,
