@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     is_internal INTEGER NOT NULL DEFAULT 0,
     is_global_augmentation INTEGER NOT NULL DEFAULT 0,
     is_inherited INTEGER NOT NULL DEFAULT 0,
-    inherited_from TEXT,
+    inherited_from_sources TEXT,
     UNIQUE(package_id, id)
 );
 

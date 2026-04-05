@@ -189,8 +189,8 @@ export interface ResolvedSymbol {
   heritage?: string[];
   /** Whether this is an inherited symbol synthesized from a parent */
   isInherited?: boolean;
-  /** ID of the symbol this one was inherited from */
-  inheritedFrom?: string;
+  /** Parent symbol ids this synthesized member is inherited from (sorted, unique) */
+  inheritedFromSources?: string[];
   /** Structured modifiers (readonly, abstract, static, etc.) */
   modifiers?: string[];
   /** Temporary storage for raw dependencies during graph building (not in final report) */
@@ -241,8 +241,8 @@ export interface SymbolNode {
   decorators?: DecoratorMetadata[];
   /** Whether this is an inherited symbol synthesized from a parent */
   isInherited?: boolean;
-  /** ID of the symbol this one was inherited from */
-  inheritedFrom?: string;
+  /** Parent symbol ids this synthesized member is inherited from (sorted, unique) */
+  inheritedFromSources?: string[];
   /** Names of classes or interfaces this symbol extends/implements */
   heritage?: string[];
   /** Structured modifiers (readonly, abstract, static, etc.) */

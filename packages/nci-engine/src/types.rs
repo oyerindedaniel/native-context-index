@@ -412,8 +412,8 @@ pub struct ResolvedSymbol {
     /// Whether this is an inherited symbol synthesized from a parent.
     pub is_inherited: bool,
 
-    /// ID of the symbol this one was inherited from.
-    pub inherited_from: Option<SharedString>,
+    /// Parent symbol ids this symbol is inherited from (sorted, unique).
+    pub inherited_from_sources: SharedVec<SharedString>,
 
     /// Structured modifiers.
     pub modifiers: SharedVec<SharedString>,
@@ -439,7 +439,7 @@ impl ResolvedSymbol {
             decorators: export.decorators.clone(),
             heritage: export.heritage.clone(),
             is_inherited: false,
-            inherited_from: None,
+            inherited_from_sources: SharedVec::from(Vec::new()),
             modifiers: export.modifiers.clone(),
         }
     }
@@ -520,9 +520,9 @@ pub struct SymbolNode {
     #[serde(skip_serializing_if = "is_false")]
     pub is_inherited: bool,
 
-    /// ID of the symbol this one was inherited from.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub inherited_from: Option<SharedString>,
+    /// Parent symbol ids this synthesized member is inherited from (sorted, unique).
+    #[serde(skip_serializing_if = "is_shared_vec_empty")]
+    pub inherited_from_sources: SharedVec<SharedString>,
 
     /// Names of classes or interfaces this symbol extends/implements.
     #[serde(skip_serializing_if = "is_shared_vec_empty")]

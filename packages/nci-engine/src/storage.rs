@@ -198,7 +198,7 @@ impl NciDatabase {
             .prepare(
                 "SELECT symbol_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated,
-                        visibility, since, is_internal, is_global_augmentation, is_inherited, inherited_from
+                        visibility, since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -251,7 +251,7 @@ impl NciDatabase {
                 is_internal_int,
                 is_global_augmentation_int,
                 is_inherited_int,
-                inherited_from_opt,
+                inherited_from_sources_json,
             ) = row_result;
 
             let dependencies = SharedVec::from(
@@ -316,7 +316,9 @@ impl NciDatabase {
                 is_global_augmentation: is_global_augmentation_int != 0,
                 decorators,
                 is_inherited: is_inherited_int != 0,
-                inherited_from: inherited_from_opt.map(SharedString::from),
+                inherited_from_sources: inherited_from_sources_from_json_column(
+                    inherited_from_sources_json,
+                ),
                 heritage,
                 modifiers,
                 dep_dedupe_keys: None,
@@ -372,7 +374,7 @@ impl NciDatabase {
                 "INSERT OR REPLACE INTO symbols (
                 package_id, id, name, kind, kind_name, file_path, signature,
                 js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                since, is_internal, is_global_augmentation, is_inherited, inherited_from
+                since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             )?;
 
@@ -422,10 +424,8 @@ impl NciDatabase {
                         0i64
                     },
                     if symbol_node.is_inherited { 1i64 } else { 0i64 },
-                    symbol_node
-                        .inherited_from
-                        .as_ref()
-                        .map(|value| value.as_ref()),
+                    inherited_from_sources_to_json_column(&symbol_node.inherited_from_sources)
+                        .as_deref(),
                 ])?;
 
                 let symbol_row_id = transaction.last_insert_rowid();
@@ -526,7 +526,7 @@ impl NciDatabase {
             .query_row(
                 "SELECT package_id, id, name, kind, kind_name, file_path, signature,
                         js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                        since, is_internal, is_global_augmentation, is_inherited, inherited_from
+                        since, is_internal, is_global_augmentation, is_inherited, inherited_from_sources
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -572,7 +572,7 @@ impl NciDatabase {
             is_internal_int,
             is_global_augmentation_int,
             is_inherited_int,
-            inherited_from_opt,
+            inherited_from_sources_json,
         )) = row_opt
         else {
             return Ok(None);
@@ -707,7 +707,9 @@ impl NciDatabase {
             is_global_augmentation: is_global_augmentation_int != 0,
             decorators,
             is_inherited: is_inherited_int != 0,
-            inherited_from: inherited_from_opt.map(SharedString::from),
+            inherited_from_sources: inherited_from_sources_from_json_column(
+                inherited_from_sources_json,
+            ),
             heritage,
             modifiers,
             dep_dedupe_keys: None,
@@ -849,6 +851,32 @@ fn parse_symbol_space_from_db(text: &str) -> Option<SymbolSpace> {
     }
 }
 
+/// Serializes [`SymbolNode::inherited_from_sources`] to JSON `["id1","id2"]` for `symbols.inherited_from_sources` (schema v1).
+fn inherited_from_sources_to_json_column(sources: &SharedVec<SharedString>) -> Option<String> {
+    if sources.is_empty() {
+        return None;
+    }
+    let ids: Vec<&str> = sources.iter().map(|symbol_id| symbol_id.as_ref()).collect();
+    serde_json::to_string(&ids).ok()
+}
+
+/// Deserializes JSON array only; missing, empty, or invalid values yield an empty list (re-index after schema/format changes).
+fn inherited_from_sources_from_json_column(raw: Option<String>) -> SharedVec<SharedString> {
+    let Some(text) = raw.filter(|column| !column.is_empty()) else {
+        return SharedVec::from(Vec::<SharedString>::new().into_boxed_slice());
+    };
+    let Ok(parsed) = serde_json::from_str::<Vec<String>>(&text) else {
+        return SharedVec::from(Vec::<SharedString>::new().into_boxed_slice());
+    };
+    SharedVec::from(
+        parsed
+            .into_iter()
+            .map(SharedString::from)
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -878,7 +906,7 @@ mod tests {
             is_global_augmentation: false,
             decorators: SharedVec::from(Vec::new().into_boxed_slice()),
             is_inherited: false,
-            inherited_from: None,
+            inherited_from_sources: SharedVec::from(Vec::new().into_boxed_slice()),
             heritage: SharedVec::from(Vec::new().into_boxed_slice()),
             modifiers: SharedVec::from(Vec::new().into_boxed_slice()),
             dep_dedupe_keys: None,
@@ -918,6 +946,56 @@ mod tests {
         assert_eq!(loaded.total_files, 3);
         assert_eq!(loaded.crawl_duration_ms, 12.0);
         assert_eq!(loaded.build_duration_ms, 7.0);
+    }
+
+    #[test]
+    fn inherited_from_sources_json_roundtrip() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("inherited.sqlite");
+        let mut database = NciDatabase::open(&db_path).expect("open");
+
+        let package_info = PackageInfo {
+            name: SharedString::from("demo-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/x"),
+            is_scoped: false,
+        };
+
+        let mut sym = minimal_symbol("sym-inh", "Child.x");
+        sym.is_inherited = true;
+        sym.inherited_from_sources = SharedVec::from(
+            vec![
+                SharedString::from("demo-pkg@1.0.0::Trait.x"),
+                SharedString::from("demo-pkg@1.0.0::Base.prototype.x"),
+            ]
+            .into_boxed_slice(),
+        );
+
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+
+        database.save_package(&package_info, &graph).expect("save");
+        let loaded = database.load_package(&package_info).expect("load");
+        assert_eq!(loaded.symbols.len(), 1);
+        let loaded_sources: Vec<&str> = loaded.symbols[0]
+            .inherited_from_sources
+            .iter()
+            .map(|symbol_id| symbol_id.as_ref())
+            .collect();
+        assert_eq!(
+            loaded_sources,
+            vec![
+                "demo-pkg@1.0.0::Trait.x",
+                "demo-pkg@1.0.0::Base.prototype.x",
+            ]
+        );
     }
 
     #[test]

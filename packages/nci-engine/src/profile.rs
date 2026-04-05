@@ -1,8 +1,4 @@
 //! Optional stderr profiling for nci-engine.
-//!
-//! When the environment variable `NCI_PROFILE` is set to `1`, helpers in this module emit
-//! human-readable lines to **stderr**. Each line is written atomically with a locked handle so
-//! concurrent phases do not interleave bytes from different writes on the same line.
 
 use std::io::Write;
 
@@ -16,9 +12,6 @@ pub fn phases_enabled() -> bool {
 }
 
 /// Prints one phase line: fixed-width label (left-aligned, 24 columns) and duration in milliseconds.
-///
-/// Format: two leading spaces, `[profile] `, label padded/truncated to the width used by
-/// `format!`’s `{:<24}`, one space, then the float and `ms`.
 pub fn profile_log(label: &str, ms: f64) {
     if !phases_enabled() {
         return;

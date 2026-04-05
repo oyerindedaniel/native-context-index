@@ -3,6 +3,12 @@
  * When a class AND an interface both named "Composite" each extend one of
  * these parents, the flattening step must merge their heritage before
  * processing — otherwise it creates duplicate synthetic IDs.
+ *
+ * Flattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name
+ * `shared`, so heritage emits one row `Composite.shared` (type-side,
+ * inheritedFrom Trait). `baseOnly` exists only on `Base`, so you still get
+ * `Composite.prototype.baseOnly` (value-side). There is intentionally no
+ * `Composite.prototype.shared` row in addition to `Composite.shared`.
  */
 
 export declare class Base {
@@ -24,3 +30,16 @@ export declare interface Composite extends Trait {
 export declare class Composite extends Base {
   ownProp: number;
 }
+
+/**
+ * Type-position `Composite`: merged symbol resolution shows up in this symbol's `dependencies[]`.
+ * (Contrast: `Composite.shared` is flattened once from the interface side — `Trait.shared` — not
+ * `Composite.prototype.shared` from `Base`.)
+ */
+export declare function bridgeComposite(instance: Composite): Composite;
+
+/**
+ * Type alias to `Composite`. Dependency IDs still include **both** merged declarations
+ * (`Composite` interface and `Composite#2` class) — same as value+type uses.
+ */
+export type CompositeTypeAlias = Composite;

@@ -586,7 +586,9 @@ describe("buildPackageGraph", () => {
       expect(leafMiddle).toBeDefined();
       expect(leafMiddle!.since).toBe("2.0.0");
       expect(leafMiddle!.isInherited).toBe(true);
-      expect(leafMiddle!.inheritedFrom).toContain("MiddleNode");
+      expect(
+        leafMiddle!.inheritedFromSources?.some(sourceId => sourceId.includes("MiddleNode")),
+      ).toBe(true);
     });
 
     it("resolves heritage on the interface when a const shares the same name (value listed after interface)", () => {
@@ -609,6 +611,10 @@ describe("buildPackageGraph", () => {
       );
       expect(sharedSynthetics).toHaveLength(1);
       expect(sharedSynthetics[0].isInherited).toBe(true);
+      const sharedSources = sharedSynthetics[0].inheritedFromSources ?? [];
+      expect(sharedSources).toHaveLength(2);
+      expect(sharedSources.some(id => id.includes("Trait.shared"))).toBe(true);
+      expect(sharedSources.some(id => id.includes("Base.prototype.shared"))).toBe(true);
 
       const compositeNames = graph.symbols
         .filter(symbolNode => symbolNode.name.startsWith("Composite."))
@@ -616,6 +622,19 @@ describe("buildPackageGraph", () => {
       expect(compositeNames).toContain("Composite.compositeFunc");
       expect(compositeNames).toContain("Composite.traitOnly");
       expect(compositeNames).toContain("Composite.shared");
+
+      const mergedCompositeDeps = [
+        "multi-declaration-heritage@1.0.0::Composite",
+        "multi-declaration-heritage@1.0.0::Composite#2",
+      ].sort();
+
+      const bridge = graph.symbols.find(symbolNode => symbolNode.name === "bridgeComposite");
+      expect(bridge).toBeDefined();
+      expect(bridge!.dependencies?.sort()).toEqual(mergedCompositeDeps);
+
+      const typeAlias = graph.symbols.find(symbolNode => symbolNode.name === "CompositeTypeAlias");
+      expect(typeAlias).toBeDefined();
+      expect(typeAlias!.dependencies?.sort()).toEqual(mergedCompositeDeps);
     });
 
     it("lists distinct heritage clauses for repeated type constructors with different type arguments", () => {

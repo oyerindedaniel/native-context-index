@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::sync::LazyLock;
@@ -560,7 +561,7 @@ pub fn build_package_graph(
                 is_global_augmentation: resolved.is_global_augmentation,
                 decorators: resolved.decorators.clone(),
                 is_inherited: false,
-                inherited_from: None,
+                inherited_from_sources: SharedVec::from(Vec::new()),
                 heritage: resolved.heritage.clone(),
                 modifiers: resolved.modifiers.clone(),
                 dep_dedupe_keys: None,
@@ -922,7 +923,7 @@ fn flatten_inherited_members(
             .map(|members| members.as_slice())
             .unwrap_or(&[]);
 
-        let mut child_member_names: HashSet<String> = child_members
+        let direct_child_short_names: HashSet<String> = child_members
             .iter()
             .map(|member| {
                 member
@@ -933,6 +934,8 @@ fn flatten_inherited_members(
                     .to_string()
             })
             .collect();
+
+        let mut inherited_by_leaf: HashMap<String, SymbolNode> = HashMap::new();
 
         let mut visited_parents: HashSet<String> = HashSet::new();
         let mut parents_to_visit: VecDeque<String> = heritage
@@ -968,10 +971,9 @@ fn flatten_inherited_members(
                     .next()
                     .unwrap_or(&parent_member.name);
 
-                if child_member_names.contains(short_name) {
+                if direct_child_short_names.contains(short_name) {
                     continue;
                 }
-                child_member_names.insert(short_name.to_string());
 
                 if matches!(parent_member.visibility, Some(Visibility::Internal)) {
                     continue;
@@ -985,17 +987,42 @@ fn flatten_inherited_members(
                 };
 
                 let synth_id = format!("{}@{}::{}", pkg_name, pkg_version, new_member_name);
+                let leaf_key = format!("{}::{}", node_name, short_name);
 
-                let mut synth_node = (*parent_member).clone();
-                synth_node.id = synth_id.into();
-                synth_node.name = new_member_name.into();
-                synth_node.package = pkg_name.clone();
-                synth_node.is_inherited = true;
-                synth_node.inherited_from = Some(parent_member.id.clone());
-                synth_node.additional_files = None;
-
-                synthetic.push(synth_node);
+                match inherited_by_leaf.entry(leaf_key) {
+                    Entry::Occupied(mut occupied) => {
+                        let synth = occupied.get_mut();
+                        let parent_source_id = parent_member.id.clone();
+                        if !synth.inherited_from_sources.iter().any(|prior_source_id| {
+                            *prior_source_id == parent_source_id
+                        }) {
+                            let mut combined: Vec<SharedString> =
+                                synth.inherited_from_sources.iter().cloned().collect();
+                            combined.push(parent_source_id);
+                            synth.inherited_from_sources = SharedVec::from(combined);
+                        }
+                    }
+                    Entry::Vacant(vacant) => {
+                        let mut synth_node = (*parent_member).clone();
+                        synth_node.id = synth_id.into();
+                        synth_node.name = new_member_name.into();
+                        synth_node.package = pkg_name.clone();
+                        synth_node.is_inherited = true;
+                        synth_node.inherited_from_sources =
+                            SharedVec::from(vec![parent_member.id.clone()]);
+                        synth_node.additional_files = None;
+                        vacant.insert(synth_node);
+                    }
+                }
             }
+        }
+
+        for mut sym in inherited_by_leaf.into_values() {
+            let mut sources: Vec<SharedString> =
+                sym.inherited_from_sources.iter().cloned().collect();
+            sources.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+            sym.inherited_from_sources = SharedVec::from(sources);
+            synthetic.push(sym);
         }
     }
 
@@ -1232,5 +1259,13 @@ mod tests {
             shared_synthetics.len()
         );
         assert!(shared_synthetics[0].is_inherited);
+        let sources: Vec<&str> = shared_synthetics[0]
+            .inherited_from_sources
+            .iter()
+            .map(|symbol_id| symbol_id.as_ref())
+            .collect();
+        assert_eq!(sources.len(), 2, "Composite.shared should list both parent defs");
+        assert!(sources.iter().any(|id| id.contains("Trait.shared")));
+        assert!(sources.iter().any(|id| id.contains("Base.prototype.shared")));
     }
 }

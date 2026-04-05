@@ -612,7 +612,10 @@ function flattenInheritedMembers(
 
   for (const [nodeName, heritage] of mergedHeritage) {
     const childMembers = membersByParentName.get(nodeName) || [];
-    const childMemberNames = new Set(childMembers.map(member => member.name.split(".").pop()!));
+    const directChildShortNames = new Set(
+      childMembers.map(member => member.name.split(".").pop()!)
+    );
+    const inheritedByLeaf = new Map<string, SymbolNode>();
 
     const visitedParents = new Set<string>();
     const parentsToVisit = heritage.map(heritageLookupKey);
@@ -636,28 +639,40 @@ function flattenInheritedMembers(
       for (const parentMember of parentMembers) {
         const shortName = parentMember.name.split(".").pop()!;
 
-        // Shadowing Detection (Override)
-        if (childMemberNames.has(shortName)) continue;
-        childMemberNames.add(shortName);
+        if (directChildShortNames.has(shortName)) continue;
 
         if (parentMember.visibility === "internal") continue;
 
         const isPrototype = parentMember.name.includes(".prototype.");
-        const newMemberName = isPrototype 
-          ? `${nodeName}.prototype.${shortName}` 
+        const newMemberName = isPrototype
+          ? `${nodeName}.prototype.${shortName}`
           : `${nodeName}.${shortName}`;
 
         const synthId = `${pkgName}@${pkgVersion}::${newMemberName}`;
+        const leafKey = `${nodeName}::${shortName}`;
 
-        syntheticSymbols.push({
-          ...parentMember,
-          id: synthId,
-          name: newMemberName,
-          isInherited: true,
-          inheritedFrom: parentMember.id,
-          additionalFiles: undefined,
-        });
+        const existingSynth = inheritedByLeaf.get(leafKey);
+        if (!existingSynth) {
+          inheritedByLeaf.set(leafKey, {
+            ...parentMember,
+            id: synthId,
+            name: newMemberName,
+            isInherited: true,
+            inheritedFromSources: [parentMember.id],
+            additionalFiles: undefined,
+          });
+        } else {
+          const sources = existingSynth.inheritedFromSources!;
+          if (!sources.includes(parentMember.id)) {
+            sources.push(parentMember.id);
+          }
+        }
       }
+    }
+
+    for (const sym of inheritedByLeaf.values()) {
+      sym.inheritedFromSources!.sort();
+      syntheticSymbols.push(sym);
     }
   }
 
