@@ -541,6 +541,13 @@ export function buildPackageGraph(
   return result;
 }
 
+/** Map full heritage clause text to a declared parent name (e.g. `Omit<Foo, 'k'>` → `Omit`). */
+function heritageLookupKey(heritage: string): string {
+  const trimmed = heritage.trim();
+  const angle = trimmed.indexOf("<");
+  return angle === -1 ? trimmed : trimmed.slice(0, angle).trim();
+}
+
 /** Flatten inherited members. */
 function flattenInheritedMembers(
   symbols: SymbolNode[],
@@ -569,35 +576,52 @@ function flattenInheritedMembers(
     }
   }
 
-  const classOrInterfaceNodes = symbols.filter(
-    (symbolNode) => symbolNode.kind === ts.SyntaxKind.ClassDeclaration || symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
-  );
+  const mergedHeritage = new Map<string, string[]>();
+  for (const symbolNode of symbols) {
+    if (
+      (symbolNode.kind === ts.SyntaxKind.ClassDeclaration ||
+        symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration) &&
+      symbolNode.heritage &&
+      symbolNode.heritage.length > 0
+    ) {
+      let entry = mergedHeritage.get(symbolNode.name);
+      if (!entry) {
+        entry = [];
+        mergedHeritage.set(symbolNode.name, entry);
+      }
+      for (const parent of symbolNode.heritage) {
+        if (!entry.includes(parent)) {
+          entry.push(parent);
+        }
+      }
+    }
+  }
 
   const syntheticSymbols: SymbolNode[] = [];
 
-  for (const node of classOrInterfaceNodes) {
-    if (!node.heritage || node.heritage.length === 0) continue;
-
-    const childMembers = membersByParentName.get(node.name) || [];
+  for (const [nodeName, heritage] of mergedHeritage) {
+    const childMembers = membersByParentName.get(nodeName) || [];
     const childMemberNames = new Set(childMembers.map(member => member.name.split(".").pop()!));
 
     const visitedParents = new Set<string>();
-    const parentsToVisit = [...node.heritage];
+    const parentsToVisit = heritage.map(heritageLookupKey);
 
     while (parentsToVisit.length > 0) {
-      const parentName = parentsToVisit.shift()!;
-      if (visitedParents.has(parentName)) continue;
-      visitedParents.add(parentName);
+      const parentKey = parentsToVisit.shift()!;
+      if (visitedParents.has(parentKey)) continue;
+      visitedParents.add(parentKey);
 
-      const parentId = nameToId.get(parentName);
+      const parentId = nameToId.get(parentKey);
       if (!parentId) continue;
 
       const parentNode = idToNode.get(parentId);
       if (parentNode && parentNode.heritage) {
-        parentsToVisit.push(...parentNode.heritage);
+        for (const grandparent of parentNode.heritage) {
+          parentsToVisit.push(heritageLookupKey(grandparent));
+        }
       }
 
-      const parentMembers = membersByParentName.get(parentName) || [];
+      const parentMembers = membersByParentName.get(parentKey) || [];
       for (const parentMember of parentMembers) {
         const shortName = parentMember.name.split(".").pop()!;
 
@@ -609,8 +633,8 @@ function flattenInheritedMembers(
 
         const isPrototype = parentMember.name.includes(".prototype.");
         const newMemberName = isPrototype 
-          ? `${node.name}.prototype.${shortName}` 
-          : `${node.name}.${shortName}`;
+          ? `${nodeName}.prototype.${shortName}` 
+          : `${nodeName}.${shortName}`;
 
         const synthId = `${pkgName}@${pkgVersion}::${newMemberName}`;
 

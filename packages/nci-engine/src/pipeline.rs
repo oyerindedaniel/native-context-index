@@ -1,9 +1,14 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
+use tracing::{debug, trace, warn};
 
+use crate::cache;
+use crate::storage::NciDatabase;
 use crate::crawler::CrawlOptions;
+use crate::filter::FilterConfig;
 use crate::graph::build_package_graph;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
@@ -17,6 +22,19 @@ pub struct IndexOptions {
     /// Whether to run in parallel (default: true).
     /// Set to false for deterministic output ordering in tests.
     pub parallel: bool,
+
+    /// Read/write per-package graphs to SQLite under the OS cache dir (`NCI_CACHE_DIR` overrides).
+    /// Disable in tests to avoid stale hits and shared-cache pollution.
+    pub enable_package_cache: bool,
+
+    /// Path to `nci.sqlite`. When `None`, uses [`crate::cache::nci_sqlite_path`].
+    pub db_path: Option<PathBuf>,
+
+    /// When set, `.nciignore` is loaded from this root before [`Self::filter`] is applied.
+    pub project_root: Option<PathBuf>,
+
+    /// Package-name filtering (ignore patterns, dep sections, CLI globs).
+    pub filter: FilterConfig,
 }
 
 impl Default for IndexOptions {
@@ -24,8 +42,19 @@ impl Default for IndexOptions {
         Self {
             max_depth: crate::constants::DEFAULT_MAX_DEPTH,
             parallel: true,
+            enable_package_cache: true,
+            db_path: None,
+            project_root: None,
+            filter: FilterConfig::default(),
         }
     }
+}
+
+fn merge_filter_for_scan(project_root: Option<&Path>, mut filter: FilterConfig) -> FilterConfig {
+    if let Some(root) = project_root {
+        filter = filter.with_nciignore_file(root);
+    }
+    filter
 }
 
 /// Index all packages in a `node_modules` directory.
@@ -34,37 +63,19 @@ impl Default for IndexOptions {
 /// and builds a symbol graph for each package.
 ///
 /// When `parallel` is true (default), packages are processed concurrently
-/// using `rayon`'s work-stealing thread pool.
-///
-/// # Errors
-/// Returns `ScanError` if the `node_modules` directory doesn't exist or
-/// cannot be read.
 pub fn index_all(
     node_modules: &Path,
     options: Option<IndexOptions>,
-) -> Result<Vec<PackageGraph>, ScanError> {
+) -> Result<Vec<IndexedGraph>, ScanError> {
     let index_opts = options.unwrap_or_default();
     let packages = scan_packages(node_modules)?;
+    let filter = merge_filter_for_scan(
+        index_opts.project_root.as_deref(),
+        index_opts.filter.clone(),
+    );
+    let packages = filter.apply(packages);
 
-    let crawl_options_factory = || {
-        Some(CrawlOptions {
-            max_depth: index_opts.max_depth,
-        })
-    };
-
-    let graphs: Vec<PackageGraph> = if index_opts.parallel {
-        packages
-            .par_iter()
-            .map(|package| build_package_graph(package, crawl_options_factory()))
-            .collect()
-    } else {
-        packages
-            .iter()
-            .map(|package| build_package_graph(package, crawl_options_factory()))
-            .collect()
-    };
-
-    Ok(graphs)
+    Ok(index_packages(&packages, Some(index_opts)))
 }
 
 /// Drops later entries that resolve to the same canonical package directory as an earlier one.
@@ -82,11 +93,25 @@ pub fn dedupe_packages_by_canonical_dir(packages: Vec<PackageInfo>) -> Vec<Packa
     unique
 }
 
+/// Whether a graph came from the SQLite cache or a fresh crawl.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphSource {
+    Cached,
+    Crawled,
+}
+
+/// A graph together with its source (cache hit vs fresh crawl).
+#[derive(Debug)]
+pub struct IndexedGraph {
+    pub graph: PackageGraph,
+    pub source: GraphSource,
+}
+
 /// Builds a graph for each discovered package, optionally in parallel (Rayon).
 ///
 /// Use this when packages were collected from several `node_modules` trees and deduped with
 /// [`dedupe_packages_by_canonical_dir`].
-pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -> Vec<PackageGraph> {
+pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
     let crawl_options_factory = || {
         Some(CrawlOptions {
@@ -94,16 +119,84 @@ pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -
         })
     };
 
-    if index_opts.parallel {
-        packages
-            .par_iter()
-            .map(|package| build_package_graph(package, crawl_options_factory()))
-            .collect()
+    let database_arc: Option<Arc<Mutex<NciDatabase>>> = if index_opts.enable_package_cache {
+        if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            debug!(path = %path.display(), "package cache enabled");
+            match NciDatabase::open(&path) {
+                Ok(database) => Some(Arc::new(Mutex::new(database))),
+                Err(open_error) => {
+                    warn!(
+                        path = %path.display(),
+                        error = %open_error,
+                        "NciDatabase::open failed; indexing without sqlite cache"
+                    );
+                    None
+                }
+            }
+        } else {
+            warn!("enable_package_cache is true but no sqlite path resolved (cache dir missing?)");
+            None
+        }
     } else {
-        packages
-            .iter()
-            .map(|package| build_package_graph(package, crawl_options_factory()))
-            .collect()
+        debug!("package cache disabled");
+        None
+    };
+
+    let build_one = |package: &PackageInfo| -> IndexedGraph {
+        if let Some(database_mutex) = database_arc.as_ref() {
+            if !cache::package_dir_is_symlink(package) {
+                let database_guard = database_mutex
+                    .lock()
+                    .expect("sqlite storage mutex poisoned");
+                if database_guard.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
+                    if let Some(cached_graph) = database_guard.load_package(package) {
+                        trace!(
+                            package = %package.name.as_ref(),
+                            version = %package.version.as_ref(),
+                            "package cache hit"
+                        );
+                        return IndexedGraph { graph: cached_graph, source: GraphSource::Cached };
+                    }
+                    trace!(
+                        package = %package.name.as_ref(),
+                        "package cache miss (stale engine_version or load failed)"
+                    );
+                } else {
+                    trace!(
+                        package = %package.name.as_ref(),
+                        "package cache miss (not in sqlite)"
+                    );
+                }
+            }
+        }
+
+        let graph = build_package_graph(package, crawl_options_factory());
+
+        if let Some(database_mutex) = database_arc.as_ref() {
+            if !cache::package_dir_is_symlink(package) {
+                let mut database_guard = database_mutex
+                    .lock()
+                    .expect("sqlite storage mutex poisoned");
+                if let Err(save_error) = database_guard.save_package(package, &graph) {
+                    warn!(
+                        package = %package.name.as_ref(),
+                        error = %save_error,
+                        "save_package failed"
+                    );
+                }
+            }
+        }
+
+        IndexedGraph { graph, source: GraphSource::Crawled }
+    };
+
+    if index_opts.parallel {
+        packages.par_iter().map(build_one).collect()
+    } else {
+        packages.iter().map(build_one).collect()
     }
 }
 
@@ -205,16 +298,18 @@ mod tests {
             node_modules_dir,
             Some(IndexOptions {
                 parallel: false,
+                enable_package_cache: false,
                 ..Default::default()
             }),
         );
 
         assert!(result.is_ok());
-        let graphs = result.unwrap();
-        assert_eq!(graphs.len(), 1);
-        assert_eq!(graphs[0].package, "my-lib".into());
+        let results = result.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].graph.package, "my-lib".into());
         assert!(
-            graphs[0]
+            results[0]
+                .graph
                 .symbols
                 .iter()
                 .any(|symbol| symbol.name == "VALUE".into())

@@ -10,6 +10,7 @@ static PROTOCOL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+)
 use crate::constants::NODE_BUILTINS;
 use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
+use crate::hash::sha256_hex;
 use crate::resolver::{normalize_path, resolve_module_specifier, resolve_types_entry};
 use crate::types::{
     PackageEntry, PackageGraph, PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode,
@@ -207,6 +208,7 @@ pub fn build_package_graph(
                 file_path: symbol_file_path,
                 additional_files: None,
                 signature: resolved.signature.clone(),
+                signature_hash: None,
                 js_doc: resolved.js_doc.clone(),
                 is_type_only: resolved.is_type_only,
                 symbol_space: resolved.symbol_space,
@@ -614,6 +616,8 @@ pub fn build_package_graph(
         &package_info.version,
     );
 
+    apply_signature_hashes(&mut symbols);
+
     let total_symbols = symbols.len();
     let total_files = visited.len();
 
@@ -724,6 +728,25 @@ fn parent_name_for_dotted_member(name: &str) -> Option<String> {
         .map(|last_dot_index| name[..last_dot_index].to_string())
 }
 
+fn apply_signature_hashes(symbol_nodes: &mut [SymbolNode]) {
+    for symbol_node in symbol_nodes {
+        symbol_node.signature_hash = symbol_node
+            .signature
+            .as_ref()
+            .map(|signature| SharedString::from(sha256_hex(signature.as_ref()).as_str()));
+    }
+}
+
+/// Resolves `extends` / `implements` text to a declared parent name for member lookup and `name_to_id`.
+/// Full clause text (e.g. `Omit<Foo, 'k'>` → `Omit`) matches how references attach to named declarations.
+fn heritage_lookup_key(heritage: &str) -> String {
+    let trimmed = heritage.trim();
+    match trimmed.find('<') {
+        Some(angle_index) => trimmed[..angle_index].trim().to_string(),
+        None => trimmed.to_string(),
+    }
+}
+
 fn flatten_inherited_members(
     symbols: &mut Vec<SymbolNode>,
     name_to_id: &HashMap<SharedString, SharedString>,
@@ -747,14 +770,22 @@ fn flatten_inherited_members(
 
     let mut synthetic: Vec<SymbolNode> = Vec::new();
 
-    let heritage_work: Vec<(SharedString, Vec<SharedString>)> = symbols
-        .iter()
-        .filter(|node| {
-            matches!(node.kind, SymbolKind::Class | SymbolKind::Interface)
-                && !node.heritage.is_empty()
-        })
-        .map(|node| (node.name.clone(), node.heritage.to_vec()))
-        .collect();
+    let mut merged_heritage: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
+    for node in symbols.iter().filter(|node| {
+        matches!(node.kind, SymbolKind::Class | SymbolKind::Interface)
+            && !node.heritage.is_empty()
+    }) {
+        let entry = merged_heritage
+            .entry(node.name.clone())
+            .or_default();
+        for parent in node.heritage.iter() {
+            if !entry.contains(parent) {
+                entry.push(parent.clone());
+            }
+        }
+    }
+    let heritage_work: Vec<(SharedString, Vec<SharedString>)> =
+        merged_heritage.into_iter().collect();
 
     for (node_name, heritage) in &heritage_work {
         let child_members = members_by_parent_name
@@ -777,28 +808,27 @@ fn flatten_inherited_members(
         let mut visited_parents: HashSet<String> = HashSet::new();
         let mut parents_to_visit: VecDeque<String> = heritage
             .iter()
-            .cloned()
-            .map(|path| path.to_string())
+            .map(|path| heritage_lookup_key(path.as_ref()))
             .collect();
 
-        while let Some(parent_name) = parents_to_visit.pop_front() {
-            if !visited_parents.insert(parent_name.clone()) {
+        while let Some(parent_key) = parents_to_visit.pop_front() {
+            if !visited_parents.insert(parent_key.clone()) {
                 continue;
             }
 
-            let parent_id = match name_to_id.get(parent_name.as_ref() as &str) {
+            let parent_id = match name_to_id.get(parent_key.as_ref() as &str) {
                 Some(id) => id,
                 None => continue,
             };
 
             if let Some(parent_node) = id_to_node.get(parent_id) {
                 for grandparent in parent_node.heritage.iter() {
-                    parents_to_visit.push_back(grandparent.clone().to_string());
+                    parents_to_visit.push_back(heritage_lookup_key(grandparent.as_ref()));
                 }
             }
 
             let parent_members = members_by_parent_name
-                .get(parent_name.as_str())
+                .get(parent_key.as_str())
                 .map(|members| members.as_slice())
                 .unwrap_or(&[]);
 
@@ -1002,5 +1032,72 @@ mod tests {
             .find(|symbol| symbol.name == "Config".into());
         assert!(config.is_some());
         assert_eq!(config.unwrap().kind, SymbolKind::Interface);
+    }
+
+    #[test]
+    fn merged_declarations_produce_unique_synthetic_ids() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let pkg_dir = temp_dir.path().to_path_buf();
+
+        std::fs::write(
+            pkg_dir.join("package.json"),
+            r#"{"name": "merge-pkg", "version": "1.0.0", "types": "./index.d.ts"}"#,
+        )
+        .unwrap();
+
+        std::fs::write(
+            pkg_dir.join("index.d.ts"),
+            concat!(
+                "export declare class Base {\n",
+                "  shared(): void;\n",
+                "  baseOnly(): void;\n",
+                "}\n",
+                "export declare interface Trait {\n",
+                "  shared(): void;\n",
+                "  traitOnly(): void;\n",
+                "}\n",
+                "export declare interface Composite extends Trait {\n",
+                "  compositeFunc(): void;\n",
+                "}\n",
+                "export declare class Composite extends Base {\n",
+                "  ownProp: number;\n",
+                "}\n",
+            ),
+        )
+        .unwrap();
+
+        let info = PackageInfo {
+            name: "merge-pkg".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(&pkg_dir),
+            is_scoped: false,
+        };
+
+        let graph = build_package_graph(&info, None);
+
+        let all_ids: Vec<&str> = graph.symbols.iter().map(|symbol| symbol.id.as_ref()).collect();
+        let unique_ids: std::collections::HashSet<&str> = all_ids.iter().copied().collect();
+        assert_eq!(
+            all_ids.len(),
+            unique_ids.len(),
+            "Duplicate symbol IDs found: {:?}",
+            all_ids
+                .iter()
+                .filter(|id| all_ids.iter().filter(|other| other == id).count() > 1)
+                .collect::<std::collections::HashSet<_>>()
+        );
+
+        let shared_synthetics: Vec<_> = graph
+            .symbols
+            .iter()
+            .filter(|symbol| symbol.name.as_ref() == "Composite.shared")
+            .collect();
+        assert_eq!(
+            shared_synthetics.len(),
+            1,
+            "Expected exactly one Composite.shared synthetic, found {}",
+            shared_synthetics.len()
+        );
+        assert!(shared_synthetics[0].is_inherited);
     }
 }

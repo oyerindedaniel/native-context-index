@@ -741,11 +741,22 @@ function extractHeritage(node: ts.ClassDeclaration | ts.InterfaceDeclaration, so
   const heritage: string[] = [];
   for (const clause of node.heritageClauses) {
     for (const type of clause.types) {
-      const text = type.expression.getText(sourceFile).trim();
+      const text = type.getText(sourceFile).trim();
       if (text) heritage.push(text);
     }
   }
-  return heritage.length > 0 ? heritage : undefined;
+  if (heritage.length === 0) {
+    return undefined;
+  }
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of heritage) {
+    if (!seen.has(entry)) {
+      seen.add(entry);
+      deduped.push(entry);
+    }
+  }
+  return deduped;
 }
 
 /** Determine if a node is explicitly being exported from the current module. */

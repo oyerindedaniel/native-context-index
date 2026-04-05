@@ -437,6 +437,14 @@ snapshot_test!(
     "parenthesized-intersection-expansion"
 );
 snapshot_test!(snapshot_dual_name_interface_const, "dual-name-interface-const");
+snapshot_test!(
+    snapshot_multi_declaration_heritage,
+    "multi-declaration-heritage"
+);
+snapshot_test!(
+    snapshot_heritage_generic_multi_extends,
+    "heritage-generic-multi-extends"
+);
 
 #[test]
 fn all_oracles_have_tests() {

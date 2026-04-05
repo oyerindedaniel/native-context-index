@@ -690,7 +690,7 @@ fn extract_export_default<'a>(
                 let signature = get_span_text(source_text, class_decl.span);
                 let jsdoc = extract_jsdoc_from_leading_comments(source_text, class_decl.span);
                 let dependencies = extract_type_refs_from_class(class_decl);
-                let heritage = extract_heritage_from_class(class_decl);
+                let heritage = extract_heritage_from_class(source_text, class_decl);
                 exports.push(ParsedExport {
                     name: class_name.clone(),
                     kind: SymbolKind::Class,
@@ -720,7 +720,7 @@ fn extract_export_default<'a>(
             let signature = get_span_text(source_text, iface_decl.span);
             let jsdoc = extract_jsdoc_from_leading_comments(source_text, iface_decl.span);
             let dependencies = extract_type_refs_from_interface(iface_decl);
-            let heritage = extract_heritage_from_interface(iface_decl);
+            let heritage = extract_heritage_from_interface(source_text, iface_decl);
             exports.push(ParsedExport {
                 name: iface_name.clone(),
                 kind: SymbolKind::Interface,
@@ -1182,7 +1182,7 @@ fn extract_declaration<'a>(
             );
             let dependencies = extract_type_refs_from_class(class_decl);
             let jsdoc = extract_jsdoc_from_leading_comments(source_text, outer_span);
-            let heritage = extract_heritage_from_class(class_decl);
+            let heritage = extract_heritage_from_class(source_text, class_decl);
 
             let mut modifiers = extract_declaration_modifiers(declaration);
             if is_explicit_export {
@@ -1231,7 +1231,7 @@ fn extract_declaration<'a>(
             );
             let dependencies = extract_type_refs_from_interface(iface_decl);
             let jsdoc = extract_jsdoc_from_leading_comments(source_text, outer_span);
-            let heritage = extract_heritage_from_interface(iface_decl);
+            let heritage = extract_heritage_from_interface(source_text, iface_decl);
 
             let mut modifiers = extract_declaration_modifiers(declaration);
             if is_explicit_export {
@@ -2483,6 +2483,11 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
     let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
 
     if let Some(super_class) = &class_decl.super_class {
+        if let Some(type_args) = &class_decl.super_type_arguments {
+            for param in &type_args.params {
+                collect_type_refs(param, &mut refs);
+            }
+        }
         if let Some(name) = expression_to_string(super_class) {
             if !BUILTIN_TYPES.contains(name.as_ref()) {
                 refs.insert(
@@ -2497,6 +2502,11 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
     }
 
     for implement in &class_decl.implements {
+        if let Some(type_args) = &implement.type_arguments {
+            for param in &type_args.params {
+                collect_type_refs(param, &mut refs);
+            }
+        }
         let name = ts_type_name_to_string(&implement.expression);
         if !BUILTIN_TYPES.contains(name.as_ref()) {
             refs.insert(
@@ -2545,6 +2555,11 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
 
     // Heritage clause refs (extends)
     for heritage in &iface_decl.extends {
+        if let Some(type_args) = &heritage.type_arguments {
+            for param in &type_args.params {
+                collect_type_refs(param, &mut refs);
+            }
+        }
         if let Expression::Identifier(ident) = &heritage.expression {
             let name = SharedString::from(ident.name.as_ref());
             if !BUILTIN_TYPES.contains(name.as_ref()) {
@@ -2773,34 +2788,57 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
     }
 }
 
-/// Extracts heritage clause names from a class declaration.
-fn extract_heritage_from_class(class_decl: &Class<'_>) -> Vec<SharedString> {
+/// Extracts heritage clauses from a class declaration using source spans (parity with TS `getText`).
+fn extract_heritage_from_class(source_text: &str, class_decl: &Class<'_>) -> Vec<SharedString> {
     let mut heritage: Vec<SharedString> = Vec::new();
 
     if let Some(super_class) = &class_decl.super_class {
-        if let Some(name) = expression_to_string(super_class) {
-            heritage.push(name);
+        let span = match &class_decl.super_type_arguments {
+            Some(type_args) => super_class.span().merge(type_args.span()),
+            None => super_class.span(),
+        };
+        let fragment = get_span_text(source_text, span);
+        if !fragment.is_empty() {
+            heritage.push(fragment);
         }
     }
 
     for implement in &class_decl.implements {
-        heritage.push(ts_type_name_to_string(&implement.expression));
-    }
-
-    heritage
-}
-
-/// Extracts heritage clause names from an interface declaration.
-fn extract_heritage_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> Vec<SharedString> {
-    let mut heritage: Vec<SharedString> = Vec::new();
-
-    for extend in &iface_decl.extends {
-        if let Some(name) = expression_to_string(&extend.expression) {
-            heritage.push(name);
+        let fragment = get_span_text(source_text, implement.span);
+        if !fragment.is_empty() {
+            heritage.push(fragment);
         }
     }
 
-    heritage
+    dedupe_shared_strings_preserve_order(heritage)
+}
+
+/// Extracts heritage clauses from an interface declaration using source spans (parity with TS `getText`).
+fn extract_heritage_from_interface(
+    source_text: &str,
+    iface_decl: &TSInterfaceDeclaration<'_>,
+) -> Vec<SharedString> {
+    let mut heritage: Vec<SharedString> = Vec::new();
+
+    for extend in &iface_decl.extends {
+        let fragment = get_span_text(source_text, extend.span);
+        if !fragment.is_empty() {
+            heritage.push(fragment);
+        }
+    }
+
+    dedupe_shared_strings_preserve_order(heritage)
+}
+
+fn dedupe_shared_strings_preserve_order(values: Vec<SharedString>) -> Vec<SharedString> {
+    let mut seen: HashSet<SharedString> = HashSet::new();
+    let mut result: Vec<SharedString> = Vec::with_capacity(values.len());
+    for value in values {
+        if seen.insert(value.clone()) {
+            result.push(value);
+        }
+    }
+    result
 }
 
 fn expression_to_string(expr: &Expression<'_>) -> Option<SharedString> {

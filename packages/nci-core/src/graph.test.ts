@@ -595,5 +595,88 @@ describe("buildPackageGraph", () => {
       expect(inherited).toBeDefined();
       expect(inherited!.isInherited).toBe(true);
     });
+
+    it("produces unique IDs when a class and interface share the same name with different heritage", () => {
+      const graph = buildPackageGraph(makePackageInfo("multi-declaration-heritage"));
+
+      const allIds = graph.symbols.map(symbolNode => symbolNode.id);
+      const uniqueIds = new Set(allIds);
+      expect(uniqueIds.size).toBe(allIds.length);
+
+      const sharedSynthetics = graph.symbols.filter(
+        symbolNode => symbolNode.name === "Composite.shared"
+      );
+      expect(sharedSynthetics).toHaveLength(1);
+      expect(sharedSynthetics[0].isInherited).toBe(true);
+
+      const compositeNames = graph.symbols
+        .filter(symbolNode => symbolNode.name.startsWith("Composite."))
+        .map(symbolNode => symbolNode.name);
+      expect(compositeNames).toContain("Composite.compositeFunc");
+      expect(compositeNames).toContain("Composite.traitOnly");
+      expect(compositeNames).toContain("Composite.shared");
+    });
+
+    it("lists distinct heritage clauses for repeated type constructors with different type arguments", () => {
+      const graph = buildPackageGraph(makePackageInfo("heritage-generic-multi-extends"));
+      const merged = graph.symbols.find(symbolNode => symbolNode.name === "MergedRows");
+      expect(merged).toBeDefined();
+      const heritage = merged!.heritage ?? [];
+      expect(heritage).toHaveLength(2);
+      expect(new Set(heritage).size).toBe(2);
+      expect(heritage.some(entry => entry.includes("HeritageRowA"))).toBe(true);
+      expect(heritage.some(entry => entry.includes("HeritageRowB"))).toBe(true);
+    });
+
+    it("flattens inherited members through a local generic parent via lookup key", () => {
+      const graph = buildPackageGraph(makePackageInfo("heritage-generic-multi-extends"));
+      const names = graph.symbols.map(symbolNode => symbolNode.name);
+
+      const genericChild = graph.symbols.find(symbolNode => symbolNode.name === "GenericChild");
+      expect(genericChild).toBeDefined();
+      expect(genericChild!.heritage).toEqual([expect.stringContaining("GenericParent")]);
+
+      expect(names).toContain("GenericChild.parentValue");
+      expect(names).toContain("GenericChild.parentFixed");
+      expect(names).toContain("GenericChild.childOwn");
+
+      const inheritedParentValue = graph.symbols.find(symbolNode => symbolNode.name === "GenericChild.parentValue");
+      expect(inheritedParentValue).toBeDefined();
+      expect(inheritedParentValue!.isInherited).toBe(true);
+    });
+
+    it("flattens inherited members through deeply nested generic type args", () => {
+      const graph = buildPackageGraph(makePackageInfo("heritage-generic-multi-extends"));
+      const names = graph.symbols.map(symbolNode => symbolNode.name);
+
+      expect(names).toContain("DeepGenericChild.parentValue");
+      expect(names).toContain("DeepGenericChild.parentFixed");
+      expect(names).toContain("DeepGenericChild.deepOwn");
+
+      const deepChild = graph.symbols.find(symbolNode => symbolNode.name === "DeepGenericChild");
+      expect(deepChild).toBeDefined();
+      expect(deepChild!.heritage).toEqual([expect.stringContaining("GenericParent<")]);
+    });
+
+    it("flattens transitively: GrandChild → GenericChild → GenericParent", () => {
+      const graph = buildPackageGraph(makePackageInfo("heritage-generic-multi-extends"));
+      const names = graph.symbols.map(symbolNode => symbolNode.name);
+
+      expect(names).toContain("GrandChild.grandOwn");
+      expect(names).toContain("GrandChild.childOwn");
+      expect(names).toContain("GrandChild.parentValue");
+      expect(names).toContain("GrandChild.parentFixed");
+
+      const grandParentValue = graph.symbols.find(symbolNode => symbolNode.name === "GrandChild.parentValue");
+      expect(grandParentValue).toBeDefined();
+      expect(grandParentValue!.isInherited).toBe(true);
+    });
+
+    it("produces unique symbol IDs across all generic heritage cases", () => {
+      const graph = buildPackageGraph(makePackageInfo("heritage-generic-multi-extends"));
+      const ids = graph.symbols.map(symbolNode => symbolNode.id);
+      const uniqueIds = new Set(ids);
+      expect(uniqueIds.size).toBe(ids.length);
+    });
   });
 });

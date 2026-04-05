@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub type SharedString = Arc<str>;
 pub type SharedVec<T> = Arc<[T]>;
@@ -9,7 +9,7 @@ pub type SharedVec<T> = Arc<[T]>;
 // ─── Visibility ────────────────────────────────────────────────
 
 /// API visibility level from JSDoc tags: @public, @internal, @alpha, @beta.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Visibility {
     Public,
@@ -21,7 +21,7 @@ pub enum Visibility {
 // ─── Decorator Metadata ────────────────────────────────────────
 
 /// Metadata for a TypeScript decorator: `@name(args)`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DecoratorMetadata {
     /// The name of the decorator (e.g., "injectable" or "route").
@@ -71,7 +71,7 @@ pub struct PackageEntry {
 // ─── Type Reference ────────────────────────────────────────────
 
 /// A reference to another type, potentially involving an inline `import()`.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TypeReference {
     /// The name of the referenced type.
@@ -114,6 +114,16 @@ impl Serialize for SymbolKind {
         S: serde::Serializer,
     {
         serializer.serialize_u32(self.numeric_kind())
+    }
+}
+
+impl<'de> Deserialize<'de> for SymbolKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let code = u32::deserialize(deserializer)?;
+        Ok(Self::from_numeric_kind(code))
     }
 }
 
@@ -163,12 +173,36 @@ impl SymbolKind {
             Self::Unknown => 0,
         }
     }
+
+    /// Reverse of [`Self::numeric_kind`] for JSON cache / round-trip.
+    pub fn from_numeric_kind(code: u32) -> Self {
+        match code {
+            263 => Self::Function,
+            264 => Self::Class,
+            265 => Self::Interface,
+            266 => Self::TypeAlias,
+            267 => Self::Enum,
+            268 => Self::Namespace,
+            244 => Self::Variable,
+            279 => Self::ExportDeclaration,
+            278 => Self::ExportAssignment,
+            173 => Self::PropertyDeclaration,
+            172 => Self::PropertySignature,
+            175 => Self::MethodDeclaration,
+            174 => Self::MethodSignature,
+            178 => Self::GetAccessor,
+            179 => Self::SetAccessor,
+            272 => Self::ImportEquals,
+            271 => Self::NamespaceExportDeclaration,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 // ─── Deprecation ───────────────────────────────────────────────
 
 /// Deprecation info: `true` if `@deprecated` with no message, or the message string.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Deprecation {
     /// `@deprecated` with no message → serializes as `true`.
@@ -181,7 +215,7 @@ pub enum Deprecation {
 // ─── Parser Output ─────────────────────────────────────────────
 
 /// TypeScript type namespace vs value namespace for a declaration site (not re-export flags).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SymbolSpace {
     #[default]
@@ -413,7 +447,7 @@ impl ResolvedSymbol {
 
 // ─── Graph Output ──────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SymbolNode {
     /// Unique ID.
@@ -441,6 +475,10 @@ pub struct SymbolNode {
     /// Full type signature.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<SharedString>,
+
+    /// SHA-256 (hex) of [`Self::signature`].
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub signature_hash: Option<SharedString>,
 
     /// JSDoc comment.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -507,7 +545,7 @@ pub struct SymbolNode {
     pub raw_dependencies: Vec<TypeReference>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageGraph {
     /// Package name.
@@ -526,7 +564,10 @@ pub struct PackageGraph {
     pub total_files: usize,
 
     /// Time taken to crawl in milliseconds.
-    #[serde(serialize_with = "serialize_duration_as_int")]
+    #[serde(
+        serialize_with = "serialize_duration_as_int",
+        deserialize_with = "deserialize_duration_from_int"
+    )]
     pub crawl_duration_ms: f64,
 }
 
@@ -535,6 +576,14 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_u64(*val as u64)
+}
+
+fn deserialize_duration_from_int<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let unit = u64::deserialize(deserializer)?;
+    Ok(unit as f64)
 }
 
 fn is_shared_vec_empty<T>(v: &SharedVec<T>) -> bool {
