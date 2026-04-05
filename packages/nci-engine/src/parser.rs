@@ -1006,9 +1006,14 @@ fn extract_global_declaration<'a>(
 
     for statement in &global_decl.body.body {
         let is_exported = statement_has_export_keyword(statement);
-        if let Some(mut decl_exports) =
-            extract_direct_statement(statement, source_text, false, current_file, local_decls, None)
-        {
+        if let Some(mut decl_exports) = extract_direct_statement(
+            statement,
+            source_text,
+            false,
+            current_file,
+            local_decls,
+            None,
+        ) {
             for export_item in &mut decl_exports {
                 export_item.is_explicit_export = is_exported;
                 export_item.is_global_augmentation = global_decl_is_augmentation;
@@ -1753,12 +1758,7 @@ fn extract_class_body_as_type_members<'a>(
                     MethodDefinitionKind::Set => SymbolKind::SetAccessor,
                     _ => SymbolKind::MethodDeclaration,
                 };
-                (
-                    name,
-                    method_def.span,
-                    kind,
-                    method_def.r#static,
-                )
+                (name, method_def.span, kind, method_def.r#static)
             }
             ClassElement::AccessorProperty(accessor) => {
                 let name = property_key_to_string(&accessor.key, source_text);
@@ -1903,7 +1903,8 @@ fn extract_interface_members<'a>(
             None => continue,
         };
 
-        let qualified_name = SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
+        let qualified_name =
+            SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
         let signature = get_span_text(source_text, member_span);
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
 
@@ -1976,9 +1977,7 @@ fn extract_interface_members<'a>(
     }
 }
 
-fn import_type_qualifier_segments<'a>(
-    qualifier: &'a TSImportTypeQualifier<'a>,
-) -> Vec<&'a str> {
+fn import_type_qualifier_segments<'a>(qualifier: &'a TSImportTypeQualifier<'a>) -> Vec<&'a str> {
     match qualifier {
         TSImportTypeQualifier::Identifier(identifier) => vec![identifier.name.as_ref()],
         TSImportTypeQualifier::QualifiedName(qualified_name) => {
@@ -2215,82 +2214,79 @@ fn extract_complex_type_members<'a>(
                 visited.remove(&ref_name);
             }
         }
-        TSType::TSTypeQuery(type_query) => {
-            match &type_query.expr_name {
-                TSTypeQueryExprName::TSImportType(import_box) => {
-                    expand_ts_import_type_members(
-                        import_box.as_ref(),
-                        source_text,
-                        current_file,
-                        parent_name,
-                        is_explicit_export,
-                        parent_jsdoc,
-                        results,
-                        visited,
-                        depth,
-                        definition_site.clone(),
-                    );
-                }
-                TSTypeQueryExprName::IdentifierReference(ident) => {
-                    let ref_name = SharedString::from(ident.name.as_ref());
-                    let was_inserted = visited.insert(ref_name.clone());
-                    if was_inserted {
-                        if let Some(local_decl) = local_decls.get(ref_name.as_ref()) {
-                            match local_decl {
-                                LocalDecl::Type(resolved_type) => {
-                                    extract_complex_type_members(
-                                        resolved_type,
-                                        source_text,
-                                        current_file,
-                                        parent_name,
-                                        is_explicit_export,
-                                        parent_jsdoc,
-                                        results,
-                                        local_decls,
-                                        visited,
-                                        depth + 1,
-                                        definition_site.clone(),
-                                    );
-                                }
-                                LocalDecl::Interface(iface_body) => {
-                                    extract_type_literal_members(
-                                        &iface_body.body,
-                                        source_text,
-                                        current_file,
-                                        parent_name,
-                                        is_explicit_export,
-                                        parent_jsdoc,
-                                        results,
-                                        local_decls,
-                                        visited,
-                                        depth + 1,
-                                        definition_site.clone(),
-                                    );
-                                }
-                                LocalDecl::Class(class) => {
-                                    extract_class_body_as_type_members(
-                                        class,
-                                        source_text,
-                                        current_file,
-                                        parent_name,
-                                        is_explicit_export,
-                                        parent_jsdoc,
-                                        results,
-                                        local_decls,
-                                        visited,
-                                        depth + 1,
-                                        definition_site.clone(),
-                                    );
-                                }
+        TSType::TSTypeQuery(type_query) => match &type_query.expr_name {
+            TSTypeQueryExprName::TSImportType(import_box) => {
+                expand_ts_import_type_members(
+                    import_box.as_ref(),
+                    source_text,
+                    current_file,
+                    parent_name,
+                    is_explicit_export,
+                    parent_jsdoc,
+                    results,
+                    visited,
+                    depth,
+                    definition_site.clone(),
+                );
+            }
+            TSTypeQueryExprName::IdentifierReference(ident) => {
+                let ref_name = SharedString::from(ident.name.as_ref());
+                let was_inserted = visited.insert(ref_name.clone());
+                if was_inserted {
+                    if let Some(local_decl) = local_decls.get(ref_name.as_ref()) {
+                        match local_decl {
+                            LocalDecl::Type(resolved_type) => {
+                                extract_complex_type_members(
+                                    resolved_type,
+                                    source_text,
+                                    current_file,
+                                    parent_name,
+                                    is_explicit_export,
+                                    parent_jsdoc,
+                                    results,
+                                    local_decls,
+                                    visited,
+                                    depth + 1,
+                                    definition_site.clone(),
+                                );
+                            }
+                            LocalDecl::Interface(iface_body) => {
+                                extract_type_literal_members(
+                                    &iface_body.body,
+                                    source_text,
+                                    current_file,
+                                    parent_name,
+                                    is_explicit_export,
+                                    parent_jsdoc,
+                                    results,
+                                    local_decls,
+                                    visited,
+                                    depth + 1,
+                                    definition_site.clone(),
+                                );
+                            }
+                            LocalDecl::Class(class) => {
+                                extract_class_body_as_type_members(
+                                    class,
+                                    source_text,
+                                    current_file,
+                                    parent_name,
+                                    is_explicit_export,
+                                    parent_jsdoc,
+                                    results,
+                                    local_decls,
+                                    visited,
+                                    depth + 1,
+                                    definition_site.clone(),
+                                );
                             }
                         }
-                        visited.remove(&ref_name);
                     }
+                    visited.remove(&ref_name);
                 }
-                TSTypeQueryExprName::QualifiedName(_)
-                | TSTypeQueryExprName::ThisExpression(_) => {}
             }
-        }
+            TSTypeQueryExprName::QualifiedName(_) | TSTypeQueryExprName::ThisExpression(_) => {}
+        },
         TSType::TSImportType(import_type) => {
             expand_ts_import_type_members(
                 import_type,
@@ -2735,35 +2731,32 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
             collect_type_refs(&indexed.index_type, refs);
         }
 
-        TSType::TSTypeQuery(type_query) => {
-            match &type_query.expr_name {
-                TSTypeQueryExprName::IdentifierReference(ident) => {
-                    let name = SharedString::from(ident.name.as_ref());
-                    if !BUILTIN_TYPES.contains(name.as_ref()) {
-                        refs.insert(
-                            name.clone(),
-                            TypeReference {
-                                name,
-                                import_path: None,
-                            },
-                        );
-                    }
+        TSType::TSTypeQuery(type_query) => match &type_query.expr_name {
+            TSTypeQueryExprName::IdentifierReference(ident) => {
+                let name = SharedString::from(ident.name.as_ref());
+                if !BUILTIN_TYPES.contains(name.as_ref()) {
+                    refs.insert(
+                        name.clone(),
+                        TypeReference {
+                            name,
+                            import_path: None,
+                        },
+                    );
                 }
-                TSTypeQueryExprName::TSImportType(import_box) => {
-                    let import_type = import_box.as_ref();
-                    if let Some(qualifier) = &import_type.qualifier {
-                        let leaf = import_type_qualifier_leaf_name(qualifier);
-                        let name = SharedString::from(leaf);
-                        let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
-                        if !BUILTIN_TYPES.contains(name.as_ref()) {
-                            refs.insert(name.clone(), TypeReference { name, import_path });
-                        }
-                    }
-                }
-                TSTypeQueryExprName::QualifiedName(_)
-                | TSTypeQueryExprName::ThisExpression(_) => {}
             }
-        }
+            TSTypeQueryExprName::TSImportType(import_box) => {
+                let import_type = import_box.as_ref();
+                if let Some(qualifier) = &import_type.qualifier {
+                    let leaf = import_type_qualifier_leaf_name(qualifier);
+                    let name = SharedString::from(leaf);
+                    let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
+                    if !BUILTIN_TYPES.contains(name.as_ref()) {
+                        refs.insert(name.clone(), TypeReference { name, import_path });
+                    }
+                }
+            }
+            TSTypeQueryExprName::QualifiedName(_) | TSTypeQueryExprName::ThisExpression(_) => {}
+        },
 
         TSType::TSImportType(import_type) => {
             if let Some(qualifier) = &import_type.qualifier {
@@ -2876,7 +2869,10 @@ fn ts_type_name_to_string(type_name: &TSTypeName<'_>) -> SharedString {
         }
     }
     segments_right_to_left.reverse();
-    let estimated_capacity: usize = segments_right_to_left.iter().map(|segment| segment.len()).sum::<usize>()
+    let estimated_capacity: usize = segments_right_to_left
+        .iter()
+        .map(|segment| segment.len())
+        .sum::<usize>()
         + segments_right_to_left.len().saturating_sub(1);
     let mut qualified_name = String::with_capacity(estimated_capacity);
     for segment in segments_right_to_left {
@@ -3011,9 +3007,7 @@ fn property_key_to_string(key: &PropertyKey<'_>, source_text: &str) -> Option<Sh
                     .raw
                     .as_ref()
                     .map(|raw_text| SharedString::from(raw_text.as_ref()))
-                    .or_else(|| {
-                        Some(SharedString::from(num_lit.value.to_string().as_ref()))
-                    }),
+                    .or_else(|| Some(SharedString::from(num_lit.value.to_string().as_ref()))),
                 _ => {
                     let span_text = get_span_text(source_text, expr.span());
                     if span_text.is_empty() {
@@ -3325,13 +3319,11 @@ mod tests {
 
     #[test]
     fn parse_ts_import_equals_require_records_module_specifier() {
-        let source =
-            "import ts = require(\"./typescript.js\");\nexport = ts;\n";
+        let source = "import ts = require(\"./typescript.js\");\nexport = ts;\n";
         let result = parse_file_from_source("shim.d.ts", source);
         assert!(
             result.imports.iter().any(|import_row| {
-                import_row.name.as_ref() == "ts"
-                    && import_row.source.as_ref() == "./typescript.js"
+                import_row.name.as_ref() == "ts" && import_row.source.as_ref() == "./typescript.js"
             }),
             "imports: {:?}",
             result.imports
@@ -3353,7 +3345,9 @@ mod tests {
             .find(|dep| dep.name.as_ref() == "Type")
             .expect("leaf name Type");
         assert_eq!(
-            dep.import_path.as_ref().map(|import_path| import_path.as_ref()),
+            dep.import_path
+                .as_ref()
+                .map(|import_path| import_path.as_ref()),
             Some("./dep")
         );
     }
@@ -3392,19 +3386,12 @@ export declare const ROOT: string;
         "#;
         let result = parse_file_from_source("test.d.ts", source);
         assert!(result.is_external_module);
-        assert!(result
-            .exports
-            .iter()
-            .any(|export_row| {
-                export_row.name.as_ref() == "Window" && export_row.is_global_augmentation
-            }));
-        assert!(result
-            .exports
-            .iter()
-            .any(|export_row| {
-                export_row.name.as_ref() == "Window.__APP_STATE__"
-                    && export_row.is_global_augmentation
-            }));
+        assert!(result.exports.iter().any(|export_row| {
+            export_row.name.as_ref() == "Window" && export_row.is_global_augmentation
+        }));
+        assert!(result.exports.iter().any(|export_row| {
+            export_row.name.as_ref() == "Window.__APP_STATE__" && export_row.is_global_augmentation
+        }));
     }
 
     /// Nested `global { }` under `declare module "…"` keeps a namespace row without setting
@@ -3422,7 +3409,9 @@ export declare const ROOT: string;
         let global_ns = result
             .exports
             .iter()
-            .find(|export_item| export_item.name.as_ref() == "global" && export_item.kind == SymbolKind::Namespace)
+            .find(|export_item| {
+                export_item.name.as_ref() == "global" && export_item.kind == SymbolKind::Namespace
+            })
             .expect("expected `global` namespace row from nested global block");
         assert!(
             !global_ns.is_global_augmentation,

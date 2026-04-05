@@ -737,8 +737,10 @@ mod tests {
         .unwrap();
         fs::write(ts_pkg.join("lib/tsserverlibrary.d.ts"), "export {}\n").unwrap();
 
-        let paths =
-            resolve_module_specifier("typescript/lib/tsserverlibrary", from_file.to_str().unwrap());
+        let paths = resolve_module_specifier(
+            "typescript/lib/tsserverlibrary",
+            from_file.to_str().unwrap(),
+        );
         assert!(
             paths.iter().any(|candidate_path| {
                 let path_str = candidate_path.as_ref();

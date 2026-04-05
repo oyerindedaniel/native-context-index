@@ -10,6 +10,7 @@ static PROTOCOL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+)
 use crate::constants::NODE_BUILTINS;
 use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
+use crate::profile;
 use crate::resolver::{normalize_path, resolve_module_specifier, resolve_types_entry};
 use crate::types::{
     PackageEntry, PackageGraph, PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode,
@@ -34,6 +35,10 @@ fn file_path_under_namespace_root(file_path: &str, namespace_root: &str) -> bool
     }
     file_path.as_bytes().get(namespace_root.len()) == Some(&b'/')
         && file_path.starts_with(namespace_root)
+}
+
+fn graph_profile_label(package: &SharedString, phase: &str) -> String {
+    format!("[{}] {}", package.as_ref(), phase)
 }
 
 fn triple_slash_reachable(
@@ -72,6 +77,10 @@ pub fn build_package_graph(
         }
     });
     let entry_resolution_ms = entry_phase_start.elapsed().as_secs_f64() * 1000.0;
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.resolve_entry"),
+        entry_resolution_ms,
+    );
 
     if entry.types_entries.is_empty() {
         return PackageGraph {
@@ -88,6 +97,10 @@ pub fn build_package_graph(
     let crawl_phase_start = Instant::now();
     let crawl_result = crawl(&entry.types_entries, crawl_options);
     let crawl_duration_ms = crawl_phase_start.elapsed().as_secs_f64() * 1000.0;
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.crawl_total"),
+        crawl_duration_ms,
+    );
 
     let graph_assembly_phase_start = Instant::now();
 
@@ -102,6 +115,7 @@ pub fn build_package_graph(
     let package_dir_str = package_info.dir.as_ref();
     let normalized_pkg_dir = package_dir_str.replace('\\', "/");
 
+    let merge_phase_start = Instant::now();
     for resolved in &all_symbols {
         let symbol_file_path = SharedString::from(
             make_relative(
@@ -159,7 +173,9 @@ pub fn build_package_graph(
                         .map(|dep| {
                             (
                                 dep.name.clone(),
-                                dep.import_path.clone().unwrap_or_else(|| SharedString::from("")),
+                                dep.import_path
+                                    .clone()
+                                    .unwrap_or_else(|| SharedString::from("")),
                             )
                         })
                         .collect()
@@ -236,10 +252,15 @@ pub fn build_package_graph(
             merged.push((SharedString::from(""), node));
         }
     }
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.merge"),
+        merge_phase_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
     // Insertion order = first occurrence of each merge key in crawl order (stable `#n` / name_to_id).
     let mut symbols: Vec<SymbolNode> = merged.into_iter().map(|(_unused_key, node)| node).collect();
 
+    let ids_maps_phase_start = Instant::now();
     let sym_cap = symbols.len().min(65536);
     let mut name_to_id: HashMap<SharedString, SharedString> = HashMap::with_capacity(sym_cap);
     let mut name_to_ids: HashMap<SharedString, Vec<SharedString>> = HashMap::with_capacity(sym_cap);
@@ -256,7 +277,8 @@ pub fn build_package_graph(
         );
 
         if symbol_node.is_internal {
-            let fk: SharedString = format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
+            let fk: SharedString =
+                format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
             let c = internal_file_name_count.entry(fk).or_insert(0);
             *c += 1;
             let ic = *c;
@@ -288,10 +310,7 @@ pub fn build_package_graph(
             } else {
                 format!(
                     "{}@{}::{}#{}",
-                    package_info.name,
-                    package_info.version,
-                    symbol_node.name,
-                    count
+                    package_info.name, package_info.version, symbol_node.name, count
                 )
                 .into()
             };
@@ -328,10 +347,15 @@ pub fn build_package_graph(
     for symbol_node in &symbols {
         id_to_file_path.insert(symbol_node.id.clone(), symbol_node.file_path.clone());
     }
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.ids_maps"),
+        ids_maps_phase_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
     let protocol_regex = &*PROTOCOL_REGEX;
     let has_ref_edges = !triple_slash_edges.is_empty();
 
+    let resolve_deps_phase_start = Instant::now();
     let mut normalized_abs_cache: HashMap<SharedString, SharedString> = HashMap::new();
     let mut closure_cache: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
     let mut module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>> =
@@ -348,9 +372,7 @@ pub fn build_package_graph(
         let abs_lookup = normalized_abs_cache
             .entry(symbol_node.file_path.clone())
             .or_insert_with(|| {
-                normalize_path(
-                    &Path::new(package_dir_str).join(symbol_node.file_path.as_ref()),
-                )
+                normalize_path(&Path::new(package_dir_str).join(symbol_node.file_path.as_ref()))
             })
             .clone();
         let abs_lookup_str: &str = abs_lookup.as_ref();
@@ -402,10 +424,15 @@ pub fn build_package_graph(
                             .iter()
                             .find(|imported| imported.name == raw_dep.name)
                         {
-                            let source_cache_key = (symbol_node.file_path.clone(), matching_import.source.clone());
+                            let source_cache_key = (
+                                symbol_node.file_path.clone(),
+                                matching_import.source.clone(),
+                            );
                             let abs_source_paths = module_specifier_cache
                                 .entry(source_cache_key)
-                                .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
+                                .or_insert_with_key(|k| {
+                                    resolve_module_specifier(&k.1, abs_lookup_str)
+                                })
                                 .clone();
                             if !abs_source_paths.is_empty() {
                                 let rel_source_path = make_relative(
@@ -428,17 +455,21 @@ pub fn build_package_graph(
                 }
 
                 if target_ids.is_empty() {
-                    if let (Some(file_imports), Some((qualifier, member_path))) =
-                        (all_imports_per_file.get(abs_lookup.as_ref()), namespace_qual)
-                    {
+                    if let (Some(file_imports), Some((qualifier, member_path))) = (
+                        all_imports_per_file.get(abs_lookup.as_ref()),
+                        namespace_qual,
+                    ) {
                         if let Some(ns_import) = file_imports
                             .iter()
                             .find(|imported| imported.name.as_ref() == qualifier)
                         {
-                            let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
+                            let ns_cache_key =
+                                (symbol_node.file_path.clone(), ns_import.source.clone());
                             let abs_source_paths = module_specifier_cache
                                 .entry(ns_cache_key)
-                                .or_insert_with_key(|k| resolve_module_specifier(&k.1, abs_lookup_str))
+                                .or_insert_with_key(|k| {
+                                    resolve_module_specifier(&k.1, abs_lookup_str)
+                                })
                                 .clone();
                             namespace_target_files_resolved = !abs_source_paths.is_empty();
                             namespace_fallback_roots.clear();
@@ -524,15 +555,19 @@ pub fn build_package_graph(
                             if skip_namespace_root_filter {
                                 target_ids.extend(ids.iter().cloned());
                             } else {
-                                let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
-                                    .iter()
-                                    .map(|root_path| root_path.as_ref())
-                                    .collect();
+                                let distinct_namespace_roots: HashSet<&str> =
+                                    namespace_fallback_roots
+                                        .iter()
+                                        .map(|root_path| root_path.as_ref())
+                                        .collect();
                                 for symbol_id in ids {
                                     if let Some(stored_path) = id_to_file_path.get(symbol_id) {
                                         let defining_path = stored_path.as_ref();
                                         if distinct_namespace_roots.iter().any(|&namespace_root| {
-                                            file_path_under_namespace_root(defining_path, namespace_root)
+                                            file_path_under_namespace_root(
+                                                defining_path,
+                                                namespace_root,
+                                            )
                                         }) {
                                             target_ids.push(symbol_id.clone());
                                         }
@@ -554,14 +589,13 @@ pub fn build_package_graph(
                 let import_path = raw_dep.import_path.as_deref();
 
                 if let Some(path) = import_path {
-                    if let Some(ext_id) = resolve_external_dep_id(path, raw_dep.name.as_ref(), protocol_regex)
+                    if let Some(ext_id) =
+                        resolve_external_dep_id(path, raw_dep.name.as_ref(), protocol_regex)
                     {
                         resolved_ids.insert(ext_id.into());
-                    } else if let Some(stub) = try_external_module_stub_id(
-                        path,
-                        raw_dep.name.as_ref(),
-                        protocol_regex,
-                    ) {
+                    } else if let Some(stub) =
+                        try_external_module_stub_id(path, raw_dep.name.as_ref(), protocol_regex)
+                    {
                         resolved_ids.insert(stub.into());
                     }
                 } else if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
@@ -611,15 +645,28 @@ pub fn build_package_graph(
         symbol_node.dependencies = SharedVec::from(resolved_ids_vec);
         symbol_node.raw_dependencies.clear();
     }
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.resolve_deps"),
+        resolve_deps_phase_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
+    let flatten_phase_start = Instant::now();
     flatten_inherited_members(
         &mut symbols,
         &name_to_id,
         &package_info.name,
         &package_info.version,
     );
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.flatten_heritage"),
+        flatten_phase_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
+    profile::profile_log(
+        &graph_profile_label(&package_info.name, "graph.assembly_total"),
+        graph_assembly_ms,
+    );
     let build_duration_ms = entry_resolution_ms + graph_assembly_ms;
 
     let total_symbols = symbols.len();
@@ -768,12 +815,9 @@ fn flatten_inherited_members(
 
     let mut merged_heritage: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
     for node in symbols.iter().filter(|node| {
-        matches!(node.kind, SymbolKind::Class | SymbolKind::Interface)
-            && !node.heritage.is_empty()
+        matches!(node.kind, SymbolKind::Class | SymbolKind::Interface) && !node.heritage.is_empty()
     }) {
-        let entry = merged_heritage
-            .entry(node.name.clone())
-            .or_default();
+        let entry = merged_heritage.entry(node.name.clone()).or_default();
         for parent in node.heritage.iter() {
             if !entry.contains(parent) {
                 entry.push(parent.clone());
@@ -1071,7 +1115,11 @@ mod tests {
 
         let graph = build_package_graph(&info, None);
 
-        let all_ids: Vec<&str> = graph.symbols.iter().map(|symbol| symbol.id.as_ref()).collect();
+        let all_ids: Vec<&str> = graph
+            .symbols
+            .iter()
+            .map(|symbol| symbol.id.as_ref())
+            .collect();
         let unique_ids: std::collections::HashSet<&str> = all_ids.iter().copied().collect();
         assert_eq!(
             all_ids.len(),

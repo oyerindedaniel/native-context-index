@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::constants::DEFAULT_MAX_DEPTH;
 use crate::dedupe::symbol_dedupe_key;
 use crate::parser;
+use crate::profile;
 use crate::resolver::{normalize_path, normalize_path_with_cache, resolve_module_specifier};
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
@@ -13,25 +15,41 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct CrawlOptions {
     pub max_depth: usize,
+    /// When `NCI_PROFILE=1`, timings include this package name (parallel `index_packages`).
+    pub profile_as: Option<SharedString>,
 }
 
 impl Default for CrawlOptions {
     fn default() -> Self {
         Self {
             max_depth: DEFAULT_MAX_DEPTH,
+            profile_as: None,
         }
     }
 }
 
 pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -> CrawlResult {
     let crawl_options = options.unwrap_or_default();
+    let profile_label = |phase: &str| {
+        if let Some(ref pkg) = crawl_options.profile_as {
+            format!("[{}] {}", pkg.as_ref(), phase)
+        } else {
+            phase.to_string()
+        }
+    };
+
     let mut session = CrawlSession::new(crawl_options.max_depth);
 
     let primary_entry = entry_file_paths.first().cloned().unwrap_or_default();
 
+    let discover_start = Instant::now();
     for entry_path in entry_file_paths {
         session.discover_files(entry_path, 0);
     }
+    profile::profile_log(
+        &profile_label("crawl.discover"),
+        discover_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
     let mut resolved_symbols: Vec<ResolvedSymbol> = Vec::new();
     let mut public_symbols: HashSet<SharedString> = HashSet::new();
@@ -48,6 +66,7 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         })
         .collect();
 
+    let resolve_exports_start = Instant::now();
     for entry_path in &unique_entries {
         let resolved = session.resolve_file(entry_path, 0, "");
         for mut resolved_symbol in resolved.iter().cloned() {
@@ -69,9 +88,14 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
             public_symbols.insert(dedup_key);
         }
     }
+    profile::profile_log(
+        &profile_label("crawl.resolve_exports"),
+        resolve_exports_start.elapsed().as_secs_f64() * 1000.0,
+    );
 
     let mut visited_files: Vec<SharedString> = session.visited.iter().cloned().collect();
     visited_files.sort_by(|path_a, path_b| path_a.cmp(path_b));
+    let internal_start = Instant::now();
     for file in &visited_files {
         let exports = match session.raw_exports.get(file) {
             Some(exports) => exports.clone(),
@@ -118,6 +142,11 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
             public_symbols.insert(definition_key);
         }
     }
+    profile::profile_log(
+        &profile_label("crawl.internal_symbols"),
+        internal_start.elapsed().as_secs_f64() * 1000.0,
+    );
+    profile::profile_stat(&profile_label("crawl.files_visited"), visited_files.len());
 
     let mut triple_rows: Vec<(SharedString, HashSet<SharedString>)> =
         session.triple_slash_ref_targets.into_iter().collect();
@@ -420,7 +449,8 @@ impl CrawlSession {
 
         self.resolution_path.insert(normalized_path.clone());
 
-        let mut known_export_keys: HashSet<SharedString> = HashSet::with_capacity(actual_exports.len());
+        let mut known_export_keys: HashSet<SharedString> =
+            HashSet::with_capacity(actual_exports.len());
         known_export_keys.extend(actual_exports.iter().map(|entry| {
             SharedString::from(
                 format!(
@@ -581,8 +611,7 @@ impl CrawlSession {
 
         let arc = Arc::new(results);
         if name_prefix.is_empty() {
-            self
-                .resolution_cache
+            self.resolution_cache
                 .insert(normalized_path, Arc::clone(&arc));
         }
 
@@ -721,7 +750,6 @@ impl CrawlSession {
 
         results
     }
-
 }
 
 /// Whether `target` is the same export-clause element as `export_entry`.
@@ -862,15 +890,12 @@ mod tests {
             result.visited_files
         );
         assert!(
-            result
-                .visited_files
-                .iter()
-                .any(|visited_path| {
-                    visited_path
-                        .as_ref()
-                        .to_ascii_lowercase()
-                        .contains("impl.d.ts")
-                }),
+            result.visited_files.iter().any(|visited_path| {
+                visited_path
+                    .as_ref()
+                    .to_ascii_lowercase()
+                    .contains("impl.d.ts")
+            }),
             "visited {:?}",
             result.visited_files
         );
@@ -963,7 +988,13 @@ mod tests {
             "export { deepFunc } from './deep';",
         );
 
-        let result = crawl(&[entry], Some(CrawlOptions { max_depth: 0 }));
+        let result = crawl(
+            &[entry],
+            Some(CrawlOptions {
+                max_depth: 0,
+                ..Default::default()
+            }),
+        );
 
         // With max_depth=0, we should only parse the entry file, not follow re-exports
         // The deepFunc should not be fully resolved
@@ -1104,10 +1135,9 @@ mod tests {
 
         let result = crawl(&[entry], None);
 
-        let alias_class = result
-            .exports
-            .iter()
-            .find(|symbol| symbol.name.as_ref() == "Experimental_Agent" && symbol.kind == SymbolKind::Class);
+        let alias_class = result.exports.iter().find(|symbol| {
+            symbol.name.as_ref() == "Experimental_Agent" && symbol.kind == SymbolKind::Class
+        });
         let alias_forward = result.exports.iter().find(|symbol| {
             symbol.name.as_ref() == "Experimental_Agent"
                 && symbol.kind == SymbolKind::ExportDeclaration
@@ -1119,12 +1149,7 @@ mod tests {
                 .exports
                 .iter()
                 .filter(|export_symbol| export_symbol.name.as_ref() == "Experimental_Agent")
-                .map(|export_symbol| {
-                    (
-                        export_symbol.kind,
-                        export_symbol.signature.as_deref(),
-                    )
-                })
+                .map(|export_symbol| { (export_symbol.kind, export_symbol.signature.as_deref(),) })
                 .collect::<Vec<_>>()
         );
     }

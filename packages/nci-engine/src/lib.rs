@@ -1,17 +1,18 @@
 pub mod cache;
 pub mod constants;
-pub mod dedupe;
 pub mod crawler;
+pub mod dedupe;
 pub mod filter;
 pub mod graph;
 pub mod parser;
 pub mod pipeline;
+pub mod profile;
 pub mod resolver;
 pub mod scanner;
 pub mod storage;
 mod storage_migrations;
 pub mod types;
 
-pub use cache::{nci_sqlite_path, NCI_ENGINE_VERSION};
+pub use cache::{NCI_ENGINE_VERSION, nci_sqlite_path};
 pub use filter::{DepKindFilter, FilterConfig, IgnoreRule};
-pub use storage::{NciDatabase, StorageError, StorageResult, SCHEMA_VERSION};
+pub use storage::{NciDatabase, SCHEMA_VERSION, StorageError, StorageResult};

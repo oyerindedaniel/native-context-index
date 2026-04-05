@@ -506,7 +506,10 @@ mod tests {
         std::fs::write(temp.path().join(".nciignore"), "jest\n").unwrap();
 
         let config = FilterConfig::default().with_nciignore_file(temp.path());
-        assert_eq!(config.project_root.as_ref().map(|path| path.as_path()), Some(temp.path()));
+        assert_eq!(
+            config.project_root.as_ref().map(|path| path.as_path()),
+            Some(temp.path())
+        );
         assert_eq!(config.nciignore_rules.len(), 1);
         assert_eq!(config.nciignore_rules[0].pattern, "jest");
     }
@@ -536,10 +539,7 @@ mod tests {
             include_names: include,
             ..Default::default()
         }
-        .apply(vec![
-            sample_package("keep"),
-            sample_package("drop"),
-        ]);
+        .apply(vec![sample_package("keep"), sample_package("drop")]);
 
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].name.as_ref(), "keep");
@@ -547,10 +547,7 @@ mod tests {
 
     #[test]
     fn apply_empty_include_names_does_not_restrict_by_name() {
-        let out = FilterConfig::default().apply(vec![
-            sample_package("a"),
-            sample_package("b"),
-        ]);
+        let out = FilterConfig::default().apply(vec![sample_package("a"), sample_package("b")]);
         assert_eq!(out.len(), 2);
     }
 
@@ -560,10 +557,7 @@ mod tests {
             exclude_patterns: vec!["eslint*".into()],
             ..Default::default()
         }
-        .apply(vec![
-            sample_package("eslint"),
-            sample_package("prettier"),
-        ]);
+        .apply(vec![sample_package("eslint"), sample_package("prettier")]);
 
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].name.as_ref(), "prettier");
@@ -604,11 +598,7 @@ mod tests {
     #[test]
     fn apply_dep_filter_with_empty_allow_set_drops_all() {
         let temp = tempfile::tempdir().unwrap();
-        std::fs::write(
-            temp.path().join("package.json"),
-            r#"{"name":"x"}"#,
-        )
-        .unwrap();
+        std::fs::write(temp.path().join("package.json"), r#"{"name":"x"}"#).unwrap();
 
         let out = FilterConfig {
             project_root: Some(temp.path().to_path_buf()),
@@ -642,10 +632,7 @@ mod tests {
             nciignore_rules: rules,
             ..Default::default()
         }
-        .apply(vec![
-            sample_package("keep"),
-            sample_package("drop-dep"),
-        ]);
+        .apply(vec![sample_package("keep"), sample_package("drop-dep")]);
 
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].name.as_ref(), "keep");

@@ -128,7 +128,9 @@ fn normalise_oracle(oracle: &mut serde_json::Value) {
                 .and_then(|deps_node| deps_node.as_array_mut())
             {
                 deps.sort_by(|left, right| {
-                    left.as_str().unwrap_or("").cmp(&right.as_str().unwrap_or(""))
+                    left.as_str()
+                        .unwrap_or("")
+                        .cmp(&right.as_str().unwrap_or(""))
                 });
             }
             if let Some(obj) = sym.as_object_mut() {
@@ -247,10 +249,7 @@ fn compare_structural_properties(
             );
         }
 
-        if let Some(ts_type_only) = ts_sym
-            .get("isTypeOnly")
-            .and_then(|flag| flag.as_bool())
-        {
+        if let Some(ts_type_only) = ts_sym.get("isTypeOnly").and_then(|flag| flag.as_bool()) {
             assert_eq!(
                 rust_sym.is_type_only, ts_type_only,
                 "[{fixture_name}] isTypeOnly mismatch for '{}'",
@@ -308,12 +307,15 @@ fn compare_structural_properties(
         let ts_visibility = ts_sym
             .get("visibility")
             .and_then(|vis_field| vis_field.as_str());
-        let rust_visibility = rust_sym.visibility.as_ref().map(|visibility| match visibility {
-            nci_engine::types::Visibility::Public => "public",
-            nci_engine::types::Visibility::Internal => "internal",
-            nci_engine::types::Visibility::Alpha => "alpha",
-            nci_engine::types::Visibility::Beta => "beta",
-        });
+        let rust_visibility = rust_sym
+            .visibility
+            .as_ref()
+            .map(|visibility| match visibility {
+                nci_engine::types::Visibility::Public => "public",
+                nci_engine::types::Visibility::Internal => "internal",
+                nci_engine::types::Visibility::Alpha => "alpha",
+                nci_engine::types::Visibility::Beta => "beta",
+            });
         assert_eq!(
             rust_visibility, ts_visibility,
             "[{fixture_name}] Visibility mismatch for '{}'",
@@ -427,17 +429,26 @@ snapshot_test!(
     snapshot_namespace_export_method_overloads,
     "namespace-export-method-overloads"
 );
-snapshot_test!(snapshot_private_class_field_skip, "private-class-field-skip");
+snapshot_test!(
+    snapshot_private_class_field_skip,
+    "private-class-field-skip"
+);
 snapshot_test!(
     snapshot_class_typeof_flat_members,
     "class-typeof-flat-members"
 );
-snapshot_test!(snapshot_typeof_import_type_query, "typeof-import-type-query");
+snapshot_test!(
+    snapshot_typeof_import_type_query,
+    "typeof-import-type-query"
+);
 snapshot_test!(
     snapshot_parenthesized_intersection_expansion,
     "parenthesized-intersection-expansion"
 );
-snapshot_test!(snapshot_dual_name_interface_const, "dual-name-interface-const");
+snapshot_test!(
+    snapshot_dual_name_interface_const,
+    "dual-name-interface-const"
+);
 snapshot_test!(
     snapshot_multi_declaration_heritage,
     "multi-declaration-heritage"

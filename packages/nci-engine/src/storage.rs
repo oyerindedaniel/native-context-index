@@ -109,14 +109,13 @@ impl NciDatabase {
     }
 
     pub fn stored_schema_version(&self) -> StorageResult<u32> {
-        crate::storage_migrations::read_schema_version(&self.connection)
-            .map_err(Into::into)
+        crate::storage_migrations::read_schema_version(&self.connection).map_err(Into::into)
     }
 
     pub fn journal_mode_label(&self) -> StorageResult<String> {
-        let label = self.connection.query_row("PRAGMA journal_mode", [], |row| {
-            row.get::<_, String>(0)
-        })?;
+        let label = self
+            .connection
+            .query_row("PRAGMA journal_mode", [], |row| row.get::<_, String>(0))?;
         Ok(label)
     }
 
@@ -394,10 +393,7 @@ impl NciDatabase {
             )?;
 
             for symbol_node in &graph.symbols {
-                let deprecated_text = symbol_node
-                    .deprecated
-                    .as_ref()
-                    .map(deprecated_to_db_string);
+                let deprecated_text = symbol_node.deprecated.as_ref().map(deprecated_to_db_string);
                 let visibility_text = symbol_node.visibility.as_ref().map(visibility_to_db_string);
                 let symbol_space_text = symbol_space_to_db_string(symbol_node.symbol_space);
 
@@ -435,18 +431,14 @@ impl NciDatabase {
                 let symbol_row_id = transaction.last_insert_rowid();
 
                 for dependency_id in symbol_node.dependencies.iter() {
-                    insert_dependency.execute(rusqlite::params![
-                        symbol_row_id,
-                        dependency_id.as_ref()
-                    ])?;
+                    insert_dependency
+                        .execute(rusqlite::params![symbol_row_id, dependency_id.as_ref()])?;
                 }
 
                 if let Some(ref additional) = symbol_node.additional_files {
                     for additional_path in additional.iter() {
-                        insert_additional.execute(rusqlite::params![
-                            symbol_row_id,
-                            additional_path.as_ref()
-                        ])?;
+                        insert_additional
+                            .execute(rusqlite::params![symbol_row_id, additional_path.as_ref()])?;
                     }
                 }
 
@@ -502,7 +494,11 @@ impl NciDatabase {
     }
 
     /// Full-text search across indexed symbols (FTS5 `MATCH` syntax).
-    pub fn find_symbols_fts(&self, fts_match_query: &str, limit: usize) -> StorageResult<Vec<SymbolNode>> {
+    pub fn find_symbols_fts(
+        &self,
+        fts_match_query: &str,
+        limit: usize,
+    ) -> StorageResult<Vec<SymbolNode>> {
         let mut output: Vec<SymbolNode> = Vec::new();
         let mut statement = self.connection.prepare(
             "SELECT indexed_symbol.symbol_id FROM symbols_fts
@@ -614,9 +610,8 @@ impl NciDatabase {
             let mut additional_files_stmt = self
                 .connection
                 .prepare("SELECT file_path FROM symbol_additional_files WHERE symbol_id = ?1")?;
-            let rows = additional_files_stmt.query_map([symbol_row_id], |path_row| {
-                path_row.get::<_, String>(0)
-            })?;
+            let rows = additional_files_stmt
+                .query_map([symbol_row_id], |path_row| path_row.get::<_, String>(0))?;
             for file_text in rows.flatten() {
                 files.push(SharedString::from(file_text));
             }
@@ -632,8 +627,9 @@ impl NciDatabase {
             let mut heritage_stmt = self
                 .connection
                 .prepare("SELECT heritage FROM symbol_heritage WHERE symbol_id = ?1")?;
-            let rows =
-                heritage_stmt.query_map([symbol_row_id], |heritage_row| heritage_row.get::<_, String>(0))?;
+            let rows = heritage_stmt.query_map([symbol_row_id], |heritage_row| {
+                heritage_row.get::<_, String>(0)
+            })?;
             for heritage_text in rows.flatten() {
                 heritage_vec.push(SharedString::from(heritage_text));
             }
@@ -642,8 +638,9 @@ impl NciDatabase {
 
         let modifiers: SharedVec<SharedString> = {
             let mut mod_vec: Vec<SharedString> = Vec::new();
-            let mut modifier_stmt =
-                self.connection.prepare("SELECT modifier FROM symbol_modifiers WHERE symbol_id = ?1")?;
+            let mut modifier_stmt = self
+                .connection
+                .prepare("SELECT modifier FROM symbol_modifiers WHERE symbol_id = ?1")?;
             let rows = modifier_stmt.query_map([symbol_row_id], |modifier_row| {
                 modifier_row.get::<_, String>(0)
             })?;
@@ -777,12 +774,10 @@ impl NciDatabase {
                             .into_boxed_slice(),
                     )
                 });
-            map.entry(symbol_id)
-                .or_default()
-                .push(DecoratorMetadata {
-                    name: SharedString::from(decorator_name),
-                    arguments,
-                });
+            map.entry(symbol_id).or_default().push(DecoratorMetadata {
+                name: SharedString::from(decorator_name),
+                arguments,
+            });
         }
         map
     }

@@ -90,10 +90,7 @@ mod tests {
     fn nci_sqlite_path_under_env_root() {
         let temp = tempfile::tempdir().expect("tempdir");
         run_with_nci_cache_root(temp.path(), || {
-            assert_eq!(
-                nci_sqlite_path(),
-                Some(temp.path().join("nci.sqlite"))
-            );
+            assert_eq!(nci_sqlite_path(), Some(temp.path().join("nci.sqlite")));
         });
     }
 

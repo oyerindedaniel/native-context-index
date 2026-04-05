@@ -6,12 +6,12 @@ use rayon::prelude::*;
 use tracing::{debug, trace, warn};
 
 use crate::cache;
-use crate::storage::NciDatabase;
 use crate::crawler::CrawlOptions;
 use crate::filter::FilterConfig;
 use crate::graph::build_package_graph;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
+use crate::storage::NciDatabase;
 use crate::types::{PackageGraph, PackageInfo};
 
 #[derive(Debug, Clone)]
@@ -111,11 +111,19 @@ pub struct IndexedGraph {
 ///
 /// Use this when packages were collected from several `node_modules` trees and deduped with
 /// [`dedupe_packages_by_canonical_dir`].
-pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -> Vec<IndexedGraph> {
+pub fn index_packages(
+    packages: &[PackageInfo],
+    options: Option<IndexOptions>,
+) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
-    let crawl_options_factory = || {
+    let crawl_options_factory = |package: &PackageInfo| {
         Some(CrawlOptions {
             max_depth: index_opts.max_depth,
+            profile_as: if crate::profile::phases_enabled() {
+                Some(package.name.clone())
+            } else {
+                None
+            },
         })
     };
 
@@ -158,7 +166,10 @@ pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -
                             version = %package.version.as_ref(),
                             "package cache hit"
                         );
-                        return IndexedGraph { graph: cached_graph, source: GraphSource::Cached };
+                        return IndexedGraph {
+                            graph: cached_graph,
+                            source: GraphSource::Cached,
+                        };
                     }
                     trace!(
                         package = %package.name.as_ref(),
@@ -173,7 +184,7 @@ pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -
             }
         }
 
-        let graph = build_package_graph(package, crawl_options_factory());
+        let graph = build_package_graph(package, crawl_options_factory(package));
 
         if let Some(database_mutex) = database_arc.as_ref() {
             if !cache::package_dir_is_symlink(package) {
@@ -190,7 +201,10 @@ pub fn index_packages(packages: &[PackageInfo], options: Option<IndexOptions>) -
             }
         }
 
-        IndexedGraph { graph, source: GraphSource::Crawled }
+        IndexedGraph {
+            graph,
+            source: GraphSource::Crawled,
+        }
     };
 
     if index_opts.parallel {

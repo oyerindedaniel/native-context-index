@@ -3,12 +3,19 @@
 //! (parallel Rayon by default).
 //!
 //! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (disable parallelism),
-//! `--skip-write` (skip huge JSON export — for timing index work only).
+//! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (`NCI_PROFILE=1`),
+//! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling).
+//!
+//! Env: `NCI_INDEX_NO_CACHE=1` is the same as `--no-package-cache` (handy when you cannot pass flags).
 //!
 //! # Diagnostics
 //!
 //! - `NCI_LOG=1` enables stderr logging for `nci_engine` at `debug` (cache and sqlite).
 //! - Or set `RUST_LOG` (see `tracing-subscriber` env filter), e.g. `RUST_LOG=nci_engine=trace`.
+//! - Phase profiling: `NCI_PROFILE=1` or `--profile` on this
+//!   example prints crawl/graph substeps to stderr (`  [profile] label …ms`).
+//! - By default this example uses the per-package SQLite cache (`IndexOptions::enable_package_cache`).
+//!   Use `--no-package-cache` or `NCI_INDEX_NO_CACHE=1` to force a fresh crawl and skip the DB.
 //! - One-shot support bundle: `cargo run -p nci-engine --example diagnose`.
 
 use std::env;
@@ -18,22 +25,25 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use nci_engine::pipeline::{
-    dedupe_packages_by_canonical_dir, index_packages, GraphSource, IndexOptions,
+    GraphSource, IndexOptions, dedupe_packages_by_canonical_dir, index_packages,
 };
 use nci_engine::scanner::scan_packages;
 
 fn try_init_tracing_from_env() {
     static INIT: OnceLock<()> = OnceLock::new();
     INIT.get_or_init(|| {
-        let nci_log = env::var("NCI_LOG").map(|value| value == "1").unwrap_or(false);
-        let rust_log_set = env::var("RUST_LOG").map(|value| !value.is_empty()).unwrap_or(false);
+        let nci_log = env::var("NCI_LOG")
+            .map(|value| value == "1")
+            .unwrap_or(false);
+        let rust_log_set = env::var("RUST_LOG")
+            .map(|value| !value.is_empty())
+            .unwrap_or(false);
         if !nci_log && !rust_log_set {
             return;
         }
         let filter = if rust_log_set {
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                tracing_subscriber::EnvFilter::new("nci_engine=debug")
-            })
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("nci_engine=debug"))
         } else {
             tracing_subscriber::EnvFilter::new("nci_engine=debug")
         };
@@ -45,13 +55,14 @@ fn try_init_tracing_from_env() {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    try_init_tracing_from_env();
     let args: Vec<String> = env::args().collect();
     let mut target_packages_args: Vec<String> = Vec::new();
     let mut output_path = String::from("nci-report-rust.json");
     let mut use_sequential = false;
     let mut skip_write = false;
     let mut pretty_json = false;
+    let mut profile_phases = false;
+    let mut no_package_cache = false;
 
     let mut current_index = 1;
     while current_index < args.len() {
@@ -73,10 +84,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--pretty" => {
                 pretty_json = true;
             }
+            "--profile" => {
+                profile_phases = true;
+            }
+            "--no-package-cache" => {
+                no_package_cache = true;
+            }
             _ => {}
         }
         current_index += 1;
     }
+
+    if env::var("NCI_INDEX_NO_CACHE")
+        .map(|value| value == "1")
+        .unwrap_or(false)
+    {
+        no_package_cache = true;
+    }
+
+    if profile_phases {
+        // SAFETY: set once on the main thread before `index_packages` spawns work that reads `NCI_PROFILE`.
+        unsafe {
+            env::set_var("NCI_PROFILE", "1");
+        }
+    }
+    try_init_tracing_from_env();
 
     println!("🔍 Scanning node_modules...\n");
     let wall_start = Instant::now();
@@ -102,9 +134,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     discovered_packages = dedupe_packages_by_canonical_dir(discovered_packages);
 
     if !target_packages_args.is_empty() {
-        discovered_packages.retain(|package_info| {
-            target_packages_args.contains(&package_info.name.to_string())
-        });
+        discovered_packages
+            .retain(|package_info| target_packages_args.contains(&package_info.name.to_string()));
     }
 
     if discovered_packages.is_empty() {
@@ -128,6 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_depth: 10,
         parallel: !use_sequential,
         project_root: Some(project_root),
+        enable_package_cache: !no_package_cache,
         ..Default::default()
     });
 
@@ -157,7 +189,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         crawled_count,
     );
 
-    indexed_results.sort_by(|result_a, result_b| result_a.graph.package.cmp(&result_b.graph.package));
+    indexed_results
+        .sort_by(|result_a, result_b| result_a.graph.package.cmp(&result_b.graph.package));
     for result in &indexed_results {
         let source_tag = match result.source {
             GraphSource::Cached => "cached",
@@ -215,19 +248,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         crawled_build_max_ms
     };
 
-    indexed_results.sort_by(|result_a, result_b| result_b.graph.total_symbols.cmp(&result_a.graph.total_symbols));
+    indexed_results.sort_by(|result_a, result_b| {
+        result_b
+            .graph
+            .total_symbols
+            .cmp(&result_a.graph.total_symbols)
+    });
 
     println!("\n{}", "═".repeat(86));
     println!("📊 SUMMARY\n");
     println!("   Index mode:      {}", mode_label);
-    println!("   Total packages:  {} ({} cached, {} crawled)", indexed_results.len(), cached_count, crawled_count);
+    println!(
+        "   Package cache:   {}",
+        if no_package_cache {
+            "off (no sqlite)"
+        } else {
+            "on (sqlite read/write when enabled)"
+        }
+    );
+    println!(
+        "   Total packages:  {} ({} cached, {} crawled)",
+        indexed_results.len(),
+        cached_count,
+        crawled_count
+    );
     println!(
         "   Total symbols:   {}",
-        indexed_results.iter().map(|result| result.graph.total_symbols).sum::<usize>()
+        indexed_results
+            .iter()
+            .map(|result| result.graph.total_symbols)
+            .sum::<usize>()
     );
     println!(
         "   Total files:     {}",
-        indexed_results.iter().map(|result| result.graph.total_files).sum::<usize>()
+        indexed_results
+            .iter()
+            .map(|result| result.graph.total_files)
+            .sum::<usize>()
     );
 
     println!(
@@ -258,15 +315,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let export_wall_ms = if skip_write {
         println!(
             "\n💾 Skipped JSON export (--skip-write). Index covered {} symbols.",
-            indexed_results.iter().map(|result| result.graph.total_symbols).sum::<usize>()
+            indexed_results
+                .iter()
+                .map(|result| result.graph.total_symbols)
+                .sum::<usize>()
         );
         0.0
     } else {
         let export_start = Instant::now();
-        let graphs_for_json: Vec<&nci_engine::types::PackageGraph> = indexed_results
-            .iter()
-            .map(|result| &result.graph)
-            .collect();
+        let graphs_for_json: Vec<&nci_engine::types::PackageGraph> =
+            indexed_results.iter().map(|result| &result.graph).collect();
         let report_data = serde_json::json!({
             "generatedAt": "now",
             "indexMode": mode_label,
@@ -313,23 +371,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Σ crawl ms (crawled pkgs only, CPU crawler)",
-        crawled_crawl_sum_display
+        "Σ crawl ms (crawled pkgs only, CPU crawler)", crawled_crawl_sum_display
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Σ build ms (crawled pkgs only, graph assembly)",
-        crawled_build_sum_display
+        "Σ build ms (crawled pkgs only, graph assembly)", crawled_build_sum_display
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Max crawl ms (single crawled package)",
-        crawled_crawl_max_display
+        "Max crawl ms (single crawled package)", crawled_crawl_max_display
     );
     println!(
         "   {:<52} {:>12.1}",
-        "Max build ms (single crawled package)",
-        crawled_build_max_display
+        "Max build ms (single crawled package)", crawled_build_max_display
     );
     println!(
         "   {:<52} {:>12.1}",
