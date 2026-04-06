@@ -1,0 +1,279 @@
+{
+  "package": "multi-declaration-heritage",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "multi-declaration-heritage@1.0.0::Base",
+      "name": "Base",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export declare class Base {\n  shared(): void;\n  baseOnly(): void;\n}",
+      "jsDoc": "Two parents that share a member with the same short name (\"shared\").\nWhen a class AND an interface both named \"Composite\" each extend one of\nthese parents, the flattening step must merge their heritage before\nprocessing — otherwise it creates duplicate synthetic IDs.\n\nFlattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name\n`shared`, so heritage emits one row `Composite.shared` (type-side) whose\n`inheritedFromSources` lists both parent symbol ids (sorted). `baseOnly` exists only on\n`Base`, so you still get `Composite.prototype.baseOnly` (value-side). There is intentionally no\n`Composite.prototype.shared` row in addition to `Composite.shared`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Base.prototype.shared",
+      "name": "Base.prototype.shared",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "shared(): void;",
+      "jsDoc": "Two parents that share a member with the same short name (\"shared\").\nWhen a class AND an interface both named \"Composite\" each extend one of\nthese parents, the flattening step must merge their heritage before\nprocessing — otherwise it creates duplicate synthetic IDs.\n\nFlattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name\n`shared`, so heritage emits one row `Composite.shared` (type-side) whose\n`inheritedFromSources` lists both parent symbol ids (sorted). `baseOnly` exists only on\n`Base`, so you still get `Composite.prototype.baseOnly` (value-side). There is intentionally no\n`Composite.prototype.shared` row in addition to `Composite.shared`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly",
+      "name": "Base.prototype.baseOnly",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "baseOnly(): void;",
+      "jsDoc": "Two parents that share a member with the same short name (\"shared\").\nWhen a class AND an interface both named \"Composite\" each extend one of\nthese parents, the flattening step must merge their heritage before\nprocessing — otherwise it creates duplicate synthetic IDs.\n\nFlattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name\n`shared`, so heritage emits one row `Composite.shared` (type-side) whose\n`inheritedFromSources` lists both parent symbol ids (sorted). `baseOnly` exists only on\n`Base`, so you still get `Composite.prototype.baseOnly` (value-side). There is intentionally no\n`Composite.prototype.shared` row in addition to `Composite.shared`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Trait",
+      "name": "Trait",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface Trait {\n  shared(): void;\n  traitOnly(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Trait.shared",
+      "name": "Trait.shared",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "shared(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Trait.traitOnly",
+      "name": "Trait.traitOnly",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "traitOnly(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite",
+      "name": "Composite",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface Composite extends Trait {\n  compositeFunc(): void;\n}",
+      "jsDoc": "Interface declaration — extends Trait.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "multi-declaration-heritage@1.0.0::Trait"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "Trait"
+      ],
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite.compositeFunc",
+      "name": "Composite.compositeFunc",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "compositeFunc(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite#2",
+      "name": "Composite",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export declare class Composite extends Base {\n  ownProp: number;\n}",
+      "jsDoc": "Class declaration — same name, extends Base.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "multi-declaration-heritage@1.0.0::Base"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "Base"
+      ],
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite.prototype.ownProp",
+      "name": "Composite.prototype.ownProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "ownProp: number;",
+      "jsDoc": "Class declaration — same name, extends Base.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::bridgeComposite",
+      "name": "bridgeComposite",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export declare function bridgeComposite(instance: Composite): Composite;",
+      "jsDoc": "Type-position `Composite`: merged symbol resolution shows up in this symbol's `dependencies[]`.\n(`Composite.shared` is a single flattened row; `inheritedFromSources` includes both\n`Trait.shared` and `Base.prototype.shared`.)",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "multi-declaration-heritage@1.0.0::Composite",
+        "multi-declaration-heritage@1.0.0::Composite#2"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::CompositeTypeAlias",
+      "name": "CompositeTypeAlias",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "export type CompositeTypeAlias = Composite;",
+      "jsDoc": "Type alias to `Composite`. Dependency IDs still include **both** merged declarations\n(`Composite` interface and `Composite#2` class) — same as value+type uses.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "multi-declaration-heritage@1.0.0::Composite",
+        "multi-declaration-heritage@1.0.0::Composite#2"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::CompositeTypeAlias.ownProp",
+      "name": "CompositeTypeAlias.ownProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "ownProp: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite.shared",
+      "name": "Composite.shared",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "shared(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "multi-declaration-heritage@1.0.0::Base.prototype.shared",
+        "multi-declaration-heritage@1.0.0::Trait.shared"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite.traitOnly",
+      "name": "Composite.traitOnly",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "traitOnly(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "multi-declaration-heritage@1.0.0::Trait.traitOnly"
+      ]
+    },
+    {
+      "id": "multi-declaration-heritage@1.0.0::Composite.prototype.baseOnly",
+      "name": "Composite.prototype.baseOnly",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "multi-declaration-heritage",
+      "filePath": "index.d.ts",
+      "signature": "baseOnly(): void;",
+      "jsDoc": "Two parents that share a member with the same short name (\"shared\").\nWhen a class AND an interface both named \"Composite\" each extend one of\nthese parents, the flattening step must merge their heritage before\nprocessing — otherwise it creates duplicate synthetic IDs.\n\nFlattening note: `Trait.shared` and `Base.prototype.shared` share the leaf name\n`shared`, so heritage emits one row `Composite.shared` (type-side) whose\n`inheritedFromSources` lists both parent symbol ids (sorted). `baseOnly` exists only on\n`Base`, so you still get `Composite.prototype.baseOnly` (value-side). There is intentionally no\n`Composite.prototype.shared` row in addition to `Composite.shared`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly"
+      ]
+    }
+  ],
+  "totalSymbols": 16,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

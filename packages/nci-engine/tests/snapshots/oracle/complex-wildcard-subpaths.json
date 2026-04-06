@@ -1,0 +1,26 @@
+{
+  "package": "complex-wildcard-subpaths",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "complex-wildcard-subpaths@1.0.0::x",
+      "name": "x",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "complex-wildcard-subpaths",
+      "filePath": "index.d.ts",
+      "signature": "declare const x: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

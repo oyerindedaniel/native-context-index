@@ -1,0 +1,30 @@
+{
+  "package": "traversal-depth-edge",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "traversal-depth-edge@1.0.0::DeepSymbol",
+      "name": "DeepSymbol",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "traversal-depth-edge",
+      "filePath": "d-7.d.ts",
+      "signature": "declare const DeepSymbol: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 7,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,31 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "traversal-depth-edge",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "traversal-depth-edge@1.0.0::DeepSymbol",
+      "name": "DeepSymbol",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "traversal-depth-edge",
+      "filePath": "d-7.d.ts",
+      "signature": "declare const DeepSymbol: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 7,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,261 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "qualified-namespace-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::Box",
+      "name": "Box",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "node_modules/@peer/core/peerCore.d.ts",
+      "signature": "export type Box<T> = T | Promise<T>;",
+      "jsDoc": "Exercised through barrel entry: resolver lands on index.d.ts; symbol is indexed here.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions",
+      "name": "InvokeOutputOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "shim.d.ts",
+      "signature": "export interface InvokeOutputOptions {\n  readonly opt?: boolean;\n}",
+      "jsDoc": "Local shim: same-package `import * as` namespace.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions.opt",
+      "name": "InvokeOutputOptions.opt",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-namespace-deps",
+      "filePath": "shim.d.ts",
+      "signature": "readonly opt?: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::LocalResult",
+      "name": "LocalResult",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface LocalResult {\n  ok: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::LocalResult.ok",
+      "name": "LocalResult.ok",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "ok: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::shim.d.ts::Output",
+      "name": "Output",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "shim.d.ts",
+      "signature": "export interface Output<T> {\n  readonly value: T;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::shim.d.ts::Output.value",
+      "name": "Output.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-namespace-deps",
+      "filePath": "shim.d.ts",
+      "signature": "readonly value: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts",
+      "name": "PeerOpts",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "node_modules/@peer/core/peerCore.d.ts",
+      "signature": "export interface PeerOpts {\n  readonly x: number;\n}",
+      "jsDoc": "Declarations for @peer/core; the package entry re-exports via `export *` only.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts.x",
+      "name": "PeerOpts.x",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-namespace-deps",
+      "filePath": "node_modules/@peer/core/peerCore.d.ts",
+      "signature": "readonly x: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut",
+      "name": "PeerOut",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "node_modules/@peer/core/peerCore.d.ts",
+      "signature": "export interface PeerOut<T> {\n  readonly out: T;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut.out",
+      "name": "PeerOut.out",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-namespace-deps",
+      "filePath": "node_modules/@peer/core/peerCore.d.ts",
+      "signature": "readonly out: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::localNs",
+      "name": "localNs",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "export declare function localNs(\n  opts?: shim.InvokeOutputOptions,\n): shim.Output<LocalResult>;",
+      "jsDoc": "Resolves to shim types in the same package graph.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-namespace-deps@1.0.0::LocalResult",
+        "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions",
+        "qualified-namespace-deps@1.0.0::shim.d.ts::Output"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::peerBarrelType",
+      "name": "peerBarrelType",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "export declare function peerBarrelType(x: peer.Box<string>): void;",
+      "jsDoc": "Peer `index.d.ts` is barrel-only (`export * from \"./peerCore\"`); `Box` is defined in peerCore.d.ts.\nRegression: dependency must be `…/peerCore.d.ts::Box`, not `npm::@peer/core::Box`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::Box"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::peerNs",
+      "name": "peerNs",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "export declare function peerNs(o?: peer.PeerOpts): peer.PeerOut<string>;",
+      "jsDoc": "Resolves via fixture node_modules peer package (still one graph).",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts",
+        "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-namespace-deps@1.0.0::unresolvedExt",
+      "name": "unresolvedExt",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "qualified-namespace-deps",
+      "filePath": "index.d.ts",
+      "signature": "export declare function unresolvedExt(x: ext.InvokeOutputOptions): void;",
+      "jsDoc": "No local install: stable stub edge `npm::@external/types::InvokeOutputOptions`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "npm::@external/types::InvokeOutputOptions"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 15,
+  "totalFiles": 4,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

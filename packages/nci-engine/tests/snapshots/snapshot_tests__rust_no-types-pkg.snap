@@ -1,0 +1,13 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "no-types-pkg",
+  "version": "1.0.0",
+  "symbols": [],
+  "totalSymbols": 0,
+  "totalFiles": 0,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

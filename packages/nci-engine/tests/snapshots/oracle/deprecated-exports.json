@@ -1,0 +1,119 @@
+{
+  "package": "deprecated-exports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "deprecated-exports@1.0.0::oldInit",
+      "name": "oldInit",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "export declare function oldInit(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "deprecated": "Use newInit instead",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "deprecated-exports@1.0.0::LegacyConfig",
+      "name": "LegacyConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "export interface LegacyConfig {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "deprecated": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deprecated-exports@1.0.0::LegacyConfig.name",
+      "name": "LegacyConfig.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "deprecated": true
+    },
+    {
+      "id": "deprecated-exports@1.0.0::newInit",
+      "name": "newInit",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "export declare function newInit(): void;",
+      "jsDoc": "This is the current API",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "deprecated-exports@1.0.0::ModernConfig",
+      "name": "ModernConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "export interface ModernConfig {\n  name: string;\n  version: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deprecated-exports@1.0.0::ModernConfig.name",
+      "name": "ModernConfig.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deprecated-exports@1.0.0::ModernConfig.version",
+      "name": "ModernConfig.version",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deprecated-exports",
+      "filePath": "index.d.ts",
+      "signature": "version: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

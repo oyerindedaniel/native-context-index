@@ -1,0 +1,45 @@
+{
+  "package": "since-decl",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "since-decl@1.0.0::I",
+      "name": "I",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "since-decl",
+      "filePath": "index.d.ts",
+      "signature": "export interface I {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "2.0.0",
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "since-decl@1.0.0::V",
+      "name": "V",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "since-decl",
+      "filePath": "index.d.ts",
+      "signature": "declare const V: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "2.1.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

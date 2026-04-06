@@ -1,0 +1,63 @@
+{
+  "package": "jsdoc-deprecated",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "jsdoc-deprecated@1.0.0::DepImplicit",
+      "name": "DepImplicit",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "jsdoc-deprecated",
+      "filePath": "index.d.ts",
+      "signature": "export interface DepImplicit {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "deprecated": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "jsdoc-deprecated@1.0.0::DepWithMessage",
+      "name": "DepWithMessage",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "jsdoc-deprecated",
+      "filePath": "index.d.ts",
+      "signature": "export interface DepWithMessage {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "deprecated": "With a message",
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "jsdoc-deprecated@1.0.0::CleanInterface",
+      "name": "CleanInterface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "jsdoc-deprecated",
+      "filePath": "index.d.ts",
+      "signature": "export interface CleanInterface extends Array<string> {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "heritage": [
+        "Array<string>"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,135 @@
+{
+  "package": "export-import-equals",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "export-import-equals@1.0.0::util",
+      "name": "util",
+      "kind": 272,
+      "kindName": "ImportEqualsDeclaration",
+      "package": "export-import-equals",
+      "filePath": "index.d.ts",
+      "signature": "export import util = require(\"./util\");",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "export-import-equals@1.0.0::util.log",
+      "name": "util.log",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "export-import-equals",
+      "filePath": "util.d.ts",
+      "signature": "export function log(msg: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "export-import-equals@1.0.0::util.version",
+      "name": "util.version",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "export-import-equals",
+      "filePath": "util.d.ts",
+      "signature": "declare const version: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "export-import-equals@1.0.0::mainFn",
+      "name": "mainFn",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "export-import-equals",
+      "filePath": "index.d.ts",
+      "signature": "export declare function mainFn(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "export-import-equals@1.0.0::MainConfig",
+      "name": "MainConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "export-import-equals",
+      "filePath": "index.d.ts",
+      "signature": "export interface MainConfig {\n  debug: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "export-import-equals@1.0.0::MainConfig.debug",
+      "name": "MainConfig.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "export-import-equals",
+      "filePath": "index.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "export-import-equals@1.0.0::util.d.ts::log",
+      "name": "log",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "export-import-equals",
+      "filePath": "util.d.ts",
+      "signature": "export function log(msg: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "export-import-equals@1.0.0::util.d.ts::version",
+      "name": "version",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "export-import-equals",
+      "filePath": "util.d.ts",
+      "signature": "declare const version: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 8,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

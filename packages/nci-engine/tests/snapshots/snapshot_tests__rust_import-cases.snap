@@ -1,0 +1,75 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "import-cases",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "import-cases@1.0.0::default.d.ts::Default",
+      "name": "Default",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "import-cases",
+      "filePath": "default.d.ts",
+      "signature": "class Default {}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "import-cases@1.0.0::Foo",
+      "name": "Foo",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "import-cases",
+      "filePath": "index.d.ts",
+      "signature": "export interface Foo {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "import-cases@1.0.0::handlers.d.ts::Handler",
+      "name": "Handler",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "import-cases",
+      "filePath": "handlers.d.ts",
+      "signature": "export interface Handler {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "import-cases@1.0.0::utils.d.ts::util",
+      "name": "util",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "import-cases",
+      "filePath": "utils.d.ts",
+      "signature": "declare const util: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 4,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,47 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "since-inheritance",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "since-inheritance@1.0.0::Database",
+      "name": "Database",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "since-inheritance",
+      "filePath": "index.d.ts",
+      "signature": "declare const Database: {\n  /** Database connection pool */\n  pool: any;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.5.0",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "since-inheritance@1.0.0::Database.pool",
+      "name": "Database.pool",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "since-inheritance",
+      "filePath": "index.d.ts",
+      "signature": "pool: any;",
+      "jsDoc": "Database connection pool",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "since": "1.5.0",
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

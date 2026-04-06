@@ -1,0 +1,135 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "deep-chain",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "deep-chain@1.0.0::APP_NAME",
+      "name": "APP_NAME",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "deep-chain",
+      "filePath": "index.d.ts",
+      "signature": "declare const APP_NAME: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "deep-chain@1.0.0::Handler",
+      "name": "Handler",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "export type Handler = (req: Request, res: Response) => void;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-chain@1.0.0::core/handler.d.ts::Request",
+        "deep-chain@1.0.0::core/handler.d.ts::Response"
+      ],
+      "reExportedFrom": "index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Request",
+      "name": "Request",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "export interface Request {\n  url: string;\n  method: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Request.method",
+      "name": "Request.method",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "method: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Request.url",
+      "name": "Request.url",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "url: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Response",
+      "name": "Response",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "export interface Response {\n  status: number;\n  body: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Response.body",
+      "name": "Response.body",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "body: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deep-chain@1.0.0::core/handler.d.ts::Response.status",
+      "name": "Response.status",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-chain",
+      "filePath": "core/handler.d.ts",
+      "signature": "status: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 8,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

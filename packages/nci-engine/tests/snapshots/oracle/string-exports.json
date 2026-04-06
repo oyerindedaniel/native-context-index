@@ -1,0 +1,27 @@
+{
+  "package": "string-exports-pkg",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "string-exports-pkg@1.0.0::VERSION",
+      "name": "VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "string-exports-pkg",
+      "filePath": "lib/index.d.ts",
+      "signature": "declare const VERSION: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

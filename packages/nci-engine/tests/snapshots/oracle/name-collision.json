@@ -1,0 +1,155 @@
+{
+  "package": "name-collision",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "name-collision@1.0.0::identity",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
+      "filePath": "dist/index.d.ts",
+      "signature": "declare const identity: <A>(a: A) => A",
+      "jsDoc": "The identity function.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/index.d.ts",
+      "signature": "export interface Config {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::Config.name",
+      "name": "Config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "name-collision@1.0.0::StreamConfig",
+      "name": "StreamConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/stream.d.ts",
+      "signature": "export interface StreamConfig {\n  bufferSize: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::StreamConfig.bufferSize",
+      "name": "StreamConfig.bufferSize",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/stream.d.ts",
+      "signature": "bufferSize: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "name-collision@1.0.0::identity#2",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
+      "filePath": "dist/stream.d.ts",
+      "signature": "declare const identity: <A>(stream: StreamConfig) => StreamConfig",
+      "jsDoc": "Stream identity — passes through unchanged.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "name-collision@1.0.0::StreamConfig"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::ChannelConfig",
+      "name": "ChannelConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "export interface ChannelConfig {\n  maxRetries: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::ChannelConfig.maxRetries",
+      "name": "ChannelConfig.maxRetries",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "maxRetries: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "name-collision@1.0.0::identity#3",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "declare const identity: <A>(channel: ChannelConfig) => ChannelConfig",
+      "jsDoc": "Channel identity — passes through unchanged.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "name-collision@1.0.0::ChannelConfig"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 9,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

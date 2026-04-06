@@ -1,0 +1,59 @@
+{
+  "package": "prototype-member-assignment",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "prototype-member-assignment@1.0.0::BaseNode",
+      "name": "BaseNode",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "prototype-member-assignment",
+      "filePath": "index.d.ts",
+      "signature": "export declare class BaseNode { }",
+      "jsDoc": "Generic Base Node",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "prototype-member-assignment@1.0.0::index.d.ts::BaseNode.prototype.isLegacy",
+      "name": "BaseNode.prototype.isLegacy",
+      "kind": 245,
+      "kindName": "ExpressionStatement",
+      "package": "prototype-member-assignment",
+      "filePath": "index.d.ts",
+      "signature": "BaseNode.prototype.isLegacy = true;",
+      "jsDoc": "Ad-hoc Prototype Assignment (Target: Property)",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "since": "1.1.0"
+    },
+    {
+      "id": "prototype-member-assignment@1.0.0::index.d.ts::BaseNode.prototype.upgrade",
+      "name": "BaseNode.prototype.upgrade",
+      "kind": 245,
+      "kindName": "ExpressionStatement",
+      "package": "prototype-member-assignment",
+      "filePath": "index.d.ts",
+      "signature": "BaseNode.prototype.upgrade = function(): void { };",
+      "jsDoc": "Ad-hoc Prototype Assignment (Target: Method)",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "since": "1.2.0"
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

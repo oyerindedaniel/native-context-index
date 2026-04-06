@@ -1,0 +1,26 @@
+{
+  "package": "no-entry-fallback",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "no-entry-fallback@1.0.0::fallback",
+      "name": "fallback",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "no-entry-fallback",
+      "filePath": "index.d.ts",
+      "signature": "declare const fallback: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

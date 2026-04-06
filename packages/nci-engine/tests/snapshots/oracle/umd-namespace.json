@@ -1,0 +1,84 @@
+{
+  "package": "umd-namespace",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "umd-namespace@1.0.0::MyLib",
+      "name": "MyLib",
+      "kind": 271,
+      "kindName": "NamespaceExportDeclaration",
+      "package": "umd-namespace",
+      "filePath": "index.d.ts",
+      "signature": "export as namespace MyLib",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "umd-namespace@1.0.0::Widget",
+      "name": "Widget",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "umd-namespace",
+      "filePath": "index.d.ts",
+      "signature": "export interface Widget {\n  id: string;\n  render(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "umd-namespace@1.0.0::Widget.id",
+      "name": "Widget.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "umd-namespace",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "umd-namespace@1.0.0::Widget.render",
+      "name": "Widget.render",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "umd-namespace",
+      "filePath": "index.d.ts",
+      "signature": "render(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "umd-namespace@1.0.0::createWidget",
+      "name": "createWidget",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "umd-namespace",
+      "filePath": "index.d.ts",
+      "signature": "export declare function createWidget(id: string): Widget;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "umd-namespace@1.0.0::Widget"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

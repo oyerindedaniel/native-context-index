@@ -1,0 +1,214 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "member-property-extraction",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES",
+      "name": "AST_NODE_TYPES",
+      "kind": 267,
+      "kindName": "EnumDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "base.d.ts",
+      "signature": "export declare enum AST_NODE_TYPES {\n    AccessorProperty = \"AccessorProperty\",\n    ArrayExpression = \"ArrayExpression\",\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName",
+      "name": "AccessorPropertyComputedName",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface AccessorPropertyComputedName extends BaseNode {\n    type: AST_NODE_TYPES.AccessorProperty;\n    computed: true;\n}",
+      "jsDoc": "Heritage from an IMPORTED interface from a DIFFERENT file.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "member-property-extraction@1.0.0::base.d.ts::BaseNode"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "BaseNode"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName.computed",
+      "name": "AccessorPropertyComputedName.computed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "computed: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName.range",
+      "name": "AccessorPropertyComputedName.range",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "base.d.ts",
+      "signature": "range: [number, number];",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "member-property-extraction@1.0.0::base.d.ts::BaseNode.range"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName.type",
+      "name": "AccessorPropertyComputedName.type",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "type: AST_NODE_TYPES.AccessorProperty;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "member-property-extraction@1.0.0::base.d.ts::BaseNode",
+      "name": "BaseNode",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "base.d.ts",
+      "signature": "export declare interface BaseNode {\n    type: AST_NODE_TYPES;\n    range: [number, number];\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES"
+      ],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::base.d.ts::BaseNode.range",
+      "name": "BaseNode.range",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "base.d.ts",
+      "signature": "range: [number, number];",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "member-property-extraction@1.0.0::base.d.ts::BaseNode.type",
+      "name": "BaseNode.type",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "base.d.ts",
+      "signature": "type: AST_NODE_TYPES;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "member-property-extraction@1.0.0::ParserOptions",
+      "name": "ParserOptions",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare class ParserOptions {\n    debugLevel: number;\n    getParser(name: string): any;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::ParserOptions.prototype.debugLevel",
+      "name": "ParserOptions.prototype.debugLevel",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "debugLevel: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "member-property-extraction@1.0.0::ParserOptions.prototype.getParser",
+      "name": "ParserOptions.prototype.getParser",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "getParser(name: string): any;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "member-property-extraction@1.0.0::ParserServices",
+      "name": "ParserServices",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface ParserServices {\n    esTreeNodeToTSNodeMap: Map<string, string>;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::ParserServices.esTreeNodeToTSNodeMap",
+      "name": "ParserServices.esTreeNodeToTSNodeMap",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "esTreeNodeToTSNodeMap: Map<string, string>;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 13,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,333 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "deep-recursion-duplicates",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Annotations",
+      "name": "Annotations",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "export interface Annotations {\n  readonly title: string;\n}",
+      "jsDoc": "Stores metadata about a schema definition.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Annotations.title",
+      "name": "Annotations.title",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly title: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Schema",
+      "name": "Schema",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "export interface Schema<A, I, R> {\n  readonly AST: string;\n  readonly Type: A;\n  readonly annotations: Annotations;\n}",
+      "jsDoc": "A generalized schema that can be nested.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Annotations"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Schema.AST",
+      "name": "Schema.AST",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly AST: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Schema.Type",
+      "name": "Schema.Type",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly Type: A;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Schema.annotations",
+      "name": "Schema.annotations",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly annotations: Annotations;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Annotations"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::Schema.annotations.title",
+      "name": "Schema.annotations.title",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly title: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult",
+      "name": "WithResult",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "export interface WithResult<Success, Failure> {\n  readonly [symbolWithResult]: {\n    readonly success: Schema<Success, string, never> & { _tag: \"Success\" };\n    readonly failure: Schema<Failure, string, never> & { _tag: \"Failure\" };\n  };\n}",
+      "jsDoc": "Represents a schema with success and failure branches.\nThis structure tests deep recursive expansion of named types\nwithin computed property keys.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Schema"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]",
+      "name": "WithResult.[symbolWithResult]",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly [symbolWithResult]: {\n    readonly success: Schema<Success, string, never> & { _tag: \"Success\" };\n    readonly failure: Schema<Failure, string, never> & { _tag: \"Failure\" };\n  };",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Schema"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
+      "name": "WithResult.[symbolWithResult].failure",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly failure: Schema<Failure, string, never> & { _tag: \"Failure\" };",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Schema"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.AST",
+      "name": "WithResult.[symbolWithResult].failure.AST",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly AST: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.Type",
+      "name": "WithResult.[symbolWithResult].failure.Type",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly Type: A;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure._tag",
+      "name": "WithResult.[symbolWithResult].failure._tag",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "_tag: \"Failure\"",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations",
+      "name": "WithResult.[symbolWithResult].failure.annotations",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly annotations: Annotations;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Annotations"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations.title",
+      "name": "WithResult.[symbolWithResult].failure.annotations.title",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly title: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
+      "name": "WithResult.[symbolWithResult].success",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly success: Schema<Success, string, never> & { _tag: \"Success\" };",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Schema"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.AST",
+      "name": "WithResult.[symbolWithResult].success.AST",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly AST: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.Type",
+      "name": "WithResult.[symbolWithResult].success.Type",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly Type: A;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success._tag",
+      "name": "WithResult.[symbolWithResult].success._tag",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "_tag: \"Success\"",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations",
+      "name": "WithResult.[symbolWithResult].success.annotations",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly annotations: Annotations;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deep-recursion-duplicates@1.0.0::Annotations"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations.title",
+      "name": "WithResult.[symbolWithResult].success.annotations.title",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "readonly title: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deep-recursion-duplicates@1.0.0::symbolWithResult",
+      "name": "symbolWithResult",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "deep-recursion-duplicates",
+      "filePath": "index.d.ts",
+      "signature": "declare const symbolWithResult: unique symbol",
+      "jsDoc": "The unique identifier for result-based schemas.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 22,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

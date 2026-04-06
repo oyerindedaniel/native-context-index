@@ -1,0 +1,23 @@
+{
+  "package": "literal-export",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "literal-export@1.0.0::index.d.ts::default",
+      "name": "default",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "literal-export",
+      "filePath": "index.d.ts",
+      "signature": "export default 123;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

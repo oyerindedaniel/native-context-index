@@ -1,0 +1,58 @@
+{
+  "package": "complex-exports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "complex-exports@1.0.0::root",
+      "name": "root",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "complex-exports",
+      "filePath": "index.d.ts",
+      "signature": "declare const root: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "complex-exports@1.0.0::featureA",
+      "name": "featureA",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "complex-exports",
+      "filePath": "types/feature/a.d.ts",
+      "signature": "declare const featureA: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "complex-exports@1.0.0::multi",
+      "name": "multi",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "complex-exports",
+      "filePath": "types/multi.d.ts",
+      "signature": "declare const multi: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

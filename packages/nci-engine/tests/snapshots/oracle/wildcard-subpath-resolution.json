@@ -1,0 +1,31 @@
+{
+  "package": "wildcard-subpath-resolution-root",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "wildcard-subpath-resolution-root@1.0.0::format",
+      "name": "format",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "wildcard-subpath-resolution-root",
+      "filePath": "node_modules/dep-with-wildcards/dist/typings/formatter.d.ts",
+      "signature": "declare const format: (text: string) => string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

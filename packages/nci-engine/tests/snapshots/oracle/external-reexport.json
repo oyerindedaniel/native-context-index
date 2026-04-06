@@ -1,0 +1,65 @@
+{
+  "package": "external-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "external-reexport@1.0.0::RunnerTask",
+      "name": "RunnerTask",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "external-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export { Task as RunnerTask } from '@vitest/runner'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "external-reexport@1.0.0::RunnerFile",
+      "name": "RunnerFile",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "external-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export { File as RunnerFile } from '@vitest/runner'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "external-reexport@1.0.0::Local",
+      "name": "Local",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "external-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export interface Local { id: string; }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "external-reexport@1.0.0::Local.id",
+      "name": "Local.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "external-reexport",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

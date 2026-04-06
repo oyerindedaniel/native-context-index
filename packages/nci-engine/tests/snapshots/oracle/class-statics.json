@@ -1,0 +1,143 @@
+{
+  "package": "class-statics",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "class-statics@1.0.0::Cache",
+      "name": "Cache",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "export class Cache {\n  /**\n   * @since 1.1.0\n   * @public\n   */\n  static maxSize: number;\n\n  /**\n   * @since 1.0.0\n   * @public\n   */\n  static clear(): void;\n\n  /**\n   * @since 1.2.0\n   * @internal\n   */\n  static _internalHelper(): boolean;\n\n  /**\n   * Non-static member (should NOT be extracted as a separate symbol)\n   */\n  get(key: string): any;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.0.0",
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache.maxSize",
+      "name": "Cache.maxSize",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "static maxSize: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.1.0",
+      "modifiers": [
+        "static"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache.clear",
+      "name": "Cache.clear",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "static clear(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.0.0",
+      "modifiers": [
+        "static"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache._internalHelper",
+      "name": "Cache._internalHelper",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "static _internalHelper(): boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "internal",
+      "since": "1.2.0",
+      "modifiers": [
+        "static"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache.prototype.get",
+      "name": "Cache.prototype.get",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "get(key: string): any;",
+      "jsDoc": "Non-static member (should NOT be extracted as a separate symbol)",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.0.0"
+    },
+    {
+      "id": "class-statics@1.0.0::Cache#2",
+      "name": "Cache",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "export namespace Cache {\n  export interface Options {\n    ttl: number;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache.Options",
+      "name": "Cache.Options",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "export interface Options {\n    ttl: number;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "class-statics@1.0.0::Cache.Options.ttl",
+      "name": "Cache.Options.ttl",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "class-statics",
+      "filePath": "index.d.ts",
+      "signature": "ttl: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 8,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

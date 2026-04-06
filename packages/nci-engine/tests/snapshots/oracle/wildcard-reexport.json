@@ -1,0 +1,97 @@
+{
+  "package": "wildcard-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "wildcard-reexport@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-reexport",
+      "filePath": "types.d.ts",
+      "signature": "export interface Config {\n  host: string;\n  port: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "wildcard-reexport@1.0.0::Config.host",
+      "name": "Config.host",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-reexport",
+      "filePath": "types.d.ts",
+      "signature": "host: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "wildcard-reexport@1.0.0::Config.port",
+      "name": "Config.port",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-reexport",
+      "filePath": "types.d.ts",
+      "signature": "port: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "wildcard-reexport@1.0.0::Callback",
+      "name": "Callback",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "wildcard-reexport",
+      "filePath": "types.d.ts",
+      "signature": "export type Callback = () => void;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "wildcard-reexport@1.0.0::LIB_VERSION",
+      "name": "LIB_VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "wildcard-reexport",
+      "filePath": "index.d.ts",
+      "signature": "declare const LIB_VERSION: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

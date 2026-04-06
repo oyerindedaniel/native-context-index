@@ -1,0 +1,306 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "inherited-member-flattening",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "inherited-member-flattening@1.0.0::BaseInterface",
+      "name": "BaseInterface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "export interface BaseInterface {\n    baseFunc(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::BaseInterface.baseFunc",
+      "name": "BaseInterface.baseFunc",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "baseFunc(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::BaseNode",
+      "name": "BaseNode",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "export declare class BaseNode {\n  /** @since 1.0.0 */\n  baseProp: string;\n  /** @since 1.0.0 */\n  commonMethod(): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp",
+      "name": "BaseNode.prototype.baseProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "baseProp: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::BaseNode.prototype.commonMethod",
+      "name": "BaseNode.prototype.commonMethod",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "commonMethod(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::DerivedInterface",
+      "name": "DerivedInterface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "export interface DerivedInterface extends BaseInterface {\n    derivedFunc(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "inherited-member-flattening@1.0.0::BaseInterface"
+      ],
+      "since": "2.0.0",
+      "isInternal": false,
+      "heritage": [
+        "BaseInterface"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::DerivedInterface.baseFunc",
+      "name": "DerivedInterface.baseFunc",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "baseFunc(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "inherited-member-flattening@1.0.0::BaseInterface.baseFunc"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::DerivedInterface.derivedFunc",
+      "name": "DerivedInterface.derivedFunc",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "derivedFunc(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "since": "2.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::LeafNode",
+      "name": "LeafNode",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "export declare class LeafNode extends MiddleNode {\n  /** @since 3.0.0 */\n  leafProp: boolean;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "inherited-member-flattening@1.0.0::MiddleNode"
+      ],
+      "since": "3.0.0",
+      "isInternal": false,
+      "heritage": [
+        "MiddleNode"
+      ],
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.baseProp",
+      "name": "LeafNode.prototype.baseProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "baseProp: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.commonMethod",
+      "name": "LeafNode.prototype.commonMethod",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "commonMethod(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "2.1.0",
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "inherited-member-flattening@1.0.0::BaseNode.prototype.commonMethod",
+        "inherited-member-flattening@1.0.0::MiddleNode.prototype.commonMethod"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.leafProp",
+      "name": "LeafNode.prototype.leafProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "leafProp: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "3.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.middleProp",
+      "name": "LeafNode.prototype.middleProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "middleProp: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "2.0.0",
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "inherited-member-flattening@1.0.0::MiddleNode.prototype.middleProp"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::MiddleNode",
+      "name": "MiddleNode",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "export declare class MiddleNode extends BaseNode {\n  /** @since 2.0.0 */\n  middleProp: number;\n  /** @since 2.1.0 */\n  commonMethod(): void; // Override\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "inherited-member-flattening@1.0.0::BaseNode"
+      ],
+      "since": "2.0.0",
+      "isInternal": false,
+      "heritage": [
+        "BaseNode"
+      ],
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.baseProp",
+      "name": "MiddleNode.prototype.baseProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "baseProp: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp"
+      ]
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.commonMethod",
+      "name": "MiddleNode.prototype.commonMethod",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "commonMethod(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "2.1.0",
+      "isInternal": false
+    },
+    {
+      "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.middleProp",
+      "name": "MiddleNode.prototype.middleProp",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "inherited-member-flattening",
+      "filePath": "index.d.ts",
+      "signature": "middleProp: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "2.0.0",
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 17,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

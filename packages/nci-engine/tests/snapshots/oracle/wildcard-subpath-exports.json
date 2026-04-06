@@ -1,0 +1,148 @@
+{
+  "package": "wildcard-subpath-exports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "wildcard-subpath-exports@1.0.0::RootConfig",
+      "name": "RootConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export interface RootConfig {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::RootConfig.name",
+      "name": "RootConfig.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::init",
+      "name": "init",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export declare function init(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::helperA",
+      "name": "helperA",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-a.d.ts",
+      "signature": "export declare function helperA(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::HelperAOptions",
+      "name": "HelperAOptions",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-a.d.ts",
+      "signature": "export type HelperAOptions = { verbose: boolean };",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::HelperAOptions.verbose",
+      "name": "HelperAOptions.verbose",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-a.d.ts",
+      "signature": "verbose: boolean",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::helperB",
+      "name": "helperB",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-b.d.ts",
+      "signature": "export declare function helperB(): number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::HelperBResult",
+      "name": "HelperBResult",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-b.d.ts",
+      "signature": "export interface HelperBResult { value: number }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::HelperBResult.value",
+      "name": "HelperBResult.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/helper-b.d.ts",
+      "signature": "value: number",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 9,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

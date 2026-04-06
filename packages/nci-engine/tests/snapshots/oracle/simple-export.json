@@ -1,0 +1,86 @@
+{
+  "package": "simple-export",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "simple-export@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "simple-export",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n  name: string;\n  version: string;\n  debug?: boolean;\n}",
+      "jsDoc": "A simple configuration interface.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "simple-export@1.0.0::Config.name",
+      "name": "Config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "simple-export",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "simple-export@1.0.0::Config.version",
+      "name": "Config.version",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "simple-export",
+      "filePath": "index.d.ts",
+      "signature": "version: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "simple-export@1.0.0::Config.debug",
+      "name": "Config.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "simple-export",
+      "filePath": "index.d.ts",
+      "signature": "debug?: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "simple-export@1.0.0::init",
+      "name": "init",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "simple-export",
+      "filePath": "index.d.ts",
+      "signature": "export declare function init(config: Config): void;",
+      "jsDoc": "Initialize the application with the given config.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "simple-export@1.0.0::Config"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

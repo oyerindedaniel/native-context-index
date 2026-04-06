@@ -1,0 +1,24 @@
+{
+  "package": "since-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "since-reexport@1.0.0::val",
+      "name": "val",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "since-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export { val } from './mod'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "4.0.0"
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

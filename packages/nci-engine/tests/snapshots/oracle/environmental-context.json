@@ -1,0 +1,127 @@
+{
+  "package": "environmental-context",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "environmental-context@1.0.0::Handler",
+      "name": "Handler",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "export interface Handler {\n  /**\n   * Writes results to a Node.js ServerResponse.\n   */\n  handle(res: ServerResponse): void;\n\n  /**\n   * Processes data using an external custom protocol type.\n   */\n  process(data: CustomType): void;\n  /**\n   * Processes an aliased, protocol-less built-in type.\n   */\n  pipe(res: ServerResponse$1): void;\n  /**\n   * More built-in types.\n   */\n  save(stream: WriteStream): void;\n  resolve(path: ParsedPath): void;\n  run(t: typeof test): void;\n}",
+      "jsDoc": "A handler that depends on environmental and external protocol types.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "ext::custom-system::CustomType",
+        "node::fs::WriteStream",
+        "node::http::ServerResponse",
+        "node::path::ParsedPath",
+        "node::test::test"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.handle",
+      "name": "Handler.handle",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "handle(res: ServerResponse): void;",
+      "jsDoc": "Writes results to a Node.js ServerResponse.",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::http::ServerResponse"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.process",
+      "name": "Handler.process",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "process(data: CustomType): void;",
+      "jsDoc": "Processes data using an external custom protocol type.",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "ext::custom-system::CustomType"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.pipe",
+      "name": "Handler.pipe",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "pipe(res: ServerResponse$1): void;",
+      "jsDoc": "Processes an aliased, protocol-less built-in type.",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::http::ServerResponse"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.save",
+      "name": "Handler.save",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "save(stream: WriteStream): void;",
+      "jsDoc": "More built-in types.",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::fs::WriteStream"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.resolve",
+      "name": "Handler.resolve",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "resolve(path: ParsedPath): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::path::ParsedPath"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "environmental-context@1.0.0::Handler.run",
+      "name": "Handler.run",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "environmental-context",
+      "filePath": "index.d.ts",
+      "signature": "run(t: typeof test): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::test::test"
+      ],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

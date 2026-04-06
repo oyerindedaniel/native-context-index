@@ -1,0 +1,58 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "visibility-merge",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "visibility-merge@1.0.0::Merged",
+      "name": "Merged",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "visibility-merge",
+      "filePath": "index.d.ts",
+      "signature": "export interface Merged { a: string; }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "visibility": "public",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "visibility-merge@1.0.0::Merged.a",
+      "name": "Merged.a",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "visibility-merge",
+      "filePath": "index.d.ts",
+      "signature": "a: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "visibility": "public",
+      "isInternal": false
+    },
+    {
+      "id": "visibility-merge@1.0.0::Merged.b",
+      "name": "Merged.b",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "visibility-merge",
+      "filePath": "index.d.ts",
+      "signature": "b: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

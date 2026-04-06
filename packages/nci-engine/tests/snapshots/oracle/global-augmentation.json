@@ -1,0 +1,104 @@
+{
+  "package": "global-augmentation",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "global-augmentation@1.0.0::AppState",
+      "name": "AppState",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "export interface AppState {\n  initialized: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "global-augmentation@1.0.0::AppState.initialized",
+      "name": "AppState.initialized",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "initialized: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "global-augmentation@1.0.0::initApp",
+      "name": "initApp",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "export declare function initApp(): AppState;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "global-augmentation@1.0.0::AppState"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "global-augmentation@1.0.0::Window",
+      "name": "Window",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "interface Window {\n    __APP_STATE__: AppState;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "global-augmentation@1.0.0::AppState"
+      ],
+      "isInternal": false,
+      "isGlobalAugmentation": true
+    },
+    {
+      "id": "global-augmentation@1.0.0::Window.__APP_STATE__",
+      "name": "Window.__APP_STATE__",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "__APP_STATE__: AppState;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "global-augmentation@1.0.0::AppState"
+      ],
+      "isInternal": false,
+      "isGlobalAugmentation": true
+    },
+    {
+      "id": "global-augmentation@1.0.0::Window.__APP_STATE__.initialized",
+      "name": "Window.__APP_STATE__.initialized",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "global-augmentation",
+      "filePath": "index.d.ts",
+      "signature": "initialized: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,45 @@
+{
+  "package": "type-value-dependency-split",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "type-value-dependency-split@1.0.0::TypeId",
+      "name": "TypeId",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "type-value-dependency-split",
+      "filePath": "index.d.ts",
+      "signature": "declare const TypeId: unique symbol",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "type-value-dependency-split@1.0.0::TypeId#2",
+      "name": "TypeId",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "type-value-dependency-split",
+      "filePath": "index.d.ts",
+      "signature": "export type TypeId = typeof TypeId;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "type-value-dependency-split@1.0.0::TypeId"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

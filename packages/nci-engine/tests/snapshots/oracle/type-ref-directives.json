@@ -1,0 +1,26 @@
+{
+  "package": "type-ref-directives",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "type-ref-directives@1.0.0::Foo",
+      "name": "Foo",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "type-ref-directives",
+      "filePath": "index.d.ts",
+      "signature": "export interface Foo {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

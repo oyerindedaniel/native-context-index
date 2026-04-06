@@ -1,0 +1,44 @@
+{
+  "package": "decorator-metadata-extraction",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "decorator-metadata-extraction@1.0.0::ServiceNode",
+      "name": "ServiceNode",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "decorator-metadata-extraction",
+      "filePath": "index.d.ts",
+      "signature": "@injectable\n@route(\"/api/v1/service\")\nexport declare class ServiceNode {\n    /** \n     * Decorated Method\n     * @since 2.0.0 \n     */\n    @authenticated\n    execute(): void;\n}",
+      "jsDoc": "Service Node with both JSDoc and Decorator Metadata",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "decorator-metadata-extraction@1.0.0::ServiceNode.prototype.execute",
+      "name": "ServiceNode.prototype.execute",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "decorator-metadata-extraction",
+      "filePath": "index.d.ts",
+      "signature": "@authenticated\n    execute(): void;",
+      "jsDoc": "Decorated Method",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "2.0.0"
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

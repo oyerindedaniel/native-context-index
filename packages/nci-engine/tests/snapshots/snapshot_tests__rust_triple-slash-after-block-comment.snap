@@ -1,0 +1,48 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "triple-slash-after-block-comment",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "triple-slash-after-block-comment@1.0.0::referenced.d.ts::fromReferenced",
+      "name": "fromReferenced",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-after-block-comment",
+      "filePath": "referenced.d.ts",
+      "signature": "declare const fromReferenced: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "triple-slash-after-block-comment@1.0.0::fromRoot",
+      "name": "fromRoot",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-after-block-comment",
+      "filePath": "index.d.ts",
+      "signature": "declare const fromRoot: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,105 @@
+{
+  "package": "namespace-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-reexport@1.0.0::Lib",
+      "name": "Lib",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "namespace-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export * as Lib from './lib.js'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "namespace-reexport@1.0.0::Lib.VERSION",
+      "name": "Lib.VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-reexport",
+      "filePath": "lib.d.ts",
+      "signature": "declare const VERSION: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "namespace-reexport@1.0.0::Lib.internal",
+      "name": "Lib.internal",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-reexport",
+      "filePath": "lib.d.ts",
+      "signature": "export function internal(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "namespace-reexport@1.0.0::CORE_VERSION",
+      "name": "CORE_VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-reexport",
+      "filePath": "index.d.ts",
+      "signature": "declare const CORE_VERSION: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-reexport@1.0.0::lib.d.ts::VERSION",
+      "name": "VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-reexport",
+      "filePath": "lib.d.ts",
+      "signature": "declare const VERSION: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-reexport@1.0.0::lib.d.ts::internal",
+      "name": "internal",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-reexport",
+      "filePath": "lib.d.ts",
+      "signature": "export function internal(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

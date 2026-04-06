@@ -1,0 +1,189 @@
+{
+  "package": "object-spread",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "object-spread@1.0.0::Base",
+      "name": "Base",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "declare const Base: {\n  /** @since 1.1.0 */\n  readonly base: string;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Base.base",
+      "name": "Base.base",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly base: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Utils",
+      "name": "Utils",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "declare const Utils: typeof Base & {\n  /** @since 2.1.0 */\n  readonly extra: number;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "object-spread@1.0.0::Base"
+      ],
+      "isInternal": false,
+      "since": "2.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Utils.base",
+      "name": "Utils.base",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly base: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Utils.extra",
+      "name": "Utils.extra",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly extra: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "2.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Deep",
+      "name": "Deep",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "declare const Deep: {\n  readonly level1: {\n    readonly level2: typeof Base & { readonly leaf: boolean };\n  };\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "object-spread@1.0.0::Base"
+      ],
+      "isInternal": false,
+      "since": "3.1.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Deep.level1",
+      "name": "Deep.level1",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly level1: {\n    readonly level2: typeof Base & { readonly leaf: boolean };\n  };",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "object-spread@1.0.0::Base"
+      ],
+      "isInternal": false,
+      "since": "3.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Deep.level1.level2",
+      "name": "Deep.level1.level2",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly level2: typeof Base & { readonly leaf: boolean };",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "object-spread@1.0.0::Base"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Deep.level1.level2.base",
+      "name": "Deep.level1.level2.base",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly base: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "object-spread@1.0.0::Deep.level1.level2.leaf",
+      "name": "Deep.level1.level2.leaf",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "object-spread",
+      "filePath": "index.d.ts",
+      "signature": "readonly leaf: boolean",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
+    }
+  ],
+  "totalSymbols": 10,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

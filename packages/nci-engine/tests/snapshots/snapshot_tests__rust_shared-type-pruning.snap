@@ -1,0 +1,156 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "shared-type-pruning",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "shared-type-pruning@1.0.0::Position",
+      "name": "Position",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "export interface Position {\n    line: number;\n    column: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::Position.column",
+      "name": "Position.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::Position.line",
+      "name": "Position.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation",
+      "name": "SourceLocation",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "export interface SourceLocation {\n    start: Position;\n    end: Position;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-pruning@1.0.0::Position"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.end",
+      "name": "SourceLocation.end",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "end: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-pruning@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.end.column",
+      "name": "SourceLocation.end.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.end.line",
+      "name": "SourceLocation.end.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.start",
+      "name": "SourceLocation.start",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "start: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-pruning@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.start.column",
+      "name": "SourceLocation.start.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-pruning@1.0.0::SourceLocation.start.line",
+      "name": "SourceLocation.start.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-pruning",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 10,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

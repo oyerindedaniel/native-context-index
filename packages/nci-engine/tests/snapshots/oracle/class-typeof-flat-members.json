@@ -1,0 +1,188 @@
+{
+  "package": "class-typeof-flat-members",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box",
+      "name": "Box",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "declare const Box: typeof InnerForBox",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box.id",
+      "name": "Box.id",
+      "kind": 178,
+      "kindName": "GetAccessor",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "get id(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box.id#2",
+      "name": "Box.id",
+      "kind": 179,
+      "kindName": "SetAccessor",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "set id(v: string);",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box.tag",
+      "name": "Box.tag",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "accessor tag: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "accessor"
+      ]
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box.parse",
+      "name": "Box.parse",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "static parse(input: string): InnerForBox;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "static"
+      ]
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::Box.check",
+      "name": "Box.check",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "check(): boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
+      "name": "InnerForBox",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "declare class InnerForBox {\n  get id(): string;\n  set id(v: string);\n  accessor tag: number;\n  static parse(input: string): InnerForBox;\n  check(): boolean;\n}",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.id",
+      "name": "InnerForBox.prototype.id",
+      "kind": 178,
+      "kindName": "GetAccessor",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "get id(): string;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.id#2",
+      "name": "InnerForBox.prototype.id",
+      "kind": 179,
+      "kindName": "SetAccessor",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "set id(v: string);",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.tag",
+      "name": "InnerForBox.prototype.tag",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "accessor tag: number;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.parse",
+      "name": "InnerForBox.parse",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "static parse(input: string): InnerForBox;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.check",
+      "name": "InnerForBox.prototype.check",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-typeof-flat-members",
+      "filePath": "index.d.ts",
+      "signature": "check(): boolean;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 12,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

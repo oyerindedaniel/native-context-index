@@ -1,0 +1,70 @@
+{
+  "package": "cjs-export",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "cjs-export@1.0.0::MyLib",
+      "name": "MyLib",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "cjs-export",
+      "filePath": "index.d.ts",
+      "signature": "declare class MyLib {\n  static create(): MyLib;\n  run(): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "cjs-export@1.0.0::MyLib.create",
+      "name": "MyLib.create",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "cjs-export",
+      "filePath": "index.d.ts",
+      "signature": "static create(): MyLib;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "cjs-export@1.0.0::MyLib"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "static"
+      ]
+    },
+    {
+      "id": "cjs-export@1.0.0::MyLib.prototype.run",
+      "name": "MyLib.prototype.run",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "cjs-export",
+      "filePath": "index.d.ts",
+      "signature": "run(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "cjs-export@1.0.0::index.d.ts::MyLib",
+      "name": "MyLib",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "cjs-export",
+      "filePath": "index.d.ts",
+      "signature": "export = MyLib;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

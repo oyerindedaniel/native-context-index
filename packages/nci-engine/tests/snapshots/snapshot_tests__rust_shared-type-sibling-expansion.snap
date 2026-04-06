@@ -1,0 +1,371 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "shared-type-sibling-expansion",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node",
+      "name": "Node",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "export interface Node {\n    loc: SourceLocation;\n    /** @since 1.0.0 */\n    anotherLoc: SourceLocation;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::SourceLocation"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc",
+      "name": "Node.anotherLoc",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "anotherLoc: SourceLocation;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::SourceLocation"
+      ],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end",
+      "name": "Node.anotherLoc.end",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "end: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.column",
+      "name": "Node.anotherLoc.end.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.line",
+      "name": "Node.anotherLoc.end.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start",
+      "name": "Node.anotherLoc.start",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "start: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.column",
+      "name": "Node.anotherLoc.start.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.line",
+      "name": "Node.anotherLoc.start.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc",
+      "name": "Node.loc",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "loc: SourceLocation;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::SourceLocation"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end",
+      "name": "Node.loc.end",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "end: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.column",
+      "name": "Node.loc.end.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.line",
+      "name": "Node.loc.end.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start",
+      "name": "Node.loc.start",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "start: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.column",
+      "name": "Node.loc.start.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.line",
+      "name": "Node.loc.start.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Position",
+      "name": "Position",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "export interface Position {\n    line: number;\n    column: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Position.column",
+      "name": "Position.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::Position.line",
+      "name": "Position.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation",
+      "name": "SourceLocation",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "export interface SourceLocation {\n    start: Position;\n    end: Position;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end",
+      "name": "SourceLocation.end",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "end: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.column",
+      "name": "SourceLocation.end.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.line",
+      "name": "SourceLocation.end.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start",
+      "name": "SourceLocation.start",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "start: Position;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "shared-type-sibling-expansion@1.0.0::Position"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.column",
+      "name": "SourceLocation.start.column",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "column: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.line",
+      "name": "SourceLocation.start.line",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "shared-type-sibling-expansion",
+      "filePath": "index.d.ts",
+      "signature": "line: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 25,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

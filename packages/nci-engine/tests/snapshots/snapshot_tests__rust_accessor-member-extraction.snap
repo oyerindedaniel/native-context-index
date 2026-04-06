@@ -1,0 +1,115 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "accessor-member-extraction",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "accessor-member-extraction@1.0.0::AccessorTest",
+      "name": "AccessorTest",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare class AccessorTest {\n    /** @since 1.0.0 */\n    get readOnlyProp(): string;\n    /** @since 1.0.0 */\n    set writeOnlyProp(value: number);\n    /** @since 1.1.0 */\n    get readWriteProp(): boolean;\n    set readWriteProp(value: boolean);\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readOnlyProp",
+      "name": "AccessorTest.prototype.readOnlyProp",
+      "kind": 178,
+      "kindName": "GetAccessor",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "get readOnlyProp(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp",
+      "name": "AccessorTest.prototype.readWriteProp",
+      "kind": 178,
+      "kindName": "GetAccessor",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "get readWriteProp(): boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.1.0",
+      "isInternal": false
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp#2",
+      "name": "AccessorTest.prototype.readWriteProp",
+      "kind": 179,
+      "kindName": "SetAccessor",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "set readWriteProp(value: boolean);",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.writeOnlyProp",
+      "name": "AccessorTest.prototype.writeOnlyProp",
+      "kind": 179,
+      "kindName": "SetAccessor",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "set writeOnlyProp(value: number);",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "since": "1.0.0",
+      "isInternal": false
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::IAccessorTest",
+      "name": "IAccessorTest",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export interface IAccessorTest {\n    get prop(): string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "accessor-member-extraction@1.0.0::IAccessorTest.prop",
+      "name": "IAccessorTest.prop",
+      "kind": 178,
+      "kindName": "GetAccessor",
+      "package": "accessor-member-extraction",
+      "filePath": "index.d.ts",
+      "signature": "get prop(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

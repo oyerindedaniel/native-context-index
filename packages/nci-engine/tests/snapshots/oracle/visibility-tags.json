@@ -1,0 +1,129 @@
+{
+  "package": "visibility-tags",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "visibility-tags@1.0.0::PublicAPI",
+      "name": "PublicAPI",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "export interface PublicAPI {\n  version: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.0.0",
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "visibility-tags@1.0.0::PublicAPI.version",
+      "name": "PublicAPI.version",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "version: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "public",
+      "since": "1.0.0"
+    },
+    {
+      "id": "visibility-tags@1.0.0::_internalHelper",
+      "name": "_internalHelper",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "export declare function _internalHelper(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "internal",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "visibility-tags@1.0.0::AlphaFeature",
+      "name": "AlphaFeature",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "export interface AlphaFeature {\n  experimental: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "alpha",
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "visibility-tags@1.0.0::AlphaFeature.experimental",
+      "name": "AlphaFeature.experimental",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "experimental: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "alpha"
+    },
+    {
+      "id": "visibility-tags@1.0.0::betaFunction",
+      "name": "betaFunction",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "export declare function betaFunction(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "beta",
+      "since": "2.1.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "visibility-tags@1.0.0::DEFAULT_VALUE",
+      "name": "DEFAULT_VALUE",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "visibility-tags",
+      "filePath": "index.d.ts",
+      "signature": "declare const DEFAULT_VALUE: number",
+      "jsDoc": "No visibility tag",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

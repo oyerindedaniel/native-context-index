@@ -1,0 +1,43 @@
+{
+  "package": "since-inheritance",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "since-inheritance@1.0.0::Database",
+      "name": "Database",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "since-inheritance",
+      "filePath": "index.d.ts",
+      "signature": "declare const Database: {\n  /** Database connection pool */\n  pool: any;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.5.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "since-inheritance@1.0.0::Database.pool",
+      "name": "Database.pool",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "since-inheritance",
+      "filePath": "index.d.ts",
+      "signature": "pool: any;",
+      "jsDoc": "Database connection pool",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.5.0"
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

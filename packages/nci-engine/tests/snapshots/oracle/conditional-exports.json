@@ -1,0 +1,52 @@
+{
+  "package": "conditional-exports-pkg",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "conditional-exports-pkg@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "conditional-exports-pkg",
+      "filePath": "dist/index.d.ts",
+      "signature": "export interface Config {\n  host: string;\n  port: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "conditional-exports-pkg@1.0.0::Config.host",
+      "name": "Config.host",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "conditional-exports-pkg",
+      "filePath": "dist/index.d.ts",
+      "signature": "host: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "conditional-exports-pkg@1.0.0::Config.port",
+      "name": "Config.port",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "conditional-exports-pkg",
+      "filePath": "dist/index.d.ts",
+      "signature": "port: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

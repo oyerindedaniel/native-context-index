@@ -1,0 +1,222 @@
+{
+  "package": "complex-resolution",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "complex-resolution@1.0.0::PublicInterface",
+      "name": "PublicInterface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "export interface PublicInterface extends InternalType {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "complex-resolution@1.0.0::internal.d.ts::InternalType"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "InternalType"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "complex-resolution@1.0.0::PublicInterface.name",
+      "name": "PublicInterface.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "complex-resolution@1.0.0::Alias",
+      "name": "Alias",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "export type Alias = import(\"./internal\").InternalType;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "complex-resolution@1.0.0::internal.d.ts::InternalType"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "complex-resolution@1.0.0::Alias.id",
+      "name": "Alias.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "additionalFiles": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "complex-resolution@1.0.0::UsesPrivateLocal",
+      "name": "UsesPrivateLocal",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesPrivateLocal {\n  data: PrivateLocal;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "complex-resolution@1.0.0::index.d.ts::PrivateLocal"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "complex-resolution@1.0.0::UsesPrivateLocal.data",
+      "name": "UsesPrivateLocal.data",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "data: PrivateLocal;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "complex-resolution@1.0.0::index.d.ts::PrivateLocal"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "complex-resolution@1.0.0::UsesPrivateLocal.data.id",
+      "name": "UsesPrivateLocal.data.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "id: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "complex-resolution@1.0.0::index.d.ts::PrivateLocal",
+      "name": "PrivateLocal",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "type PrivateLocal = {\n  id: number;\n};",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::index.d.ts::PrivateLocal.id",
+      "name": "PrivateLocal.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "index.d.ts",
+      "signature": "id: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::internal.d.ts::InternalType",
+      "name": "InternalType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "export interface InternalType {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::internal.d.ts::InternalType.id",
+      "name": "InternalType.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::internal.d.ts::AnotherInternal",
+      "name": "AnotherInternal",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "export interface AnotherInternal {\n  value: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::internal.d.ts::AnotherInternal.value",
+      "name": "AnotherInternal.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "value: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "complex-resolution@1.0.0::PublicInterface.id",
+      "name": "PublicInterface.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "complex-resolution",
+      "filePath": "internal.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "complex-resolution@1.0.0::internal.d.ts::InternalType.id"
+      ]
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

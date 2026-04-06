@@ -1,0 +1,66 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "merge-key-signature-parity",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "merge-key-signature-parity@1.0.0::afterOverload",
+      "name": "afterOverload",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "merge-key-signature-parity",
+      "filePath": "index.d.ts",
+      "signature": "declare const afterOverload: boolean",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "merge-key-signature-parity@1.0.0::mergedOverload",
+      "name": "mergedOverload",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "merge-key-signature-parity",
+      "filePath": "index.d.ts",
+      "signature": "export declare function mergedOverload(x: string): void;",
+      "jsDoc": "Two overloads of one name plus a value — ensures merged graph keeps overload rows distinct.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "merge-key-signature-parity@1.0.0::mergedOverload#2",
+      "name": "mergedOverload",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "merge-key-signature-parity",
+      "filePath": "index.d.ts",
+      "signature": "export declare function mergedOverload(x: number): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,24 @@
+{
+  "package": "since-nesting",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "since-nesting@1.0.0::NS",
+      "name": "NS",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "since-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export * as NS from './mod'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "3.10.0"
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

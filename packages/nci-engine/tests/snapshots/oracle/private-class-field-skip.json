@@ -1,0 +1,42 @@
+{
+  "package": "private-class-field-skip",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "private-class-field-skip@1.0.0::WithPrivate",
+      "name": "WithPrivate",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "private-class-field-skip",
+      "filePath": "index.d.ts",
+      "signature": "export declare class WithPrivate {\n  #secret: string;\n  visible: number;\n}",
+      "jsDoc": "Parity: TS crawler skips `#` fields; Rust must not emit prototype.[#…] symbols.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "private-class-field-skip@1.0.0::WithPrivate.prototype.visible",
+      "name": "WithPrivate.prototype.visible",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "private-class-field-skip",
+      "filePath": "index.d.ts",
+      "signature": "visible: number;",
+      "jsDoc": "Parity: TS crawler skips `#` fields; Rust must not emit prototype.[#…] symbols.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

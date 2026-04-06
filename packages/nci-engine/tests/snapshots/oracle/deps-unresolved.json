@@ -1,0 +1,214 @@
+{
+  "package": "deps-unresolved",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "deps-unresolved@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Config.name",
+      "name": "Config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service",
+      "name": "Service",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "export interface Service {\n  config: Config;\n  helper: InternalHelper;\n  base: Base;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-unresolved@1.0.0::Config",
+        "deps-unresolved@1.0.0::index.d.ts::Base",
+        "deps-unresolved@1.0.0::index.d.ts::InternalHelper"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.config",
+      "name": "Service.config",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "config: Config;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-unresolved@1.0.0::Config"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.config.name",
+      "name": "Service.config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.helper",
+      "name": "Service.helper",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "helper: InternalHelper;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-unresolved@1.0.0::index.d.ts::InternalHelper"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.helper.run",
+      "name": "Service.helper.run",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "run(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.base",
+      "name": "Service.base",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "base: Base;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-unresolved@1.0.0::index.d.ts::Base"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::Service.base.id",
+      "name": "Service.base.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "id: string",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-unresolved@1.0.0::create",
+      "name": "create",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "export declare function create<T>(input: T): Service;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "deps-unresolved@1.0.0::Service"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "deps-unresolved@1.0.0::index.d.ts::InternalHelper",
+      "name": "InternalHelper",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "interface InternalHelper {\n  run(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deps-unresolved@1.0.0::index.d.ts::InternalHelper.run",
+      "name": "InternalHelper.run",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "run(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deps-unresolved@1.0.0::index.d.ts::Base",
+      "name": "Base",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "type Base = { id: string };",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "deps-unresolved@1.0.0::index.d.ts::Base.id",
+      "name": "Base.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-unresolved",
+      "filePath": "index.d.ts",
+      "signature": "id: string",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

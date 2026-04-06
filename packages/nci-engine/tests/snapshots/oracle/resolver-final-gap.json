@@ -1,0 +1,26 @@
+{
+  "package": "resolver-final-gap",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "resolver-final-gap@1.0.0::x",
+      "name": "x",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "resolver-final-gap",
+      "filePath": "index.d.ts",
+      "signature": "declare const x: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

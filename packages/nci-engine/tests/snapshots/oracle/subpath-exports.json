@@ -1,0 +1,182 @@
+{
+  "package": "subpath-exports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "subpath-exports@1.0.0::AppConfig",
+      "name": "AppConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export interface AppConfig {\n  name: string;\n  debug: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::AppConfig.name",
+      "name": "AppConfig.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "subpath-exports@1.0.0::AppConfig.debug",
+      "name": "AppConfig.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "subpath-exports@1.0.0::createApp",
+      "name": "createApp",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export declare function createApp(config: AppConfig): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "subpath-exports@1.0.0::AppConfig"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::formatDate",
+      "name": "formatDate",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export declare function formatDate(d: Date): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::parseQuery",
+      "name": "parseQuery",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export declare function parseQuery(q: string): Record<string, string>;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::QueryParams",
+      "name": "QueryParams",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export type QueryParams = Record<string, string>;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::createServer",
+      "name": "createServer",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/server.d.ts",
+      "signature": "export declare function createServer(): Server;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "subpath-exports@1.0.0::Server"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::Server",
+      "name": "Server",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/server.d.ts",
+      "signature": "export interface Server {\n  listen(port: number): void;\n  close(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::Server.listen",
+      "name": "Server.listen",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "subpath-exports",
+      "filePath": "dist/server.d.ts",
+      "signature": "listen(port: number): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "subpath-exports@1.0.0::Server.close",
+      "name": "Server.close",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "subpath-exports",
+      "filePath": "dist/server.d.ts",
+      "signature": "close(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 11,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

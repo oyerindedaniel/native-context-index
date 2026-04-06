@@ -1,0 +1,205 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "inline-import-type",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "inline-import-type@1.0.0::ExpandedViaImport",
+      "name": "ExpandedViaImport",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "inline-import-type",
+      "filePath": "index.d.ts",
+      "signature": "export type ExpandedViaImport = import(\"./inline-import-type-remote-target.js\").RemoteInner;",
+      "jsDoc": "Expansion target for `import().Member`; member rows should point at this file.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::ExpandedViaImport.n",
+      "name": "ExpandedViaImport.n",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "inline-import-type",
+      "filePath": "inline-import-type-remote-target.d.ts",
+      "additionalFiles": [
+        "index.d.ts"
+      ],
+      "signature": "n: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "inline-import-type@1.0.0::NoQualifier",
+      "name": "NoQualifier",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "inline-import-type",
+      "filePath": "index.d.ts",
+      "signature": "export type NoQualifier = import(\"./none.js\");",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::OtherKey",
+      "name": "OtherKey",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "inline-import-type",
+      "filePath": "index.d.ts",
+      "signature": "export type OtherKey = import(\"./other.js\").OtherKey;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::chain.d.ts::Outer",
+      "name": "Outer",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "inline-import-type",
+      "filePath": "chain.d.ts",
+      "signature": "export namespace Outer {\n  export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner",
+      "name": "Outer.Inner",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "inline-import-type",
+      "filePath": "chain.d.ts",
+      "signature": "export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf",
+      "name": "Outer.Inner.Leaf",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "inline-import-type",
+      "filePath": "chain.d.ts",
+      "signature": "export interface Leaf {\n      flag: boolean;\n    }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf.flag",
+      "name": "Outer.Inner.Leaf.flag",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "inline-import-type",
+      "filePath": "chain.d.ts",
+      "signature": "flag: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "inline-import-type@1.0.0::QualifiedImportChain",
+      "name": "QualifiedImportChain",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "inline-import-type",
+      "filePath": "index.d.ts",
+      "signature": "export type QualifiedImportChain = import(\"./chain.js\").Outer.Inner.Leaf;",
+      "jsDoc": "Qualified `import()` chains (nested namespaces / interface).",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner",
+      "name": "RemoteInner",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "inline-import-type",
+      "filePath": "inline-import-type-remote-target.d.ts",
+      "signature": "export interface RemoteInner {\n  n: number;\n}",
+      "jsDoc": "Target module for `import(\"./…\").RemoteInner` expansion and definedIn parity.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner.n",
+      "name": "RemoteInner.n",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "inline-import-type",
+      "filePath": "inline-import-type-remote-target.d.ts",
+      "signature": "n: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "inline-import-type@1.0.0::VisitorKeys",
+      "name": "VisitorKeys",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "inline-import-type",
+      "filePath": "index.d.ts",
+      "signature": "export type VisitorKeys = import(\"./visitor-keys.js\").VisitorKeys;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 12,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

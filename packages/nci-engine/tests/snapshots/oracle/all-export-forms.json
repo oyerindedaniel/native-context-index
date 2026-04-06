@@ -1,0 +1,456 @@
+{
+  "package": "all-export-forms",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "all-export-forms@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n  host: string;\n  port: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::Config.host",
+      "name": "Config.host",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "host: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::Config.port",
+      "name": "Config.port",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "port: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::Status",
+      "name": "Status",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export type Status = \"active\" | \"inactive\" | \"pending\";",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::init",
+      "name": "init",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export declare function init(config: Config): void;",
+      "jsDoc": "Initialize the application.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "all-export-forms@1.0.0::Config"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::Server",
+      "name": "Server",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export declare class Server {\n  constructor(config: Config);\n  listen(): Promise<void>;\n  close(): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "all-export-forms@1.0.0::Config"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::Server.prototype.listen",
+      "name": "Server.prototype.listen",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "listen(): Promise<void>;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::Server.prototype.close",
+      "name": "Server.prototype.close",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "close(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::VERSION",
+      "name": "VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "declare const VERSION: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::LogLevel",
+      "name": "LogLevel",
+      "kind": 267,
+      "kindName": "EnumDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export declare enum LogLevel {\n  DEBUG = 0,\n  INFO = 1,\n  WARN = 2,\n  ERROR = 3,\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::Handler",
+      "name": "Handler",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "all-export-forms",
+      "filePath": "handlers.d.ts",
+      "signature": "export type Handler = (req: any, res: any) => void;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::Router",
+      "name": "Router",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "all-export-forms",
+      "filePath": "internal.d.ts",
+      "signature": "export declare class InternalRouter {\n  add(path: string, handler: any): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::formatDate",
+      "name": "formatDate",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "utils.d.ts",
+      "signature": "export declare function formatDate(date: Date): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::parseDate",
+      "name": "parseDate",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "utils.d.ts",
+      "signature": "export declare function parseDate(str: string): Date;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::helpers",
+      "name": "helpers",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export * as helpers from './helpers.js'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::helpers.encode",
+      "name": "helpers.encode",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "helpers.d.ts",
+      "signature": "export declare function encode(data: string): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::helpers.decode",
+      "name": "helpers.decode",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "helpers.d.ts",
+      "signature": "export declare function decode(data: string): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::RequestOptions",
+      "name": "RequestOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "all-export-forms",
+      "filePath": "options.d.ts",
+      "signature": "export interface RequestOptions {\n  timeout?: number;\n  retries?: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::PluginOptions",
+      "name": "PluginOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export interface PluginOptions {\n    name: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "all-export-forms@1.0.0::PluginOptions.name",
+      "name": "PluginOptions.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "all-export-forms@1.0.0::helpers.d.ts::encode",
+      "name": "encode",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "helpers.d.ts",
+      "signature": "export declare function encode(data: string): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::helpers.d.ts::decode",
+      "name": "decode",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "all-export-forms",
+      "filePath": "helpers.d.ts",
+      "signature": "export declare function decode(data: string): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::index.d.ts::Server",
+      "name": "Server",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "export default Server;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::index.d.ts::my-plugin",
+      "name": "my-plugin",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "all-export-forms",
+      "filePath": "index.d.ts",
+      "signature": "declare module \"my-plugin\" { ... }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::internal.d.ts::InternalRouter",
+      "name": "InternalRouter",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "all-export-forms",
+      "filePath": "internal.d.ts",
+      "signature": "export declare class InternalRouter {\n  add(path: string, handler: any): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::internal.d.ts::InternalRouter.prototype.add",
+      "name": "InternalRouter.prototype.add",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "all-export-forms",
+      "filePath": "internal.d.ts",
+      "signature": "add(path: string, handler: any): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.timeout",
+      "name": "RequestOptions.timeout",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "all-export-forms",
+      "filePath": "options.d.ts",
+      "signature": "timeout?: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.retries",
+      "name": "RequestOptions.retries",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "all-export-forms",
+      "filePath": "options.d.ts",
+      "signature": "retries?: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 28,
+  "totalFiles": 6,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,40 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "local-export",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "local-export@1.0.0::Local",
+      "name": "Local",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-export",
+      "filePath": "index.d.ts",
+      "signature": "interface Local { id: string }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "local-export@1.0.0::Local.id",
+      "name": "Local.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-export",
+      "filePath": "index.d.ts",
+      "signature": "id: string",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

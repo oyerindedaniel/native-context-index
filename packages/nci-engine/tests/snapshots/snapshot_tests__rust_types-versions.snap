@@ -1,0 +1,56 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "types-versions-pkg",
+  "version": "3.0.0",
+  "symbols": [
+    {
+      "id": "types-versions-pkg@3.0.0::ModernConfig",
+      "name": "ModernConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-versions-pkg",
+      "filePath": "ts5/index.d.ts",
+      "signature": "export interface ModernConfig {\n  strict: boolean;\n  esm: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "types-versions-pkg@3.0.0::ModernConfig.esm",
+      "name": "ModernConfig.esm",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-versions-pkg",
+      "filePath": "ts5/index.d.ts",
+      "signature": "esm: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "types-versions-pkg@3.0.0::ModernConfig.strict",
+      "name": "ModernConfig.strict",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-versions-pkg",
+      "filePath": "ts5/index.d.ts",
+      "signature": "strict: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

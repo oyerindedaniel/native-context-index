@@ -1,0 +1,23 @@
+{
+  "package": "export-specifier-refs",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "export-specifier-refs@1.0.0::Foo",
+      "name": "Foo",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "export-specifier-refs",
+      "filePath": "index.d.ts",
+      "signature": "type Foo = string;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

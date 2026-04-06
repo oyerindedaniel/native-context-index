@@ -1,0 +1,167 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "deps-pkg",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "deps-pkg@1.0.0::Config",
+      "name": "Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n  name: string;\n  debug: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deps-pkg@1.0.0::Config.debug",
+      "name": "Config.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::Config.name",
+      "name": "Config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::LogLevel",
+      "name": "LogLevel",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "export type LogLevel = \"info\" | \"warn\" | \"error\";",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deps-pkg@1.0.0::Logger",
+      "name": "Logger",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "export interface Logger {\n  config: Config;\n  level: LogLevel;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-pkg@1.0.0::Config",
+        "deps-pkg@1.0.0::LogLevel"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "deps-pkg@1.0.0::Logger.config",
+      "name": "Logger.config",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "config: Config;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-pkg@1.0.0::Config"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::Logger.config.debug",
+      "name": "Logger.config.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::Logger.config.name",
+      "name": "Logger.config.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::Logger.level",
+      "name": "Logger.level",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "level: LogLevel;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "deps-pkg@1.0.0::LogLevel"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "deps-pkg@1.0.0::createLogger",
+      "name": "createLogger",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "deps-pkg",
+      "filePath": "index.d.ts",
+      "signature": "export declare function createLogger(config: Config): Logger;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "deps-pkg@1.0.0::Config",
+        "deps-pkg@1.0.0::Logger"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 10,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

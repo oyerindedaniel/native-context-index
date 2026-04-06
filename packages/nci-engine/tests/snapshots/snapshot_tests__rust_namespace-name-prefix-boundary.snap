@@ -1,0 +1,58 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "namespace-name-prefix-boundary",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-name-prefix-boundary@1.0.0::Outer",
+      "name": "Outer",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-name-prefix-boundary",
+      "filePath": "index.d.ts",
+      "signature": "export declare namespace Outer {\n  interface OuterChild {\n    field: number;\n  }\n}",
+      "jsDoc": "Child identifier shares a prefix with the parent namespace name (`Outer` + `OuterChild`).\nQualified export must be `Outer.OuterChild`, not a false skip from string prefix matching.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild",
+      "name": "Outer.OuterChild",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-name-prefix-boundary",
+      "filePath": "index.d.ts",
+      "signature": "interface OuterChild {\n    field: number;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild.field",
+      "name": "Outer.OuterChild.field",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "namespace-name-prefix-boundary",
+      "filePath": "index.d.ts",
+      "signature": "field: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

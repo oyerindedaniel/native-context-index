@@ -1,0 +1,62 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "resolver-strict-boundary",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "resolver-strict-boundary@1.0.0::node_modules/strict-pkg/internal.d.ts::private_y",
+      "name": "private_y",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "resolver-strict-boundary",
+      "filePath": "node_modules/strict-pkg/internal.d.ts",
+      "signature": "declare const private_y: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "resolver-strict-boundary@1.0.0::node_modules/strict-pkg/index.d.ts::public_x",
+      "name": "public_x",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "resolver-strict-boundary",
+      "filePath": "node_modules/strict-pkg/index.d.ts",
+      "signature": "declare const public_x: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "resolver-strict-boundary@1.0.0::result",
+      "name": "result",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "resolver-strict-boundary",
+      "filePath": "index.d.ts",
+      "signature": "declare const result: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

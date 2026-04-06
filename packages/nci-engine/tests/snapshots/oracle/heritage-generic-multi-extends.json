@@ -1,0 +1,398 @@
+{
+  "package": "heritage-generic-multi-extends",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA",
+      "name": "HeritageRowA",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface HeritageRowA {\n  keepA: string;\n  dropFromA: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA.keepA",
+      "name": "HeritageRowA.keepA",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "keepA: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA.dropFromA",
+      "name": "HeritageRowA.dropFromA",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "dropFromA: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB",
+      "name": "HeritageRowB",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface HeritageRowB {\n  keepB: boolean;\n  dropFromB: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB.keepB",
+      "name": "HeritageRowB.keepB",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "keepB: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB.dropFromB",
+      "name": "HeritageRowB.dropFromB",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "dropFromB: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::MergedRows",
+      "name": "MergedRows",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface MergedRows extends Omit<HeritageRowA, \"dropFromA\">, Omit<HeritageRowB, \"dropFromB\"> {\n  mergedOnly: symbol;\n}",
+      "jsDoc": "Multiple `extends` use the same type constructor (`Omit`) with different\ntype arguments; heritage lists each clause distinctly (full span text).",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "heritage-generic-multi-extends@1.0.0::HeritageRowA",
+        "heritage-generic-multi-extends@1.0.0::HeritageRowB"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "Omit<HeritageRowA, \"dropFromA\">",
+        "Omit<HeritageRowB, \"dropFromB\">"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::MergedRows.mergedOnly",
+      "name": "MergedRows.mergedOnly",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "mergedOnly: symbol;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericParent",
+      "name": "GenericParent",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface GenericParent<T> {\n  parentValue: T;\n  parentFixed: boolean;\n}",
+      "jsDoc": "Local generic parent — flattening must resolve through `<` to find this.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue",
+      "name": "GenericParent.parentValue",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentValue: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed",
+      "name": "GenericParent.parentFixed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentFixed: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericChild",
+      "name": "GenericChild",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface GenericChild extends GenericParent<string> {\n  childOwn: number;\n}",
+      "jsDoc": "Extends a local generic — tests that `heritage_lookup_key(\"GenericParent<string>\")` → \"GenericParent\".",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "GenericParent<string>"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericChild.childOwn",
+      "name": "GenericChild.childOwn",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "childOwn: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild",
+      "name": "DeepGenericChild",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface DeepGenericChild extends GenericParent<Array<Map<string, number>>> {\n  deepOwn: string;\n}",
+      "jsDoc": "Deep nesting in type args: `GenericParent<Array<Map<string, number>>>`.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "GenericParent<Array<Map<string, number>>>"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.deepOwn",
+      "name": "DeepGenericChild.deepOwn",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "deepOwn: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GrandChild",
+      "name": "GrandChild",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface GrandChild extends GenericChild {\n  grandOwn: symbol;\n}",
+      "jsDoc": "Two-level chain: GrandChild → GenericChild → GenericParent<string>.\nTests transitive flattening when intermediate has generic heritage too.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "heritage-generic-multi-extends@1.0.0::GenericChild"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "GenericChild"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GrandChild.grandOwn",
+      "name": "GrandChild.grandOwn",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "grandOwn: symbol;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentValue",
+      "name": "GenericChild.parentValue",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentValue: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentFixed",
+      "name": "GenericChild.parentFixed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentFixed: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentValue",
+      "name": "DeepGenericChild.parentValue",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentValue: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentFixed",
+      "name": "DeepGenericChild.parentFixed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentFixed: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GrandChild.childOwn",
+      "name": "GrandChild.childOwn",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "childOwn: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericChild.childOwn"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentValue",
+      "name": "GrandChild.parentValue",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentValue: T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
+      ]
+    },
+    {
+      "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentFixed",
+      "name": "GrandChild.parentFixed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "heritage-generic-multi-extends",
+      "filePath": "index.d.ts",
+      "signature": "parentFixed: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
+      ]
+    }
+  ],
+  "totalSymbols": 24,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

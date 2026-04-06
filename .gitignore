@@ -56,9 +56,9 @@ packages/nci/vendor/
 # Backup files from `cargo fix` or other tools
 **/*.rs.bk
 
-# Snapshots
+# Snapshots (pending insta updates only — committed .snap + oracle live under packages/nci-engine/tests/snapshots/)
 /snapshots/
-**/snapshots/
+**/*.snap.new
 snapshot.md
 
 context_summary.md

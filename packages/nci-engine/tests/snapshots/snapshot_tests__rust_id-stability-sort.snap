@@ -1,0 +1,50 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "id-stability-sort",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "id-stability-sort@1.0.0::identity",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "id-stability-sort",
+      "filePath": "z-file.d.ts",
+      "signature": "declare const identity: (x: number) => number",
+      "jsDoc": "This identity should get the BASE ID if it was discovered first.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "id-stability-sort@1.0.0::identity#2",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "id-stability-sort",
+      "filePath": "a-file.d.ts",
+      "signature": "declare const identity: (x: string) => string",
+      "jsDoc": "This identity should get the Suffix #2 if it was discovered after z-file.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

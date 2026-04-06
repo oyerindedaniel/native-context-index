@@ -1,0 +1,46 @@
+{
+  "package": "multi-star-exports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "multi-star-exports@1.0.0::a_b_val",
+      "name": "a_b_val",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "multi-star-exports",
+      "filePath": "dist/a/b/index.d.ts",
+      "signature": "declare const a_b_val: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "multi-star-exports@1.0.0::x_y_val",
+      "name": "x_y_val",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "multi-star-exports",
+      "filePath": "dist/x/y/index.d.ts",
+      "signature": "declare const x_y_val: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

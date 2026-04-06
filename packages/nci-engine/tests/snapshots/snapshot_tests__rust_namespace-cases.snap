@@ -1,0 +1,166 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "namespace-cases",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-cases@1.0.0::API",
+      "name": "API",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export namespace API {\n  export interface Config {\n    url: string;\n  }\n  export function fetch(conf: Config): void;\n  /** @internal */\n  export const secret: string;\n  const hidden: number; // Internal to namespace\n}",
+      "jsDoc": "Recursive namespace with nested members",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-cases@1.0.0::API.Config",
+      "name": "API.Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n    url: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-cases@1.0.0::API.Config.url",
+      "name": "API.Config.url",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "url: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "namespace-cases@1.0.0::API.fetch",
+      "name": "API.fetch",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export function fetch(conf: Config): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-cases@1.0.0::index.d.ts::API.hidden",
+      "name": "API.hidden",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "declare const hidden: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-cases@1.0.0::API.secret",
+      "name": "API.secret",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "declare const secret: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "visibility": "internal",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-cases@1.0.0::MyLib",
+      "name": "MyLib",
+      "kind": 271,
+      "kindName": "NamespaceExportDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export as namespace MyLib;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "namespace-cases@1.0.0::Widget",
+      "name": "Widget",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export interface Widget {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-cases@1.0.0::Widget.id",
+      "name": "Widget.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "namespace-cases@1.0.0::createWidget",
+      "name": "createWidget",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-cases",
+      "filePath": "index.d.ts",
+      "signature": "export function createWidget(): Widget;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-cases@1.0.0::Widget"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 10,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,27 @@
+{
+  "package": "nested-conditional-pkg",
+  "version": "2.0.0",
+  "symbols": [
+    {
+      "id": "nested-conditional-pkg@2.0.0::greet",
+      "name": "greet",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "nested-conditional-pkg",
+      "filePath": "dist/esm/index.d.ts",
+      "signature": "export declare function greet(name: string): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

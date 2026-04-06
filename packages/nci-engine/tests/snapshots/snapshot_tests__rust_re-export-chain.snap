@@ -1,0 +1,105 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "re-export-chain",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "re-export-chain@1.0.0::Server",
+      "name": "Server",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "export declare class Server {\n  constructor(options: ServerOptions);\n  listen(): Promise<void>;\n  close(): void;\n}",
+      "jsDoc": "A basic HTTP server.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "re-export-chain@1.0.0::ServerOptions"
+      ],
+      "reExportedFrom": "index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.close",
+      "name": "Server.prototype.close",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "close(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.listen",
+      "name": "Server.prototype.listen",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "listen(): Promise<void>;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "re-export-chain@1.0.0::ServerOptions",
+      "name": "ServerOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "export interface ServerOptions {\n  port: number;\n  host?: string;\n}",
+      "jsDoc": "Options for creating a Server instance.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "reExportedFrom": "index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "re-export-chain@1.0.0::lib/core.d.ts::ServerOptions.host",
+      "name": "ServerOptions.host",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "host?: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "re-export-chain@1.0.0::lib/core.d.ts::ServerOptions.port",
+      "name": "ServerOptions.port",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "re-export-chain",
+      "filePath": "lib/core.d.ts",
+      "signature": "port: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

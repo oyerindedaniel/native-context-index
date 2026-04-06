@@ -1,0 +1,131 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "merged-symbols",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "merged-symbols@1.0.0::merged",
+      "name": "merged",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "declare const merged: {\n  /** A property as a symbol */\n  version: string;\n  /** A nested object */\n  options: {\n    verbose: boolean;\n  };\n}",
+      "jsDoc": "A merged variable and namespace",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged#2",
+      "name": "merged",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace merged {\n  /** An interface in the namespace */\n  export interface Config {\n    debug: boolean;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "merged-symbols@1.0.0::index.d.ts::merged",
+      "name": "merged",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "export = merged;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged.Config",
+      "name": "merged.Config",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "export interface Config {\n    debug: boolean;\n  }",
+      "jsDoc": "An interface in the namespace",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged.Config.debug",
+      "name": "merged.Config.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged.options",
+      "name": "merged.options",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "options: {\n    verbose: boolean;\n  };",
+      "jsDoc": "A nested object",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged.options.verbose",
+      "name": "merged.options.verbose",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "verbose: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "merged-symbols@1.0.0::merged.version",
+      "name": "merged.version",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-symbols",
+      "filePath": "index.d.ts",
+      "signature": "version: string;",
+      "jsDoc": "A property as a symbol",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 8,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

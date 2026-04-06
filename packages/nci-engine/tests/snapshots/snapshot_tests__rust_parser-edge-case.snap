@@ -1,0 +1,110 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "parser-edge-case",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "parser-edge-case@1.0.0::index.d.ts::Inherit",
+      "name": "Inherit",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "interface Inherit extends External.Base {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "heritage": [
+        "External.Base"
+      ]
+    },
+    {
+      "id": "parser-edge-case@1.0.0::MyType",
+      "name": "MyType",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "export type { MyType } from './mod'",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "parser-edge-case@1.0.0::index.d.ts::TypeA",
+      "name": "TypeA",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "type TypeA = import(\"pkg\").Inner.Type;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "npm::pkg::Type"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "parser-edge-case@1.0.0::index.d.ts::default",
+      "name": "default",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "export default { key: 'val' };",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "parser-edge-case@1.0.0::localRef",
+      "name": "localRef",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "declare const localRef: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "parser-edge-case@1.0.0::index.d.ts::localRef",
+      "name": "localRef",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "export default localRef;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "parser-edge-case@1.0.0::namespacedImport",
+      "name": "namespacedImport",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "export * as namespacedImport from './mod'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

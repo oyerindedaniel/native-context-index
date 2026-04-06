@@ -1,0 +1,74 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "nested-prefix",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "nested-prefix@1.0.0::Mid",
+      "name": "Mid",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "nested-prefix",
+      "filePath": "index.d.ts",
+      "signature": "export * as Mid from './mid.js'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "nested-prefix@1.0.0::Mid.Inner",
+      "name": "Mid.Inner",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "nested-prefix",
+      "filePath": "mid.d.ts",
+      "signature": "export * as Inner from './inner.js'",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "reExportedFrom": "index.d.ts",
+      "isInternal": false
+    },
+    {
+      "id": "nested-prefix@1.0.0::Mid.Inner.val",
+      "name": "Mid.Inner.val",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "nested-prefix",
+      "filePath": "inner.d.ts",
+      "signature": "declare const val: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "reExportedFrom": "index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "nested-prefix@1.0.0::inner.d.ts::val",
+      "name": "val",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "nested-prefix",
+      "filePath": "inner.d.ts",
+      "signature": "declare const val: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

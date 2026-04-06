@@ -1,0 +1,61 @@
+{
+  "package": "specifier-resolution",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "specifier-resolution@1.0.0::mod",
+      "name": "mod",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "specifier-resolution",
+      "filePath": "mod.d.ts",
+      "signature": "declare const mod: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "specifier-resolution@1.0.0::esm",
+      "name": "esm",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "specifier-resolution",
+      "filePath": "esm.d.mts",
+      "signature": "declare const esm: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "specifier-resolution@1.0.0::common",
+      "name": "common",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "specifier-resolution",
+      "filePath": "common.d.cts",
+      "signature": "declare const common: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 4,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

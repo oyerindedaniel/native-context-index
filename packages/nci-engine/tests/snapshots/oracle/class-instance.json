@@ -1,0 +1,93 @@
+{
+  "package": "class-instance",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "class-instance@1.0.0::User",
+      "name": "User",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "class-instance",
+      "filePath": "index.d.ts",
+      "signature": "export declare class User {\n  constructor(name: string);\n\n  /** @since 1.1.0 */\n  readonly name: string;\n\n  /** @since 1.2.0 */\n  greet(): string;\n\n  /** @internal */\n  _internalMethod(): void;\n\n  static create(name: string): User;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "class-instance@1.0.0::User.prototype.name",
+      "name": "User.prototype.name",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "class-instance",
+      "filePath": "index.d.ts",
+      "signature": "readonly name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.1.0",
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "class-instance@1.0.0::User.prototype.greet",
+      "name": "User.prototype.greet",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-instance",
+      "filePath": "index.d.ts",
+      "signature": "greet(): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.2.0"
+    },
+    {
+      "id": "class-instance@1.0.0::User.prototype._internalMethod",
+      "name": "User.prototype._internalMethod",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-instance",
+      "filePath": "index.d.ts",
+      "signature": "_internalMethod(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "visibility": "internal",
+      "since": "1.0.0"
+    },
+    {
+      "id": "class-instance@1.0.0::User.create",
+      "name": "User.create",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "class-instance",
+      "filePath": "index.d.ts",
+      "signature": "static create(name: string): User;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "class-instance@1.0.0::User"
+      ],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "static"
+      ]
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -1,0 +1,91 @@
+{
+  "package": "local-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "local-reexport@1.0.0::External",
+      "name": "External",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "interface Internal {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "local-reexport@1.0.0::External.id",
+      "name": "External.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "local-reexport@1.0.0::x",
+      "name": "x",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "declare const x: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "local-reexport@1.0.0::index.d.ts::Internal",
+      "name": "Internal",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "interface Internal {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "local-reexport@1.0.0::index.d.ts::Internal.id",
+      "name": "Internal.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "local-reexport@1.0.0::index.d.ts::x",
+      "name": "x",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "local-reexport",
+      "filePath": "index.d.ts",
+      "signature": "export default x;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

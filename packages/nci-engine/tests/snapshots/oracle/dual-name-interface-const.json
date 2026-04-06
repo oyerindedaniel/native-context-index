@@ -1,0 +1,108 @@
+{
+  "package": "dual-name-interface-const",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "dual-name-interface-const@1.0.0::Dual",
+      "name": "Dual",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface Dual extends RootParent {\n  onlyOnDual: number;\n}",
+      "jsDoc": "Interface must win for inheritance flattening even when the value export appears after it.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "dual-name-interface-const@1.0.0::index.d.ts::RootParent"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "RootParent"
+      ],
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "dual-name-interface-const@1.0.0::Dual.onlyOnDual",
+      "name": "Dual.onlyOnDual",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "onlyOnDual: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "dual-name-interface-const@1.0.0::Dual#2",
+      "name": "Dual",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "declare const Dual: unknown",
+      "jsDoc": "Same basename as the interface; last in file mimics common .d.ts emit order.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "dual-name-interface-const@1.0.0::index.d.ts::RootParent",
+      "name": "RootParent",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "declare interface RootParent {\n  fromRoot(): void;\n}",
+      "jsDoc": "Parent type in the heritage chain (zod-style internal + exported pairs).",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "dual-name-interface-const@1.0.0::index.d.ts::RootParent.fromRoot",
+      "name": "RootParent.fromRoot",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "fromRoot(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "dual-name-interface-const@1.0.0::Dual.fromRoot",
+      "name": "Dual.fromRoot",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "dual-name-interface-const",
+      "filePath": "index.d.ts",
+      "signature": "fromRoot(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "dual-name-interface-const@1.0.0::index.d.ts::RootParent.fromRoot"
+      ]
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

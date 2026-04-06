@@ -1,0 +1,50 @@
+{
+  "package": "bare-package-surface-expansion-root",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "bare-package-surface-expansion-root@1.0.0::PRIMARY",
+      "name": "PRIMARY",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "bare-package-surface-expansion-root",
+      "filePath": "node_modules/@sibling/core/dist/index.d.ts",
+      "signature": "declare const PRIMARY: \"from @sibling/core primary entry\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "bare-package-surface-expansion-root@1.0.0::INTERNAL",
+      "name": "INTERNAL",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "bare-package-surface-expansion-root",
+      "filePath": "node_modules/@sibling/core/dist/internal.d.ts",
+      "signature": "declare const INTERNAL: \"from @sibling/core internal entry\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

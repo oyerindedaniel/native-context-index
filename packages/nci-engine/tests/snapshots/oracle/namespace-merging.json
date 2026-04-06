@@ -1,0 +1,79 @@
+{
+  "package": "namespace-merging",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-merging@1.0.0::MergedNS",
+      "name": "MergedNS",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-merging",
+      "filePath": "extra.d.ts",
+      "signature": "export namespace MergedNS {\n  export const original = 1;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "since": "1.0.0",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "core.d.ts"
+      ],
+      "additionalFiles": [
+        "extra.d.ts",
+        "core.d.ts"
+      ]
+    },
+    {
+      "id": "namespace-merging@1.0.0::MergedNS.original",
+      "name": "MergedNS.original",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-merging",
+      "filePath": "core.d.ts",
+      "signature": "declare const original: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-merging@1.0.0::MergedNS#2",
+      "name": "MergedNS",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-merging",
+      "filePath": "core.d.ts",
+      "signature": "export function MergedNS(arg: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-merging@1.0.0::extra.d.ts::MergedNS.extra",
+      "name": "MergedNS.extra",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "namespace-merging",
+      "filePath": "extra.d.ts",
+      "signature": "declare const extra: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

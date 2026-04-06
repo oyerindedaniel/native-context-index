@@ -1,0 +1,125 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "triple-slash-refs",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "triple-slash-refs@1.0.0::APP_VERSION",
+      "name": "APP_VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-refs",
+      "filePath": "index.d.ts",
+      "signature": "declare const APP_VERSION: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::utils.d.ts::DateFormat",
+      "name": "DateFormat",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "triple-slash-refs",
+      "filePath": "utils.d.ts",
+      "signature": "export type DateFormat = \"iso\" | \"local\" | \"utc\";",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig",
+      "name": "GlobalConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "triple-slash-refs",
+      "filePath": "globals.d.ts",
+      "signature": "export interface GlobalConfig {\n  debug: boolean;\n  verbose: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig.debug",
+      "name": "GlobalConfig.debug",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "triple-slash-refs",
+      "filePath": "globals.d.ts",
+      "signature": "debug: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig.verbose",
+      "name": "GlobalConfig.verbose",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "triple-slash-refs",
+      "filePath": "globals.d.ts",
+      "signature": "verbose: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::utils.d.ts::formatDate",
+      "name": "formatDate",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "triple-slash-refs",
+      "filePath": "utils.d.ts",
+      "signature": "export declare function formatDate(date: Date): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "triple-slash-refs@1.0.0::globals.d.ts::setupGlobals",
+      "name": "setupGlobals",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "triple-slash-refs",
+      "filePath": "globals.d.ts",
+      "signature": "export declare function setupGlobals(config: GlobalConfig): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig"
+      ],
+      "isInternal": true,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}
