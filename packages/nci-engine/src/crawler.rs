@@ -7,7 +7,7 @@ use dashmap::DashMap;
 use rayon::prelude::*;
 
 use crate::constants::DEFAULT_MAX_HOPS;
-use crate::dedupe::symbol_dedupe_key;
+use crate::dedupe::{normalize_signature, symbol_dedupe_key};
 use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
@@ -499,7 +499,7 @@ impl CrawlSession {
                     "{}::{}::{}",
                     entry.name.as_ref(),
                     entry.kind.numeric_kind(),
-                    crate::dedupe::normalize_signature(entry.signature.as_deref())
+                    normalize_signature(entry.signature.as_deref())
                 )
                 .as_ref(),
             )
@@ -539,7 +539,7 @@ impl CrawlSession {
                             "{}::{}::{}",
                             symbol_node.name.as_ref(),
                             symbol_node.kind.numeric_kind(),
-                            crate::dedupe::normalize_signature(symbol_node.signature.as_deref())
+                            normalize_signature(symbol_node.signature.as_deref())
                         )
                         .as_ref(),
                     );

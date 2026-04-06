@@ -6,9 +6,11 @@ use rayon::prelude::*;
 use tracing::{debug, trace, warn};
 
 use crate::cache;
+use crate::constants::DEFAULT_MAX_HOPS;
 use crate::crawler::CrawlOptions;
 use crate::filter::FilterConfig;
 use crate::graph::build_package_graph;
+use crate::profile::phases_enabled;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
 use crate::storage::NciDatabase;
@@ -48,7 +50,7 @@ pub struct IndexOptions {
 impl Default for IndexOptions {
     fn default() -> Self {
         Self {
-            max_hops: crate::constants::DEFAULT_MAX_HOPS,
+            max_hops: DEFAULT_MAX_HOPS,
             parallel: true,
             enable_package_cache: true,
             db_path: None,
@@ -130,7 +132,7 @@ pub fn index_packages(
     let crawl_options_factory = |package: &PackageInfo| {
         Some(CrawlOptions {
             max_hops: index_opts.max_hops,
-            profile_as: if crate::profile::phases_enabled() {
+            profile_as: if phases_enabled() {
                 Some(package.name.clone())
             } else {
                 None
@@ -257,7 +259,7 @@ pub fn index_single(
     version: &str,
     options: Option<CrawlOptions>,
 ) -> PackageGraph {
-    let info = crate::types::PackageInfo {
+    let info = PackageInfo {
         name: name.into(),
         version: version.into(),
         dir: normalize_path(package_dir),

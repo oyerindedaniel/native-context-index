@@ -7,6 +7,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use tracing::{info, warn};
 
 use crate::cache::NCI_ENGINE_VERSION;
+use crate::storage_migrations::{read_schema_version, MIGRATIONS, META_SCHEMA_KEY};
 use crate::types::{
     DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
     SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
@@ -39,8 +40,8 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
         [],
     )?;
 
-    let current = crate::storage_migrations::read_schema_version(&transaction)?;
-    let max_known = crate::storage_migrations::MIGRATIONS
+    let current = read_schema_version(&transaction)?;
+    let max_known = MIGRATIONS
         .last()
         .map(|migration| migration.version)
         .unwrap_or(0);
@@ -63,7 +64,7 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
         });
     }
 
-    for migration in crate::storage_migrations::MIGRATIONS {
+    for migration in MIGRATIONS {
         if migration.version > current {
             if let Err(sqlite_error) = transaction.execute_batch(migration.sql) {
                 tracing::error!(
@@ -76,7 +77,7 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
             transaction.execute(
                 "INSERT OR REPLACE INTO nci_meta (key, value) VALUES (?1, ?2)",
                 rusqlite::params![
-                    crate::storage_migrations::META_SCHEMA_KEY,
+                    META_SCHEMA_KEY,
                     migration.version.to_string(),
                 ],
             )?;
@@ -109,7 +110,7 @@ impl NciDatabase {
     }
 
     pub fn stored_schema_version(&self) -> StorageResult<u32> {
-        crate::storage_migrations::read_schema_version(&self.connection).map_err(Into::into)
+        read_schema_version(&self.connection).map_err(Into::into)
     }
 
     pub fn journal_mode_label(&self) -> StorageResult<String> {
