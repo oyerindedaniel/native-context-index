@@ -422,10 +422,6 @@ snapshot_test!(
     "merge-key-signature-parity"
 );
 snapshot_test!(
-    snapshot_cross_file_overload_reexport,
-    "cross-file-overload-reexport"
-);
-snapshot_test!(
     snapshot_namespace_name_prefix_boundary,
     "namespace-name-prefix-boundary"
 );

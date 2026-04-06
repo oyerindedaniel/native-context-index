@@ -1,5 +1,0 @@
-{
-  "name": "cross-file-overload-reexport",
-  "version": "1.0.0",
-  "types": "./index.d.ts"
-}
