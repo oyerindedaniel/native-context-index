@@ -62,7 +62,10 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     }
   }
 
-  return { name, dirPath: packageDir, typesEntries, subpaths };
+  typesEntries.sort();
+  const deduped = [...new Set(typesEntries)];
+
+  return { name, dirPath: packageDir, typesEntries: deduped, subpaths };
 }
 
 /**
@@ -327,6 +330,7 @@ function expandWildcardSubpath(
     }
   }
 
+  matchingEntries.sort();
   return matchingEntries;
 }
 

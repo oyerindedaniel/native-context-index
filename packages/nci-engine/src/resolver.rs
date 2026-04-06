@@ -91,6 +91,9 @@ pub fn package_entry_from_parsed_pkg(
         }
     }
 
+    types_entries.sort();
+    types_entries.dedup();
+
     Ok(PackageEntry {
         name,
         dir_path: normalize_path(package_dir),
@@ -349,6 +352,8 @@ fn expand_wildcard_subpath(package_dir: &Path, value: &serde_json::Value) -> Vec
         }
     }
 
+    // read_dir order is platform-dependent; stable sort keeps crawl + symbol id suffixes consistent in CI.
+    matching_entries.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
     matching_entries
 }
 

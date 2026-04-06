@@ -3,52 +3,6 @@
   "version": "1.0.0",
   "symbols": [
     {
-      "id": "wildcard-subpath-exports@1.0.0::RootConfig",
-      "name": "RootConfig",
-      "kind": 265,
-      "kindName": "InterfaceDeclaration",
-      "package": "wildcard-subpath-exports",
-      "filePath": "dist/index.d.ts",
-      "signature": "export interface RootConfig {\n  name: string;\n}",
-      "isTypeOnly": true,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export"
-      ]
-    },
-    {
-      "id": "wildcard-subpath-exports@1.0.0::RootConfig.name",
-      "name": "RootConfig.name",
-      "kind": 172,
-      "kindName": "PropertySignature",
-      "package": "wildcard-subpath-exports",
-      "filePath": "dist/index.d.ts",
-      "signature": "name: string;",
-      "isTypeOnly": false,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false
-    },
-    {
-      "id": "wildcard-subpath-exports@1.0.0::init",
-      "name": "init",
-      "kind": 263,
-      "kindName": "FunctionDeclaration",
-      "package": "wildcard-subpath-exports",
-      "filePath": "dist/index.d.ts",
-      "signature": "export declare function init(): void;",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
       "id": "wildcard-subpath-exports@1.0.0::helperA",
       "name": "helperA",
       "kind": 263,
@@ -139,6 +93,52 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::RootConfig",
+      "name": "RootConfig",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export interface RootConfig {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::RootConfig.name",
+      "name": "RootConfig.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-subpath-exports@1.0.0::init",
+      "name": "init",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-subpath-exports",
+      "filePath": "dist/index.d.ts",
+      "signature": "export declare function init(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
     }
   ],
   "totalSymbols": 9,

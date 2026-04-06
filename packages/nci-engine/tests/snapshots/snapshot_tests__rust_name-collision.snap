@@ -99,6 +99,26 @@ expression: "& rust_graph"
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "declare const identity: <A>(channel: ChannelConfig) => ChannelConfig",
+      "jsDoc": "Channel identity — passes through unchanged.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "name-collision@1.0.0::ChannelConfig"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::identity#2",
+      "name": "identity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
       "filePath": "dist/index.d.ts",
       "signature": "declare const identity: <A>(a: A) => A",
       "jsDoc": "The identity function.",
@@ -112,7 +132,7 @@ expression: "& rust_graph"
       ]
     },
     {
-      "id": "name-collision@1.0.0::identity#2",
+      "id": "name-collision@1.0.0::identity#3",
       "name": "identity",
       "kind": 244,
       "kindName": "VariableStatement",
@@ -124,26 +144,6 @@ expression: "& rust_graph"
       "symbolSpace": "value",
       "dependencies": [
         "name-collision@1.0.0::StreamConfig"
-      ],
-      "isInternal": false,
-      "modifiers": [
-        "declare",
-        "export"
-      ]
-    },
-    {
-      "id": "name-collision@1.0.0::identity#3",
-      "name": "identity",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "name-collision",
-      "filePath": "dist/channel.d.ts",
-      "signature": "declare const identity: <A>(channel: ChannelConfig) => ChannelConfig",
-      "jsDoc": "Channel identity — passes through unchanged.",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [
-        "name-collision@1.0.0::ChannelConfig"
       ],
       "isInternal": false,
       "modifiers": [

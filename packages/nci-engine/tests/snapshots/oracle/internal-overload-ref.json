@@ -3,6 +3,162 @@
   "version": "1.0.0",
   "symbols": [
     {
+      "id": "internal-overload-ref@1.0.0::EXTRA_ENTRY",
+      "name": "EXTRA_ENTRY",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "extra-entry.d.ts",
+      "signature": "declare const EXTRA_ENTRY: 3",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::usesGlobalFromRefExtra",
+      "name": "usesGlobalFromRefExtra",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "extra-entry.d.ts",
+      "signature": "declare const usesGlobalFromRefExtra: typeof GLOBAL_FROM_REF",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "internal-overload-ref@1.0.0::GLOBAL_FROM_REF"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::usesAmbientPickFromExtra",
+      "name": "usesAmbientPickFromExtra",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "extra-entry.d.ts",
+      "signature": "declare const usesAmbientPickFromExtra: typeof AMBIENT_PICK",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "internal-overload-ref@1.0.0::AMBIENT_PICK"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::GLOBAL_FROM_REF",
+      "name": "GLOBAL_FROM_REF",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "ref.d.ts",
+      "signature": "declare const GLOBAL_FROM_REF: \"global-via-module-ref\"",
+      "jsDoc": "Module file augments global scope; entries see this without importing ref.d.ts.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::AMBIENT_PICK",
+      "name": "AMBIENT_PICK",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "ambient-ref.d.ts",
+      "signature": "declare const AMBIENT_PICK: \"ambient\"",
+      "jsDoc": "Script-style declarations only: no top-level import/export so names are ambient globals.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ],
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::ImportedShape",
+      "name": "ImportedShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "internal-overload-ref",
+      "filePath": "imported-entry.d.ts",
+      "signature": "export interface ImportedShape {\n  value: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::ImportedShape.value",
+      "name": "ImportedShape.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "internal-overload-ref",
+      "filePath": "imported-entry.d.ts",
+      "signature": "value: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::IMPORTED_TOKEN",
+      "name": "IMPORTED_TOKEN",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "internal-overload-ref",
+      "filePath": "imported-entry.d.ts",
+      "signature": "declare const IMPORTED_TOKEN: ImportedShape",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "internal-overload-ref@1.0.0::ImportedShape"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "internal-overload-ref@1.0.0::IMPORTED_TOKEN.value",
+      "name": "IMPORTED_TOKEN.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "internal-overload-ref",
+      "filePath": "imported-entry.d.ts",
+      "signature": "value: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
       "id": "internal-overload-ref@1.0.0::ENTRY",
       "name": "ENTRY",
       "kind": 244,
@@ -117,162 +273,6 @@
         "export",
         "declare"
       ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::GLOBAL_FROM_REF",
-      "name": "GLOBAL_FROM_REF",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "ref.d.ts",
-      "signature": "declare const GLOBAL_FROM_REF: \"global-via-module-ref\"",
-      "jsDoc": "Module file augments global scope; entries see this without importing ref.d.ts.",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::AMBIENT_PICK",
-      "name": "AMBIENT_PICK",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "ambient-ref.d.ts",
-      "signature": "declare const AMBIENT_PICK: \"ambient\"",
-      "jsDoc": "Script-style declarations only: no top-level import/export so names are ambient globals.",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "declare"
-      ],
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::EXTRA_ENTRY",
-      "name": "EXTRA_ENTRY",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "extra-entry.d.ts",
-      "signature": "declare const EXTRA_ENTRY: 3",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::usesGlobalFromRefExtra",
-      "name": "usesGlobalFromRefExtra",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "extra-entry.d.ts",
-      "signature": "declare const usesGlobalFromRefExtra: typeof GLOBAL_FROM_REF",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [
-        "internal-overload-ref@1.0.0::GLOBAL_FROM_REF"
-      ],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::usesAmbientPickFromExtra",
-      "name": "usesAmbientPickFromExtra",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "extra-entry.d.ts",
-      "signature": "declare const usesAmbientPickFromExtra: typeof AMBIENT_PICK",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [
-        "internal-overload-ref@1.0.0::AMBIENT_PICK"
-      ],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::ImportedShape",
-      "name": "ImportedShape",
-      "kind": 265,
-      "kindName": "InterfaceDeclaration",
-      "package": "internal-overload-ref",
-      "filePath": "imported-entry.d.ts",
-      "signature": "export interface ImportedShape {\n  value: string;\n}",
-      "isTypeOnly": true,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::ImportedShape.value",
-      "name": "ImportedShape.value",
-      "kind": 172,
-      "kindName": "PropertySignature",
-      "package": "internal-overload-ref",
-      "filePath": "imported-entry.d.ts",
-      "signature": "value: string;",
-      "isTypeOnly": false,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::IMPORTED_TOKEN",
-      "name": "IMPORTED_TOKEN",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "internal-overload-ref",
-      "filePath": "imported-entry.d.ts",
-      "signature": "declare const IMPORTED_TOKEN: ImportedShape",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [
-        "internal-overload-ref@1.0.0::ImportedShape"
-      ],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "internal-overload-ref@1.0.0::IMPORTED_TOKEN.value",
-      "name": "IMPORTED_TOKEN.value",
-      "kind": 172,
-      "kindName": "PropertySignature",
-      "package": "internal-overload-ref",
-      "filePath": "imported-entry.d.ts",
-      "signature": "value: string;",
-      "isTypeOnly": false,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false
     },
     {
       "id": "internal-overload-ref@1.0.0::index.d.ts::noExportKeyword",

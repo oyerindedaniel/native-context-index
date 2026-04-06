@@ -3,6 +3,151 @@
   "version": "1.0.0",
   "symbols": [
     {
+      "id": "module-global-augmentation-ref@1.0.0::EXTRA_ENTRY",
+      "name": "EXTRA_ENTRY",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "module-global-augmentation-ref",
+      "filePath": "extra-entry.d.ts",
+      "signature": "declare const EXTRA_ENTRY: 2",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::usesPickFromExtra",
+      "name": "usesPickFromExtra",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "module-global-augmentation-ref",
+      "filePath": "extra-entry.d.ts",
+      "signature": "declare const usesPickFromExtra: typeof PICK_TYPE",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "module-global-augmentation-ref@1.0.0::PICK_TYPE"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::PICK_TYPE",
+      "name": "PICK_TYPE",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "declare const PICK_TYPE: \"pick\"",
+      "jsDoc": "Global pick marker visible via triple-slash from module files.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType",
+      "name": "MyGlobalType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "interface MyGlobalType {\n    id: string;\n    value: number;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.id",
+      "name": "MyGlobalType.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.value",
+      "name": "MyGlobalType.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "value: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::MyNamespace",
+      "name": "MyNamespace",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "namespace MyNamespace {\n    const VERSION: string;\n  }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "module-global-augmentation-ref@1.0.0::MyNamespace.VERSION",
+      "name": "MyNamespace.VERSION",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "module-global-augmentation-ref",
+      "filePath": "global-types.d.ts",
+      "signature": "declare const VERSION: string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ]
+    },
+    {
       "id": "module-global-augmentation-ref@1.0.0::ENTRY",
       "name": "ENTRY",
       "kind": 244,
@@ -50,151 +195,6 @@
       "symbolSpace": "value",
       "dependencies": [
         "module-global-augmentation-ref@1.0.0::MyGlobalType"
-      ],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::PICK_TYPE",
-      "name": "PICK_TYPE",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "declare const PICK_TYPE: \"pick\"",
-      "jsDoc": "Global pick marker visible via triple-slash from module files.",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType",
-      "name": "MyGlobalType",
-      "kind": 265,
-      "kindName": "InterfaceDeclaration",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "interface MyGlobalType {\n    id: string;\n    value: number;\n  }",
-      "isTypeOnly": true,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.id",
-      "name": "MyGlobalType.id",
-      "kind": 172,
-      "kindName": "PropertySignature",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "id: string;",
-      "isTypeOnly": false,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.value",
-      "name": "MyGlobalType.value",
-      "kind": 172,
-      "kindName": "PropertySignature",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "value: number;",
-      "isTypeOnly": false,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::MyNamespace",
-      "name": "MyNamespace",
-      "kind": 268,
-      "kindName": "ModuleDeclaration",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "namespace MyNamespace {\n    const VERSION: string;\n  }",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::MyNamespace.VERSION",
-      "name": "MyNamespace.VERSION",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "module-global-augmentation-ref",
-      "filePath": "global-types.d.ts",
-      "signature": "declare const VERSION: string",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "isGlobalAugmentation": true,
-      "entryVisibility": [
-        "index.d.ts",
-        "extra-entry.d.ts"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::EXTRA_ENTRY",
-      "name": "EXTRA_ENTRY",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "module-global-augmentation-ref",
-      "filePath": "extra-entry.d.ts",
-      "signature": "declare const EXTRA_ENTRY: 2",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "module-global-augmentation-ref@1.0.0::usesPickFromExtra",
-      "name": "usesPickFromExtra",
-      "kind": 244,
-      "kindName": "VariableStatement",
-      "package": "module-global-augmentation-ref",
-      "filePath": "extra-entry.d.ts",
-      "signature": "declare const usesPickFromExtra: typeof PICK_TYPE",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [
-        "module-global-augmentation-ref@1.0.0::PICK_TYPE"
       ],
       "isInternal": false,
       "modifiers": [

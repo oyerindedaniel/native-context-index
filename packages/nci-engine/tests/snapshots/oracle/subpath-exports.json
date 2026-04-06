@@ -64,56 +64,6 @@
       ]
     },
     {
-      "id": "subpath-exports@1.0.0::formatDate",
-      "name": "formatDate",
-      "kind": 263,
-      "kindName": "FunctionDeclaration",
-      "package": "subpath-exports",
-      "filePath": "dist/utils.d.ts",
-      "signature": "export declare function formatDate(d: Date): string;",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "subpath-exports@1.0.0::parseQuery",
-      "name": "parseQuery",
-      "kind": 263,
-      "kindName": "FunctionDeclaration",
-      "package": "subpath-exports",
-      "filePath": "dist/utils.d.ts",
-      "signature": "export declare function parseQuery(q: string): Record<string, string>;",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export",
-        "declare"
-      ]
-    },
-    {
-      "id": "subpath-exports@1.0.0::QueryParams",
-      "name": "QueryParams",
-      "kind": 266,
-      "kindName": "TypeAliasDeclaration",
-      "package": "subpath-exports",
-      "filePath": "dist/utils.d.ts",
-      "signature": "export type QueryParams = Record<string, string>;",
-      "isTypeOnly": true,
-      "symbolSpace": "type",
-      "dependencies": [],
-      "isInternal": false,
-      "modifiers": [
-        "export"
-      ]
-    },
-    {
       "id": "subpath-exports@1.0.0::createServer",
       "name": "createServer",
       "kind": 263,
@@ -173,6 +123,56 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false
+    },
+    {
+      "id": "subpath-exports@1.0.0::formatDate",
+      "name": "formatDate",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export declare function formatDate(d: Date): string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::parseQuery",
+      "name": "parseQuery",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export declare function parseQuery(q: string): Record<string, string>;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "subpath-exports@1.0.0::QueryParams",
+      "name": "QueryParams",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "subpath-exports",
+      "filePath": "dist/utils.d.ts",
+      "signature": "export type QueryParams = Record<string, string>;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
     }
   ],
   "totalSymbols": 11,
