@@ -1,7 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Dependencies
-node_modules
+# Dependencies (ignore workspace installs; tracked fixture vendor trees under packages/nci-core/fixtures)
+node_modules/
+!packages/nci-core/fixtures/**/node_modules/
+!packages/nci-core/fixtures/**/node_modules/**/*
 .pnp
 .pnp.js
 
@@ -24,9 +26,11 @@ coverage
 # Build Outputs
 .next/
 out/
-build
-dist
-
+# Only root + direct packages/*/ (keeps packages/nci-core/fixtures/**/dist/ committable for tests)
+/build/
+/packages/*/build/
+/dist/
+/packages/*/dist/
 
 # Debug
 npm-debug.log*
