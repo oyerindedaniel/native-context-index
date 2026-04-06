@@ -5,8 +5,8 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 use dashmap::DashMap;
-use regex::Regex;
 use rayon::prelude::*;
+use regex::Regex;
 
 static PROTOCOL_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([a-z]+):(.*)$").unwrap());
 
@@ -122,11 +122,16 @@ fn resolve_dependency_ids_for_symbol(
     has_ref_edges: bool,
     protocol_regex: &Regex,
 ) -> Vec<SharedString> {
-    let abs_lookup = dash_norm_abs(normalized_abs_cache, &symbol_node.file_path, package_dir_str);
+    let abs_lookup = dash_norm_abs(
+        normalized_abs_cache,
+        &symbol_node.file_path,
+        package_dir_str,
+    );
     let abs_lookup_str: &str = abs_lookup.as_ref();
 
     let dep_count = symbol_node.raw_dependencies.len();
-    let mut resolved_ids: HashSet<SharedString> = HashSet::with_capacity(dep_count.saturating_mul(2));
+    let mut resolved_ids: HashSet<SharedString> =
+        HashSet::with_capacity(dep_count.saturating_mul(2));
     let mut target_ids: Vec<SharedString> = Vec::with_capacity(8);
     let mut namespace_fallback_roots: Vec<SharedString> = Vec::with_capacity(4);
 
@@ -144,10 +149,8 @@ fn resolve_dependency_ids_for_symbol(
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
             let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
             if !abs_paths.is_empty() {
-                let rel_path =
-                    make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir);
-                let key: SharedString =
-                    format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
+                let rel_path = make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir);
+                let key: SharedString = format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
                 if let Some(ids) = file_local_to_ids.get(&key) {
                     target_ids.extend(ids.iter().cloned());
                 }
@@ -165,74 +168,65 @@ fn resolve_dependency_ids_for_symbol(
                 target_ids.extend(ids.iter().cloned());
             }
 
-            if target_ids.is_empty() {
-                if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
-                    if let Some(matching_import) = file_imports
-                        .iter()
-                        .find(|import_entry| import_entry.name == raw_dep.name)
-                    {
-                        let source_cache_key = (
-                            symbol_node.file_path.clone(),
-                            matching_import.source.clone(),
-                        );
-                        let abs_source_paths =
-                            dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
-                        if !abs_source_paths.is_empty() {
-                            let rel_source_path = make_relative(
-                                &abs_source_paths[0],
-                                package_dir_str,
-                                normalized_pkg_dir,
-                            );
-                            let original_name = matching_import
-                                .original_name
-                                .as_deref()
-                                .unwrap_or(&matching_import.name);
-                            let import_key: SharedString =
-                                format!("{}::{}", rel_source_path, original_name).into();
-                            if let Some(ids) = file_local_to_ids.get(&import_key) {
-                                target_ids.extend(ids.iter().cloned());
-                            }
-                        }
+            if target_ids.is_empty()
+                && let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref())
+                && let Some(matching_import) = file_imports
+                    .iter()
+                    .find(|import_entry| import_entry.name == raw_dep.name)
+            {
+                let source_cache_key = (
+                    symbol_node.file_path.clone(),
+                    matching_import.source.clone(),
+                );
+                let abs_source_paths =
+                    dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
+                if !abs_source_paths.is_empty() {
+                    let rel_source_path =
+                        make_relative(&abs_source_paths[0], package_dir_str, normalized_pkg_dir);
+                    let original_name = matching_import
+                        .original_name
+                        .as_deref()
+                        .unwrap_or(&matching_import.name);
+                    let import_key: SharedString =
+                        format!("{}::{}", rel_source_path, original_name).into();
+                    if let Some(ids) = file_local_to_ids.get(&import_key) {
+                        target_ids.extend(ids.iter().cloned());
                     }
                 }
             }
 
-            if target_ids.is_empty() {
-                if let (Some(file_imports), Some((qualifier, member_path))) = (
+            if target_ids.is_empty()
+                && let (Some(file_imports), Some((qualifier, member_path))) = (
                     all_imports_per_file.get(abs_lookup.as_ref()),
                     namespace_qual,
-                ) {
-                    if let Some(ns_import) = file_imports
-                        .iter()
-                        .find(|import_entry| import_entry.name.as_ref() == qualifier)
-                    {
-                        let ns_cache_key =
-                            (symbol_node.file_path.clone(), ns_import.source.clone());
-                        let abs_source_paths =
-                            dash_module_paths(module_specifier_cache, ns_cache_key, abs_lookup_str);
-                        namespace_target_files_resolved = !abs_source_paths.is_empty();
-                        namespace_fallback_roots.clear();
-                        for absolute_source_path in &abs_source_paths {
-                            let rel_source_path = make_relative(
-                                absolute_source_path.as_ref(),
-                                package_dir_str,
-                                normalized_pkg_dir,
-                            );
-                            namespace_fallback_roots
-                                .push(rel_parent_dir(rel_source_path.as_ref()));
-                        }
-                        for absolute_source_path in &abs_source_paths {
-                            let rel_source_path = make_relative(
-                                absolute_source_path.as_ref(),
-                                package_dir_str,
-                                normalized_pkg_dir,
-                            );
-                            let import_key: SharedString =
-                                format!("{}::{}", rel_source_path, member_path).into();
-                            if let Some(ids) = file_local_to_ids.get(&import_key) {
-                                target_ids.extend(ids.iter().cloned());
-                            }
-                        }
+                )
+                && let Some(ns_import) = file_imports
+                    .iter()
+                    .find(|import_entry| import_entry.name.as_ref() == qualifier)
+            {
+                let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
+                let abs_source_paths =
+                    dash_module_paths(module_specifier_cache, ns_cache_key, abs_lookup_str);
+                namespace_target_files_resolved = !abs_source_paths.is_empty();
+                namespace_fallback_roots.clear();
+                for absolute_source_path in &abs_source_paths {
+                    let rel_source_path = make_relative(
+                        absolute_source_path.as_ref(),
+                        package_dir_str,
+                        normalized_pkg_dir,
+                    );
+                    namespace_fallback_roots.push(rel_parent_dir(rel_source_path.as_ref()));
+                }
+                for absolute_source_path in &abs_source_paths {
+                    let rel_source_path = make_relative(
+                        absolute_source_path.as_ref(),
+                        package_dir_str,
+                        normalized_pkg_dir,
+                    );
+                    let import_key: SharedString =
+                        format!("{}::{}", rel_source_path, member_path).into();
+                    if let Some(ids) = file_local_to_ids.get(&import_key) {
+                        target_ids.extend(ids.iter().cloned());
                     }
                 }
             }
@@ -246,11 +240,8 @@ fn resolve_dependency_ids_for_symbol(
                 );
                 let mut from_closure: HashSet<SharedString> = HashSet::new();
                 for reachable_abs in closure {
-                    let relative_file_path = make_relative(
-                        reachable_abs.as_ref(),
-                        package_dir_str,
-                        normalized_pkg_dir,
-                    );
+                    let relative_file_path =
+                        make_relative(reachable_abs.as_ref(), package_dir_str, normalized_pkg_dir);
                     if relative_file_path == symbol_node.file_path.as_ref() {
                         continue;
                     }
@@ -274,37 +265,35 @@ fn resolve_dependency_ids_for_symbol(
                 target_ids.extend(from_closure.into_iter());
             }
 
-            if target_ids.is_empty() {
-                if let Some(ids) = name_to_ids.get(&raw_dep.name) {
-                    target_ids.extend(ids.iter().cloned());
-                }
+            if target_ids.is_empty()
+                && let Some(ids) = name_to_ids.get(&raw_dep.name)
+            {
+                target_ids.extend(ids.iter().cloned());
             }
-            if target_ids.is_empty() && namespace_target_files_resolved {
-                if let Some((_, member_path)) = namespace_qual {
-                    let member_key: SharedString = SharedString::from(member_path);
-                    if let Some(ids) = name_to_ids.get(&member_key) {
-                        let skip_namespace_root_filter = namespace_fallback_roots.is_empty()
-                            || namespace_fallback_roots.iter().any(|root_path| {
-                                root_path.as_ref() == "." || root_path.as_ref().is_empty()
-                            });
-                        if skip_namespace_root_filter {
-                            target_ids.extend(ids.iter().cloned());
-                        } else {
-                            let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
-                                .iter()
-                                .map(|root_path| root_path.as_ref())
-                                .collect();
-                            for symbol_id in ids {
-                                if let Some(stored_path) = id_to_file_path.get(symbol_id) {
-                                    let defining_path = stored_path.as_ref();
-                                    if distinct_namespace_roots.iter().any(|&namespace_root| {
-                                        file_path_under_namespace_root(
-                                            defining_path,
-                                            namespace_root,
-                                        )
-                                    }) {
-                                        target_ids.push(symbol_id.clone());
-                                    }
+            if target_ids.is_empty()
+                && namespace_target_files_resolved
+                && let Some((_, member_path)) = namespace_qual
+            {
+                let member_key: SharedString = SharedString::from(member_path);
+                if let Some(ids) = name_to_ids.get(&member_key) {
+                    let skip_namespace_root_filter = namespace_fallback_roots.is_empty()
+                        || namespace_fallback_roots.iter().any(|root_path| {
+                            root_path.as_ref() == "." || root_path.as_ref().is_empty()
+                        });
+                    if skip_namespace_root_filter {
+                        target_ids.extend(ids.iter().cloned());
+                    } else {
+                        let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
+                            .iter()
+                            .map(|root_path| root_path.as_ref())
+                            .collect();
+                        for symbol_id in ids {
+                            if let Some(stored_path) = id_to_file_path.get(symbol_id) {
+                                let defining_path = stored_path.as_ref();
+                                if distinct_namespace_roots.iter().any(|&namespace_root| {
+                                    file_path_under_namespace_root(defining_path, namespace_root)
+                                }) {
+                                    target_ids.push(symbol_id.clone());
                                 }
                             }
                         }
@@ -355,19 +344,17 @@ fn resolve_dependency_ids_for_symbol(
                         resolved_ids.insert(stub.into());
                     }
                 }
-                if let Some((qualifier, member_path)) = namespace_qual {
-                    if let Some(ns_import) = file_imports
+                if let Some((qualifier, member_path)) = namespace_qual
+                    && let Some(ns_import) = file_imports
                         .iter()
                         .find(|import_entry| import_entry.name.as_ref() == qualifier)
-                    {
-                        if let Some(stub) = try_external_module_stub_id(
-                            ns_import.source.as_ref(),
-                            member_path,
-                            protocol_regex,
-                        ) {
-                            resolved_ids.insert(stub.into());
-                        }
-                    }
+                    && let Some(stub) = try_external_module_stub_id(
+                        ns_import.source.as_ref(),
+                        member_path,
+                        protocol_regex,
+                    )
+                {
+                    resolved_ids.insert(stub.into());
                 }
             }
         }
@@ -535,7 +522,7 @@ pub fn build_package_graph(
             });
 
             let re_exported_from = match &re_export_source {
-                Some(source) if &*source != &*symbol_file_path => Some(source.clone()),
+                Some(source) if source != &*symbol_file_path => Some(source.clone()),
                 _ => None,
             };
 
@@ -808,11 +795,7 @@ fn resolve_external_dep_id(source: &str, name: &str, protocol_regex: &Regex) -> 
             .get(2)
             .map(|match_val| {
                 let raw = match_val.as_str();
-                if raw.starts_with("//") {
-                    &raw[2..]
-                } else {
-                    raw
-                }
+                raw.strip_prefix("//").unwrap_or(raw)
             })
             .unwrap_or("unknown")
             .to_string();
@@ -858,7 +841,7 @@ fn parent_name_for_dotted_member(name: &str) -> Option<String> {
     }
     if name.contains(".prototype.") {
         let segments: Vec<&str> = name.split('.').collect();
-        if segments.iter().any(|segment| *segment == "prototype") {
+        if segments.contains(&"prototype") {
             let prototype_index = segments
                 .iter()
                 .position(|segment| *segment == "prototype")?;
@@ -993,9 +976,7 @@ fn flatten_inherited_members(
                     Entry::Occupied(mut occupied) => {
                         let synth = occupied.get_mut();
                         let parent_source_id = parent_member.id.clone();
-                        if !synth.inherited_from_sources.iter().any(|prior_source_id| {
-                            *prior_source_id == parent_source_id
-                        }) {
+                        if !synth.inherited_from_sources.contains(&parent_source_id) {
                             let mut combined: Vec<SharedString> =
                                 synth.inherited_from_sources.iter().cloned().collect();
                             combined.push(parent_source_id);
@@ -1033,18 +1014,16 @@ fn flatten_inherited_members(
 fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str) -> String {
     let normalized = abs_path.replace('\\', "/");
 
-    if normalized.starts_with(normalized_package_dir) {
-        let rest = &normalized[normalized_package_dir.len()..];
-        if rest.starts_with('/') {
-            return rest[1..].to_string();
+    if let Some(rest) = normalized.strip_prefix(normalized_package_dir) {
+        if let Some(no_slash) = rest.strip_prefix('/') {
+            return no_slash.to_string();
         }
         return rest.to_string();
     }
 
-    let rel = pathdiff::diff_paths(abs_path, package_dir)
+    pathdiff::diff_paths(abs_path, package_dir)
         .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|| normalized);
-    rel
+        .unwrap_or_else(|| normalized)
 }
 
 #[cfg(test)]
@@ -1264,8 +1243,16 @@ mod tests {
             .iter()
             .map(|symbol_id| symbol_id.as_ref())
             .collect();
-        assert_eq!(sources.len(), 2, "Composite.shared should list both parent defs");
+        assert_eq!(
+            sources.len(),
+            2,
+            "Composite.shared should list both parent defs"
+        );
         assert!(sources.iter().any(|id| id.contains("Trait.shared")));
-        assert!(sources.iter().any(|id| id.contains("Base.prototype.shared")));
+        assert!(
+            sources
+                .iter()
+                .any(|id| id.contains("Base.prototype.shared"))
+        );
     }
 }

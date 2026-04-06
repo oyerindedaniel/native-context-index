@@ -1,0 +1,4 @@
+# Bump when upgrading; then run `cargo fmt --all` and `cargo clippy -p nci-engine --all-targets -- -D warnings`.
+[toolchain]
+channel = "1.94.1"
+components = ["rustfmt", "clippy"]

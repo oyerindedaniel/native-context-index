@@ -541,6 +541,18 @@ pub struct SymbolNode {
     pub raw_dependencies: Vec<TypeReference>,
 }
 
+/// Row-level index stats for a package when the SQLite cache matches but
+/// a full [`PackageGraph`] is not loaded (see [`crate::pipeline::IndexOptions::hydrate_cache_hits`]).
+#[derive(Debug, Clone)]
+pub struct PackageIndexMetadata {
+    pub package: SharedString,
+    pub version: SharedString,
+    pub total_symbols: usize,
+    pub total_files: usize,
+    pub crawl_duration_ms: f64,
+    pub build_duration_ms: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackageGraph {

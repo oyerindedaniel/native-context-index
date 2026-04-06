@@ -133,13 +133,13 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
             }
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
-                    if let BindingPattern::BindingIdentifier(ident) = &decl.id {
-                        if let Some(anno) = &decl.type_annotation {
-                            local_decls.insert(
-                                ident.name.as_ref().into(),
-                                LocalDecl::Type(&anno.type_annotation),
-                            );
-                        }
+                    if let BindingPattern::BindingIdentifier(ident) = &decl.id
+                        && let Some(anno) = &decl.type_annotation
+                    {
+                        local_decls.insert(
+                            ident.name.as_ref().into(),
+                            LocalDecl::Type(&anno.type_annotation),
+                        );
                     }
                 }
             }
@@ -166,13 +166,13 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                         }
                         Declaration::VariableDeclaration(var_decl) => {
                             for decl in &var_decl.declarations {
-                                if let BindingPattern::BindingIdentifier(ident) = &decl.id {
-                                    if let Some(anno) = &decl.type_annotation {
-                                        local_decls.insert(
-                                            ident.name.as_ref().into(),
-                                            LocalDecl::Type(&anno.type_annotation),
-                                        );
-                                    }
+                                if let BindingPattern::BindingIdentifier(ident) = &decl.id
+                                    && let Some(anno) = &decl.type_annotation
+                                {
+                                    local_decls.insert(
+                                        ident.name.as_ref().into(),
+                                        LocalDecl::Type(&anno.type_annotation),
+                                    );
                                 }
                             }
                         }
@@ -340,13 +340,13 @@ fn extend_local_decl_map_from_body<'a>(
             }
             Statement::VariableDeclaration(var_decl) => {
                 for decl in &var_decl.declarations {
-                    if let BindingPattern::BindingIdentifier(ident) = &decl.id {
-                        if let Some(anno) = &decl.type_annotation {
-                            out.insert(
-                                ident.name.as_ref().into(),
-                                LocalDecl::Type(&anno.type_annotation),
-                            );
-                        }
+                    if let BindingPattern::BindingIdentifier(ident) = &decl.id
+                        && let Some(anno) = &decl.type_annotation
+                    {
+                        out.insert(
+                            ident.name.as_ref().into(),
+                            LocalDecl::Type(&anno.type_annotation),
+                        );
                     }
                 }
             }
@@ -372,13 +372,13 @@ fn extend_local_decl_map_from_body<'a>(
                         }
                         Declaration::VariableDeclaration(var_decl) => {
                             for decl in &var_decl.declarations {
-                                if let BindingPattern::BindingIdentifier(ident) = &decl.id {
-                                    if let Some(anno) = &decl.type_annotation {
-                                        out.insert(
-                                            ident.name.as_ref().into(),
-                                            LocalDecl::Type(&anno.type_annotation),
-                                        );
-                                    }
+                                if let BindingPattern::BindingIdentifier(ident) = &decl.id
+                                    && let Some(anno) = &decl.type_annotation
+                                {
+                                    out.insert(
+                                        ident.name.as_ref().into(),
+                                        LocalDecl::Type(&anno.type_annotation),
+                                    );
                                 }
                             }
                         }
@@ -439,10 +439,10 @@ fn extract_triple_slash_directives(source_text: &str) -> (Vec<SharedString>, Vec
             if let Some(path) = caps.get(1) {
                 references.push(SharedString::from(path.as_str()));
             }
-        } else if let Some(caps) = types_regex.captures(trimmed) {
-            if let Some(types) = caps.get(1) {
-                type_references.push(SharedString::from(types.as_str()));
-            }
+        } else if let Some(caps) = types_regex.captures(trimmed)
+            && let Some(types) = caps.get(1)
+        {
+            type_references.push(SharedString::from(types.as_str()));
         }
     }
 
@@ -615,17 +615,10 @@ fn extract_export_default<'a>(
             SharedString::from(iface_decl.id.name.as_ref())
         }
 
-        kind if kind.is_expression() => {
-            if let Some(expr) = kind.as_expression() {
-                if let Expression::Identifier(ident) = expr {
-                    SharedString::from(ident.name.as_ref())
-                } else {
-                    SharedString::from("default")
-                }
-            } else {
-                SharedString::from("default")
-            }
-        }
+        kind if kind.is_expression() => match kind.as_expression() {
+            Some(Expression::Identifier(ident)) => SharedString::from(ident.name.as_ref()),
+            _ => SharedString::from("default"),
+        },
 
         _ => SharedString::from("default"),
     };
@@ -861,6 +854,7 @@ fn merge_nested_dependencies_into_namespace(
     ns.dependencies = merged.into();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn extract_module_declaration<'a>(
     module_decl: &TSModuleDeclaration<'a>,
     source_text: &str,
@@ -1060,26 +1054,26 @@ fn extract_module_body<'a>(
                 // Inside namespace blocks, exported declarations appear as
                 // ExportNamedDeclaration wrapping the actual declaration.
                 // Handle these explicitly before falling through to extract_direct_statement.
-                if let Statement::ExportNamedDeclaration(export_named) = statement {
-                    if let Some(declaration) = &export_named.declaration {
-                        let mut decl_exports = extract_declaration(
-                            declaration,
-                            source_text,
-                            current_file,
-                            true,
-                            export_named.span,
-                            local_decls,
-                        );
-                        for export_item in &mut decl_exports {
-                            if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
-                                export_item.name = SharedString::from(
-                                    format!("{}.{}", parent_name, export_item.name).as_ref(),
-                                );
-                            }
+                if let Statement::ExportNamedDeclaration(export_named) = statement
+                    && let Some(declaration) = &export_named.declaration
+                {
+                    let mut decl_exports = extract_declaration(
+                        declaration,
+                        source_text,
+                        current_file,
+                        true,
+                        export_named.span,
+                        local_decls,
+                    );
+                    for export_item in &mut decl_exports {
+                        if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
+                            export_item.name = SharedString::from(
+                                format!("{}.{}", parent_name, export_item.name).as_ref(),
+                            );
                         }
-                        exports.extend(decl_exports);
-                        continue;
                     }
+                    exports.extend(decl_exports);
+                    continue;
                 }
 
                 let is_exported = statement_has_export_keyword(statement);
@@ -1603,6 +1597,7 @@ fn statement_to_declaration<'a>(statement: &'a Statement<'a>) -> Option<&'a Decl
 }
 
 /// Extracts instance and static members from a class declaration.
+#[allow(clippy::too_many_arguments)]
 fn extract_class_members<'a>(
     class_decl: &Class<'a>,
     source_text: &str,
@@ -1724,6 +1719,7 @@ fn extract_class_members<'a>(
 /// Used when resolving `typeof ClassName` or type references to classes through
 /// the local declaration registry. Here instance members flatten as `Parent.member`
 /// (not `Parent.prototype.member`) so `typeof`-driven expansion stays type-shaped.
+#[allow(clippy::too_many_arguments)]
 fn extract_class_body_as_type_members<'a>(
     class_decl: &Class<'a>,
     source_text: &str,
@@ -1847,27 +1843,28 @@ fn extract_class_body_as_type_members<'a>(
         });
 
         // Recursively extract nested type members from property type annotations
-        if let ClassElement::PropertyDefinition(prop_def) = member {
-            if let Some(anno) = &prop_def.type_annotation {
-                extract_complex_type_members(
-                    &anno.type_annotation,
-                    source_text,
-                    current_file,
-                    qualified_name.as_ref(),
-                    is_explicit_export,
-                    &member_jsdoc,
-                    results,
-                    local_decls,
-                    visited,
-                    depth + 1,
-                    definition_site.clone(),
-                );
-            }
+        if let ClassElement::PropertyDefinition(prop_def) = member
+            && let Some(anno) = &prop_def.type_annotation
+        {
+            extract_complex_type_members(
+                &anno.type_annotation,
+                source_text,
+                current_file,
+                qualified_name.as_ref(),
+                is_explicit_export,
+                &member_jsdoc,
+                results,
+                local_decls,
+                visited,
+                depth + 1,
+                definition_site.clone(),
+            );
         }
     }
 }
 
 /// Extracts property and method signatures from an interface declaration.
+#[allow(clippy::too_many_arguments)]
 fn extract_interface_members<'a>(
     iface_decl: &TSInterfaceDeclaration<'a>,
     source_text: &str,
@@ -1957,22 +1954,22 @@ fn extract_interface_members<'a>(
         // Recursively extract nested type members from property type annotations.
         // When a property has a type annotation (e.g., `config: Config`),
         // resolve it through the local declaration registry to flatten members.
-        if let TSSignature::TSPropertySignature(prop_sig) = member {
-            if let Some(anno) = &prop_sig.type_annotation {
-                extract_complex_type_members(
-                    &anno.type_annotation,
-                    source_text,
-                    current_file,
-                    qualified_name.as_ref(),
-                    is_explicit_export,
-                    &member_jsdoc,
-                    results,
-                    local_decls,
-                    &mut HashSet::new(),
-                    0,
-                    None,
-                );
-            }
+        if let TSSignature::TSPropertySignature(prop_sig) = member
+            && let Some(anno) = &prop_sig.type_annotation
+        {
+            extract_complex_type_members(
+                &anno.type_annotation,
+                source_text,
+                current_file,
+                qualified_name.as_ref(),
+                is_explicit_export,
+                &member_jsdoc,
+                results,
+                local_decls,
+                &mut HashSet::new(),
+                0,
+                None,
+            );
         }
     }
 }
@@ -1989,6 +1986,7 @@ fn import_type_qualifier_segments<'a>(qualifier: &'a TSImportTypeQualifier<'a>) 
 }
 
 /// `import('./m').X` / `typeof import('./m').X` — resolve the module and flatten the exported type/class.
+#[allow(clippy::too_many_arguments)]
 fn expand_ts_import_type_members<'a>(
     import_type: &TSImportType<'a>,
     _source_file_text: &str,
@@ -2092,6 +2090,7 @@ fn expand_ts_import_type_members<'a>(
 /// Walks type shapes rooted at a value’s annotation: object literals, intersections, `typeof`,
 /// imports, and local type aliases—mirroring how nested properties are flattened onto the parent
 /// symbol path (`x.version`, intersection members, `prototype` expansion, etc.).
+#[allow(clippy::too_many_arguments)]
 fn extract_complex_type_members<'a>(
     ts_type: &TSType<'a>,
     source_text: &str,
@@ -2306,6 +2305,7 @@ fn extract_complex_type_members<'a>(
 }
 
 /// Extracts PropertySignature/MethodSignature members from a TSTypeLiteral's members list.
+#[allow(clippy::too_many_arguments)]
 fn extract_type_literal_members<'a>(
     members: &[TSSignature<'a>],
     source_text: &str,
@@ -2484,16 +2484,16 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
                 collect_type_refs(param, &mut refs);
             }
         }
-        if let Some(name) = expression_to_string(super_class) {
-            if !BUILTIN_TYPES.contains(name.as_ref()) {
-                refs.insert(
-                    name.clone(),
-                    TypeReference {
-                        name,
-                        import_path: None,
-                    },
-                );
-            }
+        if let Some(name) = expression_to_string(super_class)
+            && !BUILTIN_TYPES.contains(name.as_ref())
+        {
+            refs.insert(
+                name.clone(),
+                TypeReference {
+                    name,
+                    import_path: None,
+                },
+            );
         }
     }
 

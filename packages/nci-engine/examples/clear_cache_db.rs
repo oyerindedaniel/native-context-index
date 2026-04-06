@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
     };
 
     let mut paths_to_remove: Vec<PathBuf> = vec![database_path.clone()];
-    paths_to_remove.extend(sqlite_wal_sidecars(&database_path).into_iter());
+    paths_to_remove.extend(sqlite_wal_sidecars(&database_path));
 
     let mut removed_any = false;
     for path in &paths_to_remove {

@@ -12,7 +12,7 @@ use crate::graph::build_package_graph;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
 use crate::storage::NciDatabase;
-use crate::types::{PackageGraph, PackageInfo};
+use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo};
 
 #[derive(Debug, Clone)]
 pub struct IndexOptions {
@@ -38,6 +38,11 @@ pub struct IndexOptions {
 
     /// Parallel symbol dependency resolution in graph build (see [`crate::crawler::CrawlOptions`]).
     pub parallel_resolve_deps: bool,
+
+    /// When the SQLite per-package cache hits, load the full [`PackageGraph`] from the database.
+    /// Default is **`false`**: only [`PackageIndexMetadata`] is read. Set **`true`**
+    /// for tooling that needs symbols in RAM on a cache hit (e.g. demo JSON export, tests).
+    pub hydrate_cache_hits: bool,
 }
 
 impl Default for IndexOptions {
@@ -50,6 +55,7 @@ impl Default for IndexOptions {
             project_root: None,
             filter: FilterConfig::default(),
             parallel_resolve_deps: true,
+            hydrate_cache_hits: false,
         }
     }
 }
@@ -107,8 +113,9 @@ pub enum GraphSource {
 /// A graph together with its source (cache hit vs fresh crawl).
 #[derive(Debug)]
 pub struct IndexedGraph {
-    pub graph: PackageGraph,
+    pub graph: Option<PackageGraph>,
     pub source: GraphSource,
+    pub cache_metadata: Option<PackageIndexMetadata>,
 }
 
 /// Builds a graph for each discovered package, optionally in parallel (Rayon).
@@ -159,56 +166,71 @@ pub fn index_packages(
     };
 
     let build_one = |package: &PackageInfo| -> IndexedGraph {
-        if let Some(database_mutex) = database_arc.as_ref() {
-            if !cache::package_dir_is_symlink(package) {
-                let database_guard = database_mutex
-                    .lock()
-                    .expect("sqlite storage mutex poisoned");
-                if database_guard.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
+        if let Some(database_mutex) = database_arc.as_ref()
+            && !cache::package_dir_is_symlink(package)
+        {
+            let database_guard = database_mutex
+                .lock()
+                .expect("sqlite storage mutex poisoned");
+            if database_guard.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
+                if index_opts.hydrate_cache_hits {
                     if let Some(cached_graph) = database_guard.load_package(package) {
                         trace!(
                             package = %package.name.as_ref(),
                             version = %package.version.as_ref(),
-                            "package cache hit"
+                            "package cache hit (hydrated)"
                         );
                         return IndexedGraph {
-                            graph: cached_graph,
+                            graph: Some(cached_graph),
                             source: GraphSource::Cached,
+                            cache_metadata: None,
                         };
                     }
+                } else if let Some(meta) = database_guard.load_package_index_metadata(package) {
                     trace!(
                         package = %package.name.as_ref(),
-                        "package cache miss (stale engine_version or load failed)"
+                        version = %package.version.as_ref(),
+                        "package cache hit (metadata only)"
                     );
-                } else {
-                    trace!(
-                        package = %package.name.as_ref(),
-                        "package cache miss (not in sqlite)"
-                    );
+                    return IndexedGraph {
+                        graph: None,
+                        source: GraphSource::Cached,
+                        cache_metadata: Some(meta),
+                    };
                 }
+                trace!(
+                    package = %package.name.as_ref(),
+                    "package cache miss (stale engine_version or load failed)"
+                );
+            } else {
+                trace!(
+                    package = %package.name.as_ref(),
+                    "package cache miss (not in sqlite)"
+                );
             }
         }
 
         let graph = build_package_graph(package, crawl_options_factory(package));
 
-        if let Some(database_mutex) = database_arc.as_ref() {
-            if !cache::package_dir_is_symlink(package) {
-                let mut database_guard = database_mutex
-                    .lock()
-                    .expect("sqlite storage mutex poisoned");
-                if let Err(save_error) = database_guard.save_package(package, &graph) {
-                    warn!(
-                        package = %package.name.as_ref(),
-                        error = %save_error,
-                        "save_package failed"
-                    );
-                }
+        if let Some(database_mutex) = database_arc.as_ref()
+            && !cache::package_dir_is_symlink(package)
+        {
+            let mut database_guard = database_mutex
+                .lock()
+                .expect("sqlite storage mutex poisoned");
+            if let Err(save_error) = database_guard.save_package(package, &graph) {
+                warn!(
+                    package = %package.name.as_ref(),
+                    error = %save_error,
+                    "save_package failed"
+                );
             }
         }
 
         IndexedGraph {
-            graph,
+            graph: Some(graph),
             source: GraphSource::Crawled,
+            cache_metadata: None,
         }
     };
 
@@ -325,10 +347,10 @@ mod tests {
         assert!(result.is_ok());
         let results = result.unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].graph.package, "my-lib".into());
+        let graph = results[0].graph.as_ref().expect("indexed graph");
+        assert_eq!(graph.package, "my-lib".into());
         assert!(
-            results[0]
-                .graph
+            graph
                 .symbols
                 .iter()
                 .any(|symbol| symbol.name == "VALUE".into())

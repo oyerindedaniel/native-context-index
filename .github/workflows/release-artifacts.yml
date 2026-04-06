@@ -1,0 +1,103 @@
+name: Release artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver (must match packages/nci-engine Cargo.toml); creates tag vVERSION"
+        required: true
+        type: string
+      dry_run:
+        description: "If true, build only — skip GitHub Release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: nci.exe
+            asset_name: nci-win32-x64.exe.gz
+          - host: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            bin: nci.exe
+            asset_name: nci-win32-arm64.exe.gz
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: nci
+            asset_name: nci-linux-x64.gz
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            bin: nci
+            asset_name: nci-linux-arm64.gz
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            bin: nci
+            asset_name: nci-darwin-arm64.gz
+          - host: macos-13
+            target: x86_64-apple-darwin
+            bin: nci
+            asset_name: nci-darwin-x64.gz
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Match version to Cargo.toml
+        shell: bash
+        run: |
+          v="$(sed -n 's/^version = "\(.*\)"$/\1/p' packages/nci-engine/Cargo.toml | head -n1)"
+          if [[ "${{ inputs.version }}" != "$v" ]]; then
+            echo "::error::workflow version '${{ inputs.version }}' != Cargo.toml version '$v'"
+            exit 1
+          fi
+      - name: build
+        run: cargo build --release -p nci-engine --bin nci --target ${{ matrix.target }}
+      - name: stage and gzip
+        shell: bash
+        run: |
+          mkdir -p staging upload
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "staging/${{ matrix.bin }}"
+          if [[ "${{ matrix.bin }}" == "nci" ]]; then
+            chmod +x "staging/${{ matrix.bin }}"
+          fi
+          gzip -c -n < "staging/${{ matrix.bin }}" > "upload/${{ matrix.asset_name }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: upload/${{ matrix.asset_name }}
+
+  release:
+    needs: [build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: "*.gz"
+          merge-multiple: true
+      - name: Flatten for upload
+        shell: bash
+        run: |
+          mkdir -p upload-here
+          find release-assets -type f -name '*.gz' -exec cp -t upload-here {} +
+          ls -la upload-here
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          files: upload-here/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

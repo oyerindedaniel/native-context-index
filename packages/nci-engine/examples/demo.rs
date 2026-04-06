@@ -3,7 +3,7 @@
 //! (concurrent per package unless `--sequential`).
 //!
 //! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (serialize package indexing),
-//! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (`NCI_PROFILE=1`),
+//! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (sets `NCI_PROFILE=1`; stderr lines only if built with `--features phase-profile`),
 //! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling),
 //! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing).
 //!
@@ -14,8 +14,8 @@
 //!
 //! - `NCI_LOG=1` enables stderr logging for `nci_engine` at `debug` (cache and sqlite).
 //! - Or set `RUST_LOG` (see `tracing-subscriber` env filter), e.g. `RUST_LOG=nci_engine=trace`.
-//! - Phase profiling: `NCI_PROFILE=1` or `--profile` on this
-//!   example prints crawl/graph substeps to stderr (`  [profile] label …ms`).
+//! - Phase profiling: build with `cargo run -p nci-engine --example demo --features phase-profile`, then
+//!   `NCI_PROFILE=1` or `--profile` prints crawl/graph substeps to stderr (`  [profile] label …ms`).
 //! - By default this example uses the per-package SQLite cache (`IndexOptions::enable_package_cache`).
 //!   Use `--no-package-cache` or `NCI_INDEX_NO_CACHE=1` to force a fresh crawl and skip the DB.
 //! - One-shot support bundle: `cargo run -p nci-engine --example diagnose`.
@@ -27,9 +27,50 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use nci_engine::pipeline::{
-    GraphSource, IndexOptions, dedupe_packages_by_canonical_dir, index_packages,
+    GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
 use nci_engine::scanner::scan_packages;
+use nci_engine::types::PackageGraph;
+
+struct IndexedSummary<'a> {
+    package: &'a str,
+    total_symbols: usize,
+    total_files: usize,
+    crawl_duration_ms: f64,
+    build_duration_ms: f64,
+}
+
+fn indexed_summary(result: &IndexedGraph) -> IndexedSummary<'_> {
+    if let Some(graph) = result.graph.as_ref() {
+        IndexedSummary {
+            package: graph.package.as_ref(),
+            total_symbols: graph.total_symbols,
+            total_files: graph.total_files,
+            crawl_duration_ms: graph.crawl_duration_ms,
+            build_duration_ms: graph.build_duration_ms,
+        }
+    } else if let Some(meta) = result.cache_metadata.as_ref() {
+        IndexedSummary {
+            package: meta.package.as_ref(),
+            total_symbols: meta.total_symbols,
+            total_files: meta.total_files,
+            crawl_duration_ms: meta.crawl_duration_ms,
+            build_duration_ms: meta.build_duration_ms,
+        }
+    } else {
+        IndexedSummary {
+            package: "?",
+            total_symbols: 0,
+            total_files: 0,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        }
+    }
+}
+
+fn crawled_graph_metric(result: &IndexedGraph, metric: impl FnOnce(&PackageGraph) -> f64) -> f64 {
+    result.graph.as_ref().map(metric).unwrap_or(0.0)
+}
 
 fn load_engine_dotenv(engine_dir: &std::path::Path) {
     let path = engine_dir.join(".env");
@@ -126,7 +167,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if profile_phases {
-        // SAFETY: set once on the main thread before `index_packages` spawns work that reads `NCI_PROFILE`.
+        // SAFETY: set once on the main thread before `index_packages` spawns work that reads `NCI_PROFILE`
+        // (only consulted when this crate is built with `--features phase-profile`).
         unsafe {
             env::set_var("NCI_PROFILE", "1");
         }
@@ -146,10 +188,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut discovered_packages = Vec::new();
     for node_modules_root in scan_paths {
-        if node_modules_root.exists() {
-            if let Ok(mut found) = scan_packages(&node_modules_root) {
-                discovered_packages.append(&mut found);
-            }
+        if node_modules_root.exists()
+            && let Ok(mut found) = scan_packages(&node_modules_root)
+        {
+            discovered_packages.append(&mut found);
         }
     }
 
@@ -182,6 +224,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         project_root: Some(repo_root.clone()),
         enable_package_cache: !no_package_cache,
         parallel_resolve_deps: !no_parallel_resolve_deps,
+        hydrate_cache_hits: true,
         ..Default::default()
     });
 
@@ -211,20 +254,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         crawled_count,
     );
 
-    indexed_results
-        .sort_by(|result_a, result_b| result_a.graph.package.cmp(&result_b.graph.package));
+    indexed_results.sort_by(|result_a, result_b| {
+        indexed_summary(result_a)
+            .package
+            .cmp(indexed_summary(result_b).package)
+    });
     for result in &indexed_results {
         let source_tag = match result.source {
             GraphSource::Cached => "cached",
             GraphSource::Crawled => "crawled",
         };
+        let row = indexed_summary(result);
         println!(
             "   {} — {} symbols, {} files | crawl {:.1}ms build {:.1}ms [{}]",
-            result.graph.package,
-            result.graph.total_symbols,
-            result.graph.total_files,
-            result.graph.crawl_duration_ms,
-            result.graph.build_duration_ms,
+            row.package,
+            row.total_symbols,
+            row.total_files,
+            row.crawl_duration_ms,
+            row.build_duration_ms,
             source_tag
         );
     }
@@ -232,22 +279,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crawled_crawl_sum_ms: f64 = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| result.graph.crawl_duration_ms)
+        .map(|result| crawled_graph_metric(result, |graph| graph.crawl_duration_ms))
         .sum();
     let crawled_build_sum_ms: f64 = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| result.graph.build_duration_ms)
+        .map(|result| crawled_graph_metric(result, |graph| graph.build_duration_ms))
         .sum();
     let crawled_crawl_max_ms = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| result.graph.crawl_duration_ms)
+        .map(|result| crawled_graph_metric(result, |graph| graph.crawl_duration_ms))
         .fold(0.0f64, f64::max);
     let crawled_build_max_ms = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| result.graph.build_duration_ms)
+        .map(|result| crawled_graph_metric(result, |graph| graph.build_duration_ms))
         .fold(0.0f64, f64::max);
     let crawled_crawl_sum_display = if crawled_count == 0 {
         0.0
@@ -271,10 +318,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     indexed_results.sort_by(|result_a, result_b| {
-        result_b
-            .graph
+        indexed_summary(result_b)
             .total_symbols
-            .cmp(&result_a.graph.total_symbols)
+            .cmp(&indexed_summary(result_a).total_symbols)
     });
 
     println!("\n{}", "═".repeat(86));
@@ -306,14 +352,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "   Total symbols:   {}",
         indexed_results
             .iter()
-            .map(|result| result.graph.total_symbols)
+            .map(|result| indexed_summary(result).total_symbols)
             .sum::<usize>()
     );
     println!(
         "   Total files:     {}",
         indexed_results
             .iter()
-            .map(|result| result.graph.total_files)
+            .map(|result| indexed_summary(result).total_files)
             .sum::<usize>()
     );
 
@@ -328,14 +374,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             GraphSource::Cached => "cached",
             GraphSource::Crawled => "crawled",
         };
+        let row = indexed_summary(result);
         println!(
             "   {: <36} {: >8} {: >9} {: >7} {: >9.1} {: >9.1}",
-            result.graph.package,
+            row.package,
             source_tag,
-            result.graph.total_symbols,
-            result.graph.total_files,
-            result.graph.crawl_duration_ms,
-            result.graph.build_duration_ms
+            row.total_symbols,
+            row.total_files,
+            row.crawl_duration_ms,
+            row.build_duration_ms
         );
     }
     println!(
@@ -347,14 +394,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "\n💾 Skipped JSON export (--skip-write). Index covered {} symbols.",
             indexed_results
                 .iter()
-                .map(|result| result.graph.total_symbols)
+                .map(|result| indexed_summary(result).total_symbols)
                 .sum::<usize>()
         );
         0.0
     } else {
         let export_start = Instant::now();
-        let graphs_for_json: Vec<&nci_engine::types::PackageGraph> =
-            indexed_results.iter().map(|result| &result.graph).collect();
+        let graphs_for_json: Vec<&nci_engine::types::PackageGraph> = indexed_results
+            .iter()
+            .filter_map(|result| result.graph.as_ref())
+            .collect();
         let report_data = serde_json::json!({
             "generatedAt": "now",
             "indexMode": mode_label,
@@ -370,8 +419,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "totalPackages": indexed_results.len(),
             "cachedCount": cached_count,
             "crawledCount": crawled_count,
-            "totalSymbols": indexed_results.iter().map(|result| result.graph.total_symbols).sum::<usize>(),
-            "totalFiles": indexed_results.iter().map(|result| result.graph.total_files).sum::<usize>(),
+            "totalSymbols": indexed_results.iter().map(|result| indexed_summary(result).total_symbols).sum::<usize>(),
+            "totalFiles": indexed_results.iter().map(|result| indexed_summary(result).total_files).sum::<usize>(),
             "packages": graphs_for_json,
         });
 

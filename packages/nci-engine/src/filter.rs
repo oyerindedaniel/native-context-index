@@ -47,10 +47,10 @@ pub struct IgnoreRule {
 impl FilterConfig {
     pub fn with_nciignore_file(mut self, project_root: &Path) -> Self {
         let path = project_root.join(".nciignore");
-        if path.is_file() {
-            if let Ok(text) = fs::read_to_string(&path) {
-                self.nciignore_rules.extend(parse_nciignore_lines(&text));
-            }
+        if path.is_file()
+            && let Ok(text) = fs::read_to_string(&path)
+        {
+            self.nciignore_rules.extend(parse_nciignore_lines(&text));
         }
         self.project_root = Some(project_root.to_path_buf());
         self
@@ -77,10 +77,10 @@ impl FilterConfig {
                 if !self.include_names.is_empty() && !self.include_names.contains(name) {
                     return false;
                 }
-                if let Some(allowed) = &allowed_by_package_json {
-                    if !allowed.contains(name) {
-                        return false;
-                    }
+                if let Some(allowed) = &allowed_by_package_json
+                    && !allowed.contains(name)
+                {
+                    return false;
                 }
                 if package_name_ignored_by_nciignore(name, &self.nciignore_rules) {
                     return false;
@@ -506,10 +506,7 @@ mod tests {
         std::fs::write(temp.path().join(".nciignore"), "jest\n").unwrap();
 
         let config = FilterConfig::default().with_nciignore_file(temp.path());
-        assert_eq!(
-            config.project_root.as_ref().map(|path| path.as_path()),
-            Some(temp.path())
-        );
+        assert_eq!(config.project_root.as_deref(), Some(temp.path()));
         assert_eq!(config.nciignore_rules.len(), 1);
         assert_eq!(config.nciignore_rules[0].pattern, "jest");
     }

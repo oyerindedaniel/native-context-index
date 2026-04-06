@@ -1,0 +1,30 @@
+{
+  "name": "nci",
+  "version": "0.1.0",
+  "description": "Native Context Index CLI (downloads prebuilt binary from GitHub Releases on install)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/native-context-modules/native-context-modules.git"
+  },
+  "bin": {
+    "nci": "dist/bin/nci.js"
+  },
+  "files": [
+    "dist",
+    "scripts"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "pnpm run build",
+    "postinstall": "node scripts/postinstall.cjs"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "tsup": "^8.5.1",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

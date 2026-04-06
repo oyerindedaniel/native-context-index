@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
-    "test:watch": "turbo run test:watch"
+    "test:watch": "turbo run test:watch",
+    "nci:sync-npm-version": "tsx scripts/sync-npm-version.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

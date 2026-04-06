@@ -8,8 +8,8 @@ use tracing::{info, warn};
 
 use crate::cache::NCI_ENGINE_VERSION;
 use crate::types::{
-    DecoratorMetadata, Deprecation, PackageGraph, PackageInfo, SharedString, SharedVec, SymbolKind,
-    SymbolNode, SymbolSpace, Visibility,
+    DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
+    SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -134,6 +134,53 @@ impl NciDatabase {
             .ok()
             .flatten()
             .is_some()
+    }
+
+    pub fn load_package_index_metadata(
+        &self,
+        package_info: &PackageInfo,
+    ) -> Option<PackageIndexMetadata> {
+        self.connection
+            .query_row(
+                "SELECT total_symbols, total_files, crawl_duration_ms, build_duration_ms
+                 FROM packages
+                 WHERE name = ?1 AND version = ?2 AND engine_version = ?3",
+                rusqlite::params![
+                    package_info.name.as_ref(),
+                    package_info.version.as_ref(),
+                    NCI_ENGINE_VERSION,
+                ],
+                |package_row| {
+                    Ok(PackageIndexMetadata {
+                        package: package_info.name.clone(),
+                        version: package_info.version.clone(),
+                        total_symbols: package_row.get::<_, i64>(0)? as usize,
+                        total_files: package_row.get::<_, i64>(1)? as usize,
+                        crawl_duration_ms: package_row.get::<_, i64>(2)? as f64,
+                        build_duration_ms: package_row.get::<_, i64>(3)? as f64,
+                    })
+                },
+            )
+            .optional()
+            .ok()
+            .flatten()
+    }
+
+    pub fn list_indexed_packages(&self) -> StorageResult<Vec<(String, String)>> {
+        let mut statement = self.connection.prepare(
+            "SELECT name, version FROM packages WHERE engine_version = ?1 ORDER BY name, version",
+        )?;
+        let rows = statement.query_map(rusqlite::params![NCI_ENGINE_VERSION], |package_row| {
+            Ok((
+                package_row.get::<_, String>(0)?,
+                package_row.get::<_, String>(1)?,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
     }
 
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
@@ -430,7 +477,7 @@ impl NciDatabase {
                         .as_ref()
                         .map(|value| value.as_ref()),
                     deprecated_text.as_deref(),
-                    visibility_text.as_deref(),
+                    visibility_text,
                     symbol_node.since.as_ref().map(|value| value.as_ref()),
                     if symbol_node.is_internal { 1i64 } else { 0i64 },
                     if symbol_node.is_global_augmentation {
@@ -444,10 +491,8 @@ impl NciDatabase {
                 let symbol_row_id = transaction.last_insert_rowid();
 
                 for source_id in symbol_node.inherited_from_sources.iter() {
-                    insert_inherited.execute(rusqlite::params![
-                        symbol_row_id,
-                        source_id.as_ref(),
-                    ])?;
+                    insert_inherited
+                        .execute(rusqlite::params![symbol_row_id, source_id.as_ref(),])?;
                 }
 
                 for dependency_id in symbol_node.dependencies.iter() {

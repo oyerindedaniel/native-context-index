@@ -58,31 +58,28 @@ pub fn package_entry_from_parsed_pkg(
         types_entries.extend(resolved);
     }
 
-    if types_entries.is_empty() {
-        if let Some(types_versions) = parsed_pkg.get("typesVersions") {
-            if let Some(resolved) = resolve_types_versions(package_dir, types_versions) {
-                subpaths.insert(".".into(), resolved.clone());
-                types_entries.push(resolved);
-            }
-        }
+    if types_entries.is_empty()
+        && let Some(types_versions) = parsed_pkg.get("typesVersions")
+        && let Some(resolved) = resolve_types_versions(package_dir, types_versions)
+    {
+        subpaths.insert(".".into(), resolved.clone());
+        types_entries.push(resolved);
     }
 
-    if types_entries.is_empty() {
-        if let Some(types_value) = parsed_pkg["types"].as_str() {
-            if let Some(resolved) = resolve_file(package_dir, types_value) {
-                subpaths.insert(".".into(), resolved.clone());
-                types_entries.push(resolved);
-            }
-        }
+    if types_entries.is_empty()
+        && let Some(types_value) = parsed_pkg["types"].as_str()
+        && let Some(resolved) = resolve_file(package_dir, types_value)
+    {
+        subpaths.insert(".".into(), resolved.clone());
+        types_entries.push(resolved);
     }
 
-    if types_entries.is_empty() {
-        if let Some(typings_value) = parsed_pkg["typings"].as_str() {
-            if let Some(resolved) = resolve_file(package_dir, typings_value) {
-                subpaths.insert(".".into(), resolved.clone());
-                types_entries.push(resolved);
-            }
-        }
+    if types_entries.is_empty()
+        && let Some(typings_value) = parsed_pkg["typings"].as_str()
+        && let Some(resolved) = resolve_file(package_dir, typings_value)
+    {
+        subpaths.insert(".".into(), resolved.clone());
+        types_entries.push(resolved);
     }
 
     if types_entries.is_empty() {
@@ -139,11 +136,11 @@ fn resolve_all_exports(
 
     match exports {
         serde_json::Value::String(export_string) => {
-            if is_declaration_file(export_string) {
-                if let Some(resolved) = resolve_file(package_dir, export_string) {
-                    entries.push(resolved.clone());
-                    subpaths.entry(".".into()).or_insert(resolved);
-                }
+            if is_declaration_file(export_string)
+                && let Some(resolved) = resolve_file(package_dir, export_string)
+            {
+                entries.push(resolved.clone());
+                subpaths.entry(".".into()).or_insert(resolved);
             }
         }
 
@@ -220,10 +217,10 @@ fn resolve_export_condition(package_dir: &Path, entry: &serde_json::Value) -> Op
             // Priority order: types → import → require → node → default
             let condition_keys = ["types", "import", "require", "node", "default"];
             for key in &condition_keys {
-                if let Some(value) = condition_map.get(*key) {
-                    if let Some(resolved) = resolve_export_condition(package_dir, value) {
-                        return Some(resolved);
-                    }
+                if let Some(value) = condition_map.get(*key)
+                    && let Some(resolved) = resolve_export_condition(package_dir, value)
+                {
+                    return Some(resolved);
                 }
             }
             None
@@ -253,26 +250,23 @@ fn resolve_types_versions(
         };
 
         // Try wildcard paths first
-        if let Some(wildcard_paths) = path_map.get("*") {
-            if let Some(first_pattern) = wildcard_paths.as_array().and_then(|arr| arr.first()) {
-                if let Some(pattern_str) = first_pattern.as_str() {
-                    let redirect_path = pattern_str.replace('*', "index.d.ts");
-                    if let Some(resolved) = resolve_file(package_dir, &redirect_path) {
-                        return Some(resolved);
-                    }
-                }
+        if let Some(wildcard_paths) = path_map.get("*")
+            && let Some(first_pattern) = wildcard_paths.as_array().and_then(|arr| arr.first())
+            && let Some(pattern_str) = first_pattern.as_str()
+        {
+            let redirect_path = pattern_str.replace('*', "index.d.ts");
+            if let Some(resolved) = resolve_file(package_dir, &redirect_path) {
+                return Some(resolved);
             }
         }
 
         // Try dot paths
-        if let Some(dot_paths) = path_map.get(".") {
-            if let Some(first_path) = dot_paths.as_array().and_then(|arr| arr.first()) {
-                if let Some(path_str) = first_path.as_str() {
-                    if let Some(resolved) = resolve_file(package_dir, path_str) {
-                        return Some(resolved);
-                    }
-                }
-            }
+        if let Some(dot_paths) = path_map.get(".")
+            && let Some(first_path) = dot_paths.as_array().and_then(|arr| arr.first())
+            && let Some(path_str) = first_path.as_str()
+            && let Some(resolved) = resolve_file(package_dir, path_str)
+        {
+            return Some(resolved);
         }
     }
 
@@ -365,10 +359,10 @@ fn extract_wildcard_pattern(value: &serde_json::Value) -> Option<String> {
         serde_json::Value::Object(condition_map) => {
             let priority_keys = ["types", "import", "require", "default"];
             for key in &priority_keys {
-                if let Some(nested_value) = condition_map.get(*key) {
-                    if let Some(result) = extract_wildcard_pattern(nested_value) {
-                        return Some(result);
-                    }
+                if let Some(nested_value) = condition_map.get(*key)
+                    && let Some(result) = extract_wildcard_pattern(nested_value)
+                {
+                    return Some(result);
                 }
             }
             None
@@ -531,12 +525,11 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
     }
 
     // Try wildcard matching against exports
-    if let Some(exports) = parsed_pkg.get("exports") {
-        if let Some(wildcard_matched) = match_wildcard_subpath(&subpath, exports) {
-            if let Some(resolved) = resolve_export_condition(&pkg_dir, &wildcard_matched) {
-                return vec![resolved];
-            }
-        }
+    if let Some(exports) = parsed_pkg.get("exports")
+        && let Some(wildcard_matched) = match_wildcard_subpath(&subpath, exports)
+        && let Some(resolved) = resolve_export_condition(&pkg_dir, &wildcard_matched)
+    {
+        return vec![resolved];
     }
 
     // Direct file resolution fallback

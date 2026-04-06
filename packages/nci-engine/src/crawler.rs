@@ -11,9 +11,7 @@ use crate::dedupe::symbol_dedupe_key;
 use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
-use crate::resolver::{
-    normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
-};
+use crate::resolver::{normalize_path, normalize_path_with_dashmap, resolve_module_specifier};
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
 };
@@ -22,7 +20,7 @@ use crate::types::{
 pub struct CrawlOptions {
     /// Upper bound on unweighted discovery edges from each package entry (`0` = entry files only).
     pub max_hops: usize,
-    /// When `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
+    /// When built with `--features phase-profile` and `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
     /// When true, resolve `SymbolNode` dependency ids in parallel during graph build (Rayon + DashMap).
     pub parallel_resolve_deps: bool,
@@ -101,7 +99,7 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     );
 
     let mut visited_files: Vec<SharedString> = session.visited.iter().cloned().collect();
-    visited_files.sort_by(|path_a, path_b| path_a.cmp(path_b));
+    visited_files.sort();
     let internal_start = Instant::now();
     for file in &visited_files {
         let Some(exports_slice) = session.raw_exports.get(file) else {
@@ -162,13 +160,13 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         .into_iter()
         .map(|(from, set)| {
             let mut targets: Vec<SharedString> = set.into_iter().collect();
-            targets.sort_by(|path_a, path_b| path_a.cmp(path_b));
+            targets.sort();
             (from, targets)
         })
         .collect();
 
     let mut type_ref_packages: Vec<SharedString> = session.type_ref_packages.into_iter().collect();
-    type_ref_packages.sort_by(|name_a, name_b| name_a.cmp(name_b));
+    type_ref_packages.sort();
 
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
@@ -186,14 +184,9 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
 /// symbols when both explicit and non-explicit exports exist in a group—without cloning the full
 /// export list for every file.
 fn preferred_inner_export_indices(exports: &[ParsedExport]) -> Vec<usize> {
-    let mut grouped: HashMap<String, Vec<usize>> =
-        HashMap::with_capacity(exports.len().min(256));
+    let mut grouped: HashMap<String, Vec<usize>> = HashMap::with_capacity(exports.len().min(256));
     for (export_index, export) in exports.iter().enumerate() {
-        let key = format!(
-            "{}::{}",
-            export.name.as_ref(),
-            export.kind.numeric_kind()
-        );
+        let key = format!("{}::{}", export.name.as_ref(), export.kind.numeric_kind());
         grouped.entry(key).or_default().push(export_index);
     }
 
@@ -361,10 +354,8 @@ impl CrawlSession {
                     normalized_path.clone(),
                     parse_result.references.iter().cloned().collect(),
                 );
-                self.file_is_external_module.insert(
-                    normalized_path.clone(),
-                    parse_result.is_external_module,
-                );
+                self.file_is_external_module
+                    .insert(normalized_path.clone(), parse_result.is_external_module);
 
                 let (triple_edges, mut targets) =
                     self.enumerate_discovery_edges(&normalized_path, &parse_result);
@@ -487,10 +478,10 @@ impl CrawlSession {
             return Arc::new(Vec::new());
         }
 
-        if name_prefix.is_empty() {
-            if let Some(cached) = self.resolution_cache.get(&normalized_path) {
-                return Arc::clone(cached);
-            }
+        if name_prefix.is_empty()
+            && let Some(cached) = self.resolution_cache.get(&normalized_path)
+        {
+            return Arc::clone(cached);
         }
 
         let mut actual_exports = match self.raw_exports.get(&normalized_path) {
@@ -527,7 +518,6 @@ impl CrawlSession {
             } else {
                 resolve_triple_slash_ref(reference.as_ref(), &normalized_path)
                     .into_iter()
-                    .map(SharedString::from)
                     .collect()
             };
 
@@ -589,7 +579,7 @@ impl CrawlSession {
         }
 
         let mut local_keys_sorted: Vec<SharedString> = local_index.keys().cloned().collect();
-        local_keys_sorted.sort_by(|key_a, key_b| key_a.cmp(key_b));
+        local_keys_sorted.sort();
 
         let mut results: Vec<ResolvedSymbol> = Vec::new();
 

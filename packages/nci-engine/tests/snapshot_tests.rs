@@ -130,7 +130,7 @@ fn normalise_oracle(oracle: &mut serde_json::Value) {
                 deps.sort_by(|left, right| {
                     left.as_str()
                         .unwrap_or("")
-                        .cmp(&right.as_str().unwrap_or(""))
+                        .cmp(right.as_str().unwrap_or(""))
                 });
             }
             if let Some(obj) = sym.as_object_mut() {
