@@ -2,6 +2,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const { gunzipSync } = require("node:zlib");
 
 function readPackageJson() {
   const pkgPath = path.join(__dirname, "..", "package.json");
@@ -104,7 +105,6 @@ async function main() {
   const assetName = releaseAssetFileName(process.platform, process.arch);
   const url = releaseAssetUrl(pkg, version, assetName);
   const compressed = await download(url);
-  const { gunzipSync } = require("node:zlib");
   const body = gunzipSync(compressed);
 
   fs.mkdirSync(vendorDir, { recursive: true });

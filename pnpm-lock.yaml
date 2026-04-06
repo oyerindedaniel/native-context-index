@@ -47,10 +47,10 @@ importers:
     devDependencies:
       '@repo/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../tooling/eslint-config
       '@repo/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../tooling/typescript-config
       '@types/node':
         specifier: ^22.15.3
         version: 22.15.3
@@ -84,10 +84,10 @@ importers:
     devDependencies:
       '@repo/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../tooling/eslint-config
       '@repo/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../tooling/typescript-config
       '@types/node':
         specifier: ^22.15.3
         version: 22.15.3
@@ -104,7 +104,75 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
-  packages/eslint-config:
+  packages/nci:
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript-config
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.2)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
+  packages/nci-core:
+    dependencies:
+      '@oyerinde/caliper':
+        specifier: ^0.2.3
+        version: 0.2.3(hono@4.12.8)
+    devDependencies:
+      '@pulumi/aws':
+        specifier: ^7.24.0
+        version: 7.24.0(ts-node@10.9.2(@types/node@22.15.3)(typescript@5.9.2))(typescript@5.9.2)
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript-config
+      '@vitest/coverage-v8':
+        specifier: ^4.1.0
+        version: 4.1.0(vitest@4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.15.3)(vite@8.0.0(@types/node@22.15.3)(esbuild@0.27.4)(tsx@4.21.0)))
+      ai:
+        specifier: ^6.0.134
+        version: 6.0.134(zod@4.3.5)
+      effect:
+        specifier: ^3.21.0
+        version: 3.21.0
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.15.3)(vite@8.0.0(@types/node@22.15.3)(esbuild@0.27.4)(tsx@4.21.0))
+
+  packages/ui:
+    dependencies:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.0(react@19.2.0)
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
+      '@types/react':
+        specifier: 19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: 19.2.2
+        version: 19.2.2(@types/react@19.2.2)
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
+  tooling/eslint-config:
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.1
@@ -140,75 +208,7 @@ importers:
         specifier: ^8.50.0
         version: 8.50.0(eslint@9.39.1)(typescript@5.9.2)
 
-  packages/nci:
-    devDependencies:
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.2)
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
-
-  packages/nci-core:
-    dependencies:
-      '@oyerinde/caliper':
-        specifier: ^0.2.3
-        version: 0.2.3(hono@4.12.8)
-    devDependencies:
-      '@pulumi/aws':
-        specifier: ^7.24.0
-        version: 7.24.0(ts-node@10.9.2(@types/node@22.15.3)(typescript@5.9.2))(typescript@5.9.2)
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@vitest/coverage-v8':
-        specifier: ^4.1.0
-        version: 4.1.0(vitest@4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.15.3)(vite@8.0.0(@types/node@22.15.3)(esbuild@0.27.4)(tsx@4.21.0)))
-      ai:
-        specifier: ^6.0.134
-        version: 6.0.134(zod@4.3.5)
-      effect:
-        specifier: ^3.21.0
-        version: 3.21.0
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.15.3)(vite@8.0.0(@types/node@22.15.3)(esbuild@0.27.4)(tsx@4.21.0))
-
-  packages/typescript-config: {}
-
-  packages/ui:
-    dependencies:
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
-    devDependencies:
-      '@repo/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: ^22.15.3
-        version: 22.15.3
-      '@types/react':
-        specifier: 19.2.2
-        version: 19.2.2
-      '@types/react-dom':
-        specifier: 19.2.2
-        version: 19.2.2(@types/react@19.2.2)
-      eslint:
-        specifier: ^9.39.1
-        version: 9.39.1
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
+  tooling/typescript-config: {}
 
 packages:
 
