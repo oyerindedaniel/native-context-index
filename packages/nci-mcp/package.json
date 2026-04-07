@@ -1,0 +1,35 @@
+{
+  "name": "nci-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (stdio) server for the Native Context Index (nci)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/native-context-modules/native-context-modules.git"
+  },
+  "type": "commonjs",
+  "bin": {
+    "nci-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "pnpm run build",
+    "check-types": "tsc --noEmit",
+    "dev": "tsc --noEmit --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "tsup": "^8.5.1",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -141,6 +141,25 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.15.3)(vite@8.0.0(@types/node@22.15.3)(esbuild@0.27.4)(tsx@4.21.0))
 
+  packages/nci-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@4.3.5)
+      zod:
+        specifier: ^4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript-config
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.2)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   packages/ui:
     dependencies:
       react:
@@ -660,6 +679,16 @@ packages:
 
   '@modelcontextprotocol/sdk@1.25.3':
     resolution: {integrity: sha512-vsAMBMERybvYgKbg/l4L1rhS7VXV1c0CtyJg72vwxONVX0l4ZfKVAnZEWTQixJGTzKnELjQ59e4NbdFDALRiAQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@cfworker/json-schema': ^4.1.1
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@cfworker/json-schema':
+        optional: true
+
+  '@modelcontextprotocol/sdk@1.29.0':
+    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -1919,6 +1948,12 @@ packages:
 
   express-rate-limit@7.5.1:
     resolution: {integrity: sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
+
+  express-rate-limit@8.3.2:
+    resolution: {integrity: sha512-77VmFeJkO0/rvimEDuUC5H30oqUC4EyOhyGccfqoLebB0oiEYfM7nwPrsDsBL1gsTpwfzX8SFy2MT3TDyRq+bg==}
     engines: {node: '>= 16'}
     peerDependencies:
       express: '>= 4.11'
@@ -3994,6 +4029,28 @@ snapshots:
       - hono
       - supports-color
 
+  '@modelcontextprotocol/sdk@1.29.0(zod@4.3.5)':
+    dependencies:
+      '@hono/node-server': 1.19.11(hono@4.12.8)
+      ajv: 8.18.0
+      ajv-formats: 3.0.1(ajv@8.18.0)
+      content-type: 1.0.5
+      cors: 2.8.6
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 8.3.2(express@5.2.1)
+      hono: 4.12.8
+      jose: 6.2.2
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
+      zod: 4.3.5
+      zod-to-json-schema: 3.25.1(zod@4.3.5)
+    transitivePeerDependencies:
+      - supports-color
+
   '@napi-rs/wasm-runtime@1.1.1':
     dependencies:
       '@emnapi/core': 1.9.0
@@ -5423,6 +5480,11 @@ snapshots:
   express-rate-limit@7.5.1(express@5.2.1):
     dependencies:
       express: 5.2.1
+
+  express-rate-limit@8.3.2(express@5.2.1):
+    dependencies:
+      express: 5.2.1
+      ip-address: 10.1.0
 
   express@5.2.1:
     dependencies:

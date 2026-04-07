@@ -129,6 +129,12 @@ enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+    #[command(
+        name = "binary-path",
+        visible_alias = "which",
+        about = "Print the absolute path of the running nci executable (e.g. for NCI_BINARY when using nci-mcp)"
+    )]
+    BinaryPath,
 }
 
 #[derive(Subcommand)]
@@ -222,7 +228,15 @@ pub fn run() -> Result<(), String> {
             generate(*shell, &mut cmd, bin_name, &mut io::stdout());
             Ok(())
         }
+        Commands::BinaryPath => run_binary_path(),
     }
+}
+
+fn run_binary_path() -> Result<(), String> {
+    let path = std::env::current_exe()
+        .map_err(|e| format!("nci binary-path: could not resolve current executable: {e}"))?;
+    println!("{}", path.display());
+    Ok(())
 }
 
 fn load_file_for_root(project_root: &Path) -> Option<NciConfigFile> {

@@ -118,6 +118,43 @@ fn index_dry_run_empty_node_modules() {
         .stdout(predicate::str::contains("\"packages\""));
 }
 
+#[test]
+fn binary_path_prints_running_executable() {
+    let out = nci_cmd()
+        .arg("binary-path")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let line = String::from_utf8(out).expect("utf8 stdout");
+    let path = line.trim();
+    assert!(!path.is_empty(), "binary-path stdout empty");
+    assert!(
+        Path::new(path).is_file(),
+        "binary-path should print a file path: {path:?}"
+    );
+}
+
+#[test]
+fn which_alias_prints_same_as_binary_path() {
+    let a = nci_cmd()
+        .arg("binary-path")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let b = nci_cmd()
+        .arg("which")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(a, b);
+}
+
 fn write_minimal_pkg(root: &Path, name: &str, version: &str) {
     let pkg = root.join("node_modules").join(name);
     fs::create_dir_all(&pkg).unwrap();
