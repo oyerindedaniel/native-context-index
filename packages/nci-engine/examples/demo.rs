@@ -30,8 +30,6 @@ use nci_engine::pipeline::{
     GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
 use nci_engine::scanner::scan_packages;
-use nci_engine::types::PackageGraph;
-
 struct IndexedSummary<'a> {
     package: &'a str,
     total_symbols: usize,
@@ -68,8 +66,30 @@ fn indexed_summary(result: &IndexedGraph) -> IndexedSummary<'_> {
     }
 }
 
-fn crawled_graph_metric(result: &IndexedGraph, metric: impl FnOnce(&PackageGraph) -> f64) -> f64 {
-    result.graph.as_ref().map(metric).unwrap_or(0.0)
+fn summary_timings_shown(result: &IndexedGraph) -> (f64, f64) {
+    let row = indexed_summary(result);
+    if result.source == GraphSource::Cached {
+        (0.0, 0.0)
+    } else {
+        (row.crawl_duration_ms, row.build_duration_ms)
+    }
+}
+
+fn format_duration_ms(ms: f64) -> String {
+    let ms = if ms.is_finite() { ms.max(0.0) } else { 0.0 };
+    if ms == 0.0 {
+        return "0".to_string();
+    }
+    let sec = ms / 1000.0;
+    if sec >= 60.0 {
+        let mins = (sec / 60.0).floor() as u64;
+        let rem = sec - (mins as f64) * 60.0;
+        format!("{mins}m {rem:.1}s")
+    } else if sec >= 1.0 {
+        format!("{sec:.2}s")
+    } else {
+        format!("{sec:.3}s")
+    }
 }
 
 fn load_engine_dotenv(engine_dir: &std::path::Path) {
@@ -225,8 +245,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         project_root: Some(repo_root.clone()),
         enable_package_cache: !no_package_cache,
         parallel_resolve_deps: !no_parallel_resolve_deps,
-        hydrate_cache_hits: true,
-        retain_graph_after_save: true,
+        hydrate_cache_hits: false,
+        retain_graph_after_save: false,
         ..Default::default()
     });
 
@@ -251,9 +271,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crawled_count = indexed_results.len() - cached_count;
 
     println!(
-        "   Built {} graphs — {:.1}ms ({}) | {} cached, {} crawled\n",
+        "   Built {} graphs — {} ({}) | {} cached, {} crawled\n",
         indexed_results.len(),
-        index_wall_ms,
+        format_duration_ms(index_wall_ms),
         mode_label,
         cached_count,
         crawled_count,
@@ -270,13 +290,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             GraphSource::Crawled => "crawled",
         };
         let row = indexed_summary(result);
+        let (crawl_ms, build_ms) = summary_timings_shown(result);
         println!(
-            "   {} — {} symbols, {} files | crawl {:.1}ms build {:.1}ms [{}]",
+            "   {} — {} symbols, {} files | crawl {} build {} [{}]",
             row.package,
             row.total_symbols,
             row.total_files,
-            row.crawl_duration_ms,
-            row.build_duration_ms,
+            format_duration_ms(crawl_ms),
+            format_duration_ms(build_ms),
             source_tag
         );
     }
@@ -284,22 +305,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crawled_crawl_sum_ms: f64 = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| crawled_graph_metric(result, |graph| graph.crawl_duration_ms))
+        .map(|result| indexed_summary(result).crawl_duration_ms)
         .sum();
     let crawled_build_sum_ms: f64 = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| crawled_graph_metric(result, |graph| graph.build_duration_ms))
+        .map(|result| indexed_summary(result).build_duration_ms)
         .sum();
     let crawled_crawl_max_ms = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| crawled_graph_metric(result, |graph| graph.crawl_duration_ms))
+        .map(|result| indexed_summary(result).crawl_duration_ms)
         .fold(0.0f64, f64::max);
     let crawled_build_max_ms = indexed_results
         .iter()
         .filter(|result| result.source == GraphSource::Crawled)
-        .map(|result| crawled_graph_metric(result, |graph| graph.build_duration_ms))
+        .map(|result| indexed_summary(result).build_duration_ms)
         .fold(0.0f64, f64::max);
     let crawled_crawl_sum_display = if crawled_count == 0 {
         0.0
@@ -321,7 +342,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         crawled_build_max_ms
     };
-
     indexed_results.sort_by(|result_a, result_b| {
         indexed_summary(result_b)
             .total_symbols
@@ -369,10 +389,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     println!(
-        "\n   {:<36} {:>8} {:>9} {:>7} {:>10} {:>10}",
-        "Package", "Source", "Symbols", "Files", "Crawl ms", "Build ms"
+        "\n   {:<36} {:>8} {:>9} {:>7} {:>12} {:>12}",
+        "Package",
+        "Source",
+        "Symbols",
+        "Files",
+        "Crawl",
+        "Build"
     );
-    println!("   {}", "─".repeat(96));
+    println!("   {}", "─".repeat(98));
 
     for result in &indexed_results {
         let source_tag = match result.source {
@@ -380,20 +405,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             GraphSource::Crawled => "crawled",
         };
         let row = indexed_summary(result);
+        let (crawl_ms, build_ms) = summary_timings_shown(result);
         println!(
-            "   {: <36} {: >8} {: >9} {: >7} {: >9.1} {: >9.1}",
+            "   {: <36} {: >8} {: >9} {: >7} {: >12} {: >12}",
             row.package,
             source_tag,
             row.total_symbols,
             row.total_files,
-            row.crawl_duration_ms,
-            row.build_duration_ms
+            format_duration_ms(crawl_ms),
+            format_duration_ms(build_ms)
         );
     }
     let crawl_build_footnote = if no_package_cache {
-        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Timings come from the in-memory graph (no package SQLite cache this run)."
+        "   Crawl / Build: this run only (crawled packages). Cache off."
     } else {
-        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Values come from the graph in RAM or, on cache hits with hydrate, from SQLite."
+        "   Crawl / Build: this run only; cache hits show 0 (no crawl/graph build)."
     };
     println!("{crawl_build_footnote}");
 
@@ -446,42 +472,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n{}", "═".repeat(86));
     println!("⏱️  TIMING\n");
-    println!("   {:<52} {:>12}", "Phase / metric", "ms");
-    println!("   {}", "─".repeat(66));
+    let timing_w = 14usize;
     println!(
-        "   {:<52} {:>12.1}",
+        "   {:<52} {:>width$}",
+        "Phase / metric",
+        "Time",
+        width = timing_w
+    );
+    println!("   {}", "─".repeat(52 + timing_w));
+    println!(
+        "   {:<52} {:>width$}",
         "Scan + dedupe (find packages)",
-        scan_wall_ms
+        format_duration_ms(scan_wall_ms),
+        width = timing_w
     );
     let index_wall_label = if no_package_cache {
         "Index all packages (parallel): crawl + graph build"
     } else {
         "Index all packages (parallel): crawl + graph + SQLite"
     };
-    println!("   {:<52} {:>12.1}", index_wall_label, index_wall_ms);
     println!(
-        "   {:<52} {:>12.1}",
-        "Slowest single package — crawl phase",
-        crawled_crawl_max_display
+        "   {:<52} {:>width$}",
+        index_wall_label,
+        format_duration_ms(index_wall_ms),
+        width = timing_w
     );
     println!(
-        "   {:<52} {:>12.1}",
-        "Slowest single package — graph build phase",
-        crawled_build_max_display
+        "   {:<52} {:>width$}",
+        "Slowest single package — crawl (crawled this run)",
+        format_duration_ms(crawled_crawl_max_display),
+        width = timing_w
     );
     println!(
-        "   {:<52} {:>12.1}",
-        "JSON serialize + write (0 if --skip-write)", export_wall_ms
+        "   {:<52} {:>width$}",
+        "Slowest single package — build (crawled this run)",
+        format_duration_ms(crawled_build_max_display),
+        width = timing_w
     );
-    println!("   {}", "─".repeat(66));
+    println!(
+        "   {:<52} {:>width$}",
+        "JSON serialize + write (0 if --skip-write)",
+        format_duration_ms(export_wall_ms),
+        width = timing_w
+    );
+    println!("   {}", "─".repeat(52 + timing_w));
     let n_packages = indexed_results.len();
     println!(
-        "   {:<52} {:>12.1}",
+        "   {:<52} {:>width$}",
         format!("Total ({n_packages} pkgs: scan + index all)"),
-        total_packages_run_ms
+        format_duration_ms(total_packages_run_ms),
+        width = timing_w
     );
     println!(
-        "   Each package’s crawl ms / build ms are in the list above; many run at once, so do not add them for total time."
+        "   Crawl/build column is for crawled packages only (0 if cached); parallel work means do not add rows for wall-clock total."
     );
 
     Ok(())
