@@ -3,6 +3,12 @@ import ts from "typescript";
 /** Default cap on discovery edges from each package entry. */
 export const DEFAULT_MAX_HOPS = 10;
 
+/**
+ * Pass as `maxHops` to mean no hop cap (only graph structure and circular handling stop discovery).
+ * Internally this uses `Infinity` so comparisons behave like an unbounded limit.
+ */
+export const MAX_HOPS_UNLIMITED = -1 as const;
+
 /** The maximum recursion depth for complex type expansion (Object Spreads & Mixins) */
 export const MAX_RECURSION_DEPTH = 10;
 

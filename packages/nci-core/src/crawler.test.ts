@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import { crawl } from "./crawler.js";
 import { buildPackageGraph } from "./graph.js";
+import { MAX_HOPS_UNLIMITED } from "./constants.js";
 import type { PackageInfo } from "./types.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
@@ -88,6 +89,28 @@ describe("crawl", () => {
 
     const names = result.exports.map((exportItem) => exportItem.name);
     expect(names).toContain("APP_NAME");
+  });
+
+  it("maxHops -1 (unlimited) reaches the full hop-limit-chain like default", () => {
+    const entry = path.join(FIXTURES_DIR, "hop-limit-chain", "index.d.ts");
+    const baseline = crawl(entry);
+    const unlimited = crawl(entry, { maxHops: MAX_HOPS_UNLIMITED });
+    expect(baseline.visitedFiles.length).toBe(5);
+    expect(unlimited.visitedFiles.length).toBe(baseline.visitedFiles.length);
+    expect(unlimited.exports.some((exp) => exp.name === "deepLeaf")).toBe(true);
+  });
+
+  it("maxHops 2 truncates hop-limit-chain before the leaf files", () => {
+    const entry = path.join(FIXTURES_DIR, "hop-limit-chain", "index.d.ts");
+    const limited = crawl(entry, { maxHops: 2 });
+    expect(limited.visitedFiles.length).toBe(3);
+    const full = crawl(entry);
+    expect(full.visitedFiles.length).toBeGreaterThan(limited.visitedFiles.length);
+  });
+
+  it("rejects maxHops below -1", () => {
+    const entry = path.join(FIXTURES_DIR, "hop-limit-chain", "index.d.ts");
+    expect(() => crawl(entry, { maxHops: -2 })).toThrow(/unlimited/);
   });
 
   it("tracks all visited files", () => {

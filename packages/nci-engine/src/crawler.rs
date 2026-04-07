@@ -19,6 +19,7 @@ use crate::types::{
 #[derive(Debug, Clone)]
 pub struct CrawlOptions {
     /// Upper bound on unweighted discovery edges from each package entry (`0` = entry files only).
+    /// [`usize::MAX`] means unlimited.
     pub max_hops: usize,
     /// When built with `--features phase-profile` and `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
@@ -368,8 +369,10 @@ impl CrawlSession {
 
                 targets.sort();
                 targets.dedup();
-                let candidate_hop = from_hop + 1;
-                if candidate_hop > self.max_hops {
+                let Some(candidate_hop) = from_hop.checked_add(1) else {
+                    continue;
+                };
+                if self.max_hops != usize::MAX && candidate_hop > self.max_hops {
                     continue;
                 }
                 for target_path in targets {
@@ -474,7 +477,9 @@ impl CrawlSession {
     ) -> Arc<Vec<ResolvedSymbol>> {
         let normalized_path = self.norm_path(Path::new(file_path.as_ref()));
 
-        if depth > self.max_hops || self.resolution_path.contains(&normalized_path) {
+        if self.max_hops != usize::MAX && depth > self.max_hops
+            || self.resolution_path.contains(&normalized_path)
+        {
             return Arc::new(Vec::new());
         }
 
@@ -898,6 +903,7 @@ fn resolve_triple_slash_ref(ref_path: &str, current_file: &SharedString) -> Opti
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     /// Helper: creates a .d.ts file in the temp directory.
@@ -1036,6 +1042,55 @@ mod tests {
 
         // max_hops = 0: only the entry file is read; re-export target is not visited.
         assert!(result.visited_files.len() <= 1);
+    }
+
+    fn hop_limit_chain_entry() -> SharedString {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../nci-core/fixtures/hop-limit-chain/index.d.ts");
+        let path = fs::canonicalize(&path)
+            .unwrap_or_else(|err| panic!("hop-limit-chain fixture missing at {}: {err}", path.display()));
+        normalize_path(&path)
+    }
+
+    #[test]
+    fn crawl_unlimited_max_hops_matches_default_for_deep_chain() {
+        let entry = hop_limit_chain_entry();
+        let baseline = crawl(&[entry.clone()], None);
+        let unlimited = crawl(
+            &[entry],
+            Some(CrawlOptions {
+                max_hops: usize::MAX,
+                ..Default::default()
+            }),
+        );
+        assert_eq!(
+            baseline.visited_files.len(),
+            5,
+            "fixture should span 5 declaration files"
+        );
+        assert_eq!(unlimited.visited_files.len(), baseline.visited_files.len());
+        assert!(
+            unlimited
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "deepLeaf")
+        );
+    }
+
+    #[test]
+    fn crawl_low_max_hops_truncates_reexport_chain() {
+        let entry = hop_limit_chain_entry();
+        let limited = crawl(
+            &[entry],
+            Some(CrawlOptions {
+                max_hops: 2,
+                ..Default::default()
+            }),
+        );
+        assert_eq!(limited.visited_files.len(), 3, "hops 0..=2 => three files");
+        let full = crawl(&[hop_limit_chain_entry()], None);
+        assert_eq!(full.visited_files.len(), 5);
+        assert!(full.visited_files.len() > limited.visited_files.len());
     }
 
     #[test]

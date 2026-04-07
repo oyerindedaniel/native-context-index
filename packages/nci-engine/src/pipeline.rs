@@ -23,6 +23,7 @@ use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo};
 #[derive(Debug, Clone)]
 pub struct IndexOptions {
     /// Upper bound on discovery edges from each package entry (default: 10).
+    /// Use [`usize::MAX`] for no hop cap (CLI / `.nci.toml` use `max_hops = -1` → [`crate::constants::MAX_HOPS_UNLIMITED`]).
     pub max_hops: usize,
 
     /// Whether to run in parallel (default: true).

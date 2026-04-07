@@ -23,8 +23,9 @@ pub struct NciConfigFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_resolve_deps: Option<bool>,
 
+    /// `0` = entry files only; `-1` = unlimited (see `nci_engine::constants::MAX_HOPS_UNLIMITED`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_hops: Option<usize>,
+    pub max_hops: Option<i64>,
 
     /// Include-only package name globs (`FilterConfig::include_globs`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -71,5 +72,17 @@ mod tests {
         let loaded = load_config_file(temp.path()).expect("parsed");
         assert_eq!(loaded.max_hops, Some(7));
         assert_eq!(loaded.packages.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn roundtrip_max_hops_unlimited_sentinel() {
+        let temp = tempfile::tempdir().unwrap();
+        let cfg = NciConfigFile {
+            max_hops: Some(-1),
+            ..Default::default()
+        };
+        write_config_file(temp.path(), &cfg).unwrap();
+        let loaded = load_config_file(temp.path()).expect("parsed");
+        assert_eq!(loaded.max_hops, Some(-1));
     }
 }

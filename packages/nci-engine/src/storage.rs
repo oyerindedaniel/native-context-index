@@ -40,8 +40,9 @@ pub struct DatabaseStatusReport {
     pub journal_mode: String,
     pub schema_version: u32,
     pub integrity_check: String,
-    /// `NCI_CACHE_DIR` when set, else `null` in JSON.
-    pub nci_cache_dir: Option<String>,
+    /// Value of `NCI_CACHE_DIR` when that env var is set in this process.
+    /// Independent of [`Self::path`]: `--database` may point elsewhere.
+    pub nci_cache_dir_env: Option<String>,
 }
 
 fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
@@ -204,7 +205,7 @@ impl NciDatabase {
         let journal_mode = self.journal_mode_label()?;
         let schema_version = self.stored_schema_version()?;
         let integrity_check = self.pragma_integrity_check_line()?;
-        let nci_cache_dir = std::env::var_os("NCI_CACHE_DIR")
+        let nci_cache_dir_env = std::env::var_os("NCI_CACHE_DIR")
             .map(|value| value.to_string_lossy().into_owned());
         Ok(DatabaseStatusReport {
             path: db_path.to_path_buf(),
@@ -215,7 +216,7 @@ impl NciDatabase {
             journal_mode,
             schema_version,
             integrity_check,
-            nci_cache_dir,
+            nci_cache_dir_env,
         })
     }
 

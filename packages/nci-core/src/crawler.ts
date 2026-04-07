@@ -4,13 +4,25 @@ import ts from "typescript";
 import { parseFile } from "./parser.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
-import { DEFAULT_MAX_HOPS } from "./constants.js";
+import { DEFAULT_MAX_HOPS, MAX_HOPS_UNLIMITED } from "./constants.js";
 import { normalizeSignature, symbolDedupeKey } from "./dedupe.js";
 import { nciProfileEnabled, profileLog, profileStat } from "./nci-log-flags.js";
 
 export interface CrawlOptions {
-  /** Upper bound on discovery edges from each package entry (default 10). */
+  /**
+   * Upper bound on discovery edges from each package entry (default `DEFAULT_MAX_HOPS`).
+   * Use `MAX_HOPS_UNLIMITED` (-1) for no cap (only graph shape and circular detection stop the crawl).
+   */
   maxHops?: number;
+}
+
+function normalizeMaxHops(raw?: number): number {
+  const resolved = raw ?? DEFAULT_MAX_HOPS;
+  if (resolved === MAX_HOPS_UNLIMITED) return Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(resolved) || !Number.isInteger(resolved))
+    throw new Error(`maxHops must be a finite integer, ${MAX_HOPS_UNLIMITED} (unlimited), or >= 0`);
+  if (resolved < 0) throw new Error(`maxHops must be ${MAX_HOPS_UNLIMITED} (unlimited) or >= 0, got ${resolved}`);
+  return resolved;
 }
 
 /** Crawl one or more .d.ts files, following all re-exports recursively. */
@@ -18,7 +30,7 @@ export function crawl(
   entryFilePaths: string | string[],
   options: CrawlOptions = {}
 ): CrawlResult {
-  const maxHops = options.maxHops ?? DEFAULT_MAX_HOPS;
+  const maxHops = normalizeMaxHops(options.maxHops);
   const visited = new Set<string>();
   const circularRefs: string[] = [];
   const resolvedSymbols: ResolvedSymbol[] = [];

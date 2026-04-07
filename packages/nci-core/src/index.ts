@@ -8,6 +8,7 @@ export { scanPackages } from "./scanner.js";
 export { resolveTypesEntry } from "./resolver.js";
 export { parseFile } from "./parser.js";
 export { crawl, type CrawlOptions } from "./crawler.js";
+export { DEFAULT_MAX_HOPS, MAX_HOPS_UNLIMITED } from "./constants.js";
 export { buildPackageGraph } from "./graph.js";
 export {
   NCI_LOG_ALL_RAW_EXPORTS,

@@ -3,6 +3,21 @@ use phf::phf_set;
 /// Default cap on discovery edges from each package entry (`0` = entry files only).
 pub const DEFAULT_MAX_HOPS: usize = 10;
 
+/// User-facing value for “no hop cap” in CLI / `.nci.toml`. Internally mapped to [`usize::MAX`].
+pub const MAX_HOPS_UNLIMITED: i64 = -1;
+
+/// Convert merged CLI/config `max_hops` (`None` → default cap, [`MAX_HOPS_UNLIMITED`] → [`usize::MAX`]).
+pub fn max_hops_from_user_value(opt: Option<i64>) -> Result<usize, String> {
+    match opt.unwrap_or(DEFAULT_MAX_HOPS as i64) {
+        MAX_HOPS_UNLIMITED => Ok(usize::MAX),
+        hops if hops < 0 => Err(format!(
+            "max-hops must be {} (unlimited) or a non-negative integer, got {hops}",
+            MAX_HOPS_UNLIMITED
+        )),
+        hops => usize::try_from(hops).map_err(|_| format!("max-hops value {hops} does not fit usize")),
+    }
+}
+
 /// The maximum recursion depth for complex type expansion (Object Spreads & Mixins).
 pub const MAX_RECURSION_DEPTH: usize = 10;
 
@@ -108,5 +123,23 @@ mod tests {
     fn recursion_caps_stay_in_sync() {
         assert_eq!(DEFAULT_MAX_HOPS, 10);
         assert_eq!(MAX_RECURSION_DEPTH, 10);
+    }
+
+    #[test]
+    fn max_hops_from_user_value_unlimited() {
+        assert_eq!(max_hops_from_user_value(Some(MAX_HOPS_UNLIMITED)).unwrap(), usize::MAX);
+    }
+
+    #[test]
+    fn max_hops_from_user_value_default_when_none() {
+        assert_eq!(
+            max_hops_from_user_value(None).unwrap(),
+            DEFAULT_MAX_HOPS
+        );
+    }
+
+    #[test]
+    fn max_hops_from_user_value_rejects_invalid_negative() {
+        assert!(max_hops_from_user_value(Some(-2)).is_err());
     }
 }

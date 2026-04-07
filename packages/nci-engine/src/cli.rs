@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
-use nci_engine::constants::DEFAULT_MAX_HOPS;
+use nci_engine::constants::{max_hops_from_user_value, DEFAULT_MAX_HOPS};
 use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::scanner::{self, find_package_in_node_modules, ScanError};
@@ -130,8 +130,9 @@ struct BulkIndexArgs {
     )]
     project_root: Option<PathBuf>,
 
-    #[arg(long)]
-    max_hops: Option<usize>,
+    /// `0` = entry only; `-1` = unlimited (see `MAX_HOPS_UNLIMITED`).
+    #[arg(long, allow_hyphen_values = true)]
+    max_hops: Option<i64>,
 
     #[arg(long, help = "Parallel package indexing (default true)")]
     parallel: Option<bool>,
@@ -295,8 +296,8 @@ fn print_status_plain(r: &DatabaseStatusReport) {
     println!("journal_mode: {}", r.journal_mode);
     println!("schema_version: {}", r.schema_version);
     println!("integrity_check: {}", r.integrity_check);
-    if let Some(ref d) = r.nci_cache_dir {
-        println!("NCI_CACHE_DIR: {d}");
+    if let Some(ref env_value) = r.nci_cache_dir_env {
+        println!("NCI_CACHE_DIR (env override, may differ from DB path): {env_value}");
     }
 }
 
@@ -319,7 +320,7 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         file_cfg.format = Some("plain".into());
         file_cfg.parallel = Some(true);
         file_cfg.parallel_resolve_deps = Some(true);
-        file_cfg.max_hops = Some(DEFAULT_MAX_HOPS);
+        file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
         if file_cfg.database.is_none() {
             return Err(
                 "could not resolve default SQLite path; set NCI_CACHE_DIR or pass --database"
@@ -369,7 +370,7 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
             || par_line.trim().eq_ignore_ascii_case("yes");
         file_cfg.parallel = Some(par);
         file_cfg.parallel_resolve_deps = Some(true);
-        file_cfg.max_hops = Some(DEFAULT_MAX_HOPS);
+        file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
     }
 
     config::write_config_file(&project_root, &file_cfg)?;
@@ -506,10 +507,11 @@ fn build_index_options(
     bulk: &BulkIndexArgs,
 ) -> Result<IndexOptions, String> {
     let db_path = merge_database_path(cli, file);
-    let max_hops = bulk
-        .max_hops
-        .or(file.and_then(|toml| toml.max_hops))
-        .unwrap_or(DEFAULT_MAX_HOPS);
+    let max_hops = max_hops_from_user_value(
+        bulk
+            .max_hops
+            .or(file.and_then(|toml| toml.max_hops)),
+    )?;
     let parallel = bulk
         .parallel
         .or(file.and_then(|toml| toml.parallel))
