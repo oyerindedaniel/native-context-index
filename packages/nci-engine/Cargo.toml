@@ -24,7 +24,7 @@ dashmap = "6.1.0"
 clap = { version = "4.6", features = ["derive"] }
 
 [features]
-# Phase/crawl stderr profiling (`NCI_PROFILE=1`). Off by default so release binaries do not read env or log phases unless you build with `--features phase-profile`.
+# Phase/crawl stderr profiling when `NCI_PROFILE=1` (e.g. `cargo run --example demo --features phase-profile -- --profile`).
 phase-profile = []
 
 [[bin]]

@@ -103,6 +103,8 @@ impl NciDatabase {
             PRAGMA foreign_keys = ON;
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA cache_size = -64000;
             ",
         )?;
         run_migrations(&mut connection)?;
@@ -449,7 +451,7 @@ impl NciDatabase {
 
         {
             let mut insert_symbol = transaction.prepare(
-                "INSERT OR REPLACE INTO symbols (
+                "INSERT INTO symbols (
                 package_id, id, name, kind, kind_name, file_path, signature,
                 js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
                 since, is_internal, is_global_augmentation, is_inherited
@@ -538,15 +540,10 @@ impl NciDatabase {
                 }
 
                 for decorator in symbol_node.decorators.iter() {
-                    let arguments_json: Option<String> =
-                        decorator.arguments.as_ref().map(|argument_arc| {
-                            let collected: Vec<&str> = argument_arc
-                                .iter()
-                                .map(|argument_string| argument_string.as_ref())
-                                .collect();
-                            serde_json::to_string(&collected)
-                                .unwrap_or_else(|_json_error| "[]".to_string())
-                        });
+                    let arguments_json = decorator
+                        .arguments
+                        .as_ref()
+                        .map(|args| decorator_arguments_json(args.as_ref()));
                     insert_decorator.execute(rusqlite::params![
                         symbol_row_id,
                         decorator.name.as_ref(),
@@ -556,7 +553,28 @@ impl NciDatabase {
             }
         }
 
+        // No AFTER INSERT trigger on `symbols`: FTS5 is synced here only. Any other INSERT into
+        // `symbols` must update `symbols_fts` too or MATCH queries will miss those rows.
+        transaction.execute(
+            "INSERT INTO symbols_fts(rowid, name, signature, js_doc)
+             SELECT symbol_id, name, COALESCE(signature, ''), COALESCE(js_doc, '')
+             FROM symbols WHERE package_id = ?1",
+            [package_id],
+        )?;
+
+        transaction.execute(
+            "INSERT INTO symbols_fts(symbols_fts) VALUES('integrity-check')",
+            [],
+        )?;
+
         transaction.commit()?;
+        trace!(
+            target: "nci_engine::storage",
+            package = %package_info.name,
+            version = %package_info.version,
+            symbol_count = graph.symbols.len(),
+            "save_package committed"
+        );
         Ok(())
     }
 
@@ -947,12 +965,21 @@ fn parse_symbol_space_from_db(text: &str) -> Option<SymbolSpace> {
     }
 }
 
+fn decorator_arguments_json(arguments: &[SharedString]) -> String {
+    if arguments.is_empty() {
+        return "[]".into();
+    }
+    let as_refs: Vec<&str> = arguments.iter().map(|shared| shared.as_ref()).collect();
+    serde_json::to_string(&as_refs).unwrap_or_else(|_| "[]".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::PackageGraph;
     use std::sync::{Arc, Mutex};
     use std::thread;
+    use std::time::Instant;
 
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {
         SymbolNode {
@@ -1065,6 +1092,95 @@ mod tests {
                 "demo-pkg@1.0.0::Base.prototype.x",
                 "demo-pkg@1.0.0::Trait.x",
             ]
+        );
+    }
+
+    #[test]
+    fn save_package_profile_large_graph_smoke() {
+        const N: usize = 3_000;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("large.sqlite")).expect("open");
+        assert_eq!(
+            database.stored_schema_version().expect("schema"),
+            SCHEMA_VERSION
+        );
+        let package_info = PackageInfo {
+            name: SharedString::from("large-prof"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/l"),
+            is_scoped: false,
+        };
+        let mut symbols = Vec::with_capacity(N);
+        for index in 0..N {
+            let mut sym = minimal_symbol(&format!("sym-{index}"), &format!("name-{index}"));
+            sym.js_doc = Some(SharedString::from(format!("token_{index} uniquefts")));
+            symbols.push(sym);
+        }
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols,
+            total_symbols: N,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        let started = Instant::now();
+        database.save_package(&package_info, &graph).expect("save");
+        let ms = started.elapsed().as_secs_f64() * 1000.0;
+        eprintln!(
+            "save_package profile: {N} symbols in {ms:.1} ms (batch FTS + integrity-check)"
+        );
+        let hits = database.find_symbols_fts("uniquefts", 50).expect("fts");
+        assert!(
+            !hits.is_empty(),
+            "FTS should find indexed js_doc tokens after batch populate"
+        );
+        assert!(ms < 600_000.0, "sanity: save should finish in under 10 minutes");
+    }
+
+    #[test]
+    fn fts_survives_save_resave_same_package() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("resave.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("re-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/r"),
+            is_scoped: false,
+        };
+        let graph1 = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![minimal_symbol("a", "alpha")],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database.save_package(&package_info, &graph1).expect("save1");
+        assert!(!database.find_symbols_fts("Hello", 5).expect("fts").is_empty());
+
+        let mut sym2 = minimal_symbol("b", "beta");
+        sym2.js_doc = Some(SharedString::from("ResaveUniqueToken"));
+        let graph2 = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym2],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database.save_package(&package_info, &graph2).expect("save2");
+        let hits = database
+            .find_symbols_fts("ResaveUniqueToken", 10)
+            .expect("fts");
+        assert!(!hits.is_empty());
+        let old = database.find_symbols_fts("Hello", 10).expect("old");
+        assert!(
+            old.is_empty(),
+            "previous package slice should be replaced; old token gone from FTS"
         );
     }
 

@@ -106,19 +106,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS symbols_fts USING fts5(
     content_rowid='symbol_id'
 );
 
+-- No symbols_ai: FTS rows for new symbols are populated in save_package via INSERT...SELECT.
 DROP TRIGGER IF EXISTS symbols_ai;
 DROP TRIGGER IF EXISTS symbols_ad;
 DROP TRIGGER IF EXISTS symbols_au;
-
-CREATE TRIGGER symbols_ai AFTER INSERT ON symbols BEGIN
-  INSERT INTO symbols_fts(rowid, name, signature, js_doc)
-  VALUES (
-    new.symbol_id,
-    new.name,
-    COALESCE(new.signature, ''),
-    COALESCE(new.js_doc, '')
-  );
-END;
 
 CREATE TRIGGER symbols_ad AFTER DELETE ON symbols BEGIN
   INSERT INTO symbols_fts(symbols_fts, rowid, name, signature, js_doc)
