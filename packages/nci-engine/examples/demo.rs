@@ -2,8 +2,13 @@
 //! canonical package directory, then indexes with [`nci_engine::pipeline::index_packages`]
 //! (concurrent per package unless `--sequential`).
 //!
+//! **Recommended:** `cargo run --release -p nci-engine --example demo` (profiling **off** unless you opt in).
+//! For crawl/graph timings on stderr:  
+//! `cargo run --release -p nci-engine --example demo --features phase-profile -- --profile`  
+//! The demo sets `NCI_PROFILE=1` before indexing when you opt in (no restore afterward).
+//!
 //! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (serialize package indexing),
-//! `--skip-write` (skip huge JSON export — for timing index work only), `--profile` (sets `NCI_PROFILE=1`; stderr lines only if built with `--features phase-profile`),
+//! `--skip-write` (skip huge JSON export — for timing index work only), `--profile`,
 //! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling),
 //! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing).
 //!
@@ -14,8 +19,8 @@
 //!
 //! - `NCI_LOG=1` enables stderr logging for `nci_engine` at `debug` (cache and sqlite).
 //! - Or set `RUST_LOG` (see `tracing-subscriber` env filter), e.g. `RUST_LOG=nci_engine=trace`.
-//! - Phase profiling: build with `cargo run -p nci-engine --example demo --features phase-profile`, then
-//!   `NCI_PROFILE=1` or `--profile` prints crawl/graph substeps to stderr (`  [profile] label …ms`).
+//! - Phase profiling: build with `--features phase-profile`, then `--profile` or pre-set `NCI_PROFILE=1`.
+//!   Lines: `  [profile] label …ms`.
 //! - By default this example uses the per-package SQLite cache (`IndexOptions::enable_package_cache`).
 //!   Use `--no-package-cache` or `NCI_INDEX_NO_CACHE=1` to force a fresh crawl and skip the DB.
 //! - One-shot support bundle: `cargo run -p nci-engine --example diagnose`.
@@ -522,9 +527,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("Total ({n_packages} pkgs: scan + index all)"),
         format_duration_ms(total_packages_run_ms),
         width = timing_w
-    );
-    println!(
-        "   Crawl/build column is for crawled packages only (0 if cached); parallel work means do not add rows for wall-clock total."
     );
 
     Ok(())
