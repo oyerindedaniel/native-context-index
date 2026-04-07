@@ -64,16 +64,9 @@ pub struct IndexOptions {
     /// slow `save_package` without queuing an unbounded number of full graphs in memory.
     pub save_queue_capacity: Option<usize>,
 
-    /// How many times the writer thread calls `save_package` per package before giving up.
-    /// **`1`** means a single attempt (no retries). Failed saves still return the in-memory graph.
-    pub save_max_attempts: u32,
-
-    /// Milliseconds to sleep before each **retry** after a failed save (not before the first try).
-    pub save_retry_delay_ms: u64,
-
-    /// Extra sleep uniformly sampled from **`0..=save_retry_jitter_ms`** and added on top of
-    /// [`Self::save_retry_delay_ms`] before each retry. **`0`** disables jitter.
-    pub save_retry_jitter_ms: u64,
+    /// Extra `save_package` attempts after the first try fails (writer thread). **`0`** = one try
+    /// only. Backoff between retries is fixed internally (bounded ms + clock jitter).
+    pub save_retry_count: u32,
 }
 
 impl Default for IndexOptions {
@@ -89,23 +82,19 @@ impl Default for IndexOptions {
             hydrate_cache_hits: false,
             retain_graph_after_save: false,
             save_queue_capacity: None,
-            save_max_attempts: 1,
-            save_retry_delay_ms: 50,
-            save_retry_jitter_ms: 0,
+            save_retry_count: 0,
         }
     }
 }
 
-fn sleep_before_save_retry(delay_ms: u64, jitter_ms: u64) {
-    let jitter = if jitter_ms == 0 {
-        0u64
-    } else {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|elapsed| (elapsed.subsec_nanos() as u64) % jitter_ms.saturating_add(1))
-            .unwrap_or(0)
-    };
-    thread::sleep(Duration::from_millis(delay_ms.saturating_add(jitter)));
+fn sleep_after_failed_save_attempt() {
+    const BASE_MS: u64 = 35;
+    const SPAN_MS: u64 = 40;
+    let extra = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| (elapsed.subsec_nanos() as u64) % (SPAN_MS + 1))
+        .unwrap_or(0);
+    thread::sleep(Duration::from_millis(BASE_MS + extra));
 }
 
 fn default_save_queue_depth() -> usize {
@@ -342,9 +331,7 @@ pub fn index_packages(
         let results_thread = Arc::clone(&results);
         let sqlite_path_owned = sqlite_path.clone();
         let retain = index_opts.retain_graph_after_save;
-        let save_max_attempts = index_opts.save_max_attempts;
-        let save_retry_delay_ms = index_opts.save_retry_delay_ms;
-        let save_retry_jitter_ms = index_opts.save_retry_jitter_ms;
+        let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
         let join = std::thread::spawn(move || {
             let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
                 Ok(database) => Some(database),
@@ -360,10 +347,9 @@ pub fn index_packages(
             while let Ok((idx, package, graph)) = save_rx.recv() {
                 let slot = &results_thread[idx];
                 let indexed = if let Some(ref mut db) = db_opt {
-                    let attempts = save_max_attempts.max(1);
                     let mut last_err = None;
                     let mut saved = false;
-                    for attempt in 0..attempts {
+                    for attempt in 0..save_attempts {
                         match db.save_package(&package, &graph) {
                             Ok(()) => {
                                 saved = true;
@@ -371,17 +357,14 @@ pub fn index_packages(
                             }
                             Err(err) => {
                                 last_err = Some(err);
-                                if attempt + 1 < attempts {
+                                if attempt + 1 < save_attempts {
                                     trace!(
                                         package = %package.name.as_ref(),
                                         attempt = attempt + 1,
-                                        max = attempts,
+                                        max = save_attempts,
                                         "save_package failed; retrying after delay"
                                     );
-                                    sleep_before_save_retry(
-                                        save_retry_delay_ms,
-                                        save_retry_jitter_ms,
-                                    );
+                                    sleep_after_failed_save_attempt();
                                 }
                             }
                         }
@@ -406,7 +389,7 @@ pub fn index_packages(
                         let err = last_err.expect("save_package failed without error");
                         warn!(
                             package = %package.name.as_ref(),
-                            attempts = attempts,
+                            attempts = save_attempts,
                             error = %err,
                             "save_package failed"
                         );
