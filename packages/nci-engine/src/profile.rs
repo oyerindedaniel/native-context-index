@@ -1,10 +1,5 @@
-//! Optional stderr profiling for nci-engine.
-//!
-//! Without the `phase-profile` Cargo feature (the default), this module compiles to **no-ops**:
-//! no stderr I/O and **no** `NCI_PROFILE` / env checks — zero publication-time cost.
-//!
-//! With `phase-profile`, output is gated on `NCI_PROFILE=1`. The flag is read **once** per process
-//! (`OnceLock`) so call sites stay cheap when profiling is enabled.
+//! Optional stderr phase profiling. Build with `phase-profile`; logs when `NCI_PROFILE=1`.
+//! Without the feature the public API is stubbed out. With it, `NCI_PROFILE` is read once per process (`OnceLock`).
 
 #[cfg(feature = "phase-profile")]
 use std::io::Write;

@@ -55,7 +55,7 @@ pub struct IndexOptions {
     ///
     /// Default **`false`**: only [`PackageIndexMetadata`] is attached (`graph: None`) to lower RAM
     /// for production-style indexing. Ignored when [`Self::enable_package_cache`] is false or when
-    /// no save ran (e.g. symlink packages). On save failure the graph is still returned.
+    /// no save ran (e.g. symlink packages). After all save attempts fail, the graph is dropped.
     pub retain_graph_after_save: bool,
 
     /// Capacity of the bounded channel from crawl workers to the SQLite writer thread.
@@ -393,10 +393,12 @@ pub fn index_packages(
                             error = %err,
                             "save_package failed"
                         );
+                        let meta = index_metadata_from_graph(&graph);
+                        drop(graph);
                         IndexedGraph {
-                            graph: Some(graph),
+                            graph: None,
                             source: GraphSource::Crawled,
-                            cache_metadata: None,
+                            cache_metadata: Some(meta),
                         }
                     }
                 } else {
