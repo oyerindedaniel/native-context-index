@@ -9,6 +9,13 @@ pub enum ScanError {
     #[error("node_modules not found at: {path}")]
     NotFound { path: PathBuf },
 
+    #[error("no package {name}@{version} under {path}")]
+    PackageVersionNotInNodeModules {
+        name: String,
+        version: String,
+        path: PathBuf,
+    },
+
     #[error("IO error during scan: {source}")]
     Io {
         #[from]
@@ -53,6 +60,25 @@ pub fn scan_packages(node_modules_path: &Path) -> Result<Vec<PackageInfo>, ScanE
     }
 
     Ok(packages)
+}
+
+/// Resolve a single package from `node_modules` by exact `package.json` name and version.
+pub fn find_package_in_node_modules(
+    node_modules_path: &Path,
+    name: &str,
+    version: &str,
+) -> Result<PackageInfo, ScanError> {
+    let mut found: Option<PackageInfo> = None;
+    for package in scan_packages(node_modules_path)? {
+        if package.name.as_ref() == name && package.version.as_ref() == version && found.is_none() {
+            found = Some(package);
+        }
+    }
+    found.ok_or_else(|| ScanError::PackageVersionNotInNodeModules {
+        name: name.to_string(),
+        version: version.to_string(),
+        path: node_modules_path.to_path_buf(),
+    })
 }
 
 fn scan_scoped_packages(

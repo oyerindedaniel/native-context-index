@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod config;
 pub mod constants;
 pub mod crawler;
 pub mod dedupe;
@@ -15,5 +16,5 @@ pub mod types;
 
 pub use cache::{NCI_ENGINE_VERSION, nci_sqlite_path};
 pub use filter::{DepKindFilter, FilterConfig, IgnoreRule};
-pub use storage::{NciDatabase, SCHEMA_VERSION, StorageError, StorageResult};
+pub use storage::{DatabaseStatusReport, NciDatabase, SCHEMA_VERSION, StorageError, StorageResult};
 pub use types::PackageIndexMetadata;

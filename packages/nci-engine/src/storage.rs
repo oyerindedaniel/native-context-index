@@ -1,9 +1,10 @@
 //! SQLite-backed NCI index: packages, symbols, and FTS5 search.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+use serde::Serialize;
 use tracing::{info, trace, warn};
 
 use crate::cache::NCI_ENGINE_VERSION;
@@ -27,6 +28,21 @@ pub enum StorageError {
 pub type StorageResult<T> = Result<T, StorageError>;
 
 pub use crate::storage_migrations::SCHEMA_VERSION;
+
+/// Introspection snapshot for `nci db status` (plain or JSON).
+#[derive(Debug, Clone, Serialize)]
+pub struct DatabaseStatusReport {
+    pub path: PathBuf,
+    pub file_size_bytes: Option<u64>,
+    pub page_size: i64,
+    pub page_count: i64,
+    pub database_size_bytes_approx: u64,
+    pub journal_mode: String,
+    pub schema_version: u32,
+    pub integrity_check: String,
+    /// `NCI_CACHE_DIR` when set, else `null` in JSON.
+    pub nci_cache_dir: Option<String>,
+}
 
 fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
     use tracing::debug;
@@ -139,6 +155,68 @@ impl NciDatabase {
             .connection
             .query_row("PRAGMA journal_mode", [], |row| row.get::<_, String>(0))?;
         Ok(label)
+    }
+
+    pub fn pragma_page_size(&self) -> StorageResult<i64> {
+        self.connection
+            .query_row("PRAGMA page_size", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
+    pub fn pragma_page_count(&self) -> StorageResult<i64> {
+        self.connection
+            .query_row("PRAGMA page_count", [], |row| row.get(0))
+            .map_err(Into::into)
+    }
+
+    /// One-line summary: `ok` or the first integrity message.
+    pub fn pragma_integrity_check_line(&self) -> StorageResult<String> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA integrity_check")
+            .map_err(StorageError::from)?;
+        let mut rows = statement.query([]).map_err(StorageError::from)?;
+        if let Some(row) = rows.next().map_err(StorageError::from)? {
+            Ok(row.get::<_, String>(0)?)
+        } else {
+            Ok(String::new())
+        }
+    }
+
+    pub fn vacuum(&self) -> StorageResult<()> {
+        self.connection.execute("VACUUM", [])?;
+        Ok(())
+    }
+
+    /// `PRAGMA wal_checkpoint(TRUNCATE)` — moves WAL pages into the DB file and truncates the WAL.
+    pub fn wal_checkpoint_truncate(&self) -> StorageResult<()> {
+        self.connection
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(StorageError::from)
+    }
+
+    /// Fill [`DatabaseStatusReport`] using this connection plus optional filesystem metadata for `path`.
+    pub fn status_report(&self, db_path: &Path) -> StorageResult<DatabaseStatusReport> {
+        let page_size = self.pragma_page_size()?;
+        let page_count = self.pragma_page_count()?;
+        let approx = (page_size.max(0) as u64).saturating_mul(page_count.max(0) as u64);
+        let file_size_bytes = std::fs::metadata(db_path).ok().map(|meta| meta.len());
+        let journal_mode = self.journal_mode_label()?;
+        let schema_version = self.stored_schema_version()?;
+        let integrity_check = self.pragma_integrity_check_line()?;
+        let nci_cache_dir = std::env::var_os("NCI_CACHE_DIR")
+            .map(|value| value.to_string_lossy().into_owned());
+        Ok(DatabaseStatusReport {
+            path: db_path.to_path_buf(),
+            file_size_bytes,
+            page_size,
+            page_count,
+            database_size_bytes_approx: approx,
+            journal_mode,
+            schema_version,
+            integrity_check,
+            nci_cache_dir,
+        })
     }
 
     pub fn has_cached_package(&self, package_info: &PackageInfo, engine_version: &str) -> bool {

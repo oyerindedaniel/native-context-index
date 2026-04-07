@@ -22,6 +22,9 @@ rusqlite = { version = "0.39", features = ["bundled"] }
 tracing = "0.1"
 dashmap = "6.1.0"
 clap = { version = "4.6", features = ["derive"] }
+toml = "0.8.23"
+dialoguer = "0.11.0"
+clap_complete = "4.6.0"
 
 [features]
 # Phase/crawl stderr profiling when `NCI_PROFILE=1` (e.g. `cargo run --example demo --features phase-profile -- --profile`).
@@ -32,7 +35,9 @@ name = "nci"
 path = "src/main.rs"
 
 [dev-dependencies]
+assert_cmd = "2.2.0"
 dotenvy = "0.15.7"
 insta = { version = "1.46.3", features = ["json"] }
+predicates = "3"
 tempfile = "3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

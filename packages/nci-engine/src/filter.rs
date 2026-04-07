@@ -35,6 +35,10 @@ pub struct FilterConfig {
     pub include_names: HashSet<String>,
     /// Glob-style exclude patterns checked after ignore rules (e.g. CLI `--exclude`).
     pub exclude_patterns: Vec<String>,
+
+    /// When non-empty, only packages whose names match at least one of these globs are kept
+    /// (e.g. repeatable CLI `--package` or `.nci.toml` `packages`).
+    pub include_globs: Vec<String>,
 }
 
 /// One line from `.nciignore`: positive pattern ignores; `negated` means "do not ignore".
@@ -75,6 +79,14 @@ impl FilterConfig {
             .filter(|package_info| {
                 let name = package_info.name.as_ref();
                 if !self.include_names.is_empty() && !self.include_names.contains(name) {
+                    return false;
+                }
+                if !self.include_globs.is_empty()
+                    && !self
+                        .include_globs
+                        .iter()
+                        .any(|pattern| package_matches_glob(name, pattern))
+                {
                     return false;
                 }
                 if let Some(allowed) = &allowed_by_package_json
@@ -546,6 +558,25 @@ mod tests {
     fn apply_empty_include_names_does_not_restrict_by_name() {
         let out = FilterConfig::default().apply(vec![sample_package("a"), sample_package("b")]);
         assert_eq!(out.len(), 2);
+    }
+
+    #[test]
+    fn apply_include_globs_keeps_only_matches() {
+        let out = FilterConfig {
+            include_globs: vec!["react*".into()],
+            ..Default::default()
+        }
+        .apply(vec![
+            sample_package("react"),
+            sample_package("react-dom"),
+            sample_package("lodash"),
+        ]);
+
+        assert_eq!(out.len(), 2);
+        let names: Vec<_> = out.iter().map(|pkg| pkg.name.as_ref()).collect();
+        assert!(names.contains(&"react"));
+        assert!(names.contains(&"react-dom"));
+        assert!(!names.contains(&"lodash"));
     }
 
     #[test]
