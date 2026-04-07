@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
-use tracing::{info, warn};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+use tracing::{info, trace, warn};
 
 use crate::cache::NCI_ENGINE_VERSION;
 use crate::storage_migrations::{read_schema_version, MIGRATIONS, META_SCHEMA_KEY};
@@ -106,6 +106,25 @@ impl NciDatabase {
             ",
         )?;
         run_migrations(&mut connection)?;
+        Ok(Self { connection })
+    }
+
+    /// Read-only connection for concurrent cache probes while another connection writes (WAL).
+    ///
+    /// Does not run migrations (read-only). Callers should open a read-write [`Self::open`] first
+    /// so schema is initialized. One connection per thread (see `rusqlite` / SQLite threading rules).
+    pub fn open_read_only(path: impl AsRef<Path>) -> StorageResult<Self> {
+        let path_ref = path.as_ref();
+        trace!(path = %path_ref.display(), "opening nci sqlite database (read-only)");
+        let connection = Connection::open_with_flags(
+            path_ref,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        connection.execute_batch(
+            "
+            PRAGMA foreign_keys = ON;
+            ",
+        )?;
         Ok(Self { connection })
     }
 

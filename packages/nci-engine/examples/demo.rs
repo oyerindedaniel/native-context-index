@@ -176,7 +176,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     try_init_tracing_from_env();
 
     println!("🔍 Scanning node_modules...\n");
-    let wall_start = Instant::now();
+    // Wall-clock for discover → index all (used for `total_packages_run_ms`; tables/JSON come after).
+    let run_start = Instant::now();
 
     // Same resolution order as the JS demo: repo → `packages/nci-core` → this crate so pnpm
     // hoists merge identically; manifest-dir paths stay correct when CWD is the repo root.
@@ -216,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("📦 Found {} packages\n", discovered_packages.len());
 
-    let scan_dedupe_duration = wall_start.elapsed();
+    let scan_dedupe_duration = run_start.elapsed();
 
     let index_options = Some(IndexOptions {
         max_hops: 10,
@@ -225,6 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         enable_package_cache: !no_package_cache,
         parallel_resolve_deps: !no_parallel_resolve_deps,
         hydrate_cache_hits: true,
+        retain_graph_after_save: true,
         ..Default::default()
     });
 
@@ -232,6 +234,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut indexed_results = index_packages(&discovered_packages, index_options);
     let index_duration = index_start.elapsed();
     let index_wall_ms = index_duration.as_secs_f64() * 1000.0;
+    // One number for “how long did it take to run all packages”: scan + index (crawl, graph, SQLite…
+    // all happen inside `index_packages`). Does not include demo tables or JSON below.
+    let total_packages_run_ms = run_start.elapsed().as_secs_f64() * 1000.0;
 
     let mode_label = if use_sequential {
         "sequential"
@@ -385,9 +390,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             row.build_duration_ms
         );
     }
-    println!(
-        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Values come from the graph (SQLite when cached)."
-    );
+    let crawl_build_footnote = if no_package_cache {
+        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Timings come from the in-memory graph (no package SQLite cache this run)."
+    } else {
+        "   Crawl ms: time inside the crawler (parse + file walk + export resolution). Build ms: entry resolution, merge, dep IDs, inheritance flatten. Values come from the graph in RAM or, on cache hits with hydrate, from SQLite."
+    };
+    println!("{crawl_build_footnote}");
 
     let export_wall_ms = if skip_write {
         println!(
@@ -435,42 +443,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let scan_wall_ms = scan_dedupe_duration.as_secs_f64() * 1000.0;
-    let total_wall_ms = wall_start.elapsed().as_secs_f64() * 1000.0;
 
     println!("\n{}", "═".repeat(86));
-    println!("⏱️  TIMING (wall clock)\n");
+    println!("⏱️  TIMING\n");
     println!("   {:<52} {:>12}", "Phase / metric", "ms");
     println!("   {}", "─".repeat(66));
     println!(
         "   {:<52} {:>12.1}",
-        "Scan node_modules + dedupe (+ filter)", scan_wall_ms
+        "Scan + dedupe (find packages)",
+        scan_wall_ms
+    );
+    let index_wall_label = if no_package_cache {
+        "Index all packages (parallel): crawl + graph build"
+    } else {
+        "Index all packages (parallel): crawl + graph + SQLite"
+    };
+    println!("   {:<52} {:>12.1}", index_wall_label, index_wall_ms);
+    println!(
+        "   {:<52} {:>12.1}",
+        "Slowest single package — crawl phase",
+        crawled_crawl_max_display
     );
     println!(
         "   {:<52} {:>12.1}",
-        "index_packages (wall: parallel index + SQLite)", index_wall_ms
-    );
-    println!(
-        "   {:<52} {:>12.1}",
-        "Σ crawl ms (crawled pkgs only, CPU crawler)", crawled_crawl_sum_display
-    );
-    println!(
-        "   {:<52} {:>12.1}",
-        "Σ build ms (crawled pkgs only, graph assembly)", crawled_build_sum_display
-    );
-    println!(
-        "   {:<52} {:>12.1}",
-        "Max crawl ms (single crawled package)", crawled_crawl_max_display
-    );
-    println!(
-        "   {:<52} {:>12.1}",
-        "Max build ms (single crawled package)", crawled_build_max_display
+        "Slowest single package — graph build phase",
+        crawled_build_max_display
     );
     println!(
         "   {:<52} {:>12.1}",
         "JSON serialize + write (0 if --skip-write)", export_wall_ms
     );
     println!("   {}", "─".repeat(66));
-    println!("   {:<52} {:>12.1}", "Total demo wall", total_wall_ms);
+    let n_packages = indexed_results.len();
+    println!(
+        "   {:<52} {:>12.1}",
+        format!("Total ({n_packages} pkgs: scan + index all)"),
+        total_packages_run_ms
+    );
+    println!(
+        "   Each package’s crawl ms / build ms are in the list above; many run at once, so do not add them for total time."
+    );
 
     Ok(())
 }

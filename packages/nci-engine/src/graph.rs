@@ -998,12 +998,12 @@ fn flatten_inherited_members(
             }
         }
 
-        for mut sym in inherited_by_leaf.into_values() {
+        for mut symbol_node in inherited_by_leaf.into_values() {
             let mut sources: Vec<SharedString> =
-                sym.inherited_from_sources.iter().cloned().collect();
+                symbol_node.inherited_from_sources.iter().cloned().collect();
             sources.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
-            sym.inherited_from_sources = SharedVec::from(sources);
-            synthetic.push(sym);
+            symbol_node.inherited_from_sources = SharedVec::from(sources);
+            synthetic.push(symbol_node);
         }
     }
 

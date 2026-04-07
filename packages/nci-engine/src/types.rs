@@ -542,7 +542,8 @@ pub struct SymbolNode {
 }
 
 /// Row-level index stats for a package when the SQLite cache matches but
-/// a full [`PackageGraph`] is not loaded (see [`crate::pipeline::IndexOptions::hydrate_cache_hits`]).
+/// a full [`PackageGraph`] is not loaded (see [`crate::pipeline::IndexOptions::hydrate_cache_hits`]),
+/// or after a fresh crawl when [`crate::pipeline::IndexOptions::retain_graph_after_save`] is false.
 #[derive(Debug, Clone)]
 pub struct PackageIndexMetadata {
     pub package: SharedString,

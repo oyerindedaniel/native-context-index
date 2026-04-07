@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
@@ -45,6 +47,20 @@ pub struct IndexOptions {
     /// Default is **`false`**: only [`PackageIndexMetadata`] is read. Set **`true`**
     /// for tooling that needs symbols in RAM on a cache hit (e.g. demo JSON export, tests).
     pub hydrate_cache_hits: bool,
+
+    /// After a **successful** SQLite persist of a freshly crawled package, keep the full
+    /// [`PackageGraph`] in [`IndexedGraph`].
+    ///
+    /// Default **`false`**: only [`PackageIndexMetadata`] is attached (`graph: None`) to lower RAM
+    /// for production-style indexing. Ignored when [`Self::enable_package_cache`] is false or when
+    /// no save ran (e.g. symlink packages). On save failure the graph is still returned.
+    pub retain_graph_after_save: bool,
+
+    /// Capacity of the bounded channel from crawl workers to the SQLite writer thread.
+    ///
+    /// When `None`, uses `max(4, rayon_max_threads * 2)` at call time for backpressure against
+    /// slow `save_package` without queuing an unbounded number of full graphs in memory.
+    pub save_queue_capacity: Option<usize>,
 }
 
 impl Default for IndexOptions {
@@ -58,8 +74,115 @@ impl Default for IndexOptions {
             filter: FilterConfig::default(),
             parallel_resolve_deps: true,
             hydrate_cache_hits: false,
+            retain_graph_after_save: false,
+            save_queue_capacity: None,
         }
     }
+}
+
+fn default_save_queue_depth() -> usize {
+    rayon::current_num_threads().saturating_mul(2).max(4)
+}
+
+fn index_metadata_from_graph(graph: &PackageGraph) -> PackageIndexMetadata {
+    PackageIndexMetadata {
+        package: graph.package.clone(),
+        version: graph.version.clone(),
+        total_symbols: graph.total_symbols,
+        total_files: graph.total_files,
+        crawl_duration_ms: graph.crawl_duration_ms,
+        build_duration_ms: graph.build_duration_ms,
+    }
+}
+
+// Rayon has no `ThreadLocal` type (see rayon 1.11 docs). Worker threads are normal OS threads, so
+// `std::thread_local!` gives one read-only `rusqlite` connection per thread without a global mutex.
+// The path is stored alongside the handle so a different `nci.sqlite` path on a later index run
+// reopens correctly on that thread.
+thread_local! {
+    static INDEX_RO_SQLITE: RefCell<Option<(PathBuf, Option<NciDatabase>)>> = const { RefCell::new(None) };
+}
+
+fn with_read_only_index_db<T>(sqlite_path: &Path, f: impl FnOnce(Option<&NciDatabase>) -> T) -> T {
+    INDEX_RO_SQLITE.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let path_buf = sqlite_path.to_path_buf();
+        let need_open = match slot.as_ref() {
+            None => true,
+            Some((cached_path, _)) => cached_path != &path_buf,
+        };
+        if need_open {
+            match NciDatabase::open_read_only(sqlite_path) {
+                Ok(database) => *slot = Some((path_buf, Some(database))),
+                Err(open_error) => {
+                    trace!(
+                        path = %sqlite_path.display(),
+                        error = %open_error,
+                        "read-only sqlite open failed for this thread"
+                    );
+                    *slot = Some((path_buf, None));
+                }
+            }
+        }
+        let db_ref = slot.as_ref().and_then(|(_, db)| db.as_ref());
+        f(db_ref)
+    })
+}
+
+fn try_package_cache_hit(
+    package: &PackageInfo,
+    sqlite_path: &Path,
+    hydrate_cache_hits: bool,
+) -> Option<IndexedGraph> {
+    if cache::package_dir_is_symlink(package) {
+        return None;
+    }
+    with_read_only_index_db(sqlite_path, |db| {
+        let db = db?;
+        if !db.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
+            trace!(
+                package = %package.name.as_ref(),
+                "package cache miss (not in sqlite)"
+            );
+            return None;
+        }
+        if hydrate_cache_hits {
+            if let Some(cached_graph) = db.load_package(package) {
+                trace!(
+                    package = %package.name.as_ref(),
+                    version = %package.version.as_ref(),
+                    "package cache hit (hydrated)"
+                );
+                return Some(IndexedGraph {
+                    graph: Some(cached_graph),
+                    source: GraphSource::Cached,
+                    cache_metadata: None,
+                });
+            }
+            trace!(
+                package = %package.name.as_ref(),
+                "package cache miss (stale engine_version or load failed)"
+            );
+            None
+        } else if let Some(meta) = db.load_package_index_metadata(package) {
+            trace!(
+                package = %package.name.as_ref(),
+                version = %package.version.as_ref(),
+                "package cache hit (metadata only)"
+            );
+            Some(IndexedGraph {
+                graph: None,
+                source: GraphSource::Cached,
+                cache_metadata: Some(meta),
+            })
+        } else {
+            trace!(
+                package = %package.name.as_ref(),
+                "package cache miss (stale engine_version or load failed)"
+            );
+            None
+        }
+    })
 }
 
 fn merge_filter_for_scan(project_root: Option<&Path>, mut filter: FilterConfig) -> FilterConfig {
@@ -141,14 +264,20 @@ pub fn index_packages(
         })
     };
 
-    let database_arc: Option<Arc<Mutex<NciDatabase>>> = if index_opts.enable_package_cache {
+    let n = packages.len();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    // `None` means no SQLite sidecar for this run (probes + saves disabled).
+    let cache_sqlite_path: Option<PathBuf> = if index_opts.enable_package_cache {
         if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
             debug!(path = %path.display(), "package cache enabled");
             match NciDatabase::open(&path) {
-                Ok(database) => Some(Arc::new(Mutex::new(database))),
+                Ok(_) => Some(path),
                 Err(open_error) => {
                     warn!(
                         path = %path.display(),
@@ -167,80 +296,146 @@ pub fn index_packages(
         None
     };
 
-    let build_one = |package: &PackageInfo| -> IndexedGraph {
-        if let Some(database_mutex) = database_arc.as_ref()
-            && !cache::package_dir_is_symlink(package)
-        {
-            let database_guard = database_mutex
-                .lock()
-                .expect("sqlite storage mutex poisoned");
-            if database_guard.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
-                if index_opts.hydrate_cache_hits {
-                    if let Some(cached_graph) = database_guard.load_package(package) {
-                        trace!(
-                            package = %package.name.as_ref(),
-                            version = %package.version.as_ref(),
-                            "package cache hit (hydrated)"
-                        );
-                        return IndexedGraph {
-                            graph: Some(cached_graph),
-                            source: GraphSource::Cached,
-                            cache_metadata: None,
-                        };
-                    }
-                } else if let Some(meta) = database_guard.load_package_index_metadata(package) {
-                    trace!(
-                        package = %package.name.as_ref(),
-                        version = %package.version.as_ref(),
-                        "package cache hit (metadata only)"
+    let queue_capacity = index_opts
+        .save_queue_capacity
+        .unwrap_or_else(default_save_queue_depth);
+
+    let results: Arc<Vec<Mutex<Option<IndexedGraph>>>> =
+        Arc::new((0..n).map(|_| Mutex::new(None)).collect());
+
+    type SaveMsg = (usize, PackageInfo, PackageGraph);
+    let (writer_join, save_tx_shared): (
+        Option<std::thread::JoinHandle<()>>,
+        Option<Arc<mpsc::SyncSender<SaveMsg>>>,
+    ) = if let Some(ref sqlite_path) = cache_sqlite_path {
+        let (save_tx, save_rx) = mpsc::sync_channel::<SaveMsg>(queue_capacity);
+        let save_tx = Arc::new(save_tx);
+        let save_tx_thread = Arc::clone(&save_tx);
+        let results_thread = Arc::clone(&results);
+        let sqlite_path_owned = sqlite_path.clone();
+        let retain = index_opts.retain_graph_after_save;
+        let join = std::thread::spawn(move || {
+            let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
+                Ok(database) => Some(database),
+                Err(open_error) => {
+                    warn!(
+                        path = %sqlite_path_owned.display(),
+                        error = %open_error,
+                        "writer NciDatabase::open failed; skipping sqlite persists"
                     );
-                    return IndexedGraph {
-                        graph: None,
-                        source: GraphSource::Cached,
-                        cache_metadata: Some(meta),
-                    };
+                    None
                 }
-                trace!(
-                    package = %package.name.as_ref(),
-                    "package cache miss (stale engine_version or load failed)"
-                );
-            } else {
-                trace!(
-                    package = %package.name.as_ref(),
-                    "package cache miss (not in sqlite)"
-                );
+            };
+            while let Ok((idx, package, graph)) = save_rx.recv() {
+                let slot = &results_thread[idx];
+                let indexed = if let Some(ref mut db) = db_opt {
+                    match db.save_package(&package, &graph) {
+                        Ok(()) => {
+                            if retain {
+                                IndexedGraph {
+                                    graph: Some(graph),
+                                    source: GraphSource::Crawled,
+                                    cache_metadata: None,
+                                }
+                            } else {
+                                let meta = index_metadata_from_graph(&graph);
+                                drop(graph);
+                                IndexedGraph {
+                                    graph: None,
+                                    source: GraphSource::Crawled,
+                                    cache_metadata: Some(meta),
+                                }
+                            }
+                        }
+                        Err(save_error) => {
+                            warn!(
+                                package = %package.name.as_ref(),
+                                error = %save_error,
+                                "save_package failed"
+                            );
+                            IndexedGraph {
+                                graph: Some(graph),
+                                source: GraphSource::Crawled,
+                                cache_metadata: None,
+                            }
+                        }
+                    }
+                } else {
+                    IndexedGraph {
+                        graph: Some(graph),
+                        source: GraphSource::Crawled,
+                        cache_metadata: None,
+                    }
+                };
+                *slot.lock().expect("indexed result mutex poisoned") = Some(indexed);
+            }
+        });
+        (Some(join), Some(save_tx_thread))
+    } else {
+        (None, None)
+    };
+
+    let hydrate = index_opts.hydrate_cache_hits;
+    let process_index = |i: usize, package: &PackageInfo| {
+        if let Some(ref p) = cache_sqlite_path {
+            if let Some(indexed) = try_package_cache_hit(package, p.as_path(), hydrate) {
+                *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
+                return;
             }
         }
 
         let graph = build_package_graph(package, crawl_options_factory(package));
 
-        if let Some(database_mutex) = database_arc.as_ref()
-            && !cache::package_dir_is_symlink(package)
-        {
-            let mut database_guard = database_mutex
-                .lock()
-                .expect("sqlite storage mutex poisoned");
-            if let Err(save_error) = database_guard.save_package(package, &graph) {
-                warn!(
-                    package = %package.name.as_ref(),
-                    error = %save_error,
-                    "save_package failed"
-                );
-            }
+        let persist_skipped = cache_sqlite_path.is_none() || cache::package_dir_is_symlink(package);
+        if persist_skipped {
+            *results[i].lock().expect("indexed result mutex poisoned") = Some(IndexedGraph {
+                graph: Some(graph),
+                source: GraphSource::Crawled,
+                cache_metadata: None,
+            });
+            return;
         }
 
-        IndexedGraph {
-            graph: Some(graph),
-            source: GraphSource::Crawled,
-            cache_metadata: None,
+        let save_tx = save_tx_shared.as_ref().expect("save channel when sqlite path set");
+        let save_tx = Arc::clone(save_tx);
+        if let Err(send_error) = save_tx.send((i, package.clone(), graph)) {
+            let (_i, _pkg, graph) = send_error.0;
+            warn!(
+                package = %package.name.as_ref(),
+                "save queue disconnected before persist; returning crawled graph without save"
+            );
+            *results[i].lock().expect("indexed result mutex poisoned") = Some(IndexedGraph {
+                graph: Some(graph),
+                source: GraphSource::Crawled,
+                cache_metadata: None,
+            });
         }
     };
 
     if index_opts.parallel {
-        packages.par_iter().map(build_one).collect()
+        packages
+            .par_iter()
+            .enumerate()
+            .for_each(|(i, package)| process_index(i, package));
     } else {
-        packages.iter().map(build_one).collect()
+        for (i, package) in packages.iter().enumerate() {
+            process_index(i, package);
+        }
     }
+
+    drop(save_tx_shared);
+
+    if let Some(join) = writer_join {
+        if let Err(join_error) = join.join() {
+            std::panic::resume_unwind(join_error);
+        }
+    }
+
+    Arc::try_unwrap(results)
+        .expect("results Arc still held")
+        .into_iter()
+        .map(|mutex| mutex.into_inner().expect("indexed result mutex poisoned").expect("indexed slot empty"))
+        .collect()
 }
 
 /// Index a single package by its directory path.
@@ -274,6 +469,8 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    use crate::scanner::scan_packages;
 
     #[test]
     fn index_all_returns_error_for_missing_dir() {
@@ -357,5 +554,84 @@ mod tests {
                 .iter()
                 .any(|symbol| symbol.name == "VALUE".into())
         );
+    }
+
+    #[test]
+    fn index_packages_drops_graph_after_save_when_retain_false() {
+        let temp_dir = TempDir::new().unwrap();
+        let node_modules_dir = temp_dir.path();
+        let db_path = temp_dir.path().join("nci.sqlite");
+
+        let pkg_dir = node_modules_dir.join("tiny-pkg");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            r#"{"name": "tiny-pkg", "version": "1.0.0", "types": "./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("index.d.ts"),
+            "export declare const X: number;",
+        )
+        .unwrap();
+
+        let packages = scan_packages(node_modules_dir).unwrap();
+        let indexed = index_packages(
+            &packages,
+            Some(IndexOptions {
+                parallel: false,
+                enable_package_cache: true,
+                db_path: Some(db_path.clone()),
+                retain_graph_after_save: false,
+                ..Default::default()
+            }),
+        );
+
+        assert_eq!(indexed.len(), 1);
+        assert_eq!(indexed[0].source, GraphSource::Crawled);
+        assert!(
+            indexed[0].graph.is_none(),
+            "expected no graph in RAM after save when retain_graph_after_save is false"
+        );
+        let meta = indexed[0].cache_metadata.as_ref().expect("metadata after crawl+save");
+        assert_eq!(meta.package, "tiny-pkg".into());
+        assert!(meta.total_symbols >= 1);
+    }
+
+    #[test]
+    fn index_packages_keeps_graph_after_save_when_retain_true() {
+        let temp_dir = TempDir::new().unwrap();
+        let node_modules_dir = temp_dir.path();
+        let db_path = temp_dir.path().join("nci.sqlite");
+
+        let pkg_dir = node_modules_dir.join("tiny-pkg2");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            r#"{"name": "tiny-pkg2", "version": "1.0.0", "types": "./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("index.d.ts"),
+            "export declare const Y: number;",
+        )
+        .unwrap();
+
+        let packages = scan_packages(node_modules_dir).unwrap();
+        let indexed = index_packages(
+            &packages,
+            Some(IndexOptions {
+                parallel: false,
+                enable_package_cache: true,
+                db_path: Some(db_path),
+                retain_graph_after_save: true,
+                ..Default::default()
+            }),
+        );
+
+        assert_eq!(indexed.len(), 1);
+        let graph = indexed[0].graph.as_ref().expect("graph retained");
+        assert_eq!(graph.package, "tiny-pkg2".into());
+        assert!(indexed[0].cache_metadata.is_none());
     }
 }
