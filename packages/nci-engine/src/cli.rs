@@ -1,7 +1,7 @@
 //! `nci` binary — command tree, config merge, and output formatting.
 
 use std::fs;
-use std::io::{self, IsTerminal};
+use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
@@ -15,13 +15,16 @@ use nci_engine::constants::{max_hops_from_user_value, DEFAULT_MAX_HOPS};
 use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::scanner::{self, find_package_in_node_modules, ScanError};
-use nci_engine::storage::{DatabaseStatusReport, NciDatabase};
+use nci_engine::storage::{DatabaseStatusReport, NciDatabase, StorageError};
+use serde_json::Value;
 
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, ValueEnum)]
 enum OutputFormat {
     #[default]
     Plain,
     Json,
+    /// Newline-delimited JSON rows (for `nci sql`).
+    Jsonl,
 }
 
 impl OutputFormat {
@@ -29,9 +32,18 @@ impl OutputFormat {
         match text.trim().to_ascii_lowercase().as_str() {
             "plain" => Some(Self::Plain),
             "json" => Some(Self::Json),
+            "jsonl" => Some(Self::Jsonl),
             _ => None,
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+enum SqlRowsFormat {
+    Plain,
+    Json,
+    #[default]
+    Jsonl,
 }
 
 #[derive(Parser)]
@@ -82,6 +94,35 @@ enum Commands {
     Query {
         #[command(subcommand)]
         command: QueryCommands,
+    },
+    #[command(
+        name = "sql",
+        about = "Run SQL that only reads the index (no writes). Use --schema to show how tables are defined.",
+        long_about = "Runs one SQL command on the database file you opened with --database (or your config). Only read-only commands are allowed; commands that change data are rejected. Output: by default each result row is one line of JSON (--format jsonl). Use --format json for one big JSON array, or --format plain for tab-separated text. Use --max-rows N to print at most N rows; the command fails if the query would return more than N rows. In PowerShell, wrap the SQL in quotes, e.g. nci sql -c \"SELECT 1\". Table tips: symbols.since_tag holds the raw @since text; symbols.since_major, since_minor, since_patch hold parsed version numbers when we could read them; packages.indexed_at is the index time as a number (Unix seconds). The SQL text you give is sent to SQLite exactly as you typed it, like the sqlite3 program—do not build it from untrusted input."
+    )]
+    Sql {
+        #[arg(long, help = "Show SQL that creates NCI tables, then exit")]
+        schema: bool,
+        #[arg(
+            short = 'c',
+            long = "command",
+            value_name = "SQL",
+            help = "SQL to run (one command; read-only only)"
+        )]
+        sql: Option<String>,
+        #[arg(
+            long,
+            value_name = "N",
+            help = "Print at most N rows; fail if the query has more rows"
+        )]
+        max_rows: Option<usize>,
+        #[arg(
+            trailing_var_arg = true,
+            allow_hyphen_values = true,
+            value_name = "SQL",
+            help = "Optional extra words joined into the SQL string; if the SQL starts with '-', use: nci sql -- your sql here"
+        )]
+        sql_parts: Vec<String>,
     },
     #[command(about = "Print shell completions")]
     Completions {
@@ -169,6 +210,12 @@ pub fn run() -> Result<(), String> {
         Commands::Db(db) => run_db(&cli, db),
         Commands::Index { target, args } => run_index(&cli, target.as_ref(), args),
         Commands::Query { command } => run_query(&cli, command),
+        Commands::Sql {
+            schema,
+            sql,
+            max_rows,
+            sql_parts,
+        } => run_sql(&cli, *schema, sql.clone(), sql_parts, *max_rows),
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
             let bin_name = cmd.get_name().to_string();
@@ -224,11 +271,41 @@ fn effective_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<OutputFor
                 return Ok(parsed);
             }
             return Err(format!(
-                "invalid format in .nci.toml: {format_str:?} (expected plain or json)"
+                "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
             ));
         }
     }
     Ok(OutputFormat::Plain)
+}
+
+fn envelope_output_format(fmt: OutputFormat) -> OutputFormat {
+    match fmt {
+        OutputFormat::Jsonl => OutputFormat::Json,
+        other => other,
+    }
+}
+
+fn sql_rows_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<SqlRowsFormat, String> {
+    if let Some(flag) = cli.format {
+        return Ok(match flag {
+            OutputFormat::Plain => SqlRowsFormat::Plain,
+            OutputFormat::Json => SqlRowsFormat::Json,
+            OutputFormat::Jsonl => SqlRowsFormat::Jsonl,
+        });
+    }
+    if let Some(toml_cfg) = file {
+        if let Some(format_str) = &toml_cfg.format {
+            return match format_str.trim().to_ascii_lowercase().as_str() {
+                "plain" => Ok(SqlRowsFormat::Plain),
+                "json" => Ok(SqlRowsFormat::Json),
+                "jsonl" => Ok(SqlRowsFormat::Jsonl),
+                _ => Err(format!(
+                    "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
+                )),
+            };
+        }
+    }
+    Ok(SqlRowsFormat::default())
 }
 
 fn merge_database_path(cli: &Cli, file: Option<&NciConfigFile>) -> Option<PathBuf> {
@@ -273,7 +350,7 @@ fn json_err(msg: &str) -> Result<(), String> {
 fn emit_error(fmt: OutputFormat, msg: &str) -> Result<(), String> {
     match fmt {
         OutputFormat::Plain => Err(msg.to_string()),
-        OutputFormat::Json => {
+        OutputFormat::Json | OutputFormat::Jsonl => {
             json_err(msg)?;
             Err(String::new())
         }
@@ -355,8 +432,8 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
             .interact_text()
             .map_err(|err| err.to_string())?;
         let fmt = fmt_line.trim().to_ascii_lowercase();
-        if fmt != "plain" && fmt != "json" {
-            return Err(format!("unknown format {fmt:?}; choose plain or json"));
+        if fmt != "plain" && fmt != "json" && fmt != "jsonl" {
+            return Err(format!("unknown format {fmt:?}; choose plain, json, or jsonl"));
         }
         file_cfg.format = Some(fmt);
 
@@ -393,7 +470,7 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
 fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
     let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
     let file = load_file_for_root(&fs::canonicalize(".").unwrap_or_else(|_| cwd.clone()));
-    let fmt = effective_format(cli, file.as_ref())?;
+    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
 
     match cmd {
         DbCommands::Init => {
@@ -404,7 +481,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                     println!("{}", path.display());
                     println!("sqlite schema version {schema}");
                 }
-                OutputFormat::Json => {
+                OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({
                         "ok": true,
                         "data": {
@@ -422,7 +499,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             let report = database.status_report(&path).map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => print_status_plain(&report),
-                OutputFormat::Json => {
+                OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": report }))?;
                 }
             }
@@ -433,7 +510,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.clear_all_packages().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("cleared all packages"),
-                OutputFormat::Json => print_json(&serde_json::json!({ "ok": true, "data": "cleared" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "cleared" }))?,
             }
             Ok(())
         }
@@ -443,7 +520,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("removed {name} {version}"),
-                OutputFormat::Json => print_json(&serde_json::json!({
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({
                     "ok": true,
                     "data": { "name": name, "version": version }
                 }))?,
@@ -462,7 +539,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             fs::remove_file(&path).map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("removed {}", path.display()),
-                OutputFormat::Json => print_json(&serde_json::json!({ "ok": true, "data": { "path": path } }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": { "path": path } }))?,
             }
             Ok(())
         }
@@ -471,7 +548,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.vacuum().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("vacuum complete"),
-                OutputFormat::Json => print_json(&serde_json::json!({ "ok": true, "data": "vacuum" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "vacuum" }))?,
             }
             Ok(())
         }
@@ -480,7 +557,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.wal_checkpoint_truncate().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("wal_checkpoint(TRUNCATE) complete"),
-                OutputFormat::Json => print_json(&serde_json::json!({ "ok": true, "data": "wal_checkpoint" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "wal_checkpoint" }))?,
             }
             Ok(())
         }
@@ -539,7 +616,7 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
     let discovery = index_config_discovery_dir(bulk)?;
     let file = load_file_for_root(&discovery);
     let project_root = index_effective_project_root(bulk, file.as_ref(), &discovery)?;
-    let fmt = effective_format(cli, file.as_ref())?;
+    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
 
     if bulk.dry_run {
         let node_modules = project_root.join("node_modules");
@@ -555,7 +632,7 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                     println!("{} {}", pkg.name, pkg.version);
                 }
             }
-            OutputFormat::Json => {
+            OutputFormat::Json | OutputFormat::Jsonl => {
                 let rows: Vec<_> = filtered
                     .iter()
                     .map(|pkg| {
@@ -621,7 +698,7 @@ fn print_index_summary(
                 "{n} packages indexed (cached: {cached}, crawled: {crawled})"
             );
         }
-        OutputFormat::Json => {
+        OutputFormat::Json | OutputFormat::Jsonl => {
             print_json(&serde_json::json!({
                 "ok": true,
                 "data": {
@@ -639,7 +716,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
     let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
     let project_root = fs::canonicalize(".").unwrap_or(cwd);
     let file = load_file_for_root(&project_root);
-    let fmt = effective_format(cli, file.as_ref())?;
+    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
     let (_, database) = open_database(cli, file.as_ref())?;
 
     match command {
@@ -656,7 +733,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                         );
                     }
                 }
-                OutputFormat::Json => {
+                OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": { "symbols": symbols } }))?;
                 }
             }
@@ -669,7 +746,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                         println!("{name}\t{ver}");
                     }
                 }
-                OutputFormat::Json => {
+                OutputFormat::Json | OutputFormat::Jsonl => {
                     let list: Vec<_> = rows
                         .into_iter()
                         .map(|(pkg_name, pkg_version)| {
@@ -691,7 +768,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                         println!("{}", symbol.name);
                     }
                 }
-                OutputFormat::Json => {
+                OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({
                         "ok": true,
                         "data": {
@@ -704,5 +781,117 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
             }
         }
     }
+    Ok(())
+}
+
+fn tsv_cell(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(boolean) => boolean.to_string(),
+        Value::Number(number) => number.to_string(),
+        Value::String(text) => text.replace(['\t', '\n', '\r'], " ").to_string(),
+        Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
+    }
+}
+
+fn write_plain_sql_row(
+    out: &mut impl Write,
+    keys: &[String],
+    row: &serde_json::Map<String, Value>,
+) -> Result<(), StorageError> {
+    let line: Vec<String> = keys
+        .iter()
+        .map(|key| tsv_cell(row.get(key).unwrap_or(&Value::Null)))
+        .collect();
+    writeln!(out, "{}", line.join("\t")).map_err(|err| StorageError::SqlOutput(err.to_string()))
+}
+
+fn run_sql(
+    cli: &Cli,
+    schema: bool,
+    sql_flag: Option<String>,
+    sql_parts: &[String],
+    max_rows: Option<usize>,
+) -> Result<(), String> {
+    let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
+    let project_root = fs::canonicalize(".").unwrap_or(cwd);
+    let file = load_file_for_root(&project_root);
+    let rows_fmt = sql_rows_format(cli, file.as_ref())?;
+    let path = resolve_database_path(cli, file.as_ref())?;
+
+    let database = NciDatabase::open_read_only(&path).map_err(|err| err.to_string())?;
+
+    if schema {
+        let text = database
+            .nci_filtered_schema_sql()
+            .map_err(|err| err.to_string())?;
+        println!("{text}");
+        return Ok(());
+    }
+
+    let merged_trailing = if sql_parts.is_empty() {
+        None
+    } else {
+        Some(sql_parts.join(" "))
+    };
+    let sql = sql_flag
+        .clone()
+        .or(merged_trailing)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            "nci sql: provide SQL via -c/--command or trailing arguments, or use --schema (see --help)"
+                .to_string()
+        })?;
+
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    let mut json_array_open = false;
+
+    let summary = database
+        .for_each_readonly_sql_row(&sql, max_rows, |column_keys, row_obj| {
+            match rows_fmt {
+                SqlRowsFormat::Plain => write_plain_sql_row(&mut out, column_keys, &row_obj)?,
+                SqlRowsFormat::Jsonl => {
+                    serde_json::to_writer(&mut out, &row_obj)
+                        .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
+                    writeln!(&mut out)
+                        .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
+                }
+                SqlRowsFormat::Json => {
+                    if !json_array_open {
+                        write!(&mut out, "[").map_err(|err| {
+                            StorageError::SqlOutput(err.to_string())
+                        })?;
+                        json_array_open = true;
+                    } else {
+                        write!(&mut out, ",").map_err(|err| {
+                            StorageError::SqlOutput(err.to_string())
+                        })?;
+                    }
+                    serde_json::to_writer(&mut out, &row_obj)
+                        .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
+                }
+            }
+            Ok(())
+        })
+        .map_err(|err| err.to_string())?;
+
+    if rows_fmt == SqlRowsFormat::Json {
+        if json_array_open {
+            writeln!(&mut out, "]").map_err(|err| err.to_string())?;
+        } else {
+            writeln!(&mut out, "[]").map_err(|err| err.to_string())?;
+        }
+    }
+
+    drop(out);
+
+    if summary.truncated {
+        return Err(format!(
+            "nci sql: output truncated (--max-rows {}); more rows existed",
+            max_rows.expect("truncation requires --max-rows")
+        ));
+    }
+
     Ok(())
 }

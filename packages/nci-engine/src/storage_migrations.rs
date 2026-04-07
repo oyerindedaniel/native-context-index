@@ -25,10 +25,12 @@ CREATE TABLE IF NOT EXISTS packages (
     total_files INTEGER NOT NULL,
     crawl_duration_ms INTEGER NOT NULL,
     build_duration_ms INTEGER NOT NULL,
-    indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    indexed_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
     engine_version TEXT NOT NULL,
     UNIQUE(name, version)
 );
+
+CREATE INDEX IF NOT EXISTS idx_packages_indexed_at ON packages(indexed_at);
 
 CREATE TABLE IF NOT EXISTS symbols (
     symbol_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,9 +45,13 @@ CREATE TABLE IF NOT EXISTS symbols (
     is_type_only INTEGER NOT NULL DEFAULT 0,
     symbol_space TEXT NOT NULL DEFAULT 'value',
     re_exported_from TEXT,
-    deprecated TEXT,
+    deprecated_flag INTEGER NOT NULL DEFAULT 0,
+    deprecated_message TEXT,
     visibility TEXT,
-    since TEXT,
+    since_tag TEXT,
+    since_major INTEGER,
+    since_minor INTEGER,
+    since_patch INTEGER,
     is_internal INTEGER NOT NULL DEFAULT 0,
     is_global_augmentation INTEGER NOT NULL DEFAULT 0,
     is_inherited INTEGER NOT NULL DEFAULT 0,
@@ -55,6 +61,11 @@ CREATE TABLE IF NOT EXISTS symbols (
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_package ON symbols(package_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
+
+CREATE INDEX IF NOT EXISTS idx_symbols_since_semver ON symbols(since_major, since_minor, since_patch);
+
+CREATE INDEX IF NOT EXISTS idx_symbols_deprecated ON symbols(deprecated_flag)
+    WHERE deprecated_flag != 0;
 
 CREATE TABLE IF NOT EXISTS symbol_dependencies (
     from_symbol_id INTEGER NOT NULL REFERENCES symbols(symbol_id) ON DELETE CASCADE,

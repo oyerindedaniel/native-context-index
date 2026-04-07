@@ -246,14 +246,12 @@ pub fn dedupe_packages_by_canonical_dir(packages: Vec<PackageInfo>) -> Vec<Packa
     unique
 }
 
-/// Whether a graph came from the SQLite cache or a fresh crawl.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraphSource {
     Cached,
     Crawled,
 }
 
-/// A graph together with its source (cache hit vs fresh crawl).
 #[derive(Debug)]
 pub struct IndexedGraph {
     pub graph: Option<PackageGraph>,
@@ -419,8 +417,8 @@ pub fn index_packages(
 
     let hydrate = index_opts.hydrate_cache_hits;
     let process_index = |i: usize, package: &PackageInfo| {
-        if let Some(ref p) = cache_sqlite_path {
-            if let Some(indexed) = try_package_cache_hit(package, p.as_path(), hydrate) {
+        if let Some(ref path) = cache_sqlite_path {
+            if let Some(indexed) = try_package_cache_hit(package, path.as_path(), hydrate) {
                 *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
                 return;
             }
@@ -484,12 +482,6 @@ pub fn index_packages(
 ///
 /// Useful for targeted indexing of a specific package without scanning
 /// all of `node_modules`.
-///
-/// # Arguments
-/// * `package_dir` - Absolute path to the package directory.
-/// * `name` - Package name (e.g., `"react"` or `"@types/react"`).
-/// * `version` - Package version string.
-/// * `options` - Optional crawl configuration.
 pub fn index_single(
     package_dir: &Path,
     name: &str,

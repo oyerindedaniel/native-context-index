@@ -132,6 +132,182 @@ fn write_minimal_pkg(root: &Path, name: &str, version: &str) {
 }
 
 #[test]
+fn sql_schema_includes_packages_ddl() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqlsc.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args(["sql", "--schema", "--database", db_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("CREATE TABLE packages"));
+}
+
+#[test]
+fn sql_select_json_array() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqlj.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "sql",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "-c",
+            "SELECT 1 AS v",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[{\"v\":1}]"));
+}
+
+#[test]
+fn sql_jsonl_one_line_per_row() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqll.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    let out = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "sql",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "jsonl",
+            "-c",
+            "SELECT 1 AS a UNION SELECT 2 AS a",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(out).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 2, "jsonl: {text:?}");
+}
+
+#[test]
+fn sql_rejects_mutating_statement() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqlm.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "sql",
+            "--database",
+            db_path.to_str().unwrap(),
+            "-c",
+            "DELETE FROM packages",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("read-only"));
+}
+
+#[test]
+fn sql_explain_query_plan_allowed() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqle.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "sql",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "plain",
+            "-c",
+            "EXPLAIN QUERY PLAN SELECT 1",
+        ])
+        .assert()
+        .success();
+}
+
+#[test]
+fn sql_max_rows_truncation_errors() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("sqlt.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "sql",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "plain",
+            "--max-rows",
+            "1",
+            "-c",
+            "SELECT 1 AS x UNION SELECT 2 AS x",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("truncated"));
+}
+
+#[test]
 fn index_one_package_smoke() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();

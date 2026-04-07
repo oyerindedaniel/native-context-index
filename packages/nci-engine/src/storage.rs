@@ -3,8 +3,10 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
+use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
 
 use crate::cache::NCI_ENGINE_VERSION;
@@ -23,11 +25,25 @@ pub enum StorageError {
 
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
+
+    #[error("only read-only SQL is allowed (for example SELECT or EXPLAIN QUERY PLAN)")]
+    StatementNotReadOnly,
+
+    #[error("sql output: {0}")]
+    SqlOutput(String),
 }
 
 pub type StorageResult<T> = Result<T, StorageError>;
 
 pub use crate::storage_migrations::SCHEMA_VERSION;
+
+/// Result of streaming a user SQL query via [`NciDatabase::for_each_readonly_sql_row`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SqlRunSummary {
+    pub row_count: usize,
+    /// True when `max_rows` was hit and at least one further row existed.
+    pub truncated: bool,
+}
 
 /// Introspection snapshot for `nci db status` (plain or JSON).
 #[derive(Debug, Clone, Serialize)]
@@ -142,6 +158,7 @@ impl NciDatabase {
         connection.execute_batch(
             "
             PRAGMA foreign_keys = ON;
+            PRAGMA busy_timeout = 30000;
             ",
         )?;
         Ok(Self { connection })
@@ -354,8 +371,10 @@ impl NciDatabase {
             .connection
             .prepare(
                 "SELECT symbol_id, id, name, kind, kind_name, file_path, signature,
-                        js_doc, is_type_only, symbol_space, re_exported_from, deprecated,
-                        visibility, since, is_internal, is_global_augmentation, is_inherited
+                        js_doc, is_type_only, symbol_space, re_exported_from,
+                        deprecated_flag, deprecated_message, visibility,
+                        since_tag, since_major, since_minor, since_patch,
+                        is_internal, is_global_augmentation, is_inherited
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -374,12 +393,16 @@ impl NciDatabase {
                     symbol_row.get::<_, i64>(8)?,
                     symbol_row.get::<_, String>(9)?,
                     symbol_row.get::<_, Option<String>>(10)?,
-                    symbol_row.get::<_, Option<String>>(11)?,
+                    symbol_row.get::<_, i64>(11)?,
                     symbol_row.get::<_, Option<String>>(12)?,
                     symbol_row.get::<_, Option<String>>(13)?,
-                    symbol_row.get::<_, i64>(14)?,
-                    symbol_row.get::<_, i64>(15)?,
-                    symbol_row.get::<_, i64>(16)?,
+                    symbol_row.get::<_, Option<String>>(14)?,
+                    symbol_row.get::<_, Option<i64>>(15)?,
+                    symbol_row.get::<_, Option<i64>>(16)?,
+                    symbol_row.get::<_, Option<i64>>(17)?,
+                    symbol_row.get::<_, i64>(18)?,
+                    symbol_row.get::<_, i64>(19)?,
+                    symbol_row.get::<_, i64>(20)?,
                 ))
             })
             .ok()?;
@@ -401,9 +424,13 @@ impl NciDatabase {
                 is_type_only_int,
                 symbol_space_text,
                 re_exported_from_opt,
-                deprecated_opt,
+                deprecated_flag,
+                deprecated_message,
                 visibility_opt,
-                since_opt,
+                since_tag,
+                _since_major,
+                _since_minor,
+                _since_patch,
                 is_internal_int,
                 is_global_augmentation_int,
                 is_inherited_int,
@@ -445,7 +472,7 @@ impl NciDatabase {
                     .into_boxed_slice(),
             );
 
-            let deprecated = deprecated_opt.and_then(parse_deprecated_from_db);
+            let deprecated = deprecation_from_columns(deprecated_flag, deprecated_message);
             let visibility = visibility_opt.and_then(parse_visibility_from_db);
             let symbol_space =
                 parse_symbol_space_from_db(&symbol_space_text).unwrap_or(SymbolSpace::Value);
@@ -466,7 +493,7 @@ impl NciDatabase {
                 re_exported_from: re_exported_from_opt.map(SharedString::from),
                 deprecated,
                 visibility,
-                since: since_opt.map(SharedString::from),
+                since: since_tag.map(SharedString::from),
                 is_internal: is_internal_int != 0,
                 is_global_augmentation: is_global_augmentation_int != 0,
                 decorators,
@@ -532,9 +559,11 @@ impl NciDatabase {
             let mut insert_symbol = transaction.prepare(
                 "INSERT INTO symbols (
                 package_id, id, name, kind, kind_name, file_path, signature,
-                js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                since, is_internal, is_global_augmentation, is_inherited
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                js_doc, is_type_only, symbol_space, re_exported_from,
+                deprecated_flag, deprecated_message, visibility,
+                since_tag, since_major, since_minor, since_patch,
+                is_internal, is_global_augmentation, is_inherited
+                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
             )?;
 
             let mut insert_inherited = transaction.prepare(
@@ -558,9 +587,14 @@ impl NciDatabase {
             )?;
 
             for symbol_node in &graph.symbols {
-                let deprecated_text = symbol_node.deprecated.as_ref().map(deprecated_to_db_string);
+                let (deprecated_flag, deprecated_message) =
+                    deprecation_to_columns(symbol_node.deprecated.as_ref());
                 let visibility_text = symbol_node.visibility.as_ref().map(visibility_to_db_string);
                 let symbol_space_text = symbol_space_to_db_string(symbol_node.symbol_space);
+                let since_tag = symbol_node.since.as_ref().map(|value| value.as_ref());
+                let (since_major, since_minor, since_patch) = since_tag
+                    .map(parse_since_semver_triple)
+                    .unwrap_or((None, None, None));
 
                 insert_symbol.execute(rusqlite::params![
                     package_id,
@@ -577,9 +611,13 @@ impl NciDatabase {
                         .re_exported_from
                         .as_ref()
                         .map(|value| value.as_ref()),
-                    deprecated_text.as_deref(),
+                    deprecated_flag,
+                    deprecated_message.as_deref(),
                     visibility_text,
-                    symbol_node.since.as_ref().map(|value| value.as_ref()),
+                    since_tag,
+                    since_major,
+                    since_minor,
+                    since_patch,
                     if symbol_node.is_internal { 1i64 } else { 0i64 },
                     if symbol_node.is_global_augmentation {
                         1i64
@@ -707,8 +745,10 @@ impl NciDatabase {
             .connection
             .query_row(
                 "SELECT package_id, id, name, kind, kind_name, file_path, signature,
-                        js_doc, is_type_only, symbol_space, re_exported_from, deprecated, visibility,
-                        since, is_internal, is_global_augmentation, is_inherited
+                        js_doc, is_type_only, symbol_space, re_exported_from,
+                        deprecated_flag, deprecated_message, visibility,
+                        since_tag, since_major, since_minor, since_patch,
+                        is_internal, is_global_augmentation, is_inherited
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -724,12 +764,16 @@ impl NciDatabase {
                         symbol_row.get::<_, i64>(8)?,
                         symbol_row.get::<_, String>(9)?,
                         symbol_row.get::<_, Option<String>>(10)?,
-                        symbol_row.get::<_, Option<String>>(11)?,
+                        symbol_row.get::<_, i64>(11)?,
                         symbol_row.get::<_, Option<String>>(12)?,
                         symbol_row.get::<_, Option<String>>(13)?,
-                        symbol_row.get::<_, i64>(14)?,
-                        symbol_row.get::<_, i64>(15)?,
-                        symbol_row.get::<_, i64>(16)?,
+                        symbol_row.get::<_, Option<String>>(14)?,
+                        symbol_row.get::<_, Option<i64>>(15)?,
+                        symbol_row.get::<_, Option<i64>>(16)?,
+                        symbol_row.get::<_, Option<i64>>(17)?,
+                        symbol_row.get::<_, i64>(18)?,
+                        symbol_row.get::<_, i64>(19)?,
+                        symbol_row.get::<_, i64>(20)?,
                     ))
                 },
             )
@@ -747,9 +791,13 @@ impl NciDatabase {
             is_type_only_int,
             symbol_space_text,
             re_exported_from_opt,
-            deprecated_opt,
+            deprecated_flag,
+            deprecated_message,
             visibility_opt,
-            since_opt,
+            since_tag,
+            _since_major,
+            _since_minor,
+            _since_patch,
             is_internal_int,
             is_global_augmentation_int,
             is_inherited_int,
@@ -876,7 +924,7 @@ impl NciDatabase {
             SharedVec::from(inherited_vec.into_boxed_slice())
         };
 
-        let deprecated = deprecated_opt.and_then(parse_deprecated_from_db);
+        let deprecated = deprecation_from_columns(deprecated_flag, deprecated_message);
         let visibility = visibility_opt.and_then(parse_visibility_from_db);
         let symbol_space =
             parse_symbol_space_from_db(&symbol_space_text).unwrap_or(SymbolSpace::Value);
@@ -897,7 +945,7 @@ impl NciDatabase {
             re_exported_from: re_exported_from_opt.map(SharedString::from),
             deprecated,
             visibility,
-            since: since_opt.map(SharedString::from),
+            since: since_tag.map(SharedString::from),
             is_internal: is_internal_int != 0,
             is_global_augmentation: is_global_augmentation_int != 0,
             decorators,
@@ -990,24 +1038,184 @@ impl NciDatabase {
         self.connection.execute("DELETE FROM packages", [])?;
         Ok(())
     }
+
+    /// `CREATE TABLE` / `TRIGGER` text for NCI objects (stable name allowlist), for `nci sql --schema`.
+    pub fn nci_filtered_schema_sql(&self) -> StorageResult<String> {
+        let mut statement = self.connection.prepare(
+            "SELECT sql || char(59) AS ddl
+             FROM sqlite_master
+             WHERE sql IS NOT NULL
+               AND (
+                 name = 'nci_meta'
+                 OR name = 'packages'
+                 OR name = 'symbols'
+                 OR name = 'symbols_fts'
+                 OR name LIKE 'symbol\\_%' ESCAPE '\\'
+               )
+             ORDER BY
+               CASE type
+                 WHEN 'table' THEN 0
+                 WHEN 'view' THEN 1
+                 WHEN 'trigger' THEN 2
+                 ELSE 3
+               END,
+               name",
+        )?;
+
+        let mut blocks: Vec<String> = vec![
+            "             -- NCI index schema (internal; version key `schema_version` in nci_meta).\n\
+             -- `packages.indexed_at` is Unix seconds (INTEGER). `symbols.since_*` is semver-like; sort by since_major/minor/patch.\n\
+             -- Package `version` remains the manifest string (lexicographic compare only if you need it).\n\
+             -- Example: nci sql -c \"SELECT name, version FROM packages LIMIT 5\"\n"
+                .to_string(),
+        ];
+        let ddl_rows = statement.query_map([], |ddl_row| ddl_row.get::<_, String>(0))?;
+        for ddl in ddl_rows {
+            blocks.push(ddl?);
+        }
+        Ok(blocks.join("\n"))
+    }
+
+    /// Runs a **single** read-only statement (`prepare`); invokes `on_row` for each result row.
+    /// If `max_rows` is `Some(n)`, emits at most `n` rows and sets [`SqlRunSummary::truncated`]
+    /// when another row was available.
+    pub fn for_each_readonly_sql_row<F>(
+        &self,
+        sql: &str,
+        max_rows: Option<usize>,
+        mut on_row: F,
+    ) -> StorageResult<SqlRunSummary>
+    where
+        F: FnMut(&[String], Map<String, Value>) -> StorageResult<()>,
+    {
+        let mut statement = self.connection.prepare(sql)?;
+        if !statement.readonly() {
+            return Err(StorageError::StatementNotReadOnly);
+        }
+        let raw_names: Vec<String> = statement
+            .column_names()
+            .iter()
+            .map(|column_name| (*column_name).to_string())
+            .collect();
+        let column_keys = disambiguate_column_names(&raw_names);
+        let mut rows = statement.query([])?;
+        let mut row_count = 0;
+        let mut truncated = false;
+
+        while let Some(row) = rows.next()? {
+            if let Some(limit) = max_rows {
+                if row_count >= limit {
+                    truncated = true;
+                    break;
+                }
+            }
+            let object = row_to_json_object(&row, &column_keys)?;
+            on_row(&column_keys, object)?;
+            row_count += 1;
+        }
+
+        Ok(SqlRunSummary {
+            row_count,
+            truncated,
+        })
+    }
 }
 
-fn deprecated_to_db_string(deprecation: &Deprecation) -> String {
+fn disambiguate_column_names(raw: &[String]) -> Vec<String> {
+    use std::collections::HashMap;
+
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    let mut out = Vec::with_capacity(raw.len());
+    for name in raw {
+        let ordinal = counts.entry(name.clone()).or_insert(0);
+        *ordinal += 1;
+        if *ordinal == 1 {
+            out.push(name.clone());
+        } else {
+            out.push(format!("{name}__{}", *ordinal));
+        }
+    }
+    out
+}
+
+fn value_ref_to_json(value_ref: ValueRef<'_>) -> Result<Value, rusqlite::Error> {
+    Ok(match value_ref {
+        ValueRef::Null => Value::Null,
+        ValueRef::Integer(i) => Value::Number(i.into()),
+        ValueRef::Real(f) => serde_json::Number::from_f64(f)
+            .map(Value::Number)
+            .unwrap_or_else(|| Value::String(f.to_string())),
+        ValueRef::Text(bytes) => Value::String(String::from_utf8_lossy(bytes).into_owned()),
+        ValueRef::Blob(blob) => Value::String(format!(
+            "hex:{}",
+            blob.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        )),
+    })
+}
+
+fn row_to_json_object(
+    row: &rusqlite::Row<'_>,
+    column_keys: &[String],
+) -> rusqlite::Result<Map<String, Value>> {
+    let mut map = Map::new();
+    for (index, key) in column_keys.iter().enumerate() {
+        map.insert(key.clone(), value_ref_to_json(row.get_ref(index)?)?);
+    }
+    Ok(map)
+}
+
+fn deprecation_to_columns(deprecation: Option<&Deprecation>) -> (i64, Option<String>) {
     match deprecation {
-        Deprecation::Flag(true) => "true".to_string(),
-        Deprecation::Flag(false) => "false".to_string(),
-        Deprecation::Message(message) => message.as_ref().to_string(),
+        None | Some(Deprecation::Flag(false)) => (0, None),
+        Some(Deprecation::Flag(true)) => (1, None),
+        Some(Deprecation::Message(message)) => (1, Some(message.as_ref().to_string())),
     }
 }
 
-fn parse_deprecated_from_db(text: String) -> Option<Deprecation> {
-    if text == "true" {
-        Some(Deprecation::Flag(true))
-    } else if text == "false" {
-        Some(Deprecation::Flag(false))
-    } else {
-        Some(Deprecation::Message(SharedString::from(text)))
+fn deprecation_from_columns(flag: i64, message: Option<String>) -> Option<Deprecation> {
+    if flag == 0 {
+        return None;
     }
+    match message {
+        None => Some(Deprecation::Flag(true)),
+        Some(text) if text.is_empty() => Some(Deprecation::Flag(true)),
+        Some(text) => Some(Deprecation::Message(SharedString::from(text))),
+    }
+}
+
+/// Best-effort semver core `major.minor.patch` from a `@since` tag (optional leading `v`; ignores prerelease/build).
+pub(crate) fn parse_since_semver_triple(raw: &str) -> (Option<i64>, Option<i64>, Option<i64>) {
+    match parse_semver_loose_core(raw) {
+        Some((major, minor, patch)) => (Some(major), Some(minor), Some(patch)),
+        None => (None, None, None),
+    }
+}
+
+fn parse_semver_loose_core(raw: &str) -> Option<(i64, i64, i64)> {
+    let mut scan = raw.trim();
+    if scan.is_empty() {
+        return None;
+    }
+    if let Some(rest) = scan.strip_prefix('v').or_else(|| scan.strip_prefix('V')) {
+        scan = rest.trim_start();
+    }
+    let token = scan.split_whitespace().next()?;
+    let core = token.split('-').next()?;
+    let core = core.split('+').next()?;
+    let parts: Vec<&str> = core.split('.').filter(|piece| !piece.is_empty()).collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let major: i64 = parts[0].parse().ok()?;
+    let minor = parts
+        .get(1)
+        .and_then(|piece| piece.parse().ok())
+        .unwrap_or(0);
+    let patch = parts
+        .get(2)
+        .and_then(|piece| piece.parse().ok())
+        .unwrap_or(0);
+    Some((major, minor, patch))
 }
 
 fn visibility_to_db_string(visibility: &Visibility) -> &'static str {
@@ -1059,6 +1267,62 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Instant;
+
+    #[test]
+    fn since_semver_parse_loose() {
+        assert_eq!(
+            parse_since_semver_triple("2.0.0"),
+            (Some(2), Some(0), Some(0))
+        );
+        assert_eq!(
+            parse_since_semver_triple("v1.2.3-rc.1"),
+            (Some(1), Some(2), Some(3))
+        );
+        assert_eq!(parse_since_semver_triple("12"), (Some(12), Some(0), Some(0)));
+        assert_eq!(
+            parse_since_semver_triple("not-a-version"),
+            (None, None, None)
+        );
+    }
+
+    #[test]
+    fn deprecation_and_since_columns_roundtrip() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("dep_since.sqlite");
+        let mut database = NciDatabase::open(&path).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("demo-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/x"),
+            is_scoped: false,
+        };
+        let mut sym = minimal_symbol("sym-dep", "fnDep");
+        sym.since = Some(SharedString::from("v4.5.6"));
+        sym.deprecated = Some(Deprecation::Message(SharedString::from("use other")));
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database.save_package(&package_info, &graph).expect("save");
+        let loaded = database.load_package(&package_info).expect("load");
+        assert_eq!(
+            loaded.symbols[0].since.as_ref().map(|value| value.as_ref()),
+            Some("v4.5.6")
+        );
+        match loaded.symbols[0].deprecated.as_ref() {
+            Some(Deprecation::Message(m)) => assert_eq!(m.as_ref(), "use other"),
+            other => panic!("expected deprecated message, got {other:?}"),
+        }
+        assert_eq!(
+            parse_since_semver_triple("v4.5.6"),
+            (Some(4), Some(5), Some(6))
+        );
+    }
 
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {
         SymbolNode {
@@ -1339,6 +1603,52 @@ mod tests {
         for handle in handles {
             handle.join().expect("join");
         }
+    }
+
+    #[test]
+    fn adhoc_sql_readonly_select_and_reject_write() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("adhoc.sql");
+        let database = NciDatabase::open(&path).expect("open");
+
+        let mut collected = Vec::new();
+        let summary = database
+            .for_each_readonly_sql_row("SELECT 2 AS n, 'hi' AS t", None, |_keys, row| {
+                collected.push(row);
+                Ok(())
+            })
+            .expect("select");
+        assert_eq!(summary.row_count, 1);
+        assert!(!summary.truncated);
+        assert_eq!(collected[0]["n"], serde_json::json!(2));
+        assert_eq!(collected[0]["t"], serde_json::json!("hi"));
+
+        let read_only_db = NciDatabase::open_read_only(&path).expect("read-only open");
+        let err = read_only_db
+            .for_each_readonly_sql_row("DELETE FROM packages", None, |_, _| Ok(()))
+            .expect_err("mutating sql");
+        assert!(matches!(err, StorageError::StatementNotReadOnly));
+    }
+
+    #[test]
+    fn adhoc_sql_max_rows_truncates() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("trunc.sql");
+        let database = NciDatabase::open(&path).expect("open");
+
+        let mut n = 0;
+        let summary = database
+            .for_each_readonly_sql_row(
+                "SELECT 1 AS x UNION SELECT 2 AS x",
+                Some(1),
+                |_, _| {
+                    n += 1;
+                    Ok(())
+                },
+            )
+            .expect("run");
+        assert_eq!(n, 1);
+        assert!(summary.truncated);
     }
 
     #[test]
