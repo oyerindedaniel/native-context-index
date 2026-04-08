@@ -330,11 +330,47 @@ fn expand_wildcard_subpath(package_dir: &Path, value: &serde_json::Value) -> Vec
     }
 
     let glob_regex = glob_to_regexp(&pattern);
-    let all_files = scan_directory_recursive(&scan_directory);
     let mut matching_entries: Vec<SharedString> = Vec::new();
+    collect_wildcard_declaration_files(
+        package_dir,
+        &scan_directory,
+        &glob_regex,
+        &mut matching_entries,
+    );
 
-    for candidate_path in &all_files {
-        let relative_to_package = match candidate_path.strip_prefix(package_dir) {
+    // read_dir order is platform-dependent; stable sort keeps crawl + symbol id suffixes consistent in CI.
+    matching_entries.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
+    matching_entries
+}
+
+fn collect_wildcard_declaration_files(
+    package_dir: &Path,
+    scan_directory: &Path,
+    glob_regex: &Regex,
+    out: &mut Vec<SharedString>,
+) {
+    let entries = match fs::read_dir(scan_directory) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    for entry_result in entries {
+        let entry = match entry_result {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+            collect_wildcard_declaration_files(package_dir, &entry_path, glob_regex, out);
+            continue;
+        }
+
+        if !is_declaration_file_path(&entry_path) {
+            continue;
+        }
+
+        let relative_to_package = match entry_path.strip_prefix(package_dir) {
             Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
             Err(_) => continue,
         };
@@ -345,16 +381,10 @@ fn expand_wildcard_subpath(package_dir: &Path, value: &serde_json::Value) -> Vec
             format!("./{}", relative_to_package)
         };
 
-        if (glob_regex.is_match(&normalized_relative) || glob_regex.is_match(&relative_to_package))
-            && is_declaration_file_path(candidate_path)
-        {
-            matching_entries.push(normalize_path(candidate_path));
+        if glob_regex.is_match(&normalized_relative) || glob_regex.is_match(&relative_to_package) {
+            out.push(normalize_path(&entry_path));
         }
     }
-
-    // read_dir order is platform-dependent; stable sort keeps crawl + symbol id suffixes consistent in CI.
-    matching_entries.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
-    matching_entries
 }
 
 fn extract_wildcard_pattern(value: &serde_json::Value) -> Option<String> {
@@ -382,32 +412,6 @@ fn glob_to_regexp(pattern: &str) -> Regex {
     let escaped = regex::escape(pattern);
     let regex_str = escaped.replace(r"\*", "([^/]+)");
     Regex::new(&format!("^{}$", regex_str)).unwrap()
-}
-
-/// Scans a directory recursively to identify all candidate files.
-fn scan_directory_recursive(dir: &Path) -> Vec<PathBuf> {
-    let mut results: Vec<PathBuf> = Vec::new();
-
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return results,
-    };
-
-    for entry_result in entries {
-        let entry = match entry_result {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
-
-        let entry_path = entry.path();
-        if entry_path.is_dir() {
-            results.extend(scan_directory_recursive(&entry_path));
-        } else {
-            results.push(entry_path);
-        }
-    }
-
-    results
 }
 
 /// Resolves a relative specifier (e.g., `"./foo"`, `"../bar"`) to `.d.ts` files.
@@ -943,5 +947,40 @@ mod tests {
         let result = replace_wildcard_in_value(&value, "core");
         assert_eq!(result["types"], "./dist/core.d.ts");
         assert_eq!(result["import"], "./dist/core.mjs");
+    }
+
+    #[test]
+    fn exports_wildcard_subpath_collects_only_matching_declaration_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let pkg = temp.path();
+        fs::write(
+            pkg.join("package.json"),
+            r#"{"name":"w","version":"1.0.0","exports":{"./lib/*":{"types":"./typings/*.d.ts"}}}"#,
+        )
+        .unwrap();
+        let typings = pkg.join("typings");
+        fs::create_dir_all(&typings).unwrap();
+        fs::write(typings.join("a.d.ts"), "export const a = 1;").unwrap();
+        fs::write(typings.join("b.d.ts"), "export const b = 1;").unwrap();
+        fs::write(typings.join("skipped.ts"), "").unwrap();
+        for noise_file_index in 0..15u8 {
+            fs::write(
+                typings.join(format!("extra{noise_file_index}.js")),
+                "",
+            )
+            .unwrap();
+        }
+
+        let entry = resolve_types_entry(pkg).unwrap();
+        let mut paths: Vec<&str> = entry
+            .types_entries
+            .iter()
+            .map(|entry_path| entry_path.as_ref())
+            .collect();
+        paths.sort();
+        assert_eq!(paths.len(), 2, "expected two .d.ts matches, got {paths:?}");
+        assert!(paths
+            .iter()
+            .all(|entry_path| entry_path.ends_with(".d.ts")));
     }
 }

@@ -234,7 +234,7 @@ pub fn run() -> Result<(), String> {
 
 fn run_binary_path() -> Result<(), String> {
     let path = std::env::current_exe()
-        .map_err(|e| format!("nci binary-path: could not resolve current executable: {e}"))?;
+        .map_err(|err| format!("nci binary-path: could not resolve current executable: {err}"))?;
     println!("{}", path.display());
     Ok(())
 }

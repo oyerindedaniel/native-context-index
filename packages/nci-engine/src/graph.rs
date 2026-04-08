@@ -66,6 +66,23 @@ fn triple_slash_reachable(
     out
 }
 
+/// Per absolute file path: local binding name → parsed import (earliest statement wins, matching `.find` on the crawl list).
+fn index_imports_by_local_name(
+    all_imports_per_file: &HashMap<SharedString, Vec<ParsedImport>>,
+) -> HashMap<SharedString, HashMap<SharedString, ParsedImport>> {
+    let mut out: HashMap<SharedString, HashMap<SharedString, ParsedImport>> =
+        HashMap::with_capacity(all_imports_per_file.len());
+    for (abs_path, imports) in all_imports_per_file {
+        let mut by_name: HashMap<SharedString, ParsedImport> =
+            HashMap::with_capacity(imports.len());
+        for import in imports {
+            by_name.entry(import.name.clone()).or_insert_with(|| import.clone());
+        }
+        out.insert(abs_path.clone(), by_name);
+    }
+    out
+}
+
 fn dash_norm_abs(
     cache: &DashMap<SharedString, SharedString>,
     file_path: &SharedString,
@@ -117,7 +134,7 @@ fn resolve_dependency_ids_for_symbol(
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     name_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     id_to_file_path: &HashMap<SharedString, SharedString>,
-    all_imports_per_file: &HashMap<SharedString, Vec<ParsedImport>>,
+    import_maps_per_file: &HashMap<SharedString, HashMap<SharedString, ParsedImport>>,
     triple_slash_edges: &HashMap<SharedString, Vec<SharedString>>,
     has_ref_edges: bool,
     protocol_regex: &Regex,
@@ -169,10 +186,8 @@ fn resolve_dependency_ids_for_symbol(
             }
 
             if target_ids.is_empty()
-                && let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref())
-                && let Some(matching_import) = file_imports
-                    .iter()
-                    .find(|import_entry| import_entry.name == raw_dep.name)
+                && let Some(import_map) = import_maps_per_file.get(abs_lookup.as_ref())
+                && let Some(matching_import) = import_map.get(raw_dep.name.as_ref())
             {
                 let source_cache_key = (
                     symbol_node.file_path.clone(),
@@ -196,13 +211,9 @@ fn resolve_dependency_ids_for_symbol(
             }
 
             if target_ids.is_empty()
-                && let (Some(file_imports), Some((qualifier, member_path))) = (
-                    all_imports_per_file.get(abs_lookup.as_ref()),
-                    namespace_qual,
-                )
-                && let Some(ns_import) = file_imports
-                    .iter()
-                    .find(|import_entry| import_entry.name.as_ref() == qualifier)
+                && let (Some(import_map), Some((qualifier, member_path))) =
+                    (import_maps_per_file.get(abs_lookup.as_ref()), namespace_qual)
+                && let Some(ns_import) = import_map.get(qualifier)
             {
                 let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
                 let abs_source_paths =
@@ -321,11 +332,8 @@ fn resolve_dependency_ids_for_symbol(
                 {
                     resolved_ids.insert(stub.into());
                 }
-            } else if let Some(file_imports) = all_imports_per_file.get(abs_lookup.as_ref()) {
-                if let Some(matching_import) = file_imports
-                    .iter()
-                    .find(|import_entry| import_entry.name == raw_dep.name)
-                {
+            } else if let Some(import_map) = import_maps_per_file.get(abs_lookup.as_ref()) {
+                if let Some(matching_import) = import_map.get(raw_dep.name.as_ref()) {
                     let original_name = matching_import
                         .original_name
                         .as_deref()
@@ -345,9 +353,7 @@ fn resolve_dependency_ids_for_symbol(
                     }
                 }
                 if let Some((qualifier, member_path)) = namespace_qual
-                    && let Some(ns_import) = file_imports
-                        .iter()
-                        .find(|import_entry| import_entry.name.as_ref() == qualifier)
+                    && let Some(ns_import) = import_map.get(qualifier)
                     && let Some(stub) = try_external_module_stub_id(
                         ns_import.source.as_ref(),
                         member_path,
@@ -413,12 +419,14 @@ pub fn build_package_graph(
 
     let all_symbols = crawl_result.exports;
     let all_imports_per_file = crawl_result.imports;
+    let import_maps_per_file = index_imports_by_local_name(&all_imports_per_file);
     let triple_slash_edges = crawl_result.triple_slash_reference_targets;
     let visited: HashSet<SharedString> = crawl_result.visited_files.into_iter().collect();
 
     let mut merged: Vec<(SharedString, SymbolNode)> = Vec::new();
     let mut merge_index: HashMap<SharedString, usize> =
         HashMap::with_capacity(all_symbols.len().min(65536));
+    let mut additional_files_seen: HashMap<usize, HashSet<SharedString>> = HashMap::new();
     let package_dir_str = package_info.dir.as_ref();
     let normalized_pkg_dir = package_dir_str.replace('\\', "/");
 
@@ -458,17 +466,29 @@ pub fn build_package_graph(
             let existing = &mut merged[index].1;
 
             if symbol_file_path != existing.file_path {
-                if let Some(mut additional) = existing
-                    .additional_files
-                    .as_ref()
-                    .map(|files| files.to_vec())
-                {
-                    if !additional.contains(&symbol_file_path) {
-                        additional.push(symbol_file_path.clone());
-                        existing.additional_files = Some(SharedVec::from(additional));
+                let seen = additional_files_seen.entry(index).or_insert_with(|| {
+                    let mut known_paths = HashSet::new();
+                    known_paths.insert(existing.file_path.clone());
+                    if let Some(files) = &existing.additional_files {
+                        for path in files.iter() {
+                            known_paths.insert(path.clone());
+                        }
                     }
-                } else {
-                    existing.additional_files = Some(SharedVec::from([symbol_file_path.clone()]));
+                    known_paths
+                });
+                if seen.insert(symbol_file_path.clone()) {
+                    match &mut existing.additional_files {
+                        Some(files) => {
+                            let mut paths_with_new: Vec<SharedString> =
+                                files.iter().cloned().collect();
+                            paths_with_new.push(symbol_file_path.clone());
+                            existing.additional_files = Some(SharedVec::from(paths_with_new));
+                        }
+                        None => {
+                            existing.additional_files =
+                                Some(SharedVec::from([symbol_file_path.clone()]));
+                        }
+                    }
                 }
             }
 
@@ -686,7 +706,7 @@ pub fn build_package_graph(
                     &file_local_to_ids,
                     &name_to_ids,
                     &id_to_file_path,
-                    &all_imports_per_file,
+                    &import_maps_per_file,
                     &triple_slash_edges,
                     has_ref_edges,
                     protocol_regex,
@@ -713,7 +733,7 @@ pub fn build_package_graph(
                 &file_local_to_ids,
                 &name_to_ids,
                 &id_to_file_path,
-                &all_imports_per_file,
+                &import_maps_per_file,
                 &triple_slash_edges,
                 has_ref_edges,
                 protocol_regex,
@@ -1255,4 +1275,33 @@ mod tests {
                 .any(|id| id.contains("Base.prototype.shared"))
         );
     }
+}
+
+#[cfg(test)]
+#[test]
+fn index_imports_by_local_name_keeps_first_binding_per_name() {
+    let abs: SharedString = "/pkg/a.d.ts".into();
+    let mut all_imports: HashMap<SharedString, Vec<ParsedImport>> = HashMap::new();
+    all_imports.insert(
+        abs.clone(),
+        vec![
+            ParsedImport {
+                name: SharedString::from("Foo"),
+                source: SharedString::from("./keep"),
+                original_name: None,
+                is_default: false,
+                is_namespace: false,
+            },
+            ParsedImport {
+                name: SharedString::from("Foo"),
+                source: SharedString::from("./ignore"),
+                original_name: None,
+                is_default: false,
+                is_namespace: false,
+            },
+        ],
+    );
+    let maps = index_imports_by_local_name(&all_imports);
+    let by_name = maps.get(abs.as_ref()).expect("map for file");
+    assert_eq!(by_name.get("Foo").unwrap().source.as_ref(), "./keep");
 }

@@ -42,7 +42,6 @@ pub struct ParseResult {
     pub is_external_module: bool,
 }
 
-/// Internal struct for aggregating JSDoc tag information.
 #[derive(Debug, Default, Clone)]
 struct JsDocInfo {
     js_doc: Option<SharedString>,
@@ -1205,7 +1204,6 @@ fn extract_declaration<'a>(
             };
             results.push(export_item);
 
-            // Extract class members
             extract_class_members(
                 class_decl,
                 source_text,
@@ -1256,7 +1254,6 @@ fn extract_declaration<'a>(
             };
             results.push(export_item);
 
-            // Extract interface members
             extract_interface_members(
                 iface_decl,
                 source_text,
@@ -3033,8 +3030,8 @@ fn extract_declaration_modifiers(declaration: &Declaration<'_>) -> Vec<SharedStr
     let mut modifiers = Vec::new();
 
     match declaration {
-        Declaration::VariableDeclaration(v) => {
-            if v.declare {
+        Declaration::VariableDeclaration(var) => {
+            if var.declare {
                 modifiers.push(SharedString::from("declare"));
             }
             // Variable declarations in .d.ts often use 'const', 'let', 'var'

@@ -62,23 +62,58 @@ pub fn scan_packages(node_modules_path: &Path) -> Result<Vec<PackageInfo>, ScanE
     Ok(packages)
 }
 
-/// Resolve a single package from `node_modules` by exact `package.json` name and version.
+/// `node_modules/<name>` or `node_modules/@scope/<pkg>` (before `canonicalize`). `None` if `name` is malformed.
+fn package_install_subpath(node_modules_path: &Path, name: &str) -> Option<PathBuf> {
+    if name.starts_with('@') {
+        let parts: Vec<&str> = name.split('/').filter(|p| !p.is_empty()).collect();
+        if parts.len() != 2 {
+            return None;
+        }
+        Some(node_modules_path.join(parts[0]).join(parts[1]))
+    } else if name.contains('/') {
+        None
+    } else {
+        Some(node_modules_path.join(name))
+    }
+}
+
+
+/// Direct path resolution under `node_modules`, then `read_package_info` + version check.
 pub fn find_package_in_node_modules(
     node_modules_path: &Path,
     name: &str,
     version: &str,
 ) -> Result<PackageInfo, ScanError> {
-    let mut found: Option<PackageInfo> = None;
-    for package in scan_packages(node_modules_path)? {
-        if package.name.as_ref() == name && package.version.as_ref() == version && found.is_none() {
-            found = Some(package);
-        }
+    if !node_modules_path.exists() {
+        return Err(ScanError::NotFound {
+            path: node_modules_path.to_path_buf(),
+        });
     }
-    found.ok_or_else(|| ScanError::PackageVersionNotInNodeModules {
+
+    let not_found = || ScanError::PackageVersionNotInNodeModules {
         name: name.to_string(),
         version: version.to_string(),
         path: node_modules_path.to_path_buf(),
-    })
+    };
+
+    let install_path = package_install_subpath(node_modules_path, name).ok_or_else(not_found)?;
+
+    let resolved_dir = fs::canonicalize(&install_path).map_err(|_| not_found())?;
+
+    // Align with `scan_packages`: only treat directory (or symlink-to-directory) install roots as packages.
+    if !resolved_dir.is_dir() {
+        return Err(not_found());
+    }
+
+    let Some(info) = read_package_info(&resolved_dir, name) else {
+        return Err(not_found());
+    };
+
+    if info.name.as_ref() != name || info.version.as_ref() != version {
+        return Err(not_found());
+    }
+
+    Ok(info)
 }
 
 fn scan_scoped_packages(
@@ -284,5 +319,115 @@ mod tests {
         assert_eq!(packages.len(), 1);
         assert_eq!(packages[0].name.as_ref(), "@types/react");
         assert!(packages[0].is_scoped);
+    }
+
+    #[test]
+    fn find_package_in_node_modules_unscoped_ok() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+        let pkg_dir = node_modules.join("left-pad");
+        fs::create_dir(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            serde_json::to_string(&serde_json::json!({
+                "name": "left-pad",
+                "version": "1.0.0"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let info = find_package_in_node_modules(&node_modules, "left-pad", "1.0.0").unwrap();
+        assert_eq!(info.name.as_ref(), "left-pad");
+        assert_eq!(info.version.as_ref(), "1.0.0");
+    }
+
+    #[test]
+    fn find_package_in_node_modules_scoped_ok() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+        let scope = node_modules.join("@acme");
+        fs::create_dir(&scope).unwrap();
+        let pkg_dir = scope.join("widget");
+        fs::create_dir(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            serde_json::to_string(&serde_json::json!({
+                "name": "@acme/widget",
+                "version": "2.1.0"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let info =
+            find_package_in_node_modules(&node_modules, "@acme/widget", "2.1.0").unwrap();
+        assert_eq!(info.name.as_ref(), "@acme/widget");
+        assert_eq!(info.version.as_ref(), "2.1.0");
+        assert!(info.is_scoped);
+    }
+
+    #[test]
+    fn find_package_in_node_modules_wrong_version() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+        let pkg_dir = node_modules.join("foo");
+        fs::create_dir(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            serde_json::to_string(&serde_json::json!({
+                "name": "foo",
+                "version": "1.0.0"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let err = find_package_in_node_modules(&node_modules, "foo", "9.9.9").unwrap_err();
+        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+    }
+
+    #[test]
+    fn find_package_in_node_modules_missing() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+
+        let err = find_package_in_node_modules(&node_modules, "nope", "1.0.0").unwrap_err();
+        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+    }
+
+    #[test]
+    fn find_package_in_node_modules_rejects_file_at_install_path() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+        let bogus = node_modules.join("not-a-dir");
+        fs::write(&bogus, b"not a package folder").unwrap();
+
+        let err =
+            find_package_in_node_modules(&node_modules, "not-a-dir", "1.0.0").unwrap_err();
+        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+    }
+
+    #[test]
+    fn find_package_in_node_modules_malformed_scoped_name() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        fs::create_dir(&node_modules).unwrap();
+
+        let err = find_package_in_node_modules(&node_modules, "@only-scope", "1.0.0").unwrap_err();
+        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+    }
+
+    #[test]
+    fn find_package_not_found_errors_when_node_modules_missing() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let node_modules = temp_dir.path().join("node_modules");
+        let err = find_package_in_node_modules(&node_modules, "x", "1.0.0").unwrap_err();
+        assert!(matches!(err, ScanError::NotFound { .. }));
     }
 }
