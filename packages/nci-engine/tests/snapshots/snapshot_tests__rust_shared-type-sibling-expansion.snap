@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc",
       "name": "Node.anotherLoc",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -43,6 +44,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end",
       "name": "Node.anotherLoc.end",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -59,6 +61,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.column",
       "name": "Node.anotherLoc.end.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -72,6 +75,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.line",
       "name": "Node.anotherLoc.end.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -85,6 +89,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start",
       "name": "Node.anotherLoc.start",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -101,6 +106,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.column",
       "name": "Node.anotherLoc.start.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -114,6 +120,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.line",
       "name": "Node.anotherLoc.start.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -127,6 +134,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc",
       "name": "Node.loc",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -142,6 +150,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end",
       "name": "Node.loc.end",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -157,6 +166,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.column",
       "name": "Node.loc.end.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -170,6 +180,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.line",
       "name": "Node.loc.end.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -183,6 +194,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start",
       "name": "Node.loc.start",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -198,6 +210,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.column",
       "name": "Node.loc.start.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -211,6 +224,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.line",
       "name": "Node.loc.start.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -240,6 +254,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Position.column",
       "name": "Position.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Position",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -253,6 +268,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::Position.line",
       "name": "Position.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Position",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -284,6 +300,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end",
       "name": "SourceLocation.end",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -299,6 +316,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.column",
       "name": "SourceLocation.end.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -312,6 +330,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.line",
       "name": "SourceLocation.end.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -325,6 +344,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start",
       "name": "SourceLocation.start",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -340,6 +360,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.column",
       "name": "SourceLocation.start.column",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",
@@ -353,6 +374,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.line",
       "name": "SourceLocation.start.line",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-sibling-expansion",

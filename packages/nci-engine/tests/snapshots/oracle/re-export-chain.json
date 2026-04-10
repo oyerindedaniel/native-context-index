@@ -58,7 +58,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "re-export-chain@1.0.0::ServerOptions"
     },
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::ServerOptions.host",
@@ -71,7 +72,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "re-export-chain@1.0.0::ServerOptions"
     },
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.listen",
@@ -85,7 +87,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "re-export-chain@1.0.0::Server"
     },
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.close",
@@ -99,7 +102,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "re-export-chain@1.0.0::Server"
     }
   ],
   "totalSymbols": 6,

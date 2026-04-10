@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "types-versions-pkg@3.0.0::ModernConfig.esm",
       "name": "ModernConfig.esm",
+      "parentSymbolId": "types-versions-pkg@3.0.0::ModernConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "types-versions-pkg",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "types-versions-pkg@3.0.0::ModernConfig.strict",
       "name": "ModernConfig.strict",
+      "parentSymbolId": "types-versions-pkg@3.0.0::ModernConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "types-versions-pkg",

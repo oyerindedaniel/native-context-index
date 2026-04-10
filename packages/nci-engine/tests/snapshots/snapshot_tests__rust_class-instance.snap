@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "class-instance@1.0.0::User.create",
       "name": "User.create",
+      "parentSymbolId": "class-instance@1.0.0::User",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-instance",
@@ -46,6 +47,7 @@ expression: "& rust_graph"
     {
       "id": "class-instance@1.0.0::User.prototype._internalMethod",
       "name": "User.prototype._internalMethod",
+      "parentSymbolId": "class-instance@1.0.0::User",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-instance",
@@ -61,6 +63,7 @@ expression: "& rust_graph"
     {
       "id": "class-instance@1.0.0::User.prototype.greet",
       "name": "User.prototype.greet",
+      "parentSymbolId": "class-instance@1.0.0::User",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-instance",
@@ -75,6 +78,7 @@ expression: "& rust_graph"
     {
       "id": "class-instance@1.0.0::User.prototype.name",
       "name": "User.prototype.name",
+      "parentSymbolId": "class-instance@1.0.0::User",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "class-instance",

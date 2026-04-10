@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::Config.host",
       "name": "Config.host",
+      "parentSymbolId": "all-export-forms@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::Config.port",
       "name": "Config.port",
+      "parentSymbolId": "all-export-forms@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",
@@ -85,6 +87,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::internal.d.ts::InternalRouter.prototype.add",
       "name": "InternalRouter.prototype.add",
+      "parentSymbolId": "all-export-forms@1.0.0::internal.d.ts::InternalRouter",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "all-export-forms",
@@ -131,6 +134,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::PluginOptions.name",
       "name": "PluginOptions.name",
+      "parentSymbolId": "all-export-forms@1.0.0::PluginOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",
@@ -161,6 +165,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.retries",
       "name": "RequestOptions.retries",
+      "parentSymbolId": "all-export-forms@1.0.0::RequestOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",
@@ -174,6 +179,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.timeout",
       "name": "RequestOptions.timeout",
+      "parentSymbolId": "all-export-forms@1.0.0::RequestOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",
@@ -237,6 +243,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::Server.prototype.close",
       "name": "Server.prototype.close",
+      "parentSymbolId": "all-export-forms@1.0.0::Server",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "all-export-forms",
@@ -250,6 +257,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::Server.prototype.listen",
       "name": "Server.prototype.listen",
+      "parentSymbolId": "all-export-forms@1.0.0::Server",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "all-export-forms",
@@ -360,6 +368,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::helpers.decode",
       "name": "helpers.decode",
+      "parentSymbolId": "all-export-forms@1.0.0::helpers",
       "kind": 263,
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",
@@ -378,6 +387,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::helpers.encode",
       "name": "helpers.encode",
+      "parentSymbolId": "all-export-forms@1.0.0::helpers",
       "kind": 263,
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",

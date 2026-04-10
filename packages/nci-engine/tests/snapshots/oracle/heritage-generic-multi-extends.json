@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowA"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA.dropFromA",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowA"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB",
@@ -71,7 +73,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowB"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB.dropFromB",
@@ -84,7 +87,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowB"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::MergedRows",
@@ -121,7 +125,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::MergedRows"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericParent",
@@ -151,7 +156,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericParent"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed",
@@ -164,7 +170,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericParent"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild",
@@ -199,7 +206,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild",
@@ -234,7 +242,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild",
@@ -269,7 +278,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentValue",
@@ -286,7 +296,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentFixed",
@@ -303,7 +314,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentValue",
@@ -320,7 +332,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentFixed",
@@ -337,7 +350,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.childOwn",
@@ -354,7 +368,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericChild.childOwn"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentValue",
@@ -371,7 +386,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild"
     },
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentFixed",
@@ -388,7 +404,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed"
-      ]
+      ],
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild"
     }
   ],
   "totalSymbols": 24,

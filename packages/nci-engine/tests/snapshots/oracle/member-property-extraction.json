@@ -30,7 +30,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::ParserServices"
     },
     {
       "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName",
@@ -66,7 +67,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::AccessorPropertyComputedName"
     },
     {
       "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName.computed",
@@ -79,7 +81,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::AccessorPropertyComputedName"
     },
     {
       "id": "member-property-extraction@1.0.0::ParserOptions",
@@ -109,7 +112,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::ParserOptions"
     },
     {
       "id": "member-property-extraction@1.0.0::ParserOptions.prototype.getParser",
@@ -122,7 +126,236 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::ParserOptions"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::BRIDGE_METHODS",
+      "name": "BRIDGE_METHODS",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "declare const BRIDGE_METHODS: {\n    readonly SELECT: \"BRIDGE_SELECT\";\n    readonly MEASURE: \"BRIDGE_MEASURE\";\n}",
+      "jsDoc": "Const object literal shape (caliper-style) for `parentSymbolId` tests.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::BRIDGE_METHODS.SELECT",
+      "name": "BRIDGE_METHODS.SELECT",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "readonly SELECT: \"BRIDGE_SELECT\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::BRIDGE_METHODS"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::BRIDGE_METHODS.MEASURE",
+      "name": "BRIDGE_METHODS.MEASURE",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "readonly MEASURE: \"BRIDGE_MEASURE\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::BRIDGE_METHODS"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::MethodSigParent",
+      "name": "MethodSigParent",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare interface MethodSigParent {\n    onFlush(): void;\n}",
+      "jsDoc": "Interface member with `MethodSignature` (vs object literal / class body shapes).",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::MethodSigParent.onFlush",
+      "name": "MethodSigParent.onFlush",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "onFlush(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::MethodSigParent"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::CaliperNS",
+      "name": "CaliperNS",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare namespace CaliperNS {\n    export interface BenchOpts {\n        label: string;\n        refresh(): void;\n    }\n    export function snapshot(): void;\n}",
+      "jsDoc": "Exported namespace: qualified `Ns.Child.member` parents, including nested interface\n`PropertySignature` / `MethodSignature` and a namespace-level function export.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::CaliperNS.BenchOpts",
+      "name": "CaliperNS.BenchOpts",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export interface BenchOpts {\n        label: string;\n        refresh(): void;\n    }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::CaliperNS.BenchOpts.label",
+      "name": "CaliperNS.BenchOpts.label",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "label: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::CaliperNS.BenchOpts.refresh",
+      "name": "CaliperNS.BenchOpts.refresh",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "refresh(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::CaliperNS.snapshot",
+      "name": "CaliperNS.snapshot",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export function snapshot(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::OuterNS",
+      "name": "OuterNS",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare namespace OuterNS {\n    export declare class InnerWidget {\n        slot: string;\n        mount(): void;\n    }\n}",
+      "jsDoc": "Nested namespace + class: `*.prototype.*` members resolve parent to the qualified class\nsymbol (`OuterNS.InnerWidget`), matching `parent_name_for_dotted_member` (prefix before `prototype`).",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "member-property-extraction@1.0.0::OuterNS.InnerWidget",
+      "name": "OuterNS.InnerWidget",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "export declare class InnerWidget {\n        slot: string;\n        mount(): void;\n    }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::OuterNS.InnerWidget.prototype.slot",
+      "name": "OuterNS.InnerWidget.prototype.slot",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "slot: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget"
+    },
+    {
+      "id": "member-property-extraction@1.0.0::OuterNS.InnerWidget.prototype.mount",
+      "name": "OuterNS.InnerWidget.prototype.mount",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "member-property-extraction",
+      "filePath": "index.d.ts",
+      "signature": "mount(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget"
     },
     {
       "id": "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES",
@@ -165,7 +398,8 @@
       "dependencies": [
         "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES"
       ],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "member-property-extraction@1.0.0::base.d.ts::BaseNode"
     },
     {
       "id": "member-property-extraction@1.0.0::base.d.ts::BaseNode.range",
@@ -178,7 +412,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "member-property-extraction@1.0.0::base.d.ts::BaseNode"
     },
     {
       "id": "member-property-extraction@1.0.0::AccessorPropertyComputedName.range",
@@ -195,10 +430,11 @@
       "isInherited": true,
       "inheritedFromSources": [
         "member-property-extraction@1.0.0::base.d.ts::BaseNode.range"
-      ]
+      ],
+      "parentSymbolId": "member-property-extraction@1.0.0::AccessorPropertyComputedName"
     }
   ],
-  "totalSymbols": 13,
+  "totalSymbols": 27,
   "totalFiles": 2,
   "crawlDurationMs": 0,
   "buildDurationMs": 0

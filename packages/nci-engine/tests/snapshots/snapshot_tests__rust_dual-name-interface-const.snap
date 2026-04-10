@@ -49,6 +49,7 @@ expression: "& rust_graph"
     {
       "id": "dual-name-interface-const@1.0.0::Dual.fromRoot",
       "name": "Dual.fromRoot",
+      "parentSymbolId": "dual-name-interface-const@1.0.0::Dual",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "dual-name-interface-const",
@@ -66,6 +67,7 @@ expression: "& rust_graph"
     {
       "id": "dual-name-interface-const@1.0.0::Dual.onlyOnDual",
       "name": "Dual.onlyOnDual",
+      "parentSymbolId": "dual-name-interface-const@1.0.0::Dual",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "dual-name-interface-const",
@@ -93,6 +95,7 @@ expression: "& rust_graph"
     {
       "id": "dual-name-interface-const@1.0.0::index.d.ts::RootParent.fromRoot",
       "name": "RootParent.fromRoot",
+      "parentSymbolId": "dual-name-interface-const@1.0.0::index.d.ts::RootParent",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "dual-name-interface-const",

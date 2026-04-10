@@ -32,7 +32,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Base"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly",
@@ -46,7 +47,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Base"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Trait",
@@ -76,7 +78,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Trait"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Trait.traitOnly",
@@ -89,7 +92,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Trait"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Composite",
@@ -125,7 +129,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Composite#2",
@@ -162,7 +167,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::bridgeComposite",
@@ -216,7 +222,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::CompositeTypeAlias"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.shared",
@@ -234,7 +241,8 @@
       "inheritedFromSources": [
         "multi-declaration-heritage@1.0.0::Base.prototype.shared",
         "multi-declaration-heritage@1.0.0::Trait.shared"
-      ]
+      ],
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.traitOnly",
@@ -251,7 +259,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "multi-declaration-heritage@1.0.0::Trait.traitOnly"
-      ]
+      ],
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.prototype.baseOnly",
@@ -269,7 +278,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly"
-      ]
+      ],
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
     }
   ],
   "totalSymbols": 16,

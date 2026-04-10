@@ -33,7 +33,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.5.0"
+      "since": "1.5.0",
+      "parentSymbolId": "since-inheritance@1.0.0::Database"
     }
   ],
   "totalSymbols": 2,

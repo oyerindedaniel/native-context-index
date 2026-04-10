@@ -31,7 +31,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "visibility": "public"
+      "visibility": "public",
+      "parentSymbolId": "visibility-merge@1.0.0::Merged"
     },
     {
       "id": "visibility-merge@1.0.0::Merged.b",
@@ -44,7 +45,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "visibility-merge@1.0.0::Merged"
     }
   ],
   "totalSymbols": 3,

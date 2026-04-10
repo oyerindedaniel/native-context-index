@@ -32,7 +32,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::BaseNode.prototype.commonMethod",
@@ -46,7 +47,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode",
@@ -83,7 +85,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.commonMethod",
@@ -97,7 +100,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.1.0"
+      "since": "2.1.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode",
@@ -134,7 +138,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "3.0.0"
+      "since": "3.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::BaseInterface",
@@ -165,7 +170,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseInterface"
     },
     {
       "id": "inherited-member-flattening@1.0.0::DerivedInterface",
@@ -201,7 +207,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::DerivedInterface"
     },
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.baseProp",
@@ -219,7 +226,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp"
-      ]
+      ],
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.middleProp",
@@ -237,7 +245,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "inherited-member-flattening@1.0.0::MiddleNode.prototype.middleProp"
-      ]
+      ],
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.commonMethod",
@@ -256,7 +265,8 @@
       "inheritedFromSources": [
         "inherited-member-flattening@1.0.0::BaseNode.prototype.commonMethod",
         "inherited-member-flattening@1.0.0::MiddleNode.prototype.commonMethod"
-      ]
+      ],
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.baseProp",
@@ -274,7 +284,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp"
-      ]
+      ],
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode"
     },
     {
       "id": "inherited-member-flattening@1.0.0::DerivedInterface.baseFunc",
@@ -292,7 +303,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "inherited-member-flattening@1.0.0::BaseInterface.baseFunc"
-      ]
+      ],
+      "parentSymbolId": "inherited-member-flattening@1.0.0::DerivedInterface"
     }
   ],
   "totalSymbols": 17,

@@ -33,7 +33,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "namespace-reexport@1.0.0::Lib"
     },
     {
       "id": "namespace-reexport@1.0.0::Lib.internal",
@@ -53,7 +54,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "namespace-reexport@1.0.0::Lib"
     },
     {
       "id": "namespace-reexport@1.0.0::CORE_VERSION",

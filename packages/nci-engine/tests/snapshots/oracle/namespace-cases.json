@@ -43,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "namespace-cases@1.0.0::Widget"
     },
     {
       "id": "namespace-cases@1.0.0::createWidget",
@@ -94,7 +95,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-cases@1.0.0::API"
     },
     {
       "id": "namespace-cases@1.0.0::API.Config.url",
@@ -107,7 +109,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "namespace-cases@1.0.0::API.Config"
     },
     {
       "id": "namespace-cases@1.0.0::API.fetch",
@@ -123,7 +126,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-cases@1.0.0::API"
     },
     {
       "id": "namespace-cases@1.0.0::API.secret",
@@ -140,7 +144,8 @@
       "visibility": "internal",
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-cases@1.0.0::API"
     },
     {
       "id": "namespace-cases@1.0.0::index.d.ts::API.hidden",
@@ -153,7 +158,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-cases@1.0.0::API"
     }
   ],
   "totalSymbols": 10,

@@ -30,6 +30,7 @@ expression: "& rust_graph"
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.close",
       "name": "Server.prototype.close",
+      "parentSymbolId": "re-export-chain@1.0.0::Server",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "re-export-chain",
@@ -43,6 +44,7 @@ expression: "& rust_graph"
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::Server.prototype.listen",
       "name": "Server.prototype.listen",
+      "parentSymbolId": "re-export-chain@1.0.0::Server",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "re-export-chain",
@@ -74,6 +76,7 @@ expression: "& rust_graph"
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::ServerOptions.host",
       "name": "ServerOptions.host",
+      "parentSymbolId": "re-export-chain@1.0.0::ServerOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "re-export-chain",
@@ -87,6 +90,7 @@ expression: "& rust_graph"
     {
       "id": "re-export-chain@1.0.0::lib/core.d.ts::ServerOptions.port",
       "name": "ServerOptions.port",
+      "parentSymbolId": "re-export-chain@1.0.0::ServerOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "re-export-chain",

@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "deprecated-exports@1.0.0::LegacyConfig.name",
       "name": "LegacyConfig.name",
+      "parentSymbolId": "deprecated-exports@1.0.0::LegacyConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deprecated-exports",
@@ -56,6 +57,7 @@ expression: "& rust_graph"
     {
       "id": "deprecated-exports@1.0.0::ModernConfig.name",
       "name": "ModernConfig.name",
+      "parentSymbolId": "deprecated-exports@1.0.0::ModernConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deprecated-exports",
@@ -69,6 +71,7 @@ expression: "& rust_graph"
     {
       "id": "deprecated-exports@1.0.0::ModernConfig.version",
       "name": "ModernConfig.version",
+      "parentSymbolId": "deprecated-exports@1.0.0::ModernConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deprecated-exports",

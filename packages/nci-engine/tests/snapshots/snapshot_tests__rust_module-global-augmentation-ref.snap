@@ -57,6 +57,7 @@ expression: "& rust_graph"
     {
       "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.id",
       "name": "MyGlobalType.id",
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
@@ -71,6 +72,7 @@ expression: "& rust_graph"
     {
       "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.value",
       "name": "MyGlobalType.value",
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
@@ -99,6 +101,7 @@ expression: "& rust_graph"
     {
       "id": "module-global-augmentation-ref@1.0.0::MyNamespace.VERSION",
       "name": "MyNamespace.VERSION",
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyNamespace",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",

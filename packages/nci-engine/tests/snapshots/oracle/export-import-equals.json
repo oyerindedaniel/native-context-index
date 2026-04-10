@@ -33,7 +33,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "export-import-equals@1.0.0::util"
     },
     {
       "id": "export-import-equals@1.0.0::util.version",
@@ -53,7 +54,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "export-import-equals@1.0.0::util"
     },
     {
       "id": "export-import-equals@1.0.0::mainFn",
@@ -99,7 +101,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "export-import-equals@1.0.0::MainConfig"
     },
     {
       "id": "export-import-equals@1.0.0::util.d.ts::log",

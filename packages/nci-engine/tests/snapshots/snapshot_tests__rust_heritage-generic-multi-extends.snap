@@ -31,6 +31,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.deepOwn",
       "name": "DeepGenericChild.deepOwn",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -44,6 +45,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentFixed",
       "name": "DeepGenericChild.parentFixed",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -61,6 +63,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::DeepGenericChild.parentValue",
       "name": "DeepGenericChild.parentValue",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::DeepGenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -100,6 +103,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild.childOwn",
       "name": "GenericChild.childOwn",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -113,6 +117,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentFixed",
       "name": "GenericChild.parentFixed",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -130,6 +135,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericChild.parentValue",
       "name": "GenericChild.parentValue",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -164,6 +170,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericParent.parentFixed",
       "name": "GenericParent.parentFixed",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericParent",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -177,6 +184,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GenericParent.parentValue",
       "name": "GenericParent.parentValue",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GenericParent",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -212,6 +220,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.childOwn",
       "name": "GrandChild.childOwn",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -229,6 +238,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.grandOwn",
       "name": "GrandChild.grandOwn",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -242,6 +252,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentFixed",
       "name": "GrandChild.parentFixed",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -259,6 +270,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::GrandChild.parentValue",
       "name": "GrandChild.parentValue",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::GrandChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -292,6 +304,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA.dropFromA",
       "name": "HeritageRowA.dropFromA",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowA",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -305,6 +318,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowA.keepA",
       "name": "HeritageRowA.keepA",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowA",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -334,6 +348,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB.dropFromB",
       "name": "HeritageRowB.dropFromB",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowB",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -347,6 +362,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::HeritageRowB.keepB",
       "name": "HeritageRowB.keepB",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::HeritageRowB",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",
@@ -384,6 +400,7 @@ expression: "& rust_graph"
     {
       "id": "heritage-generic-multi-extends@1.0.0::MergedRows.mergedOnly",
       "name": "MergedRows.mergedOnly",
+      "parentSymbolId": "heritage-generic-multi-extends@1.0.0::MergedRows",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "heritage-generic-multi-extends",

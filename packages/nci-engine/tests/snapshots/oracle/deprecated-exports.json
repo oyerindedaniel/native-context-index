@@ -49,7 +49,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "deprecated": true
+      "deprecated": true,
+      "parentSymbolId": "deprecated-exports@1.0.0::LegacyConfig"
     },
     {
       "id": "deprecated-exports@1.0.0::newInit",
@@ -96,7 +97,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deprecated-exports@1.0.0::ModernConfig"
     },
     {
       "id": "deprecated-exports@1.0.0::ModernConfig.version",
@@ -109,7 +111,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deprecated-exports@1.0.0::ModernConfig"
     }
   ],
   "totalSymbols": 7,

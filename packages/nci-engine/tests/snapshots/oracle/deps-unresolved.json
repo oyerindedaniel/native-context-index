@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Config"
     },
     {
       "id": "deps-unresolved@1.0.0::Service",
@@ -64,7 +65,8 @@
       "dependencies": [
         "deps-unresolved@1.0.0::Config"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service"
     },
     {
       "id": "deps-unresolved@1.0.0::Service.config.name",
@@ -77,7 +79,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service.config"
     },
     {
       "id": "deps-unresolved@1.0.0::Service.helper",
@@ -92,7 +95,8 @@
       "dependencies": [
         "deps-unresolved@1.0.0::index.d.ts::InternalHelper"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service"
     },
     {
       "id": "deps-unresolved@1.0.0::Service.helper.run",
@@ -105,7 +109,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service.helper"
     },
     {
       "id": "deps-unresolved@1.0.0::Service.base",
@@ -120,7 +125,8 @@
       "dependencies": [
         "deps-unresolved@1.0.0::index.d.ts::Base"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service"
     },
     {
       "id": "deps-unresolved@1.0.0::Service.base.id",
@@ -133,7 +139,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-unresolved@1.0.0::Service.base"
     },
     {
       "id": "deps-unresolved@1.0.0::create",
@@ -178,7 +185,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "deps-unresolved@1.0.0::index.d.ts::InternalHelper"
     },
     {
       "id": "deps-unresolved@1.0.0::index.d.ts::Base",
@@ -204,7 +212,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "deps-unresolved@1.0.0::index.d.ts::Base"
     }
   ],
   "totalSymbols": 14,

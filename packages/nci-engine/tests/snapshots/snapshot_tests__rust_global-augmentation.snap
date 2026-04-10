@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "global-augmentation@1.0.0::AppState.initialized",
       "name": "AppState.initialized",
+      "parentSymbolId": "global-augmentation@1.0.0::AppState",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "global-augmentation",
@@ -54,6 +55,7 @@ expression: "& rust_graph"
     {
       "id": "global-augmentation@1.0.0::Window.__APP_STATE__",
       "name": "Window.__APP_STATE__",
+      "parentSymbolId": "global-augmentation@1.0.0::Window",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "global-augmentation",
@@ -70,6 +72,7 @@ expression: "& rust_graph"
     {
       "id": "global-augmentation@1.0.0::Window.__APP_STATE__.initialized",
       "name": "Window.__APP_STATE__.initialized",
+      "parentSymbolId": "global-augmentation@1.0.0::Window.__APP_STATE__",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "global-augmentation",

@@ -35,7 +35,8 @@
       "isInternal": false,
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "wildcard-reexport@1.0.0::Config"
     },
     {
       "id": "wildcard-reexport@1.0.0::Config.port",
@@ -51,7 +52,8 @@
       "isInternal": false,
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "wildcard-reexport@1.0.0::Config"
     },
     {
       "id": "wildcard-reexport@1.0.0::Callback",

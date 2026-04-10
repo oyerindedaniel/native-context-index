@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::BaseInterface.baseFunc",
       "name": "BaseInterface.baseFunc",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseInterface",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "inherited-member-flattening",
@@ -58,6 +59,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::BaseNode.prototype.baseProp",
       "name": "BaseNode.prototype.baseProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",
@@ -72,6 +74,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::BaseNode.prototype.commonMethod",
       "name": "BaseNode.prototype.commonMethod",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::BaseNode",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "inherited-member-flattening",
@@ -108,6 +111,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::DerivedInterface.baseFunc",
       "name": "DerivedInterface.baseFunc",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::DerivedInterface",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "inherited-member-flattening",
@@ -126,6 +130,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::DerivedInterface.derivedFunc",
       "name": "DerivedInterface.derivedFunc",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::DerivedInterface",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "inherited-member-flattening",
@@ -163,6 +168,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.baseProp",
       "name": "LeafNode.prototype.baseProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",
@@ -181,6 +187,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.commonMethod",
       "name": "LeafNode.prototype.commonMethod",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "inherited-member-flattening",
@@ -200,6 +207,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.leafProp",
       "name": "LeafNode.prototype.leafProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",
@@ -214,6 +222,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::LeafNode.prototype.middleProp",
       "name": "LeafNode.prototype.middleProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::LeafNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",
@@ -255,6 +264,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.baseProp",
       "name": "MiddleNode.prototype.baseProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",
@@ -273,6 +283,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.commonMethod",
       "name": "MiddleNode.prototype.commonMethod",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "inherited-member-flattening",
@@ -287,6 +298,7 @@ expression: "& rust_graph"
     {
       "id": "inherited-member-flattening@1.0.0::MiddleNode.prototype.middleProp",
       "name": "MiddleNode.prototype.middleProp",
+      "parentSymbolId": "inherited-member-flattening@1.0.0::MiddleNode",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "inherited-member-flattening",

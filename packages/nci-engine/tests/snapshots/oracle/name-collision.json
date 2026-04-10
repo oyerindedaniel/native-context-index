@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::ChannelConfig"
     },
     {
       "id": "name-collision@1.0.0::identity",
@@ -96,7 +97,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::Config"
     },
     {
       "id": "name-collision@1.0.0::StreamConfig",
@@ -125,7 +127,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::StreamConfig"
     },
     {
       "id": "name-collision@1.0.0::identity#3",

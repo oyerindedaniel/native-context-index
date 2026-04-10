@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "mixin-composition@1.0.0::Base.prototype.baseMethod",
       "name": "Base.prototype.baseMethod",
+      "parentSymbolId": "mixin-composition@1.0.0::Base",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "mixin-composition",
@@ -60,6 +61,7 @@ expression: "& rust_graph"
     {
       "id": "mixin-composition@1.0.0::Mixed.baseMethod",
       "name": "Mixed.baseMethod",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "mixin-composition",
@@ -74,6 +76,7 @@ expression: "& rust_graph"
     {
       "id": "mixin-composition@1.0.0::Mixed.prototype",
       "name": "Mixed.prototype",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "mixin-composition",
@@ -88,6 +91,7 @@ expression: "& rust_graph"
     {
       "id": "mixin-composition@1.0.0::Mixed.prototype.mixinMethod",
       "name": "Mixed.prototype.mixinMethod",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "mixin-composition",
@@ -102,6 +106,7 @@ expression: "& rust_graph"
     {
       "id": "mixin-composition@1.0.0::Mixed.staticExtra",
       "name": "Mixed.staticExtra",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "mixin-composition",

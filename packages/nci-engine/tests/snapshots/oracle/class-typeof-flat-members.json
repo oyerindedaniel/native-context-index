@@ -32,7 +32,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::Box.id#2",
@@ -45,7 +46,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::Box.tag",
@@ -61,7 +63,8 @@
       "isInternal": false,
       "modifiers": [
         "accessor"
-      ]
+      ],
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::Box.parse",
@@ -79,7 +82,8 @@
       "isInternal": false,
       "modifiers": [
         "static"
-      ]
+      ],
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::Box.check",
@@ -92,7 +96,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
@@ -120,7 +125,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.id#2",
@@ -134,7 +140,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.tag",
@@ -148,7 +155,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.parse",
@@ -164,7 +172,8 @@
       "dependencies": [
         "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
       ],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.check",
@@ -178,7 +187,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox"
     }
   ],
   "totalSymbols": 12,

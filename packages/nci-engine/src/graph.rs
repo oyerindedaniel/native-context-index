@@ -549,6 +549,7 @@ pub fn build_package_graph(
             let node = SymbolNode {
                 id: "".into(),
                 name: resolved.name.clone(),
+                parent_symbol_id: None,
                 kind: resolved.kind,
                 kind_name: SharedString::from(resolved.kind.as_str()),
                 package: package_info.name.clone(),
@@ -748,6 +749,7 @@ pub fn build_package_graph(
     );
 
     let flatten_phase_start = Instant::now();
+    let pre_flatten_len = symbols.len();
     flatten_inherited_members(
         &mut symbols,
         &name_to_id,
@@ -758,6 +760,29 @@ pub fn build_package_graph(
         &graph_profile_label(&package_info.name, "graph.flatten_heritage"),
         flatten_phase_start.elapsed().as_secs_f64() * 1000.0,
     );
+
+    for symbol_node in &symbols[pre_flatten_len..] {
+        let short_key: SharedString =
+            format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
+        file_local_to_ids
+            .entry(short_key)
+            .or_default()
+            .push(symbol_node.id.clone());
+    }
+    for symbol_node in &symbols[pre_flatten_len..] {
+        if matches!(symbol_node.kind, SymbolKind::Class | SymbolKind::Interface) {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols[pre_flatten_len..] {
+        if !name_to_id.contains_key(symbol_node.name.as_ref()) {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for ids in file_local_to_ids.values_mut() {
+        ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
+    }
+    assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id);
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -853,6 +878,35 @@ fn try_external_module_stub_id(
         return None;
     }
     Some(format!("npm::{specifier}::{member}"))
+}
+
+/// Sets [`SymbolNode::parent_symbol_id`] for dotted names using the same `file_local_to_ids` /
+/// `name_to_id` maps built during id assignment (extended after heritage flatten for synthetic rows).
+///
+/// `file_local_to_ids` values **must** be sorted by id string (see call site); dependency resolution
+/// runs before that sort and only needs multisets, not order.
+fn assign_parent_symbol_ids(
+    symbols: &mut [SymbolNode],
+    file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    name_to_id: &HashMap<SharedString, SharedString>,
+) {
+    for node in symbols.iter_mut() {
+        let Some(parent_name) = parent_name_for_dotted_member(node.name.as_ref()) else {
+            continue;
+        };
+        let parent_name: SharedString = parent_name.into();
+        let file_key: SharedString =
+            format!("{}::{}", node.file_path.as_ref(), parent_name.as_ref()).into();
+        if let Some(ids) = file_local_to_ids.get(&file_key) {
+            if let Some(first) = ids.first() {
+                node.parent_symbol_id = Some(first.clone());
+                continue;
+            }
+        }
+        if let Some(pid) = name_to_id.get(parent_name.as_ref()) {
+            node.parent_symbol_id = Some(pid.clone());
+        }
+    }
 }
 
 fn parent_name_for_dotted_member(name: &str) -> Option<String> {
@@ -1050,6 +1104,7 @@ fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str
 mod tests {
     use super::*;
     use crate::resolver::normalize_path;
+    use std::path::Path;
 
     #[test]
     fn make_relative_strips_prefix() {
@@ -1108,6 +1163,14 @@ mod tests {
         assert_eq!(
             parent_name_for_dotted_member("A.B.prototype.c").as_deref(),
             Some("A.B")
+        );
+    }
+
+    #[test]
+    fn parent_name_for_dotted_member_qualified_class_before_prototype() {
+        assert_eq!(
+            parent_name_for_dotted_member("OuterNS.InnerWidget.prototype.slot").as_deref(),
+            Some("OuterNS.InnerWidget")
         );
     }
 
@@ -1274,6 +1337,112 @@ mod tests {
                 .iter()
                 .any(|id| id.contains("Base.prototype.shared"))
         );
+    }
+
+    #[test]
+    fn parent_symbol_id_fixture_covers_signatures_namespace_and_prototype() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join("member-property-extraction");
+        let info = PackageInfo {
+            name: "member-property-extraction".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(&fixture),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let find = |name: &str| {
+            graph
+                .symbols
+                .iter()
+                .find(|symbol| symbol.name.as_ref() == name)
+                .unwrap_or_else(|| panic!("missing symbol {name:?}"))
+        };
+
+        let parser_services = find("ParserServices");
+        let es_tree_map = find("ParserServices.esTreeNodeToTSNodeMap");
+        assert_eq!(es_tree_map.kind, SymbolKind::PropertySignature);
+        assert_eq!(
+            es_tree_map.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(parser_services.id.as_ref())
+        );
+
+        let method_parent = find("MethodSigParent");
+        let on_flush = find("MethodSigParent.onFlush");
+        assert_eq!(on_flush.kind, SymbolKind::MethodSignature);
+        assert_eq!(
+            on_flush.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(method_parent.id.as_ref())
+        );
+
+        let caliper_ns = find("CaliperNS");
+        let bench_opts = find("CaliperNS.BenchOpts");
+        assert_eq!(
+            bench_opts.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(caliper_ns.id.as_ref())
+        );
+        let label = find("CaliperNS.BenchOpts.label");
+        let refresh = find("CaliperNS.BenchOpts.refresh");
+        let snapshot_fn = find("CaliperNS.snapshot");
+        assert_eq!(label.kind, SymbolKind::PropertySignature);
+        assert_eq!(refresh.kind, SymbolKind::MethodSignature);
+        assert_eq!(
+            label.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(bench_opts.id.as_ref())
+        );
+        assert_eq!(
+            refresh.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(bench_opts.id.as_ref())
+        );
+        assert_eq!(
+            snapshot_fn.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(caliper_ns.id.as_ref())
+        );
+
+        let parser_options = find("ParserOptions");
+        let debug_level = find("ParserOptions.prototype.debugLevel");
+        let get_parser = find("ParserOptions.prototype.getParser");
+        assert_eq!(
+            debug_level.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(parser_options.id.as_ref())
+        );
+        assert_eq!(
+            get_parser.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(parser_options.id.as_ref())
+        );
+
+        let outer_ns = find("OuterNS");
+        let inner_widget = find("OuterNS.InnerWidget");
+        assert_eq!(
+            inner_widget.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(outer_ns.id.as_ref())
+        );
+        let slot = find("OuterNS.InnerWidget.prototype.slot");
+        let mount = find("OuterNS.InnerWidget.prototype.mount");
+        assert_eq!(
+            slot.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(inner_widget.id.as_ref())
+        );
+        assert_eq!(
+            mount.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(inner_widget.id.as_ref())
+        );
+
+        let bridge = find("BRIDGE_METHODS");
+        let select = find("BRIDGE_METHODS.SELECT");
+        let measure = find("BRIDGE_METHODS.MEASURE");
+        assert_eq!(
+            select.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(bridge.id.as_ref())
+        );
+        assert_eq!(
+            measure.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            Some(bridge.id.as_ref())
+        );
+        assert!(bridge.parent_symbol_id.is_none());
     }
 }
 

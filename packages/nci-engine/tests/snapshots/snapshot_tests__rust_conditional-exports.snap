@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "conditional-exports-pkg@1.0.0::Config.host",
       "name": "Config.host",
+      "parentSymbolId": "conditional-exports-pkg@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "conditional-exports-pkg",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "conditional-exports-pkg@1.0.0::Config.port",
       "name": "Config.port",
+      "parentSymbolId": "conditional-exports-pkg@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "conditional-exports-pkg",

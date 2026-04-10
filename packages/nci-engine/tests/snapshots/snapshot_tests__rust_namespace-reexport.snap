@@ -38,6 +38,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-reexport@1.0.0::Lib.VERSION",
       "name": "Lib.VERSION",
+      "parentSymbolId": "namespace-reexport@1.0.0::Lib",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "namespace-reexport",
@@ -55,6 +56,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-reexport@1.0.0::Lib.internal",
       "name": "Lib.internal",
+      "parentSymbolId": "namespace-reexport@1.0.0::Lib",
       "kind": 263,
       "kindName": "FunctionDeclaration",
       "package": "namespace-reexport",

@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Config.debug",
       "name": "Config.debug",
+      "parentSymbolId": "deps-pkg@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Config.name",
       "name": "Config.name",
+      "parentSymbolId": "deps-pkg@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",
@@ -86,6 +88,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Logger.config",
       "name": "Logger.config",
+      "parentSymbolId": "deps-pkg@1.0.0::Logger",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",
@@ -101,6 +104,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Logger.config.debug",
       "name": "Logger.config.debug",
+      "parentSymbolId": "deps-pkg@1.0.0::Logger.config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",
@@ -114,6 +118,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Logger.config.name",
       "name": "Logger.config.name",
+      "parentSymbolId": "deps-pkg@1.0.0::Logger.config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",
@@ -127,6 +132,7 @@ expression: "& rust_graph"
     {
       "id": "deps-pkg@1.0.0::Logger.level",
       "name": "Logger.level",
+      "parentSymbolId": "deps-pkg@1.0.0::Logger",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deps-pkg",

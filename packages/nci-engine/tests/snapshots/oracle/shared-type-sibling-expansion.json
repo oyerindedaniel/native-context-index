@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Position"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Position.column",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Position"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation",
@@ -75,7 +77,8 @@
       "dependencies": [
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.line",
@@ -88,7 +91,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.start.column",
@@ -101,7 +105,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end",
@@ -116,7 +121,8 @@
       "dependencies": [
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.line",
@@ -129,7 +135,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.end"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::SourceLocation.end.column",
@@ -142,7 +149,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::SourceLocation.end"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node",
@@ -175,7 +183,8 @@
       "dependencies": [
         "shared-type-sibling-expansion@1.0.0::SourceLocation"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start",
@@ -190,7 +199,8 @@
       "dependencies": [
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.line",
@@ -203,7 +213,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.start.column",
@@ -216,7 +227,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end",
@@ -231,7 +243,8 @@
       "dependencies": [
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.line",
@@ -244,7 +257,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.end"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.loc.end.column",
@@ -257,7 +271,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.loc.end"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc",
@@ -273,7 +288,8 @@
         "shared-type-sibling-expansion@1.0.0::SourceLocation"
       ],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start",
@@ -289,7 +305,8 @@
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.line",
@@ -302,7 +319,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start.column",
@@ -315,7 +333,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.start"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end",
@@ -331,7 +350,8 @@
         "shared-type-sibling-expansion@1.0.0::Position"
       ],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.line",
@@ -344,7 +364,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end"
     },
     {
       "id": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end.column",
@@ -357,7 +378,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-sibling-expansion@1.0.0::Node.anotherLoc.end"
     }
   ],
   "totalSymbols": 25,

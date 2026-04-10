@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "all-export-forms@1.0.0::Config"
     },
     {
       "id": "all-export-forms@1.0.0::Config.port",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "all-export-forms@1.0.0::Config"
     },
     {
       "id": "all-export-forms@1.0.0::Status",
@@ -110,7 +112,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "all-export-forms@1.0.0::Server"
     },
     {
       "id": "all-export-forms@1.0.0::Server.prototype.close",
@@ -123,7 +126,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "all-export-forms@1.0.0::Server"
     },
     {
       "id": "all-export-forms@1.0.0::VERSION",
@@ -272,7 +276,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "all-export-forms@1.0.0::helpers"
     },
     {
       "id": "all-export-forms@1.0.0::helpers.decode",
@@ -293,7 +298,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "all-export-forms@1.0.0::helpers"
     },
     {
       "id": "all-export-forms@1.0.0::RequestOptions",
@@ -342,7 +348,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "all-export-forms@1.0.0::PluginOptions"
     },
     {
       "id": "all-export-forms@1.0.0::helpers.d.ts::encode",
@@ -420,7 +427,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "all-export-forms@1.0.0::internal.d.ts::InternalRouter"
     },
     {
       "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.timeout",
@@ -433,7 +441,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "all-export-forms@1.0.0::RequestOptions"
     },
     {
       "id": "all-export-forms@1.0.0::options.d.ts::RequestOptions.retries",
@@ -446,7 +455,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "all-export-forms@1.0.0::RequestOptions"
     }
   ],
   "totalSymbols": 28,

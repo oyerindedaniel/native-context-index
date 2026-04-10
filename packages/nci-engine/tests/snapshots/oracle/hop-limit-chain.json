@@ -1,0 +1,31 @@
+{
+  "package": "hop-limit-chain",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "hop-limit-chain@1.0.0::deepLeaf",
+      "name": "deepLeaf",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "hop-limit-chain",
+      "filePath": "d.d.ts",
+      "signature": "export declare function deepLeaf(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export",
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 5,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

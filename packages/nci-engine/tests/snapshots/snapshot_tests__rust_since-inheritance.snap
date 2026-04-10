@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "since-inheritance@1.0.0::Database.pool",
       "name": "Database.pool",
+      "parentSymbolId": "since-inheritance@1.0.0::Database",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "since-inheritance",

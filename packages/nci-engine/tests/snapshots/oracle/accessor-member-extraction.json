@@ -31,7 +31,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest"
     },
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.writeOnlyProp",
@@ -45,7 +46,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest"
     },
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp",
@@ -59,7 +61,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.1.0"
+      "since": "1.1.0",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest"
     },
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp#2",
@@ -72,7 +75,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest"
     },
     {
       "id": "accessor-member-extraction@1.0.0::IAccessorTest",
@@ -101,7 +105,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "accessor-member-extraction@1.0.0::IAccessorTest"
     }
   ],
   "totalSymbols": 7,

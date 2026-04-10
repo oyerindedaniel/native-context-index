@@ -43,6 +43,7 @@ expression: "& rust_graph"
     {
       "id": "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions.opt",
       "name": "InvokeOutputOptions.opt",
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "qualified-namespace-deps",
@@ -72,6 +73,7 @@ expression: "& rust_graph"
     {
       "id": "qualified-namespace-deps@1.0.0::LocalResult.ok",
       "name": "LocalResult.ok",
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::LocalResult",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "qualified-namespace-deps",
@@ -101,6 +103,7 @@ expression: "& rust_graph"
     {
       "id": "qualified-namespace-deps@1.0.0::shim.d.ts::Output.value",
       "name": "Output.value",
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::shim.d.ts::Output",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "qualified-namespace-deps",
@@ -131,6 +134,7 @@ expression: "& rust_graph"
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts.x",
       "name": "PeerOpts.x",
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "qualified-namespace-deps",
@@ -160,6 +164,7 @@ expression: "& rust_graph"
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut.out",
       "name": "PeerOut.out",
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "qualified-namespace-deps",

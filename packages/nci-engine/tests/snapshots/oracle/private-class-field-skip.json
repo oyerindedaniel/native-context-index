@@ -32,7 +32,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "private-class-field-skip@1.0.0::WithPrivate"
     }
   ],
   "totalSymbols": 2,

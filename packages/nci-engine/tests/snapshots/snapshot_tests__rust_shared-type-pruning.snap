@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::Position.column",
       "name": "Position.column",
+      "parentSymbolId": "shared-type-pruning@1.0.0::Position",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::Position.line",
       "name": "Position.line",
+      "parentSymbolId": "shared-type-pruning@1.0.0::Position",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -69,6 +71,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end",
       "name": "SourceLocation.end",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -84,6 +87,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end.column",
       "name": "SourceLocation.end.column",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -97,6 +101,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end.line",
       "name": "SourceLocation.end.line",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.end",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -110,6 +115,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.start",
       "name": "SourceLocation.start",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -125,6 +131,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.start.column",
       "name": "SourceLocation.start.column",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",
@@ -138,6 +145,7 @@ expression: "& rust_graph"
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.start.line",
       "name": "SourceLocation.start.line",
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.start",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "shared-type-pruning",

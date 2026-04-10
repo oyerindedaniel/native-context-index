@@ -34,7 +34,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "parentSymbolId": "decorator-metadata-extraction@1.0.0::ServiceNode"
     }
   ],
   "totalSymbols": 2,

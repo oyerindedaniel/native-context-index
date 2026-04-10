@@ -22,6 +22,7 @@ expression: "& rust_graph"
     {
       "id": "local-reexport@1.0.0::External.id",
       "name": "External.id",
+      "parentSymbolId": "local-reexport@1.0.0::External",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "local-reexport",
@@ -48,6 +49,7 @@ expression: "& rust_graph"
     {
       "id": "local-reexport@1.0.0::index.d.ts::Internal.id",
       "name": "Internal.id",
+      "parentSymbolId": "local-reexport@1.0.0::index.d.ts::Internal",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "local-reexport",

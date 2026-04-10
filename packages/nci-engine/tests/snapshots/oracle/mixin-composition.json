@@ -31,7 +31,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "mixin-composition@1.0.0::Base"
     },
     {
       "id": "mixin-composition@1.0.0::Mixed",
@@ -65,7 +66,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed"
     },
     {
       "id": "mixin-composition@1.0.0::Mixed.staticExtra",
@@ -79,7 +81,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.1.0"
+      "since": "2.1.0",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed"
     },
     {
       "id": "mixin-composition@1.0.0::Mixed.prototype",
@@ -93,7 +96,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed"
     },
     {
       "id": "mixin-composition@1.0.0::Mixed.prototype.mixinMethod",
@@ -107,7 +111,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.2.0"
+      "since": "2.2.0",
+      "parentSymbolId": "mixin-composition@1.0.0::Mixed"
     }
   ],
   "totalSymbols": 7,

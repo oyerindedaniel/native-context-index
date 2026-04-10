@@ -57,6 +57,7 @@ expression: "& rust_graph"
     {
       "id": "computed-properties@1.0.0::Literals.literal-key",
       "name": "Literals.literal-key",
+      "parentSymbolId": "computed-properties@1.0.0::Literals",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "computed-properties",
@@ -87,6 +88,7 @@ expression: "& rust_graph"
     {
       "id": "computed-properties@1.0.0::Overloaded.prototype.[Symbol.iterator]",
       "name": "Overloaded.prototype.[Symbol.iterator]",
+      "parentSymbolId": "computed-properties@1.0.0::Overloaded",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "computed-properties",
@@ -101,6 +103,7 @@ expression: "& rust_graph"
     {
       "id": "computed-properties@1.0.0::Overloaded.prototype.[Symbol.iterator]#2",
       "name": "Overloaded.prototype.[Symbol.iterator]",
+      "parentSymbolId": "computed-properties@1.0.0::Overloaded",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "computed-properties",
@@ -132,6 +135,7 @@ expression: "& rust_graph"
     {
       "id": "computed-properties@1.0.0::Tagged.prototype.[Symbol.toStringTag]",
       "name": "Tagged.prototype.[Symbol.toStringTag]",
+      "parentSymbolId": "computed-properties@1.0.0::Tagged",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "computed-properties",

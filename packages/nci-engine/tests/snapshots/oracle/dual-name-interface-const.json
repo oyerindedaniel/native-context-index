@@ -36,7 +36,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "dual-name-interface-const@1.0.0::Dual"
     },
     {
       "id": "dual-name-interface-const@1.0.0::Dual#2",
@@ -81,7 +82,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "dual-name-interface-const@1.0.0::index.d.ts::RootParent"
     },
     {
       "id": "dual-name-interface-const@1.0.0::Dual.fromRoot",
@@ -98,7 +100,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "dual-name-interface-const@1.0.0::index.d.ts::RootParent.fromRoot"
-      ]
+      ],
+      "parentSymbolId": "dual-name-interface-const@1.0.0::Dual"
     }
   ],
   "totalSymbols": 6,

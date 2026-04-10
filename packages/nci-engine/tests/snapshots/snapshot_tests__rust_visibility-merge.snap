@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "visibility-merge@1.0.0::Merged.a",
       "name": "Merged.a",
+      "parentSymbolId": "visibility-merge@1.0.0::Merged",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "visibility-merge",
@@ -40,6 +41,7 @@ expression: "& rust_graph"
     {
       "id": "visibility-merge@1.0.0::Merged.b",
       "name": "Merged.b",
+      "parentSymbolId": "visibility-merge@1.0.0::Merged",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "visibility-merge",

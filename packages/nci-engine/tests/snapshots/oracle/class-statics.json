@@ -36,7 +36,8 @@
       "since": "1.1.0",
       "modifiers": [
         "static"
-      ]
+      ],
+      "parentSymbolId": "class-statics@1.0.0::Cache"
     },
     {
       "id": "class-statics@1.0.0::Cache.clear",
@@ -54,7 +55,8 @@
       "since": "1.0.0",
       "modifiers": [
         "static"
-      ]
+      ],
+      "parentSymbolId": "class-statics@1.0.0::Cache"
     },
     {
       "id": "class-statics@1.0.0::Cache._internalHelper",
@@ -72,7 +74,8 @@
       "since": "1.2.0",
       "modifiers": [
         "static"
-      ]
+      ],
+      "parentSymbolId": "class-statics@1.0.0::Cache"
     },
     {
       "id": "class-statics@1.0.0::Cache.prototype.get",
@@ -88,7 +91,8 @@
       "dependencies": [],
       "isInternal": false,
       "visibility": "public",
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "class-statics@1.0.0::Cache"
     },
     {
       "id": "class-statics@1.0.0::Cache#2",
@@ -120,7 +124,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "class-statics@1.0.0::Cache"
     },
     {
       "id": "class-statics@1.0.0::Cache.Options.ttl",
@@ -133,7 +138,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "class-statics@1.0.0::Cache.Options"
     }
   ],
   "totalSymbols": 8,

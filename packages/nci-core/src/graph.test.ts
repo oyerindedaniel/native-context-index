@@ -550,6 +550,52 @@ describe("buildPackageGraph", () => {
     expect(mergedKinds.filter((kindName) => kindName === "ModuleDeclaration")).toHaveLength(1);
   });
 
+  it("sets parentSymbolId on dotted members: PropertySignature, MethodSignature, namespaces, prototypes", () => {
+    const graph = buildPackageGraph(makePackageInfo("member-property-extraction"));
+    const find = (name: string) => graph.symbols.find((s) => s.name === name);
+
+    const parserServices = find("ParserServices");
+    const esTreeMap = find("ParserServices.esTreeNodeToTSNodeMap");
+    expect(esTreeMap?.kindName).toBe("PropertySignature");
+    expect(esTreeMap?.parentSymbolId).toBe(parserServices?.id);
+
+    const methodSigParent = find("MethodSigParent");
+    const onFlush = find("MethodSigParent.onFlush");
+    expect(onFlush?.kindName).toBe("MethodSignature");
+    expect(onFlush?.parentSymbolId).toBe(methodSigParent?.id);
+
+    const caliperNs = find("CaliperNS");
+    const benchOpts = find("CaliperNS.BenchOpts");
+    expect(benchOpts?.parentSymbolId).toBe(caliperNs?.id);
+    const label = find("CaliperNS.BenchOpts.label");
+    const refresh = find("CaliperNS.BenchOpts.refresh");
+    const snapshotFn = find("CaliperNS.snapshot");
+    expect(label?.kindName).toBe("PropertySignature");
+    expect(refresh?.kindName).toBe("MethodSignature");
+    expect(label?.parentSymbolId).toBe(benchOpts?.id);
+    expect(refresh?.parentSymbolId).toBe(benchOpts?.id);
+    expect(snapshotFn?.parentSymbolId).toBe(caliperNs?.id);
+
+    const parserOptions = find("ParserOptions");
+    const debugLevel = find("ParserOptions.prototype.debugLevel");
+    const getParser = find("ParserOptions.prototype.getParser");
+    expect(debugLevel?.parentSymbolId).toBe(parserOptions?.id);
+    expect(getParser?.parentSymbolId).toBe(parserOptions?.id);
+
+    const outerNs = find("OuterNS");
+    const innerWidget = find("OuterNS.InnerWidget");
+    expect(innerWidget?.parentSymbolId).toBe(outerNs?.id);
+    const slot = find("OuterNS.InnerWidget.prototype.slot");
+    const mount = find("OuterNS.InnerWidget.prototype.mount");
+    expect(slot?.parentSymbolId).toBe(innerWidget?.id);
+    expect(mount?.parentSymbolId).toBe(innerWidget?.id);
+
+    const bridge = find("BRIDGE_METHODS");
+    expect(find("BRIDGE_METHODS.SELECT")?.parentSymbolId).toBe(bridge?.id);
+    expect(find("BRIDGE_METHODS.MEASURE")?.parentSymbolId).toBe(bridge?.id);
+    expect(bridge?.parentSymbolId).toBeUndefined();
+  });
+
   describe("makeRelative — Path Normalization Fallbacks", () => {
     it("handles paths outside the package directory by falling back to relative calculation", () => {
       const graph = buildPackageGraph(makePackageInfo("simple-export"));

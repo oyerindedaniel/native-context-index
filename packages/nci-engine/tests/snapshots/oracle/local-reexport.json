@@ -26,7 +26,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "local-reexport@1.0.0::External"
     },
     {
       "id": "local-reexport@1.0.0::x",
@@ -68,7 +69,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "local-reexport@1.0.0::index.d.ts::Internal"
     },
     {
       "id": "local-reexport@1.0.0::index.d.ts::x",

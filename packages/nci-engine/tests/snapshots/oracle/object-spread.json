@@ -35,7 +35,8 @@
       "since": "1.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Base"
     },
     {
       "id": "object-spread@1.0.0::Utils",
@@ -72,7 +73,8 @@
       "since": "1.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Utils"
     },
     {
       "id": "object-spread@1.0.0::Utils.extra",
@@ -89,7 +91,8 @@
       "since": "2.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Utils"
     },
     {
       "id": "object-spread@1.0.0::Deep",
@@ -128,7 +131,8 @@
       "since": "3.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Deep"
     },
     {
       "id": "object-spread@1.0.0::Deep.level1.level2",
@@ -146,7 +150,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Deep.level1"
     },
     {
       "id": "object-spread@1.0.0::Deep.level1.level2.base",
@@ -163,7 +168,8 @@
       "since": "1.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Deep.level1.level2"
     },
     {
       "id": "object-spread@1.0.0::Deep.level1.level2.leaf",
@@ -179,7 +185,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "object-spread@1.0.0::Deep.level1.level2"
     }
   ],
   "totalSymbols": 10,

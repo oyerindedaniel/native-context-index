@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::LocalResult"
     },
     {
       "id": "qualified-namespace-deps@1.0.0::localNs",
@@ -139,7 +140,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts"
     },
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut",
@@ -165,7 +167,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut"
     },
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::Box",
@@ -206,7 +209,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::shim.d.ts::InvokeOutputOptions"
     },
     {
       "id": "qualified-namespace-deps@1.0.0::shim.d.ts::Output",
@@ -232,7 +236,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "qualified-namespace-deps@1.0.0::shim.d.ts::Output"
     }
   ],
   "totalSymbols": 15,

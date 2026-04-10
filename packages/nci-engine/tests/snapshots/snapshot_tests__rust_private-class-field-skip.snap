@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "private-class-field-skip@1.0.0::WithPrivate.prototype.visible",
       "name": "WithPrivate.prototype.visible",
+      "parentSymbolId": "private-class-field-skip@1.0.0::WithPrivate",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "private-class-field-skip",

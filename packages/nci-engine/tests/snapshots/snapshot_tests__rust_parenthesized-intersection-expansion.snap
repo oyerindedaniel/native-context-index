@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "parenthesized-intersection-expansion@1.0.0::index.d.ts::InnerParen.prototype.fromClass",
       "name": "InnerParen.prototype.fromClass",
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::index.d.ts::InnerParen",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "parenthesized-intersection-expansion",
@@ -57,6 +58,7 @@ expression: "& rust_graph"
     {
       "id": "parenthesized-intersection-expansion@1.0.0::ParenBox.fromClass",
       "name": "ParenBox.fromClass",
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::ParenBox",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "parenthesized-intersection-expansion",
@@ -70,6 +72,7 @@ expression: "& rust_graph"
     {
       "id": "parenthesized-intersection-expansion@1.0.0::ParenBox.merged",
       "name": "ParenBox.merged",
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::ParenBox",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "parenthesized-intersection-expansion",

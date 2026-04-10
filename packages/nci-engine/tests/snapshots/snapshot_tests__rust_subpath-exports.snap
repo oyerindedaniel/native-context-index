@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "subpath-exports@1.0.0::AppConfig.debug",
       "name": "AppConfig.debug",
+      "parentSymbolId": "subpath-exports@1.0.0::AppConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "subpath-exports",
@@ -38,6 +39,7 @@ expression: "& rust_graph"
     {
       "id": "subpath-exports@1.0.0::AppConfig.name",
       "name": "AppConfig.name",
+      "parentSymbolId": "subpath-exports@1.0.0::AppConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "subpath-exports",
@@ -83,6 +85,7 @@ expression: "& rust_graph"
     {
       "id": "subpath-exports@1.0.0::Server.close",
       "name": "Server.close",
+      "parentSymbolId": "subpath-exports@1.0.0::Server",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "subpath-exports",
@@ -96,6 +99,7 @@ expression: "& rust_graph"
     {
       "id": "subpath-exports@1.0.0::Server.listen",
       "name": "Server.listen",
+      "parentSymbolId": "subpath-exports@1.0.0::Server",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "subpath-exports",

@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "conditional-exports-pkg@1.0.0::Config"
     },
     {
       "id": "conditional-exports-pkg@1.0.0::Config.port",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "conditional-exports-pkg@1.0.0::Config"
     }
   ],
   "totalSymbols": 3,

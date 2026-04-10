@@ -26,7 +26,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "local-export@1.0.0::Local"
     }
   ],
   "totalSymbols": 2,

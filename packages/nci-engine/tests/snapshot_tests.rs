@@ -292,6 +292,19 @@ fn compare_structural_properties(
             );
         }
 
+        let rust_parent = rust_sym
+            .parent_symbol_id
+            .as_ref()
+            .map(|parent_id| parent_id.as_ref());
+        let ts_parent = ts_sym
+            .get("parentSymbolId")
+            .and_then(|parent_field| parent_field.as_str());
+        assert_eq!(
+            rust_parent, ts_parent,
+            "[{fixture_name}] parentSymbolId mismatch for '{}' ({})",
+            rust_sym.name, rust_sym.id
+        );
+
         if let Some(ts_deps) = ts_sym
             .get("dependencies")
             .and_then(|deps_field| deps_field.as_array())

@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "types-versions-pkg@3.0.0::ModernConfig"
     },
     {
       "id": "types-versions-pkg@3.0.0::ModernConfig.esm",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "types-versions-pkg@3.0.0::ModernConfig"
     }
   ],
   "totalSymbols": 3,

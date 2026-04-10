@@ -30,7 +30,8 @@
       "reExportedFrom": "index.d.ts",
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "nested-prefix@1.0.0::Mid"
     },
     {
       "id": "nested-prefix@1.0.0::Mid.Inner.val",
@@ -50,7 +51,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "nested-prefix@1.0.0::Mid.Inner"
     },
     {
       "id": "nested-prefix@1.0.0::inner.d.ts::val",

@@ -28,6 +28,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::Box.check",
       "name": "Box.check",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-typeof-flat-members",
@@ -41,6 +42,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::Box.id",
       "name": "Box.id",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box",
       "kind": 178,
       "kindName": "GetAccessor",
       "package": "class-typeof-flat-members",
@@ -54,6 +56,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::Box.id#2",
       "name": "Box.id",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box",
       "kind": 179,
       "kindName": "SetAccessor",
       "package": "class-typeof-flat-members",
@@ -67,6 +70,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::Box.parse",
       "name": "Box.parse",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-typeof-flat-members",
@@ -85,6 +89,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::Box.tag",
       "name": "Box.tag",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::Box",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "class-typeof-flat-members",
@@ -115,6 +120,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.parse",
       "name": "InnerForBox.parse",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-typeof-flat-members",
@@ -133,6 +139,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.check",
       "name": "InnerForBox.prototype.check",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-typeof-flat-members",
@@ -146,6 +153,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.id",
       "name": "InnerForBox.prototype.id",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
       "kind": 178,
       "kindName": "GetAccessor",
       "package": "class-typeof-flat-members",
@@ -159,6 +167,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.id#2",
       "name": "InnerForBox.prototype.id",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
       "kind": 179,
       "kindName": "SetAccessor",
       "package": "class-typeof-flat-members",
@@ -172,6 +181,7 @@ expression: "& rust_graph"
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox.prototype.tag",
       "name": "InnerForBox.prototype.tag",
+      "parentSymbolId": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "class-typeof-flat-members",

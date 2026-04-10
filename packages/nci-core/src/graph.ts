@@ -11,6 +11,7 @@ import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./reso
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
 import { normalizeSignature } from "./dedupe.js";
+import { assignParentSymbolIds } from "./parent-symbol.js";
 import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
 
 /** Build a symbol graph for a single package. */
@@ -522,11 +523,39 @@ export function buildPackageGraph(
     phaseStart = performance.now();
   }
 
+  const preFlattenLen = symbols.length;
   flattenInheritedMembers(symbols, nameToId, packageInfo.name, packageInfo.version);
 
   if (profiling) {
     profileLog("flattenInherited", performance.now() - phaseStart);
   }
+
+  for (let i = preFlattenLen; i < symbols.length; i++) {
+    const symbolNode = symbols[i]!;
+    const shortKey = `${symbolNode.filePath}::${symbolNode.name}`;
+    const existingShort = fileLocalToIds.get(shortKey) || [];
+    existingShort.push(symbolNode.id);
+    fileLocalToIds.set(shortKey, existingShort);
+  }
+  for (let i = preFlattenLen; i < symbols.length; i++) {
+    const symbolNode = symbols[i]!;
+    if (
+      symbolNode.kind === ts.SyntaxKind.ClassDeclaration ||
+      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
+    ) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (let i = preFlattenLen; i < symbols.length; i++) {
+    const symbolNode = symbols[i]!;
+    if (!nameToId.has(symbolNode.name)) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (const ids of fileLocalToIds.values()) {
+    ids.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  }
+  assignParentSymbolIds(symbols, fileLocalToIds, nameToId);
 
   const afterFlatten = performance.now();
   clearParserCache();

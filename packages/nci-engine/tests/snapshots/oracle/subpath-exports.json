@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "subpath-exports@1.0.0::AppConfig"
     },
     {
       "id": "subpath-exports@1.0.0::AppConfig.debug",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "subpath-exports@1.0.0::AppConfig"
     },
     {
       "id": "subpath-exports@1.0.0::createApp",
@@ -109,7 +111,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "subpath-exports@1.0.0::Server"
     },
     {
       "id": "subpath-exports@1.0.0::Server.close",
@@ -122,7 +125,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "subpath-exports@1.0.0::Server"
     },
     {
       "id": "subpath-exports@1.0.0::formatDate",

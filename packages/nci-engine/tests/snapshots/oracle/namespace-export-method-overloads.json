@@ -33,7 +33,8 @@
       ],
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns"
     },
     {
       "id": "namespace-export-method-overloads@1.0.0::Ns.Service.use",
@@ -50,7 +51,8 @@
       "reExportedFrom": "index.d.ts",
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns.Service"
     },
     {
       "id": "namespace-export-method-overloads@1.0.0::Ns.Service.use#2",
@@ -67,7 +69,8 @@
       "reExportedFrom": "index.d.ts",
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns.Service"
     },
     {
       "id": "namespace-export-method-overloads@1.0.0::api.d.ts::Service",
@@ -93,7 +96,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::api.d.ts::Service"
     },
     {
       "id": "namespace-export-method-overloads@1.0.0::api.d.ts::Service.use#2",
@@ -106,7 +110,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::api.d.ts::Service"
     }
   ],
   "totalSymbols": 7,

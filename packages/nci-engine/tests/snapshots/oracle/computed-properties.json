@@ -62,7 +62,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "2.1.0"
+      "since": "2.1.0",
+      "parentSymbolId": "computed-properties@1.0.0::Tagged"
     },
     {
       "id": "computed-properties@1.0.0::Literals",
@@ -93,7 +94,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "3.1.0"
+      "since": "3.1.0",
+      "parentSymbolId": "computed-properties@1.0.0::Literals"
     },
     {
       "id": "computed-properties@1.0.0::Overloaded",
@@ -123,7 +125,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "computed-properties@1.0.0::Overloaded"
     },
     {
       "id": "computed-properties@1.0.0::Overloaded.prototype.[Symbol.iterator]#2",
@@ -137,7 +140,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.1.0"
+      "since": "1.1.0",
+      "parentSymbolId": "computed-properties@1.0.0::Overloaded"
     }
   ],
   "totalSymbols": 9,

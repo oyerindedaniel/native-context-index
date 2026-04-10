@@ -42,7 +42,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "umd-namespace@1.0.0::Widget"
     },
     {
       "id": "umd-namespace@1.0.0::Widget.render",
@@ -55,7 +56,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "umd-namespace@1.0.0::Widget"
     },
     {
       "id": "umd-namespace@1.0.0::createWidget",

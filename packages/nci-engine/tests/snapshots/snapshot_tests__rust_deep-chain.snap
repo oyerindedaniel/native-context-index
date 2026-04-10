@@ -62,6 +62,7 @@ expression: "& rust_graph"
     {
       "id": "deep-chain@1.0.0::core/handler.d.ts::Request.method",
       "name": "Request.method",
+      "parentSymbolId": "deep-chain@1.0.0::core/handler.d.ts::Request",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-chain",
@@ -75,6 +76,7 @@ expression: "& rust_graph"
     {
       "id": "deep-chain@1.0.0::core/handler.d.ts::Request.url",
       "name": "Request.url",
+      "parentSymbolId": "deep-chain@1.0.0::core/handler.d.ts::Request",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-chain",
@@ -104,6 +106,7 @@ expression: "& rust_graph"
     {
       "id": "deep-chain@1.0.0::core/handler.d.ts::Response.body",
       "name": "Response.body",
+      "parentSymbolId": "deep-chain@1.0.0::core/handler.d.ts::Response",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-chain",
@@ -117,6 +120,7 @@ expression: "& rust_graph"
     {
       "id": "deep-chain@1.0.0::core/handler.d.ts::Response.status",
       "name": "Response.status",
+      "parentSymbolId": "deep-chain@1.0.0::core/handler.d.ts::Response",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-chain",

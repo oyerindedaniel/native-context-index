@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "visibility-tags@1.0.0::AlphaFeature.experimental",
       "name": "AlphaFeature.experimental",
+      "parentSymbolId": "visibility-tags@1.0.0::AlphaFeature",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "visibility-tags",
@@ -76,6 +77,7 @@ expression: "& rust_graph"
     {
       "id": "visibility-tags@1.0.0::PublicAPI.version",
       "name": "PublicAPI.version",
+      "parentSymbolId": "visibility-tags@1.0.0::PublicAPI",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "visibility-tags",

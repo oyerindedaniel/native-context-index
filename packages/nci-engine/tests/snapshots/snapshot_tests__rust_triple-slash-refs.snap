@@ -58,6 +58,7 @@ expression: "& rust_graph"
     {
       "id": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig.debug",
       "name": "GlobalConfig.debug",
+      "parentSymbolId": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "triple-slash-refs",
@@ -71,6 +72,7 @@ expression: "& rust_graph"
     {
       "id": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig.verbose",
       "name": "GlobalConfig.verbose",
+      "parentSymbolId": "triple-slash-refs@1.0.0::globals.d.ts::GlobalConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "triple-slash-refs",

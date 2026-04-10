@@ -31,7 +31,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-name-prefix-boundary@1.0.0::Outer"
     },
     {
       "id": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild.field",
@@ -44,7 +45,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild"
     }
   ],
   "totalSymbols": 3,

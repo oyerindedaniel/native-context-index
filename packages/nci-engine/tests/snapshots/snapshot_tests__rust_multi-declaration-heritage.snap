@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly",
       "name": "Base.prototype.baseOnly",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Base",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "multi-declaration-heritage",
@@ -40,6 +41,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Base.prototype.shared",
       "name": "Base.prototype.shared",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Base",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "multi-declaration-heritage",
@@ -98,6 +100,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.compositeFunc",
       "name": "Composite.compositeFunc",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "multi-declaration-heritage",
@@ -111,6 +114,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.prototype.baseOnly",
       "name": "Composite.prototype.baseOnly",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "multi-declaration-heritage",
@@ -128,6 +132,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.prototype.ownProp",
       "name": "Composite.prototype.ownProp",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "multi-declaration-heritage",
@@ -141,6 +146,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.shared",
       "name": "Composite.shared",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "multi-declaration-heritage",
@@ -159,6 +165,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.traitOnly",
       "name": "Composite.traitOnly",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "multi-declaration-heritage",
@@ -196,6 +203,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::CompositeTypeAlias.ownProp",
       "name": "CompositeTypeAlias.ownProp",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::CompositeTypeAlias",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "multi-declaration-heritage",
@@ -225,6 +233,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Trait.shared",
       "name": "Trait.shared",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Trait",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "multi-declaration-heritage",
@@ -238,6 +247,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Trait.traitOnly",
       "name": "Trait.traitOnly",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Trait",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "multi-declaration-heritage",

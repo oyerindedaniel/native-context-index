@@ -35,7 +35,8 @@
       "since": "1.1.0",
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "class-instance@1.0.0::User"
     },
     {
       "id": "class-instance@1.0.0::User.prototype.greet",
@@ -49,7 +50,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.2.0"
+      "since": "1.2.0",
+      "parentSymbolId": "class-instance@1.0.0::User"
     },
     {
       "id": "class-instance@1.0.0::User.prototype._internalMethod",
@@ -64,7 +66,8 @@
       "dependencies": [],
       "isInternal": false,
       "visibility": "internal",
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "class-instance@1.0.0::User"
     },
     {
       "id": "class-instance@1.0.0::User.create",
@@ -83,7 +86,8 @@
       "since": "1.0.0",
       "modifiers": [
         "static"
-      ]
+      ],
+      "parentSymbolId": "class-instance@1.0.0::User"
     }
   ],
   "totalSymbols": 5,

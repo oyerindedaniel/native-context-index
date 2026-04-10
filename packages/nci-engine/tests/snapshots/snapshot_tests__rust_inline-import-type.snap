@@ -28,6 +28,7 @@ expression: "& rust_graph"
     {
       "id": "inline-import-type@1.0.0::ExpandedViaImport.n",
       "name": "ExpandedViaImport.n",
+      "parentSymbolId": "inline-import-type@1.0.0::ExpandedViaImport",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "inline-import-type",
@@ -92,6 +93,7 @@ expression: "& rust_graph"
     {
       "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner",
       "name": "Outer.Inner",
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer",
       "kind": 268,
       "kindName": "ModuleDeclaration",
       "package": "inline-import-type",
@@ -108,6 +110,7 @@ expression: "& rust_graph"
     {
       "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf",
       "name": "Outer.Inner.Leaf",
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "inline-import-type",
@@ -124,6 +127,7 @@ expression: "& rust_graph"
     {
       "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf.flag",
       "name": "Outer.Inner.Leaf.flag",
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "inline-import-type",
@@ -171,6 +175,7 @@ expression: "& rust_graph"
     {
       "id": "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner.n",
       "name": "RemoteInner.n",
+      "parentSymbolId": "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "inline-import-type",

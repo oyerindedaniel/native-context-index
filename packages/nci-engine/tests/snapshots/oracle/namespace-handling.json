@@ -32,7 +32,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-handling@1.0.0::API"
     },
     {
       "id": "namespace-handling@1.0.0::API.Config.url",
@@ -45,7 +46,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "namespace-handling@1.0.0::API.Config"
     },
     {
       "id": "namespace-handling@1.0.0::API.fetch",
@@ -61,7 +63,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-handling@1.0.0::API"
     },
     {
       "id": "namespace-handling@1.0.0::API.secret",
@@ -78,7 +81,8 @@
       "visibility": "internal",
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-handling@1.0.0::API"
     },
     {
       "id": "namespace-handling@1.0.0::index.d.ts::API.hidden",
@@ -91,7 +95,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-handling@1.0.0::API"
     }
   ],
   "totalSymbols": 6,

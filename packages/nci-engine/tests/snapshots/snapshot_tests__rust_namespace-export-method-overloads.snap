@@ -22,6 +22,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-export-method-overloads@1.0.0::Ns.Service",
       "name": "Ns.Service",
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "namespace-export-method-overloads",
@@ -39,6 +40,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-export-method-overloads@1.0.0::Ns.Service.use",
       "name": "Ns.Service.use",
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns.Service",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",
@@ -53,6 +55,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-export-method-overloads@1.0.0::Ns.Service.use#2",
       "name": "Ns.Service.use",
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::Ns.Service",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",
@@ -83,6 +86,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-export-method-overloads@1.0.0::api.d.ts::Service.use",
       "name": "Service.use",
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::api.d.ts::Service",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",
@@ -96,6 +100,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-export-method-overloads@1.0.0::api.d.ts::Service.use#2",
       "name": "Service.use",
+      "parentSymbolId": "namespace-export-method-overloads@1.0.0::api.d.ts::Service",
       "kind": 174,
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",

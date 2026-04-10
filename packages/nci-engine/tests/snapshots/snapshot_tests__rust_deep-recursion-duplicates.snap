@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::Annotations.title",
       "name": "Annotations.title",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Annotations",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -58,6 +59,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.AST",
       "name": "Schema.AST",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -71,6 +73,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.Type",
       "name": "Schema.Type",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -84,6 +87,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations",
       "name": "Schema.annotations",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -99,6 +103,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations.title",
       "name": "Schema.annotations.title",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema.annotations",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -131,6 +136,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]",
       "name": "WithResult.[symbolWithResult]",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -146,6 +152,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
       "name": "WithResult.[symbolWithResult].failure",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -161,6 +168,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.AST",
       "name": "WithResult.[symbolWithResult].failure.AST",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -174,6 +182,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.Type",
       "name": "WithResult.[symbolWithResult].failure.Type",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -187,6 +196,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure._tag",
       "name": "WithResult.[symbolWithResult].failure._tag",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -200,6 +210,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations",
       "name": "WithResult.[symbolWithResult].failure.annotations",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -215,6 +226,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations.title",
       "name": "WithResult.[symbolWithResult].failure.annotations.title",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -228,6 +240,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
       "name": "WithResult.[symbolWithResult].success",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -243,6 +256,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.AST",
       "name": "WithResult.[symbolWithResult].success.AST",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -256,6 +270,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.Type",
       "name": "WithResult.[symbolWithResult].success.Type",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -269,6 +284,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success._tag",
       "name": "WithResult.[symbolWithResult].success._tag",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -282,6 +298,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations",
       "name": "WithResult.[symbolWithResult].success.annotations",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",
@@ -297,6 +314,7 @@ expression: "& rust_graph"
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations.title",
       "name": "WithResult.[symbolWithResult].success.annotations.title",
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "deep-recursion-duplicates",

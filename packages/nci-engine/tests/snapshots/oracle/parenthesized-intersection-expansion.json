@@ -32,7 +32,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::ParenBox"
     },
     {
       "id": "parenthesized-intersection-expansion@1.0.0::ParenBox.merged",
@@ -45,7 +46,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::ParenBox"
     },
     {
       "id": "parenthesized-intersection-expansion@1.0.0::index.d.ts::InnerParen",
@@ -71,7 +73,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "parenthesized-intersection-expansion@1.0.0::index.d.ts::InnerParen"
     }
   ],
   "totalSymbols": 5,

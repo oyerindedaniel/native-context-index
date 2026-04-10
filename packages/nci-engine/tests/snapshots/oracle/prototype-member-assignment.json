@@ -34,7 +34,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true,
-      "since": "1.1.0"
+      "since": "1.1.0",
+      "parentSymbolId": "prototype-member-assignment@1.0.0::BaseNode"
     },
     {
       "id": "prototype-member-assignment@1.0.0::index.d.ts::BaseNode.prototype.upgrade",
@@ -49,7 +50,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true,
-      "since": "1.2.0"
+      "since": "1.2.0",
+      "parentSymbolId": "prototype-member-assignment@1.0.0::BaseNode"
     }
   ],
   "totalSymbols": 3,

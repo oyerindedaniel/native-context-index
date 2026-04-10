@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readOnlyProp",
       "name": "AccessorTest.prototype.readOnlyProp",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest",
       "kind": 178,
       "kindName": "GetAccessor",
       "package": "accessor-member-extraction",
@@ -40,6 +41,7 @@ expression: "& rust_graph"
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp",
       "name": "AccessorTest.prototype.readWriteProp",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest",
       "kind": 178,
       "kindName": "GetAccessor",
       "package": "accessor-member-extraction",
@@ -54,6 +56,7 @@ expression: "& rust_graph"
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.readWriteProp#2",
       "name": "AccessorTest.prototype.readWriteProp",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest",
       "kind": 179,
       "kindName": "SetAccessor",
       "package": "accessor-member-extraction",
@@ -67,6 +70,7 @@ expression: "& rust_graph"
     {
       "id": "accessor-member-extraction@1.0.0::AccessorTest.prototype.writeOnlyProp",
       "name": "AccessorTest.prototype.writeOnlyProp",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::AccessorTest",
       "kind": 179,
       "kindName": "SetAccessor",
       "package": "accessor-member-extraction",
@@ -97,6 +101,7 @@ expression: "& rust_graph"
     {
       "id": "accessor-member-extraction@1.0.0::IAccessorTest.prop",
       "name": "IAccessorTest.prop",
+      "parentSymbolId": "accessor-member-extraction@1.0.0::IAccessorTest",
       "kind": 178,
       "kindName": "GetAccessor",
       "package": "accessor-member-extraction",

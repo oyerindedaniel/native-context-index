@@ -43,6 +43,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.Options",
       "name": "Cache.Options",
+      "parentSymbolId": "class-statics@1.0.0::Cache",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "class-statics",
@@ -59,6 +60,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.Options.ttl",
       "name": "Cache.Options.ttl",
+      "parentSymbolId": "class-statics@1.0.0::Cache.Options",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "class-statics",
@@ -72,6 +74,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache._internalHelper",
       "name": "Cache._internalHelper",
+      "parentSymbolId": "class-statics@1.0.0::Cache",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-statics",
@@ -90,6 +93,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.clear",
       "name": "Cache.clear",
+      "parentSymbolId": "class-statics@1.0.0::Cache",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-statics",
@@ -108,6 +112,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.maxSize",
       "name": "Cache.maxSize",
+      "parentSymbolId": "class-statics@1.0.0::Cache",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "class-statics",
@@ -126,6 +131,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.prototype.get",
       "name": "Cache.prototype.get",
+      "parentSymbolId": "class-statics@1.0.0::Cache",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "class-statics",

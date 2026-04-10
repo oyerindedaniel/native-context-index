@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "global-augmentation@1.0.0::AppState"
     },
     {
       "id": "global-augmentation@1.0.0::initApp",
@@ -80,7 +81,8 @@
         "global-augmentation@1.0.0::AppState"
       ],
       "isInternal": false,
-      "isGlobalAugmentation": true
+      "isGlobalAugmentation": true,
+      "parentSymbolId": "global-augmentation@1.0.0::Window"
     },
     {
       "id": "global-augmentation@1.0.0::Window.__APP_STATE__.initialized",
@@ -94,7 +96,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "isGlobalAugmentation": true
+      "isGlobalAugmentation": true,
+      "parentSymbolId": "global-augmentation@1.0.0::Window.__APP_STATE__"
     }
   ],
   "totalSymbols": 6,

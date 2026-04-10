@@ -36,7 +36,8 @@
       "isInternal": false,
       "entryVisibility": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "typeof-import-type-query@1.0.0::box"
     },
     {
       "id": "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls",
@@ -62,7 +63,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls"
     },
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::NS",
@@ -93,7 +95,8 @@
       "dependencies": [
         "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls"
       ],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS"
     },
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::NS.box.ping",
@@ -106,7 +109,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS.box"
     },
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::box.ping",
@@ -119,7 +123,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "typeof-import-type-query@1.0.0::box"
     }
   ],
   "totalSymbols": 8,

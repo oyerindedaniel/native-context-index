@@ -456,6 +456,13 @@ pub struct SymbolNode {
     /// Symbol name.
     pub name: SharedString,
 
+    /// Lexical container symbol id when `name` encodes a member path (e.g. `Foo.bar` → parent is `Foo`).
+    ///
+    /// This is **not** [`Self::dependencies`] (type/value references) or [`Self::inherited_from_sources`]
+    /// (inheritance flattening). Agents should prefer this field over parsing `name` when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_symbol_id: Option<SharedString>,
+
     /// AST node kind identifier.
     pub kind: SymbolKind,
 

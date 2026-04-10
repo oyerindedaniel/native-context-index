@@ -40,7 +40,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "namespace-merging@1.0.0::MergedNS#2"
     },
     {
       "id": "namespace-merging@1.0.0::MergedNS#2",
@@ -69,7 +70,8 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "namespace-merging@1.0.0::MergedNS"
     }
   ],
   "totalSymbols": 4,

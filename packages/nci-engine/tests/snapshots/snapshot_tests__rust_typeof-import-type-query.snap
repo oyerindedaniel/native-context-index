@@ -28,6 +28,7 @@ expression: "& rust_graph"
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::NS.box",
       "name": "NS.box",
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "typeof-import-type-query",
@@ -43,6 +44,7 @@ expression: "& rust_graph"
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::NS.box.ping",
       "name": "NS.box.ping",
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS.box",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "typeof-import-type-query",
@@ -73,6 +75,7 @@ expression: "& rust_graph"
     {
       "id": "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls.prototype.ping",
       "name": "RemoteCls.prototype.ping",
+      "parentSymbolId": "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "typeof-import-type-query",
@@ -106,6 +109,7 @@ expression: "& rust_graph"
     {
       "id": "typeof-import-type-query@1.0.0::box.ping",
       "name": "box.ping",
+      "parentSymbolId": "typeof-import-type-query@1.0.0::box",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "typeof-import-type-query",
@@ -119,6 +123,7 @@ expression: "& rust_graph"
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::box.ping",
       "name": "box.ping",
+      "parentSymbolId": "typeof-import-type-query@1.0.0::box",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "typeof-import-type-query",

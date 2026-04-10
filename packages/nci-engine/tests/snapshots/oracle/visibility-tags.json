@@ -33,7 +33,8 @@
       "dependencies": [],
       "isInternal": false,
       "visibility": "public",
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "visibility-tags@1.0.0::PublicAPI"
     },
     {
       "id": "visibility-tags@1.0.0::_internalHelper",
@@ -82,7 +83,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "visibility": "alpha"
+      "visibility": "alpha",
+      "parentSymbolId": "visibility-tags@1.0.0::AlphaFeature"
     },
     {
       "id": "visibility-tags@1.0.0::betaFunction",

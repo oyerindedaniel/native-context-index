@@ -33,7 +33,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Annotations"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema",
@@ -68,7 +69,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.Type",
@@ -84,7 +86,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations",
@@ -102,7 +105,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations.title",
@@ -118,7 +122,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::Schema.annotations"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::symbolWithResult",
@@ -173,7 +178,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
@@ -191,7 +197,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.AST",
@@ -207,7 +214,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.Type",
@@ -223,7 +231,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations",
@@ -241,7 +250,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations.title",
@@ -257,7 +267,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success._tag",
@@ -270,7 +281,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
@@ -288,7 +300,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult]"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.AST",
@@ -304,7 +317,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.Type",
@@ -320,7 +334,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations",
@@ -338,7 +353,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations.title",
@@ -354,7 +370,8 @@
       "isInternal": false,
       "modifiers": [
         "readonly"
-      ]
+      ],
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations"
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure._tag",
@@ -367,7 +384,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure"
     }
   ],
   "totalSymbols": 22,

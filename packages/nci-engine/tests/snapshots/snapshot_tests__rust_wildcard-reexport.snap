@@ -41,6 +41,7 @@ expression: "& rust_graph"
     {
       "id": "wildcard-reexport@1.0.0::Config.host",
       "name": "Config.host",
+      "parentSymbolId": "wildcard-reexport@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",
@@ -54,6 +55,7 @@ expression: "& rust_graph"
     {
       "id": "wildcard-reexport@1.0.0::Config.port",
       "name": "Config.port",
+      "parentSymbolId": "wildcard-reexport@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",

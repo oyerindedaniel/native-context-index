@@ -30,7 +30,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "simple-export@1.0.0::Config"
     },
     {
       "id": "simple-export@1.0.0::Config.version",
@@ -43,7 +44,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "simple-export@1.0.0::Config"
     },
     {
       "id": "simple-export@1.0.0::Config.debug",
@@ -56,7 +58,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "simple-export@1.0.0::Config"
     },
     {
       "id": "simple-export@1.0.0::init",

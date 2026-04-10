@@ -22,6 +22,7 @@ expression: "& rust_graph"
     {
       "id": "nested-prefix@1.0.0::Mid.Inner",
       "name": "Mid.Inner",
+      "parentSymbolId": "nested-prefix@1.0.0::Mid",
       "kind": 279,
       "kindName": "ExportDeclaration",
       "package": "nested-prefix",
@@ -36,6 +37,7 @@ expression: "& rust_graph"
     {
       "id": "nested-prefix@1.0.0::Mid.Inner.val",
       "name": "Mid.Inner.val",
+      "parentSymbolId": "nested-prefix@1.0.0::Mid.Inner",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "nested-prefix",

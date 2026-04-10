@@ -91,7 +91,8 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType"
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.value",
@@ -109,7 +110,8 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType"
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::MyNamespace",
@@ -145,7 +147,8 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyNamespace"
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::ENTRY",

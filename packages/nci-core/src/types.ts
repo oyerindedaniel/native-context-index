@@ -205,6 +205,11 @@ export interface SymbolNode {
   id: string;
   /** Symbol name */
   name: string;
+  /**
+   * Lexical container symbol id when `name` encodes a member path (e.g. `Foo.bar` → parent's `id`).
+   * Not `dependencies` (references) or `inheritedFromSources` (inheritance flattening).
+   */
+  parentSymbolId?: string;
   /** AST node kind */
   kind: ts.SyntaxKind;
   /** Human-readable kind name */

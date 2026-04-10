@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Config"
     },
     {
       "id": "deps-pkg@1.0.0::Config.debug",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Config"
     },
     {
       "id": "deps-pkg@1.0.0::Logger",
@@ -76,7 +78,8 @@
       "dependencies": [
         "deps-pkg@1.0.0::Config"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Logger"
     },
     {
       "id": "deps-pkg@1.0.0::Logger.config.name",
@@ -89,7 +92,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Logger.config"
     },
     {
       "id": "deps-pkg@1.0.0::Logger.config.debug",
@@ -102,7 +106,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Logger.config"
     },
     {
       "id": "deps-pkg@1.0.0::Logger.level",
@@ -117,7 +122,8 @@
       "dependencies": [
         "deps-pkg@1.0.0::LogLevel"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "deps-pkg@1.0.0::Logger"
     },
     {
       "id": "deps-pkg@1.0.0::LogLevel",

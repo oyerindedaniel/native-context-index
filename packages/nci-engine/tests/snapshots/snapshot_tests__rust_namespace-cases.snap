@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::API.Config",
       "name": "API.Config",
+      "parentSymbolId": "namespace-cases@1.0.0::API",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "namespace-cases",
@@ -42,6 +43,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::API.Config.url",
       "name": "API.Config.url",
+      "parentSymbolId": "namespace-cases@1.0.0::API.Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "namespace-cases",
@@ -55,6 +57,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::API.fetch",
       "name": "API.fetch",
+      "parentSymbolId": "namespace-cases@1.0.0::API",
       "kind": 263,
       "kindName": "FunctionDeclaration",
       "package": "namespace-cases",
@@ -71,6 +74,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::index.d.ts::API.hidden",
       "name": "API.hidden",
+      "parentSymbolId": "namespace-cases@1.0.0::API",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "namespace-cases",
@@ -84,6 +88,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::API.secret",
       "name": "API.secret",
+      "parentSymbolId": "namespace-cases@1.0.0::API",
       "kind": 244,
       "kindName": "VariableStatement",
       "package": "namespace-cases",
@@ -130,6 +135,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-cases@1.0.0::Widget.id",
       "name": "Widget.id",
+      "parentSymbolId": "namespace-cases@1.0.0::Widget",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "namespace-cases",

@@ -55,7 +55,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "external-reexport@1.0.0::Local"
     }
   ],
   "totalSymbols": 4,

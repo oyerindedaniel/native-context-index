@@ -29,7 +29,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::Position"
     },
     {
       "id": "shared-type-pruning@1.0.0::Position.column",
@@ -42,7 +43,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::Position"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation",
@@ -75,7 +77,8 @@
       "dependencies": [
         "shared-type-pruning@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.start.line",
@@ -88,7 +91,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.start"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.start.column",
@@ -101,7 +105,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.start"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end",
@@ -116,7 +121,8 @@
       "dependencies": [
         "shared-type-pruning@1.0.0::Position"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end.line",
@@ -129,7 +135,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.end"
     },
     {
       "id": "shared-type-pruning@1.0.0::SourceLocation.end.column",
@@ -142,7 +149,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "shared-type-pruning@1.0.0::SourceLocation.end"
     }
   ],
   "totalSymbols": 10,

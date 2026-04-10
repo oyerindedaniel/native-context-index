@@ -55,6 +55,7 @@ expression: "& rust_graph"
     {
       "id": "merged-symbols@1.0.0::merged.Config",
       "name": "merged.Config",
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "merged-symbols",
@@ -72,6 +73,7 @@ expression: "& rust_graph"
     {
       "id": "merged-symbols@1.0.0::merged.Config.debug",
       "name": "merged.Config.debug",
+      "parentSymbolId": "merged-symbols@1.0.0::merged.Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "merged-symbols",
@@ -85,6 +87,7 @@ expression: "& rust_graph"
     {
       "id": "merged-symbols@1.0.0::merged.options",
       "name": "merged.options",
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "merged-symbols",
@@ -99,6 +102,7 @@ expression: "& rust_graph"
     {
       "id": "merged-symbols@1.0.0::merged.options.verbose",
       "name": "merged.options.verbose",
+      "parentSymbolId": "merged-symbols@1.0.0::merged.options",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "merged-symbols",
@@ -112,6 +116,7 @@ expression: "& rust_graph"
     {
       "id": "merged-symbols@1.0.0::merged.version",
       "name": "merged.version",
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "merged-symbols",

@@ -32,7 +32,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "nested-locals@1.0.0::A"
     },
     {
       "id": "nested-locals@1.0.0::B",
@@ -64,7 +65,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "nested-locals@1.0.0::B"
     },
     {
       "id": "nested-locals@1.0.0::index.d.ts::B",

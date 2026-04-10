@@ -124,7 +124,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "internal-overload-ref@1.0.0::ImportedShape"
     },
     {
       "id": "internal-overload-ref@1.0.0::IMPORTED_TOKEN",
@@ -156,7 +157,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "internal-overload-ref@1.0.0::IMPORTED_TOKEN"
     },
     {
       "id": "internal-overload-ref@1.0.0::ENTRY",
@@ -338,7 +340,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib"
     },
     {
       "id": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual.pick",
@@ -351,7 +354,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual"
     },
     {
       "id": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual.pick#2",
@@ -364,7 +368,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual"
     }
   ],
   "totalSymbols": 22,

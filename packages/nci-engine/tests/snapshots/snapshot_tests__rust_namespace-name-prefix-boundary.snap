@@ -27,6 +27,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild",
       "name": "Outer.OuterChild",
+      "parentSymbolId": "namespace-name-prefix-boundary@1.0.0::Outer",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "namespace-name-prefix-boundary",
@@ -40,6 +41,7 @@ expression: "& rust_graph"
     {
       "id": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild.field",
       "name": "Outer.OuterChild.field",
+      "parentSymbolId": "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "namespace-name-prefix-boundary",

@@ -25,6 +25,7 @@ expression: "& rust_graph"
     {
       "id": "name-collision@1.0.0::ChannelConfig.maxRetries",
       "name": "ChannelConfig.maxRetries",
+      "parentSymbolId": "name-collision@1.0.0::ChannelConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "name-collision",
@@ -54,6 +55,7 @@ expression: "& rust_graph"
     {
       "id": "name-collision@1.0.0::Config.name",
       "name": "Config.name",
+      "parentSymbolId": "name-collision@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "name-collision",
@@ -83,6 +85,7 @@ expression: "& rust_graph"
     {
       "id": "name-collision@1.0.0::StreamConfig.bufferSize",
       "name": "StreamConfig.bufferSize",
+      "parentSymbolId": "name-collision@1.0.0::StreamConfig",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "name-collision",

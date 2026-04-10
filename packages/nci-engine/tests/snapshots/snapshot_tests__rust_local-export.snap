@@ -22,6 +22,7 @@ expression: "& rust_graph"
     {
       "id": "local-export@1.0.0::Local.id",
       "name": "Local.id",
+      "parentSymbolId": "local-export@1.0.0::Local",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "local-export",

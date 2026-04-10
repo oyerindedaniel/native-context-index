@@ -28,7 +28,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "since": "1.0.0"
+      "since": "1.0.0",
+      "parentSymbolId": "implicit-script-globals@1.0.0::String"
     },
     {
       "id": "implicit-script-globals@1.0.0::AppVersion",

@@ -47,7 +47,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
     },
     {
       "id": "merged-symbols@1.0.0::merged.options",
@@ -61,7 +62,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
     },
     {
       "id": "merged-symbols@1.0.0::merged.options.verbose",
@@ -74,7 +76,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "merged-symbols@1.0.0::merged.options"
     },
     {
       "id": "merged-symbols@1.0.0::merged.Config",
@@ -91,7 +94,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
     },
     {
       "id": "merged-symbols@1.0.0::merged.Config.debug",
@@ -104,7 +108,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "merged-symbols@1.0.0::merged.Config"
     },
     {
       "id": "merged-symbols@1.0.0::index.d.ts::merged",

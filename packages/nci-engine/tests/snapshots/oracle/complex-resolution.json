@@ -34,7 +34,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "complex-resolution@1.0.0::PublicInterface"
     },
     {
       "id": "complex-resolution@1.0.0::Alias",
@@ -71,7 +72,8 @@
       ],
       "additionalFiles": [
         "index.d.ts"
-      ]
+      ],
+      "parentSymbolId": "complex-resolution@1.0.0::Alias"
     },
     {
       "id": "complex-resolution@1.0.0::UsesPrivateLocal",
@@ -104,7 +106,8 @@
       "dependencies": [
         "complex-resolution@1.0.0::index.d.ts::PrivateLocal"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "complex-resolution@1.0.0::UsesPrivateLocal"
     },
     {
       "id": "complex-resolution@1.0.0::UsesPrivateLocal.data.id",
@@ -117,7 +120,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "complex-resolution@1.0.0::UsesPrivateLocal.data"
     },
     {
       "id": "complex-resolution@1.0.0::index.d.ts::PrivateLocal",
@@ -143,7 +147,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "complex-resolution@1.0.0::index.d.ts::PrivateLocal"
     },
     {
       "id": "complex-resolution@1.0.0::internal.d.ts::InternalType",
@@ -169,7 +174,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "complex-resolution@1.0.0::internal.d.ts::InternalType"
     },
     {
       "id": "complex-resolution@1.0.0::internal.d.ts::AnotherInternal",
@@ -195,7 +201,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "parentSymbolId": "complex-resolution@1.0.0::internal.d.ts::AnotherInternal"
     },
     {
       "id": "complex-resolution@1.0.0::PublicInterface.id",
@@ -212,7 +219,8 @@
       "isInherited": true,
       "inheritedFromSources": [
         "complex-resolution@1.0.0::internal.d.ts::InternalType.id"
-      ]
+      ],
+      "parentSymbolId": "complex-resolution@1.0.0::PublicInterface"
     }
   ],
   "totalSymbols": 14,

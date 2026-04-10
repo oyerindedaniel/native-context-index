@@ -46,7 +46,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "wildcard-subpath-exports@1.0.0::HelperAOptions"
     },
     {
       "id": "wildcard-subpath-exports@1.0.0::helperB",
@@ -92,7 +93,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "wildcard-subpath-exports@1.0.0::HelperBResult"
     },
     {
       "id": "wildcard-subpath-exports@1.0.0::RootConfig",
@@ -121,7 +123,8 @@
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "parentSymbolId": "wildcard-subpath-exports@1.0.0::RootConfig"
     },
     {
       "id": "wildcard-subpath-exports@1.0.0::init",

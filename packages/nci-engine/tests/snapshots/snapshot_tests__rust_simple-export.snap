@@ -26,6 +26,7 @@ expression: "& rust_graph"
     {
       "id": "simple-export@1.0.0::Config.debug",
       "name": "Config.debug",
+      "parentSymbolId": "simple-export@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "simple-export",
@@ -39,6 +40,7 @@ expression: "& rust_graph"
     {
       "id": "simple-export@1.0.0::Config.name",
       "name": "Config.name",
+      "parentSymbolId": "simple-export@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "simple-export",
@@ -52,6 +54,7 @@ expression: "& rust_graph"
     {
       "id": "simple-export@1.0.0::Config.version",
       "name": "Config.version",
+      "parentSymbolId": "simple-export@1.0.0::Config",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "simple-export",
