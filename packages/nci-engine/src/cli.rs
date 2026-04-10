@@ -14,6 +14,7 @@ use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{max_hops_from_user_value, DEFAULT_MAX_HOPS};
 use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
+use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, find_package_in_node_modules, ScanError};
 use nci_engine::storage::{DatabaseStatusReport, NciDatabase, StorageError};
 use serde_json::Value;
@@ -189,6 +190,10 @@ struct BulkIndexArgs {
 
     #[arg(long = "package", value_name = "GLOB")]
     package_globs: Vec<String>,
+
+    /// Emit `npm::…` stubs only for this package root (repeatable); union with `.nci.toml` `dependency_stub_packages`.
+    #[arg(long = "dependency-stub-package", value_name = "PKG")]
+    dependency_stub_packages: Vec<String>,
 
     #[arg(long)]
     dry_run: bool,
@@ -614,6 +619,15 @@ fn build_index_options(
 
     let filter = build_filter(file, &bulk.package_globs);
 
+    let mut stub_list_from_config: Vec<String> = Vec::new();
+    if let Some(config_file) = file {
+        if let Some(list) = &config_file.dependency_stub_packages {
+            stub_list_from_config.extend(list.iter().cloned());
+        }
+    }
+    stub_list_from_config.extend(bulk.dependency_stub_packages.iter().cloned());
+    let dependency_stub_packages = normalize_dependency_stub_list(stub_list_from_config);
+
     Ok(IndexOptions {
         max_hops,
         parallel,
@@ -622,6 +636,7 @@ fn build_index_options(
         project_root: Some(project_root),
         filter,
         parallel_resolve_deps,
+        dependency_stub_packages,
         ..Default::default()
     })
 }

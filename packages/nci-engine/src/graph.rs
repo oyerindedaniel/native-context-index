@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
 use dashmap::DashMap;
@@ -14,7 +14,9 @@ use crate::constants::NODE_BUILTINS;
 use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
 use crate::profile;
-use crate::resolver::{normalize_path, resolve_module_specifier, resolve_types_entry};
+use crate::resolver::{
+    normalize_path, resolve_module_specifier, resolve_types_entry, specifier_is_dependency_stub,
+};
 use crate::types::{
     PackageEntry, PackageGraph, PackageInfo, ParsedImport, SharedString, SharedVec, SymbolKind,
     SymbolNode, Visibility,
@@ -138,6 +140,7 @@ fn resolve_dependency_ids_for_symbol(
     triple_slash_edges: &HashMap<SharedString, Vec<SharedString>>,
     has_ref_edges: bool,
     protocol_regex: &Regex,
+    dependency_stub_roots: Option<&HashSet<String>>,
 ) -> Vec<SharedString> {
     let abs_lookup = dash_norm_abs(
         normalized_abs_cache,
@@ -145,6 +148,8 @@ fn resolve_dependency_ids_for_symbol(
         package_dir_str,
     );
     let abs_lookup_str: &str = abs_lookup.as_ref();
+
+    let stub_roots_nonempty = dependency_stub_roots.filter(|roots| !roots.is_empty());
 
     let dep_count = symbol_node.raw_dependencies.len();
     let mut resolved_ids: HashSet<SharedString> =
@@ -161,6 +166,48 @@ fn resolve_dependency_ids_for_symbol(
 
         target_ids.clear();
         namespace_fallback_roots.clear();
+
+        if let Some(stub_roots) = stub_roots_nonempty {
+            if let Some(spec) = raw_dep.import_path.as_deref() {
+                if specifier_is_dependency_stub(spec, stub_roots) {
+                    if let Some(stub) =
+                        try_external_module_stub_id(spec, raw_dep.name.as_ref(), protocol_regex)
+                    {
+                        resolved_ids.insert(stub.into());
+                        continue;
+                    }
+                }
+            } else if let Some(import_map) = import_maps_per_file.get(abs_lookup.as_ref()) {
+                if let Some(matching_import) = import_map.get(raw_dep.name.as_ref()) {
+                    let source = matching_import.source.as_ref();
+                    if specifier_is_dependency_stub(source, stub_roots) {
+                        let original_name = matching_import
+                            .original_name
+                            .as_deref()
+                            .unwrap_or(matching_import.name.as_ref());
+                        if let Some(stub) =
+                            try_external_module_stub_id(source, original_name, protocol_regex)
+                        {
+                            resolved_ids.insert(stub.into());
+                            continue;
+                        }
+                    }
+                }
+                if let Some((qualifier, member_path)) = namespace_qual {
+                    if let Some(ns_import) = import_map.get(qualifier) {
+                        let source = ns_import.source.as_ref();
+                        if specifier_is_dependency_stub(source, stub_roots) {
+                            if let Some(stub) =
+                                try_external_module_stub_id(source, member_path, protocol_regex)
+                            {
+                                resolved_ids.insert(stub.into());
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         if let Some(import_path) = &raw_dep.import_path {
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
@@ -406,6 +453,10 @@ pub fn build_package_graph(
             build_duration_ms: entry_resolution_ms,
         };
     }
+
+    let dependency_stub_roots_arc: Option<Arc<HashSet<String>>> = crawl_options
+        .as_ref()
+        .map(|options| Arc::clone(&options.dependency_stub_roots));
 
     let crawl_phase_start = Instant::now();
     let crawl_result = crawl(&entry.types_entries, crawl_options);
@@ -683,6 +734,11 @@ pub fn build_package_graph(
     let protocol_regex = &*PROTOCOL_REGEX;
     let has_ref_edges = !triple_slash_edges.is_empty();
 
+    let dependency_stub_roots_ref = dependency_stub_roots_arc
+        .as_ref()
+        .map(|roots| roots.as_ref())
+        .filter(|roots| !roots.is_empty());
+
     let resolve_deps_phase_start = Instant::now();
     let normalized_abs_cache: DashMap<SharedString, SharedString> = DashMap::new();
     let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
@@ -711,6 +767,7 @@ pub fn build_package_graph(
                     &triple_slash_edges,
                     has_ref_edges,
                     protocol_regex,
+                    dependency_stub_roots_ref,
                 );
                 (symbol_index, deps)
             })
@@ -738,6 +795,7 @@ pub fn build_package_graph(
                 &triple_slash_edges,
                 has_ref_edges,
                 protocol_regex,
+                dependency_stub_roots_ref,
             );
             symbol_node.dependencies = SharedVec::from(deps);
             symbol_node.raw_dependencies.clear();
@@ -1103,8 +1161,11 @@ fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crawler::CrawlOptions;
     use crate::resolver::normalize_path;
+    use std::collections::HashSet;
     use std::path::Path;
+    use std::sync::Arc;
 
     #[test]
     fn make_relative_strips_prefix() {
@@ -1250,6 +1311,77 @@ mod tests {
             .find(|symbol| symbol.name == "Config".into());
         assert!(config.is_some());
         assert_eq!(config.unwrap().kind, SymbolKind::Interface);
+    }
+
+    #[test]
+    fn dependency_stub_roots_short_circuits_listed_packages_to_npm_stub_edges() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join("dependency-stub-packages");
+        let info = PackageInfo {
+            name: "stub-root-pkg".into(),
+            version: "1.0.0".into(),
+            dir: normalize_path(&fixture),
+            is_scoped: false,
+        };
+
+        let graph_plain = build_package_graph(&info, None);
+        let combined_plain = graph_plain
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "combined")
+            .expect("combined symbol");
+
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("@stub-listed/core".to_string());
+        let graph_stubbed = build_package_graph(
+            &info,
+            Some(CrawlOptions {
+                dependency_stub_roots: Arc::new(stub_roots),
+                ..Default::default()
+            }),
+        );
+        let combined_stubbed = graph_stubbed
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "combined")
+            .expect("combined symbol");
+
+        assert!(
+            combined_plain
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().starts_with("npm::@stub-listed")),
+            "without stub list, listed-dep should resolve in-graph"
+        );
+        assert!(
+            combined_stubbed.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref() == "npm::@stub-listed/core::ListedType"
+            }),
+            "with stub list, listed-dep should be npm stub"
+        );
+        assert!(
+            combined_stubbed.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref().contains("other-dep")
+            }),
+            "non-listed dependency still in-graph"
+        );
+        assert!(
+            graph_stubbed.symbols.iter().any(|symbol_node| {
+                symbol_node.file_path.as_ref().contains("other-dep")
+            }),
+            "non-stubbed dependency files remain in the graph"
+        );
+        for symbol_node in &graph_stubbed.symbols {
+            assert!(
+                !symbol_node.file_path.as_ref().contains("@stub-listed"),
+                "stub-listed package must not be crawled: {}",
+                symbol_node.file_path.as_ref()
+            );
+        }
     }
 
     #[test]

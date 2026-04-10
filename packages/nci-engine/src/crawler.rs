@@ -11,7 +11,10 @@ use crate::dedupe::{normalize_signature, symbol_dedupe_key};
 use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
-use crate::resolver::{normalize_path, normalize_path_with_dashmap, resolve_module_specifier};
+use crate::resolver::{
+    normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
+    specifier_is_dependency_stub,
+};
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
 };
@@ -23,8 +26,10 @@ pub struct CrawlOptions {
     pub max_hops: usize,
     /// When built with `--features phase-profile` and `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
-    /// When true, resolve `SymbolNode` dependency ids in parallel during graph build (Rayon + DashMap).
+    /// When true, resolve `SymbolNode` dependency ids in parallel during graph build.
     pub parallel_resolve_deps: bool,
+    /// Normalized npm package roots for dependency stubbing.
+    pub dependency_stub_roots: Arc<HashSet<String>>,
 }
 
 impl Default for CrawlOptions {
@@ -33,6 +38,7 @@ impl Default for CrawlOptions {
             max_hops: DEFAULT_MAX_HOPS,
             profile_as: None,
             parallel_resolve_deps: true,
+            dependency_stub_roots: Arc::new(HashSet::new()),
         }
     }
 }
@@ -47,7 +53,10 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         }
     };
 
-    let mut session = CrawlSession::new(crawl_options.max_hops);
+    let mut session = CrawlSession::new(
+        crawl_options.max_hops,
+        Arc::clone(&crawl_options.dependency_stub_roots),
+    );
 
     let primary_entry = entry_file_paths.first().cloned().unwrap_or_default();
 
@@ -264,10 +273,13 @@ struct CrawlSession {
 
     /// Same bound as [`CrawlOptions::max_hops`] for this session.
     max_hops: usize,
+
+    /// Package roots whose module specifiers must not resolve to disk (crawl cutoff).
+    dependency_stub_roots: Arc<HashSet<String>>,
 }
 
 impl CrawlSession {
-    fn new(max_hops: usize) -> Self {
+    fn new(max_hops: usize, dependency_stub_roots: Arc<HashSet<String>>) -> Self {
         Self {
             visited: HashSet::new(),
             circular_refs: Vec::new(),
@@ -282,6 +294,7 @@ impl CrawlSession {
             path_norm_cache: DashMap::new(),
             module_specifier_cache: DashMap::new(),
             max_hops,
+            dependency_stub_roots,
         }
     }
 
@@ -295,6 +308,11 @@ impl CrawlSession {
         let key = (SharedString::from(specifier), SharedString::from(from_file));
         if let Some(cached) = self.module_specifier_cache.get(&key) {
             return cached.clone();
+        }
+        if specifier_is_dependency_stub(specifier, self.dependency_stub_roots.as_ref()) {
+            let empty: Vec<SharedString> = Vec::new();
+            self.module_specifier_cache.insert(key, empty.clone());
+            return empty;
         }
         let result = resolve_module_specifier(specifier, from_file);
         self.module_specifier_cache.insert(key, result.clone());
@@ -902,8 +920,10 @@ fn resolve_triple_slash_ref(ref_path: &str, current_file: &SharedString) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use tempfile::TempDir;
 
     /// Helper: creates a .d.ts file in the temp directory.
@@ -1042,6 +1062,59 @@ mod tests {
 
         // max_hops = 0: only the entry file is read; re-export target is not visited.
         assert!(result.visited_files.len() <= 1);
+    }
+
+    #[test]
+    fn crawl_skips_files_for_dependency_stub_root_specifiers() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_root = temp_dir.path();
+        fs::create_dir_all(project_root.join("node_modules/stub-npm-pkg")).unwrap();
+        fs::write(
+            project_root.join("package.json"),
+            r#"{"name":"root-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            project_root.join("node_modules/stub-npm-pkg/package.json"),
+            r#"{"name":"stub-npm-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            project_root.join("node_modules/stub-npm-pkg/index.d.ts"),
+            "export interface StubExported { v: number; }\n",
+        )
+        .unwrap();
+        let entry = write_dts(
+            project_root,
+            "index.d.ts",
+            "import type { StubExported } from \"stub-npm-pkg\";\nexport declare function useStub(x: StubExported): void;\n",
+        );
+
+        let baseline = crawl(&[entry.clone()], None);
+        assert!(
+            baseline.visited_files.iter().any(|visited_path| {
+                visited_path.as_ref().contains("stub-npm-pkg")
+            }),
+            "without stub roots, dependency package should be visited: {:?}",
+            baseline.visited_files
+        );
+
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("stub-npm-pkg".to_string());
+        let stubbed = crawl(
+            &[entry],
+            Some(CrawlOptions {
+                dependency_stub_roots: Arc::new(stub_roots),
+                ..Default::default()
+            }),
+        );
+        assert!(
+            !stubbed.visited_files.iter().any(|visited_path| {
+                visited_path.as_ref().contains("stub-npm-pkg")
+            }),
+            "stub-listed roots must not add stub package files to visited set: {:?}",
+            stubbed.visited_files
+        );
     }
 
     fn hop_limit_chain_entry() -> SharedString {

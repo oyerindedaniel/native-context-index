@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -13,6 +14,144 @@ static JS_EXT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.(js|mjs|c
 
 use crate::constants::NODE_BUILTINS;
 use crate::types::{PackageEntry, SharedString};
+
+thread_local! {
+    /// Reused for [`specifier_is_dependency_stub`] so hot paths do not allocate per lookup.
+    static STUB_ROOT_MATCH_SCRATCH: RefCell<String> = RefCell::new(String::new());
+}
+
+fn push_lower_ascii_package_segment(dest: &mut String, segment: &str) {
+    dest.reserve(segment.len());
+    for character in segment.chars() {
+        dest.push(character.to_ascii_lowercase());
+    }
+}
+
+/// Writes the normalized npm root (lowercase) into `dest`.
+fn try_write_npm_package_root_lowercase(specifier: &str, dest: &mut String) -> bool {
+    dest.clear();
+    let trimmed = specifier.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    if trimmed.starts_with('.') {
+        return false;
+    }
+    if trimmed.starts_with('/') {
+        return false;
+    }
+    let spec_bytes = trimmed.as_bytes();
+    if spec_bytes.len() >= 3
+        && spec_bytes[0].is_ascii_alphabetic()
+        && spec_bytes[1] == b':'
+        && (spec_bytes[2] == b'/' || spec_bytes[2] == b'\\')
+    {
+        return false;
+    }
+    if trimmed.starts_with("node:")
+        || trimmed
+            .get(..5)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
+    {
+        return false;
+    }
+    if spec_bytes.len() >= 2 && spec_bytes[0].is_ascii_alphabetic() && spec_bytes[1] == b':' {
+        return false;
+    }
+
+    if let Some(after_at) = trimmed.strip_prefix('@') {
+        let Some(scope_delim) = after_at.find('/') else {
+            return false;
+        };
+        if scope_delim == 0 || scope_delim + 1 >= after_at.len() {
+            return false;
+        }
+        let scope_segment = &after_at[..scope_delim];
+        let after_scope = &after_at[scope_delim + 1..];
+        let package_name_end = after_scope
+            .find(|separator| separator == '/' || separator == '\\')
+            .unwrap_or(after_scope.len());
+        if package_name_end == 0 {
+            return false;
+        }
+        let package_name_segment = &after_scope[..package_name_end];
+        dest.push('@');
+        push_lower_ascii_package_segment(dest, scope_segment);
+        dest.push('/');
+        push_lower_ascii_package_segment(dest, package_name_segment);
+        return true;
+    }
+
+    let root_end = trimmed
+        .find(|separator| separator == '/' || separator == '\\')
+        .unwrap_or(trimmed.len());
+    if root_end == 0 {
+        return false;
+    }
+    let first_segment = &trimmed[..root_end];
+    push_lower_ascii_package_segment(dest, first_segment);
+    true
+}
+
+/// Normalized npm package root for `dependency_stub_packages` matching (`npm_package_root` on a bare name or specifier).
+///
+/// Returns `None` for relative specifiers, `node:`, URLs, Windows paths, and other non-npm-package patterns.
+pub fn npm_package_root(specifier: &str) -> Option<String> {
+    let mut buffer = String::new();
+    try_write_npm_package_root_lowercase(specifier, &mut buffer).then_some(buffer)
+}
+
+/// `true` when `specifier` is a bare package-style module id whose normalized root is in `stub_roots`.
+///
+/// Uses a thread-local buffer so repeated checks avoid a fresh [`String`] for the normalized root.
+#[inline]
+pub fn specifier_is_dependency_stub(specifier: &str, stub_roots: &HashSet<String>) -> bool {
+    if stub_roots.is_empty() {
+        return false;
+    }
+    STUB_ROOT_MATCH_SCRATCH.with(|scratch_cell| {
+        let scratch = &mut *scratch_cell.borrow_mut();
+        try_write_npm_package_root_lowercase(specifier, scratch) && stub_roots.contains(scratch.as_str())
+    })
+}
+
+/// Merge and normalize stub package roots from config / CLI (sorted, deduped) in one pass via [`BTreeSet`].
+pub fn normalize_dependency_stub_list(
+    entries: impl IntoIterator<Item = impl AsRef<str>>,
+) -> Vec<String> {
+    let mut roots: BTreeSet<String> = BTreeSet::new();
+    let mut norm_buf = String::new();
+    for entry in entries {
+        let trimmed = entry.as_ref().trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if try_write_npm_package_root_lowercase(trimmed, &mut norm_buf) {
+            roots.insert(std::mem::take(&mut norm_buf));
+            continue;
+        }
+        if trimmed.starts_with('@') {
+            let segments: Vec<&str> =
+                trimmed.split('/').filter(|segment| !segment.is_empty()).collect();
+            if segments.len() == 2 && segments[0].starts_with('@') {
+                norm_buf.clear();
+                norm_buf.push('@');
+                push_lower_ascii_package_segment(
+                    &mut norm_buf,
+                    segments[0].get(1..).unwrap_or_default(),
+                );
+                norm_buf.push('/');
+                push_lower_ascii_package_segment(&mut norm_buf, segments[1]);
+                roots.insert(std::mem::take(&mut norm_buf));
+            }
+        } else {
+            norm_buf.clear();
+            push_lower_ascii_package_segment(&mut norm_buf, trimmed);
+            roots.insert(std::mem::take(&mut norm_buf));
+        }
+    }
+    roots.into_iter().collect()
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ResolveError {
@@ -736,6 +875,7 @@ fn is_declaration_file_path(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use std::fs;
     use std::path::Path;
 
@@ -918,6 +1058,52 @@ mod tests {
                     .as_ref()
             )
         );
+    }
+
+    // ─── npm_package_root tests ───────────────────────────────
+
+    #[test]
+    fn npm_package_root_unscoped_and_subpath() {
+        assert_eq!(npm_package_root("zod"), Some("zod".into()));
+        assert_eq!(npm_package_root("zod/v4"), Some("zod".into()));
+        assert_eq!(npm_package_root("Lodash"), Some("lodash".into()));
+    }
+
+    #[test]
+    fn npm_package_root_scoped() {
+        assert_eq!(
+            npm_package_root("@Foo/Bar"),
+            Some("@foo/bar".into())
+        );
+        assert_eq!(
+            npm_package_root("@SCOPE/pkg/subpath"),
+            Some("@scope/pkg".into())
+        );
+    }
+
+    #[test]
+    fn npm_package_root_rejects_relative_and_builtin() {
+        assert_eq!(npm_package_root("./x"), None);
+        assert_eq!(npm_package_root("../y"), None);
+        assert_eq!(npm_package_root("/abs"), None);
+        assert_eq!(npm_package_root("node:fs"), None);
+        assert_eq!(npm_package_root("file:///tmp/x"), None);
+    }
+
+    #[test]
+    fn normalize_dependency_stub_list_sort_dedupes() {
+        let normalized_stubs =
+            normalize_dependency_stub_list(["zod", "A", "zod", "@B/C"]);
+        assert_eq!(normalized_stubs, vec!["@b/c", "a", "zod"]);
+    }
+
+    #[test]
+    fn specifier_is_dependency_stub_matches_normalized_roots() {
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("zod".to_string());
+        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots));
+        assert!(!specifier_is_dependency_stub("./local", &stub_roots));
+        assert!(!specifier_is_dependency_stub("zod", &HashSet::new()));
     }
 
     // ─── normalize_path tests ──────────────────────────────────

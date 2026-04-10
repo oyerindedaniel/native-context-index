@@ -1,5 +1,7 @@
 //! Cache locations on disk (`nci.sqlite` under the OS cache dir).
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -8,6 +10,14 @@ use crate::types::PackageInfo;
 
 /// Engine version baked at compile time; bumping invalidates rows where `packages.engine_version` differs.
 pub const NCI_ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// SQLite `packages.engine_version` value: crate version plus a hash of normalized `dependency_stub_packages`
+/// so cache hits invalidate when stub config changes.
+pub fn index_engine_cache_key(stub_roots_normalized: &[String]) -> String {
+    let mut hasher = DefaultHasher::new();
+    stub_roots_normalized.hash(&mut hasher);
+    format!("{}+{:x}", NCI_ENGINE_VERSION, hasher.finish())
+}
 
 const CACHE_SUBDIR: &str = "nci";
 

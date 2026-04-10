@@ -160,6 +160,31 @@ describe("buildPackageGraph", () => {
     expect(unresolvedExt?.dependencies).toContain("npm::@external/types::InvokeOutputOptions");
   });
 
+  it("dependencyStubRoots short-circuits listed packages to npm:: stubs", () => {
+    const info = makePackageInfo("dependency-stub-packages", "stub-root-pkg", "1.0.0");
+    const plain = buildPackageGraph(info);
+    const stubbed = buildPackageGraph(info, {
+      dependencyStubRoots: new Set(["@stub-listed/core"]),
+    });
+    const combinedPlain = plain.symbols.find((symbol) => symbol.name === "combined");
+    const combinedStubbed = stubbed.symbols.find((symbol) => symbol.name === "combined");
+    expect(combinedPlain).toBeDefined();
+    expect(combinedStubbed).toBeDefined();
+    expect(
+      combinedPlain!.dependencies.every((dependencyId) => !dependencyId.startsWith("npm::@stub-listed"))
+    ).toBe(true);
+    expect(combinedStubbed!.dependencies).toContain("npm::@stub-listed/core::ListedType");
+    expect(
+      combinedStubbed!.dependencies.some((dependencyId) => dependencyId.includes("other-dep"))
+    ).toBe(true);
+    expect(
+      stubbed.symbols.some((symbolNode) => symbolNode.filePath.includes("other-dep"))
+    ).toBe(true);
+    for (const symbolNode of stubbed.symbols) {
+      expect(symbolNode.filePath).not.toContain("@stub-listed");
+    }
+  });
+
   it("populates dependencies with resolved symbol IDs", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deps-pkg")

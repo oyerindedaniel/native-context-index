@@ -68,6 +68,9 @@ pub struct IndexOptions {
     /// Extra `save_package` attempts after the first try fails (writer thread). **`0`** = one try
     /// only. Backoff between retries is fixed internally (bounded ms + clock jitter).
     pub save_retry_count: u32,
+
+    /// Normalized npm package roots for dependency stubbing (merged from `.nci.toml` and CLI).
+    pub dependency_stub_packages: Vec<String>,
 }
 
 impl Default for IndexOptions {
@@ -84,6 +87,7 @@ impl Default for IndexOptions {
             retain_graph_after_save: false,
             save_queue_capacity: None,
             save_retry_count: 0,
+            dependency_stub_packages: Vec::new(),
         }
     }
 }
@@ -151,13 +155,14 @@ fn try_package_cache_hit(
     package: &PackageInfo,
     sqlite_path: &Path,
     hydrate_cache_hits: bool,
+    engine_cache_key: &str,
 ) -> Option<IndexedGraph> {
     if cache::package_dir_is_symlink(package) {
         return None;
     }
     with_read_only_index_db(sqlite_path, |db| {
         let db = db?;
-        if !db.has_cached_package(package, cache::NCI_ENGINE_VERSION) {
+        if !db.has_cached_package(package, engine_cache_key) {
             trace!(
                 package = %package.name.as_ref(),
                 "package cache miss (not in sqlite)"
@@ -268,15 +273,28 @@ pub fn index_packages(
     options: Option<IndexOptions>,
 ) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
-    let crawl_options_factory = |package: &PackageInfo| {
+    let index_engine_cache_key = cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
+    let dependency_stub_roots: Arc<HashSet<String>> = Arc::new(
+        index_opts
+            .dependency_stub_packages
+            .iter()
+            .cloned()
+            .collect(),
+    );
+    let crawl_max_hops = index_opts.max_hops;
+    let crawl_parallel_resolve_deps = index_opts.parallel_resolve_deps;
+    let crawl_profile_phases = phases_enabled();
+    let crawl_stub_roots = Arc::clone(&dependency_stub_roots);
+    let crawl_options_factory = move |package: &PackageInfo| {
         Some(CrawlOptions {
-            max_hops: index_opts.max_hops,
-            profile_as: if phases_enabled() {
+            max_hops: crawl_max_hops,
+            profile_as: if crawl_profile_phases {
                 Some(package.name.clone())
             } else {
                 None
             },
-            parallel_resolve_deps: index_opts.parallel_resolve_deps,
+            parallel_resolve_deps: crawl_parallel_resolve_deps,
+            dependency_stub_roots: Arc::clone(&crawl_stub_roots),
         })
     };
 
@@ -331,6 +349,7 @@ pub fn index_packages(
         let sqlite_path_owned = sqlite_path.clone();
         let retain = index_opts.retain_graph_after_save;
         let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
+        let engine_cache_key_for_writer = index_engine_cache_key.clone();
         let join = std::thread::spawn(move || {
             let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
                 Ok(database) => Some(database),
@@ -349,7 +368,7 @@ pub fn index_packages(
                     let mut last_err = None;
                     let mut saved = false;
                     for attempt in 0..save_attempts {
-                        match db.save_package(&package, &graph) {
+                        match db.save_package(&package, &graph, engine_cache_key_for_writer.as_str()) {
                             Ok(()) => {
                                 saved = true;
                                 break;
@@ -418,7 +437,9 @@ pub fn index_packages(
     let hydrate = index_opts.hydrate_cache_hits;
     let process_index = |i: usize, package: &PackageInfo| {
         if let Some(ref path) = cache_sqlite_path {
-            if let Some(indexed) = try_package_cache_hit(package, path.as_path(), hydrate) {
+            if let Some(indexed) =
+                try_package_cache_hit(package, path.as_path(), hydrate, index_engine_cache_key.as_str())
+            {
                 *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
                 return;
             }

@@ -8,11 +8,20 @@ import type {
 } from "./types.js";
 import { NODE_BUILTINS } from "./constants.js";
 import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./resolver.js";
+import { npmPackageRoot } from "./npm-package-root.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
 import { normalizeSignature } from "./dedupe.js";
 import { assignParentSymbolIds } from "./parent-symbol.js";
 import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
+
+function specifierMatchesDependencyStubRoots(
+  specifier: string,
+  stubRoots: ReadonlySet<string>
+): boolean {
+  const root = npmPackageRoot(specifier);
+  return root !== null && stubRoots.has(root);
+}
 
 /** Build a symbol graph for a single package. */
 export function buildPackageGraph(
@@ -297,6 +306,7 @@ export function buildPackageGraph(
   }
 
   const protocolRegex = /^([a-z]+):(.*)$/;
+  const dependencyStubRootsRef = crawlOptions?.dependencyStubRoots;
   const moduleSpecifierCache = new Map<string, string[]>();
   const absPathCache = new Map<string, string>();
   const importsByNameCache = new Map<string, Map<string, { source: string; originalName?: string }>>();
@@ -378,6 +388,55 @@ export function buildPackageGraph(
         const namespaceQual = !rawDep.importPath ? splitImportNamespaceMember(rawDep.name) : null;
         let targetIds: string[] = [];
         const namespaceFallbackRoots: string[] = [];
+
+        if (dependencyStubRootsRef && dependencyStubRootsRef.size > 0) {
+          if (rawDep.importPath) {
+            if (specifierMatchesDependencyStubRoots(rawDep.importPath, dependencyStubRootsRef)) {
+              const stubOnly = resolveExternalModuleStubId(rawDep.importPath, rawDep.name);
+              if (stubOnly) {
+                resolvedIds.add(stubOnly);
+                continue;
+              }
+            }
+          } else {
+            const importMapForStub = getImportsByName(symAbsPath);
+            const stubMatchingImport = importMapForStub.get(rawDep.name);
+            if (stubMatchingImport) {
+              if (
+                specifierMatchesDependencyStubRoots(
+                  stubMatchingImport.source,
+                  dependencyStubRootsRef
+                )
+              ) {
+                const originalStubName = stubMatchingImport.originalName || rawDep.name;
+                const stubOnly = resolveExternalModuleStubId(
+                  stubMatchingImport.source,
+                  originalStubName
+                );
+                if (stubOnly) {
+                  resolvedIds.add(stubOnly);
+                  continue;
+                }
+              }
+            }
+            if (namespaceQual) {
+              const stubNsImport = importMapForStub.get(namespaceQual.qualifier);
+              if (
+                stubNsImport &&
+                specifierMatchesDependencyStubRoots(stubNsImport.source, dependencyStubRootsRef)
+              ) {
+                const stubOnly = resolveExternalModuleStubId(
+                  stubNsImport.source,
+                  namespaceQual.memberPath
+                );
+                if (stubOnly) {
+                  resolvedIds.add(stubOnly);
+                  continue;
+                }
+              }
+            }
+          }
+        }
 
         if (rawDep.importPath) {
           const absPaths = getCachedModuleSpecifier(rawDep.importPath, symbolNode.filePath);

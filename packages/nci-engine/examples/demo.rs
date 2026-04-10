@@ -34,7 +34,15 @@ use std::time::Instant;
 use nci_engine::pipeline::{
     GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
+use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::scan_packages;
+
+/// Package roots for dependency stubbing (`npm::…` edges). Edit this slice; leave empty for default
+/// in-graph resolution. Not wired to CLI flags in this example.
+const DEMO_DEPENDENCY_STUB_PACKAGES: &[&str] = &[
+    "zod",
+    // "@types/node",
+];
 struct IndexedSummary<'a> {
     package: &'a str,
     total_symbols: usize,
@@ -244,6 +252,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let scan_dedupe_duration = run_start.elapsed();
 
+    let dependency_stub_packages =
+        normalize_dependency_stub_list(DEMO_DEPENDENCY_STUB_PACKAGES.iter().copied());
+
     let index_options = Some(IndexOptions {
         max_hops: 10,
         parallel: !use_sequential,
@@ -252,6 +263,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         parallel_resolve_deps: !no_parallel_resolve_deps,
         hydrate_cache_hits: false,
         retain_graph_after_save: false,
+        dependency_stub_packages,
         ..Default::default()
     });
 

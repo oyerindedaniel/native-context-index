@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { parseFile } from "./parser.js";
+import { npmPackageRoot } from "./npm-package-root.js";
 import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
 import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./types.js";
 import { DEFAULT_MAX_HOPS, MAX_HOPS_UNLIMITED } from "./constants.js";
@@ -14,6 +15,11 @@ export interface CrawlOptions {
    * Use `MAX_HOPS_UNLIMITED` (-1) for no cap (only graph shape and circular detection stop the crawl).
    */
   maxHops?: number;
+  /**
+   * Normalized npm package roots: module specifiers matching these roots are not resolved to files
+   * during crawl (same as engine). Graph build still emits `npm::…` dependency ids from app code.
+   */
+  dependencyStubRoots?: ReadonlySet<string>;
 }
 
 function normalizeMaxHops(raw?: number): number {
@@ -48,6 +54,33 @@ export function crawl(
   const primaryEntry = entries[0] || "";
   const crawlProfiling = nciProfileEnabled();
   let profileResolveFileCacheHits = 0;
+
+  const dependencyStubRootsForCrawl = options.dependencyStubRoots;
+  const moduleSpecifierResolutionCache = new Map<string, string[]>();
+
+  function specifierIsDependencyStubForCrawl(specifier: string): boolean {
+    if (!dependencyStubRootsForCrawl || dependencyStubRootsForCrawl.size === 0) {
+      return false;
+    }
+    const normalizedRoot = npmPackageRoot(specifier);
+    return normalizedRoot !== null && dependencyStubRootsForCrawl.has(normalizedRoot);
+  }
+
+  function cachedResolveModuleSpecifier(specifier: string, fromFile: string): string[] {
+    const cacheKey = `${fromFile}\0${specifier}`;
+    const existing = moduleSpecifierResolutionCache.get(cacheKey);
+    if (existing !== undefined) {
+      return existing;
+    }
+    if (specifierIsDependencyStubForCrawl(specifier)) {
+      const empty: string[] = [];
+      moduleSpecifierResolutionCache.set(cacheKey, empty);
+      return empty;
+    }
+    const resolvedPaths = resolveModuleSpecifier(specifier, fromFile);
+    moduleSpecifierResolutionCache.set(cacheKey, resolvedPaths);
+    return resolvedPaths;
+  }
 
   function recordTripleSlashEdge(fromAbs: string, toAbs: string): void {
     const from = normalizePath(fromAbs);
@@ -226,7 +259,7 @@ export function crawl(
         fileIsExternalModule.set(normalizedPath, isExternalModule);
 
         for (const reference of tripleSlashRefs) {
-          const resolvedPaths = resolveModuleSpecifier(reference, normalizedPath);
+          const resolvedPaths = cachedResolveModuleSpecifier(reference, normalizedPath);
           if (resolvedPaths.length > 0) {
             for (const refPath of resolvedPaths) {
               recordTripleSlashEdge(normalizedPath, refPath);
@@ -243,7 +276,7 @@ export function crawl(
 
         for (const exportEntry of exportEntries) {
           if (exportEntry.source) {
-            const sourcePaths = resolveModuleSpecifier(exportEntry.source, normalizedPath);
+            const sourcePaths = cachedResolveModuleSpecifier(exportEntry.source, normalizedPath);
             for (const sourcePath of sourcePaths) {
               tryEnqueue(sourcePath);
             }
@@ -252,7 +285,7 @@ export function crawl(
 
         for (const importEntry of importEntries) {
           if (importEntry.source) {
-            const importedPaths = resolveModuleSpecifier(importEntry.source, normalizedPath);
+            const importedPaths = cachedResolveModuleSpecifier(importEntry.source, normalizedPath);
             for (const importedPath of importedPaths) {
               tryEnqueue(importedPath);
             }
@@ -263,7 +296,7 @@ export function crawl(
           if (!exportEntry.dependencies) continue;
           for (const dependency of exportEntry.dependencies) {
             if (!dependency.importPath) continue;
-            const depPaths = resolveModuleSpecifier(dependency.importPath, normalizedPath);
+            const depPaths = cachedResolveModuleSpecifier(dependency.importPath, normalizedPath);
             for (const depPath of depPaths) {
               if (depPath !== dependency.importPath) {
                 tryEnqueue(depPath);
@@ -307,7 +340,7 @@ export function crawl(
     const tripleSlashRefs = allRawReferences.get(normalizedPath) || [];
   
     for (const ref of tripleSlashRefs) {
-      const resolvedPaths = resolveModuleSpecifier(ref, normalizedPath);
+      const resolvedPaths = cachedResolveModuleSpecifier(ref, normalizedPath);
       const refPaths = resolvedPaths.length > 0 ? resolvedPaths : [resolveTripleSlashRef(ref, normalizedPath)].filter(Boolean) as string[];
 
       for (const refPath of refPaths) {
@@ -428,7 +461,7 @@ export function crawl(
   ): ResolvedSymbol[] {
     const results: ResolvedSymbol[] = [];
     const fullName = namePrefix ? `${namePrefix}.${exportEntry.name}` : exportEntry.name;
-    const sourcePaths = resolveModuleSpecifier(exportEntry.source!, currentFile);
+    const sourcePaths = cachedResolveModuleSpecifier(exportEntry.source!, currentFile);
 
     if (sourcePaths.length === 0) {
       if (!exportEntry.isWildcard) {

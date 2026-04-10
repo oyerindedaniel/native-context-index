@@ -9,7 +9,6 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
 
-use crate::cache::NCI_ENGINE_VERSION;
 use crate::storage_migrations::{read_schema_version, MIGRATIONS, META_SCHEMA_KEY};
 use crate::types::{
     DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
@@ -262,11 +261,10 @@ impl NciDatabase {
             .query_row(
                 "SELECT total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
-                 WHERE name = ?1 AND version = ?2 AND engine_version = ?3",
+                 WHERE name = ?1 AND version = ?2",
                 rusqlite::params![
                     package_info.name.as_ref(),
                     package_info.version.as_ref(),
-                    NCI_ENGINE_VERSION,
                 ],
                 |package_row| {
                     Ok(PackageIndexMetadata {
@@ -286,9 +284,9 @@ impl NciDatabase {
 
     pub fn list_indexed_packages(&self) -> StorageResult<Vec<(String, String)>> {
         let mut statement = self.connection.prepare(
-            "SELECT name, version FROM packages WHERE engine_version = ?1 ORDER BY name, version",
+            "SELECT name, version FROM packages ORDER BY name, version",
         )?;
-        let rows = statement.query_map(rusqlite::params![NCI_ENGINE_VERSION], |package_row| {
+        let rows = statement.query_map([], |package_row| {
             Ok((
                 package_row.get::<_, String>(0)?,
                 package_row.get::<_, String>(1)?,
@@ -301,17 +299,18 @@ impl NciDatabase {
         Ok(out)
     }
 
+    /// Loads the graph row for `(name, version)` (unique after [`Self::save_package`]). Cache validity is
+    /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `engine_cache_key`, not this `SELECT`.
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
         let (package_id, stored_total_symbols, stored_total_files, crawl_ms, build_ms) = match self
             .connection
             .query_row(
                 "SELECT package_id, total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
-                 WHERE name = ?1 AND version = ?2 AND engine_version = ?3",
+                 WHERE name = ?1 AND version = ?2",
                 rusqlite::params![
                     package_info.name.as_ref(),
                     package_info.version.as_ref(),
-                    NCI_ENGINE_VERSION,
                 ],
                 |package_row| {
                     Ok((
@@ -530,6 +529,7 @@ impl NciDatabase {
         &mut self,
         package_info: &PackageInfo,
         graph: &PackageGraph,
+        engine_cache_key: &str,
     ) -> StorageResult<()> {
         let transaction = self
             .connection
@@ -552,7 +552,7 @@ impl NciDatabase {
                 graph.total_files as i64,
                 crawl_ms,
                 build_ms,
-                NCI_ENGINE_VERSION,
+                engine_cache_key,
             ],
         )?;
 
@@ -1273,6 +1273,7 @@ fn decorator_arguments_json(arguments: &[SharedString]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::index_engine_cache_key;
     use crate::types::PackageGraph;
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -1318,7 +1319,13 @@ mod tests {
             crawl_duration_ms: 0.0,
             build_duration_ms: 0.0,
         };
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(
             loaded.symbols[0].since.as_ref().map(|value| value.as_ref()),
@@ -1388,9 +1395,16 @@ mod tests {
             build_duration_ms: 7.0,
         };
 
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
 
-        assert!(database.has_cached_package(&package_info, NCI_ENGINE_VERSION));
+        let cache_key = index_engine_cache_key(&[]);
+        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(loaded.symbols.len(), 1);
         assert_eq!(loaded.symbols[0].name.as_ref(), "demo");
@@ -1432,7 +1446,13 @@ mod tests {
             build_duration_ms: 0.0,
         };
 
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(loaded.symbols.len(), 1);
         let loaded_sources: Vec<&str> = loaded.symbols[0]
@@ -1480,7 +1500,13 @@ mod tests {
             build_duration_ms: 0.0,
         };
         let started = Instant::now();
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
         let ms = started.elapsed().as_secs_f64() * 1000.0;
         eprintln!(
             "save_package profile: {N} symbols in {ms:.1} ms (batch FTS + integrity-check)"
@@ -1512,7 +1538,13 @@ mod tests {
             crawl_duration_ms: 0.0,
             build_duration_ms: 0.0,
         };
-        database.save_package(&package_info, &graph1).expect("save1");
+        database
+            .save_package(
+                &package_info,
+                &graph1,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save1");
         assert!(!database.find_symbols_fts("Hello", 5).expect("fts").is_empty());
 
         let mut sym2 = minimal_symbol("b", "beta");
@@ -1526,7 +1558,13 @@ mod tests {
             crawl_duration_ms: 0.0,
             build_duration_ms: 0.0,
         };
-        database.save_package(&package_info, &graph2).expect("save2");
+        database
+            .save_package(
+                &package_info,
+                &graph2,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save2");
         let hits = database
             .find_symbols_fts("ResaveUniqueToken", 10)
             .expect("fts");
@@ -1557,7 +1595,13 @@ mod tests {
             crawl_duration_ms: 1.0,
             build_duration_ms: 1.0,
         };
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
         let hits = database.find_symbols_fts("Hello", 10).expect("fts");
         assert!(!hits.is_empty());
     }
@@ -1598,16 +1642,24 @@ mod tests {
             crawl_duration_ms: 1.0,
             build_duration_ms: 1.0,
         };
-        database.save_package(&package_info, &graph).expect("save");
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
 
         let shared = Arc::new(Mutex::new(database));
         let mut handles = Vec::new();
+        let shared_cache_key = index_engine_cache_key(&[]);
         for _thread_slot in 0..8 {
             let clone_mutex = Arc::clone(&shared);
             let cloned_package_info = package_info.clone();
+            let thread_cache_key = shared_cache_key.clone();
             handles.push(thread::spawn(move || {
                 let guard = clone_mutex.lock().expect("lock");
-                assert!(guard.has_cached_package(&cloned_package_info, NCI_ENGINE_VERSION));
+                assert!(guard.has_cached_package(&cloned_package_info, thread_cache_key.as_str()));
                 assert!(guard.load_package(&cloned_package_info).is_some());
             }));
         }
@@ -1681,8 +1733,15 @@ mod tests {
             crawl_duration_ms: 1.0,
             build_duration_ms: 1.0,
         };
-        database.save_package(&package_info, &graph).expect("save");
-        assert!(database.has_cached_package(&package_info, NCI_ENGINE_VERSION));
+        database
+            .save_package(
+                &package_info,
+                &graph,
+                index_engine_cache_key(&[]).as_str(),
+            )
+            .expect("save");
+        let cache_key = index_engine_cache_key(&[]);
+        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
         assert!(!database.has_cached_package(&package_info, "not-a-real-engine-version"));
     }
 }

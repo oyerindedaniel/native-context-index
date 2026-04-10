@@ -30,6 +30,10 @@ pub struct NciConfigFile {
     /// Include-only package name globs (`FilterConfig::include_globs`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packages: Option<Vec<String>>,
+
+    /// Optional package roots (`npm_package_root` shape) whose dependencies resolve as `npm::…` stubs only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dependency_stub_packages: Option<Vec<String>>,
 }
 
 pub const CONFIG_FILENAME: &str = ".nci.toml";
@@ -67,6 +71,7 @@ mod tests {
             parallel_resolve_deps: Some(true),
             max_hops: Some(7),
             packages: Some(vec!["@types/*".into()]),
+            ..Default::default()
         };
         write_config_file(temp.path(), &cfg).unwrap();
         let loaded = load_config_file(temp.path()).expect("parsed");
