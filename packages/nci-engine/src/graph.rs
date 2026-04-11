@@ -15,7 +15,8 @@ use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
 use crate::profile;
 use crate::resolver::{
-    normalize_path, resolve_module_specifier, resolve_types_entry, specifier_is_dependency_stub,
+    normalize_path, npm_package_root, resolve_module_specifier, resolve_types_entry,
+    specifier_is_dependency_stub,
 };
 use crate::types::{
     PackageEntry, PackageGraph, PackageInfo, ParsedImport, SharedString, SharedVec, SymbolKind,
@@ -141,6 +142,7 @@ fn resolve_dependency_ids_for_symbol(
     has_ref_edges: bool,
     protocol_regex: &Regex,
     dependency_stub_roots: Option<&HashSet<String>>,
+    stub_self_exempt_root: Option<&str>,
 ) -> Vec<SharedString> {
     let abs_lookup = dash_norm_abs(
         normalized_abs_cache,
@@ -169,7 +171,7 @@ fn resolve_dependency_ids_for_symbol(
 
         if let Some(stub_roots) = stub_roots_nonempty {
             if let Some(spec) = raw_dep.import_path.as_deref() {
-                if specifier_is_dependency_stub(spec, stub_roots) {
+                if specifier_is_dependency_stub(spec, stub_roots, stub_self_exempt_root) {
                     if let Some(stub) =
                         try_external_module_stub_id(spec, raw_dep.name.as_ref(), protocol_regex)
                     {
@@ -180,7 +182,7 @@ fn resolve_dependency_ids_for_symbol(
             } else if let Some(import_map) = import_maps_per_file.get(abs_lookup.as_ref()) {
                 if let Some(matching_import) = import_map.get(raw_dep.name.as_ref()) {
                     let source = matching_import.source.as_ref();
-                    if specifier_is_dependency_stub(source, stub_roots) {
+                    if specifier_is_dependency_stub(source, stub_roots, stub_self_exempt_root) {
                         let original_name = matching_import
                             .original_name
                             .as_deref()
@@ -196,7 +198,7 @@ fn resolve_dependency_ids_for_symbol(
                 if let Some((qualifier, member_path)) = namespace_qual {
                     if let Some(ns_import) = import_map.get(qualifier) {
                         let source = ns_import.source.as_ref();
-                        if specifier_is_dependency_stub(source, stub_roots) {
+                        if specifier_is_dependency_stub(source, stub_roots, stub_self_exempt_root) {
                             if let Some(stub) =
                                 try_external_module_stub_id(source, member_path, protocol_regex)
                             {
@@ -454,12 +456,22 @@ pub fn build_package_graph(
         };
     }
 
-    let dependency_stub_roots_arc: Option<Arc<HashSet<String>>> = crawl_options
-        .as_ref()
-        .map(|options| Arc::clone(&options.dependency_stub_roots));
+    let stub_self_exempt_root = npm_package_root(package_info.name.as_ref());
+
+    let mut merged_crawl_opts = crawl_options.as_ref().cloned().unwrap_or_default();
+    merged_crawl_opts.dependency_stub_self_exempt_root = stub_self_exempt_root.clone();
+
+    let dependency_stub_roots_arc = if merged_crawl_opts.dependency_stub_roots.is_empty() {
+        None
+    } else {
+        Some(Arc::clone(&merged_crawl_opts.dependency_stub_roots))
+    };
 
     let crawl_phase_start = Instant::now();
-    let crawl_result = crawl(&entry.types_entries, crawl_options);
+    let crawl_result = crawl(
+        &entry.types_entries,
+        Some(merged_crawl_opts),
+    );
     let crawl_duration_ms = crawl_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
         &graph_profile_label(&package_info.name, "graph.crawl_total"),
@@ -739,6 +751,8 @@ pub fn build_package_graph(
         .map(|roots| roots.as_ref())
         .filter(|roots| !roots.is_empty());
 
+    let stub_self_exempt_for_resolve = stub_self_exempt_root.as_deref();
+
     let resolve_deps_phase_start = Instant::now();
     let normalized_abs_cache: DashMap<SharedString, SharedString> = DashMap::new();
     let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
@@ -768,6 +782,7 @@ pub fn build_package_graph(
                     has_ref_edges,
                     protocol_regex,
                     dependency_stub_roots_ref,
+                    stub_self_exempt_for_resolve,
                 );
                 (symbol_index, deps)
             })
@@ -796,6 +811,7 @@ pub fn build_package_graph(
                 has_ref_edges,
                 protocol_regex,
                 dependency_stub_roots_ref,
+                stub_self_exempt_for_resolve,
             );
             symbol_node.dependencies = SharedVec::from(deps);
             symbol_node.raw_dependencies.clear();
@@ -1449,6 +1465,76 @@ mod tests {
                 symbol_node.file_path.as_ref()
             );
         }
+    }
+
+    fn mirror_pkg_into_node_modules(pkg_root: &Path, package_name: &str) {
+        use std::fs;
+        let dest_dir = if package_name.starts_with('@') {
+            let mut parts = package_name.split('/');
+            let scope = parts.next().expect("scope");
+            let name = parts.next().expect("name");
+            assert!(parts.next().is_none());
+            pkg_root.join("node_modules").join(scope).join(name)
+        } else {
+            pkg_root.join("node_modules").join(package_name)
+        };
+        fs::create_dir_all(&dest_dir).unwrap();
+        for file in ["package.json", "index.d.ts", "inner.d.ts"] {
+            fs::copy(pkg_root.join(file), dest_dir.join(file)).unwrap();
+        }
+    }
+
+    #[test]
+    fn dependency_stub_self_exempt_allows_own_package_subpath_imports() {
+        use std::fs;
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let pkg = temp_dir.path();
+        fs::write(
+            pkg.join("package.json"),
+            r#"{"name":"self-stub-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg.join("index.d.ts"),
+            "export type { Inner } from \"self-stub-pkg/inner\";\n",
+        )
+        .unwrap();
+        fs::write(
+            pkg.join("inner.d.ts"),
+            "export interface Inner { marker: true }\n",
+        )
+        .unwrap();
+        mirror_pkg_into_node_modules(pkg, "self-stub-pkg");
+        let info = PackageInfo {
+            name: "self-stub-pkg".into(),
+            version: "1.0.0".into(),
+            dir: normalize_path(pkg),
+            is_scoped: false,
+        };
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("self-stub-pkg".to_string());
+        let graph = build_package_graph(
+            &info,
+            Some(CrawlOptions {
+                dependency_stub_roots: Arc::new(stub_roots),
+                ..Default::default()
+            }),
+        );
+        let inner_symbol = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "Inner")
+            .expect("Inner should be crawled when self-exempt matches package name");
+        assert!(
+            inner_symbol.file_path.as_ref().contains("inner"),
+            "Inner should be defined in inner.d.ts, got {}",
+            inner_symbol.file_path.as_ref()
+        );
+        assert!(
+            graph.total_files >= 2,
+            "expected index + inner on disk, total_files={}",
+            graph.total_files
+        );
     }
 
     #[test]

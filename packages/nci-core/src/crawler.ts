@@ -20,6 +20,11 @@ export interface CrawlOptions {
    * during crawl (same as engine). Graph build still emits `npm::…` dependency ids from app code.
    */
   dependencyStubRoots?: ReadonlySet<string>;
+  /**
+   * When set, bare imports whose normalized root equals this string are still resolved (the package
+   * being crawled can resolve its own name). `buildPackageGraph` sets this from `npmPackageRoot(packageInfo.name)`.
+   */
+  dependencyStubSelfExemptRoot?: string;
 }
 
 function normalizeMaxHops(raw?: number): number {
@@ -56,6 +61,7 @@ export function crawl(
   let profileResolveFileCacheHits = 0;
 
   const dependencyStubRootsForCrawl = options.dependencyStubRoots;
+  const dependencyStubSelfExemptRoot = options.dependencyStubSelfExemptRoot;
   const moduleSpecifierResolutionCache = new Map<string, string[]>();
 
   function specifierIsDependencyStubForCrawl(specifier: string): boolean {
@@ -63,7 +69,17 @@ export function crawl(
       return false;
     }
     const normalizedRoot = npmPackageRoot(specifier);
-    return normalizedRoot !== null && dependencyStubRootsForCrawl.has(normalizedRoot);
+    if (normalizedRoot === null) {
+      return false;
+    }
+    if (
+      dependencyStubSelfExemptRoot !== undefined &&
+      dependencyStubSelfExemptRoot !== "" &&
+      normalizedRoot === dependencyStubSelfExemptRoot
+    ) {
+      return false;
+    }
+    return dependencyStubRootsForCrawl.has(normalizedRoot);
   }
 
   function cachedResolveModuleSpecifier(specifier: string, fromFile: string): string[] {

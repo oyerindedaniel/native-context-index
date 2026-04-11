@@ -30,6 +30,9 @@ pub struct CrawlOptions {
     pub parallel_resolve_deps: bool,
     /// Normalized npm package roots for dependency stubbing.
     pub dependency_stub_roots: Arc<HashSet<String>>,
+    /// When set, bare imports whose [`crate::resolver::npm_package_root`] equals this string are not stubbed
+    /// (the package being crawled can resolve itself).
+    pub dependency_stub_self_exempt_root: Option<String>,
 }
 
 impl Default for CrawlOptions {
@@ -39,6 +42,7 @@ impl Default for CrawlOptions {
             profile_as: None,
             parallel_resolve_deps: true,
             dependency_stub_roots: Arc::new(HashSet::new()),
+            dependency_stub_self_exempt_root: None,
         }
     }
 }
@@ -56,6 +60,7 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let mut session = CrawlSession::new(
         crawl_options.max_hops,
         Arc::clone(&crawl_options.dependency_stub_roots),
+        crawl_options.dependency_stub_self_exempt_root.clone(),
     );
 
     let primary_entry = entry_file_paths.first().cloned().unwrap_or_default();
@@ -276,10 +281,16 @@ struct CrawlSession {
 
     /// Package roots whose module specifiers must not resolve to disk (crawl cutoff).
     dependency_stub_roots: Arc<HashSet<String>>,
+
+    dependency_stub_self_exempt_root: Option<String>,
 }
 
 impl CrawlSession {
-    fn new(max_hops: usize, dependency_stub_roots: Arc<HashSet<String>>) -> Self {
+    fn new(
+        max_hops: usize,
+        dependency_stub_roots: Arc<HashSet<String>>,
+        dependency_stub_self_exempt_root: Option<String>,
+    ) -> Self {
         Self {
             visited: HashSet::new(),
             circular_refs: Vec::new(),
@@ -295,6 +306,7 @@ impl CrawlSession {
             module_specifier_cache: DashMap::new(),
             max_hops,
             dependency_stub_roots,
+            dependency_stub_self_exempt_root,
         }
     }
 
@@ -309,7 +321,11 @@ impl CrawlSession {
         if let Some(cached) = self.module_specifier_cache.get(&key) {
             return cached.clone();
         }
-        if specifier_is_dependency_stub(specifier, self.dependency_stub_roots.as_ref()) {
+        if specifier_is_dependency_stub(
+            specifier,
+            self.dependency_stub_roots.as_ref(),
+            self.dependency_stub_self_exempt_root.as_deref(),
+        ) {
             let empty: Vec<SharedString> = Vec::new();
             self.module_specifier_cache.insert(key, empty.clone());
             return empty;
@@ -1114,6 +1130,87 @@ mod tests {
             }),
             "stub-listed roots must not add stub package files to visited set: {:?}",
             stubbed.visited_files
+        );
+    }
+
+    /// A package that imports its own bare name (`from "self-stub-pkg/inner"`) must still crawl
+    /// `inner` when that name is on the stub list, as long as `dependency_stub_self_exempt_root`
+    /// matches the indexed package root (mirrors `build_package_graph` behavior).
+    #[test]
+    fn crawl_resolves_self_package_bare_specifier_when_stub_self_exempt_matches() {
+        fn mirror_pkg_into_node_modules(pkg_root: &std::path::Path, package_name: &str) {
+            let dest_dir = if package_name.starts_with('@') {
+                let mut parts = package_name.split('/');
+                let scope = parts.next().expect("scope");
+                let name = parts.next().expect("name");
+                assert!(parts.next().is_none());
+                pkg_root.join("node_modules").join(scope).join(name)
+            } else {
+                pkg_root.join("node_modules").join(package_name)
+            };
+            fs::create_dir_all(&dest_dir).unwrap();
+            for file in ["package.json", "index.d.ts", "inner.d.ts"] {
+                fs::copy(pkg_root.join(file), dest_dir.join(file)).unwrap();
+            }
+        }
+
+        let temp_dir = TempDir::new().unwrap();
+        let pkg = temp_dir.path();
+        fs::write(
+            pkg.join("package.json"),
+            r#"{"name":"self-stub-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg.join("index.d.ts"),
+            r#"export type { Inner } from "self-stub-pkg/inner";
+"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg.join("inner.d.ts"),
+            "export interface Inner { marker: true }\n",
+        )
+        .unwrap();
+        mirror_pkg_into_node_modules(pkg, "self-stub-pkg");
+        let entry = normalize_path(&pkg.join("index.d.ts"));
+
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("self-stub-pkg".to_string());
+
+        let blocked = crawl(
+            &[entry.clone()],
+            Some(CrawlOptions {
+                dependency_stub_roots: Arc::new(stub_roots.clone()),
+                dependency_stub_self_exempt_root: None,
+                ..Default::default()
+            }),
+        );
+        assert!(
+            !blocked
+                .visited_files
+                .iter()
+                .any(|path| path.as_ref().contains("inner")),
+            "without self-exempt, bare self-import should not resolve: {:?}",
+            blocked.visited_files
+        );
+
+        let unblocked = crawl(
+            &[entry],
+            Some(CrawlOptions {
+                dependency_stub_roots: Arc::new(stub_roots),
+                dependency_stub_self_exempt_root: Some("self-stub-pkg".to_string()),
+                ..Default::default()
+            }),
+        );
+        assert!(
+            unblocked.visited_files.iter().any(|path| path.as_ref().contains("inner")),
+            "with self-exempt, inner.d.ts must be visited: {:?}",
+            unblocked.visited_files
+        );
+        assert!(
+            unblocked.exports.iter().any(|symbol| symbol.name.as_ref() == "Inner"),
+            "Inner symbol should be extracted"
         );
     }
 

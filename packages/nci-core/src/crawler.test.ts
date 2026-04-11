@@ -427,4 +427,35 @@ describe("crawl", () => {
       expect(internalConfig!.signature).toContain("interface InternalConfig");
     });
   });
+
+  describe("dependency stub roots + self-exempt", () => {
+    const stubSelfExemptUnscopedEntry = path.join(
+      FIXTURES_DIR,
+      "dependency-stub-self-exempt-unscoped",
+      "index.d.ts"
+    );
+
+    it("does not resolve bare self subpath when root is stub-listed and self-exempt is unset", () => {
+      const blocked = crawl(stubSelfExemptUnscopedEntry, {
+        dependencyStubRoots: new Set(["self-stub-pkg"]),
+      });
+      expect(blocked.visitedFiles.every((f) => !f.replace(/\\/g, "/").includes("/inner"))).toBe(
+        true
+      );
+      const inner = blocked.exports.find((s) => s.name === "Inner");
+      expect(inner).toBeDefined();
+      expect(inner!.definedIn.replace(/\\/g, "/")).toContain("index.d.ts");
+    });
+
+    it("resolves bare self subpath when stub-listed root matches self-exempt", () => {
+      const ok = crawl(stubSelfExemptUnscopedEntry, {
+        dependencyStubRoots: new Set(["self-stub-pkg"]),
+        dependencyStubSelfExemptRoot: "self-stub-pkg",
+      });
+      expect(ok.visitedFiles.some((f) => f.replace(/\\/g, "/").includes("inner"))).toBe(true);
+      const inner = ok.exports.find((s) => s.name === "Inner");
+      expect(inner).toBeDefined();
+      expect(inner!.definedIn.replace(/\\/g, "/")).toContain("inner");
+    });
+  });
 });

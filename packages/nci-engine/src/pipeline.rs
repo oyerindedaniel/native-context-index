@@ -295,6 +295,7 @@ pub fn index_packages(
             },
             parallel_resolve_deps: crawl_parallel_resolve_deps,
             dependency_stub_roots: Arc::clone(&crawl_stub_roots),
+            ..Default::default()
         })
     };
 

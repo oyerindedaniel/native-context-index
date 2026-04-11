@@ -185,6 +185,28 @@ describe("buildPackageGraph", () => {
     }
   });
 
+  it("dependency stub self-exempt still crawls the package’s own bare specifier", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("dependency-stub-self-exempt-unscoped", "self-stub-pkg"),
+      { dependencyStubRoots: new Set(["self-stub-pkg"]) }
+    );
+    const inner = graph.symbols.find((symbol) => symbol.name === "Inner");
+    expect(inner).toBeDefined();
+    expect(inner!.filePath).toContain("inner");
+    expect(graph.totalFiles).toBeGreaterThanOrEqual(2);
+  });
+
+  it("dependency stub self-exempt applies to scoped package bare subpath imports", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("dependency-stub-self-exempt-scoped", "@acme/self-stub"),
+      { dependencyStubRoots: new Set(["@acme/self-stub"]) }
+    );
+    const inner = graph.symbols.find((symbol) => symbol.name === "Inner");
+    expect(inner).toBeDefined();
+    expect(inner!.filePath).toContain("inner");
+    expect(graph.totalFiles).toBeGreaterThanOrEqual(2);
+  });
+
   it("populates dependencies with resolved symbol IDs", () => {
     const graph = buildPackageGraph(
       makePackageInfo("deps-pkg")

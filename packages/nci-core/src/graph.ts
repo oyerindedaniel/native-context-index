@@ -18,10 +18,17 @@ import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
 
 function specifierMatchesDependencyStubRoots(
   specifier: string,
-  stubRoots: ReadonlySet<string>
+  stubRoots: ReadonlySet<string>,
+  selfStubExemptRoot: string | null
 ): boolean {
   const root = npmPackageRoot(specifier);
-  return root !== null && stubRoots.has(root);
+  if (root === null) {
+    return false;
+  }
+  if (selfStubExemptRoot !== null && root === selfStubExemptRoot) {
+    return false;
+  }
+  return stubRoots.has(root);
 }
 
 /** Build a symbol graph for a single package. */
@@ -55,8 +62,14 @@ export function buildPackageGraph(
     };
   }
 
+  const stubSelfExemptRoot = npmPackageRoot(packageInfo.name);
+  const mergedCrawlOptions: CrawlOptions = {
+    ...(crawlOptions ?? {}),
+    dependencyStubSelfExemptRoot: stubSelfExemptRoot ?? undefined,
+  };
+
   const crawlPhaseStart = performance.now();
-  const crawlResult = crawl(entry.typesEntries, crawlOptions);
+  const crawlResult = crawl(entry.typesEntries, mergedCrawlOptions);
   const crawlDurationMs = performance.now() - crawlPhaseStart;
 
   if (profiling) {
@@ -307,7 +320,8 @@ export function buildPackageGraph(
   }
 
   const protocolRegex = /^([a-z]+):(.*)$/;
-  const dependencyStubRootsRef = crawlOptions?.dependencyStubRoots;
+  const dependencyStubRootsRef = mergedCrawlOptions.dependencyStubRoots;
+  const stubSelfExemptForResolve = stubSelfExemptRoot;
   const moduleSpecifierCache = new Map<string, string[]>();
   const absPathCache = new Map<string, string>();
   const importsByNameCache = new Map<string, Map<string, { source: string; originalName?: string }>>();
@@ -392,7 +406,13 @@ export function buildPackageGraph(
 
         if (dependencyStubRootsRef && dependencyStubRootsRef.size > 0) {
           if (rawDep.importPath) {
-            if (specifierMatchesDependencyStubRoots(rawDep.importPath, dependencyStubRootsRef)) {
+            if (
+              specifierMatchesDependencyStubRoots(
+                rawDep.importPath,
+                dependencyStubRootsRef,
+                stubSelfExemptForResolve
+              )
+            ) {
               const stubOnly = resolveExternalModuleStubId(rawDep.importPath, rawDep.name);
               if (stubOnly) {
                 resolvedIds.add(stubOnly);
@@ -406,7 +426,8 @@ export function buildPackageGraph(
               if (
                 specifierMatchesDependencyStubRoots(
                   stubMatchingImport.source,
-                  dependencyStubRootsRef
+                  dependencyStubRootsRef,
+                  stubSelfExemptForResolve
                 )
               ) {
                 const originalStubName = stubMatchingImport.originalName || rawDep.name;
@@ -424,7 +445,11 @@ export function buildPackageGraph(
               const stubNsImport = importMapForStub.get(namespaceQual.qualifier);
               if (
                 stubNsImport &&
-                specifierMatchesDependencyStubRoots(stubNsImport.source, dependencyStubRootsRef)
+                specifierMatchesDependencyStubRoots(
+                  stubNsImport.source,
+                  dependencyStubRootsRef,
+                  stubSelfExemptForResolve
+                )
               ) {
                 const stubOnly = resolveExternalModuleStubId(
                   stubNsImport.source,

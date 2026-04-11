@@ -103,16 +103,26 @@ pub fn npm_package_root(specifier: &str) -> Option<String> {
 }
 
 /// `true` when `specifier` is a bare package-style module id whose normalized root is in `stub_roots`.
-///
-/// Uses a thread-local buffer so repeated checks avoid a fresh [`String`] for the normalized root.
 #[inline]
-pub fn specifier_is_dependency_stub(specifier: &str, stub_roots: &HashSet<String>) -> bool {
+pub fn specifier_is_dependency_stub(
+    specifier: &str,
+    stub_roots: &HashSet<String>,
+    self_stub_exempt_root: Option<&str>,
+) -> bool {
     if stub_roots.is_empty() {
         return false;
     }
     STUB_ROOT_MATCH_SCRATCH.with(|scratch_cell| {
         let scratch = &mut *scratch_cell.borrow_mut();
-        try_write_npm_package_root_lowercase(specifier, scratch) && stub_roots.contains(scratch.as_str())
+        if !try_write_npm_package_root_lowercase(specifier, scratch) {
+            return false;
+        }
+        if let Some(exempt) = self_stub_exempt_root {
+            if scratch.as_str() == exempt {
+                return false;
+            }
+        }
+        stub_roots.contains(scratch.as_str())
     })
 }
 
@@ -1119,9 +1129,30 @@ mod tests {
     fn specifier_is_dependency_stub_matches_normalized_roots() {
         let mut stub_roots = HashSet::new();
         stub_roots.insert("zod".to_string());
-        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots));
-        assert!(!specifier_is_dependency_stub("./local", &stub_roots));
-        assert!(!specifier_is_dependency_stub("zod", &HashSet::new()));
+        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots, None));
+        assert!(!specifier_is_dependency_stub("./local", &stub_roots, None));
+        assert!(!specifier_is_dependency_stub("zod", &HashSet::new(), None));
+    }
+
+    #[test]
+    fn specifier_is_dependency_stub_self_exempt_skips_own_package_root() {
+        let mut stub_roots = HashSet::new();
+        stub_roots.insert("zod".to_string());
+        assert!(!specifier_is_dependency_stub("zod/v4/classic", &stub_roots, Some("zod")));
+        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots, Some("other-pkg")));
+
+        let mut scoped = HashSet::new();
+        scoped.insert("@scope/pkg".to_string());
+        assert!(!specifier_is_dependency_stub(
+            "@scope/pkg/sub",
+            &scoped,
+            Some("@scope/pkg")
+        ));
+        assert!(specifier_is_dependency_stub(
+            "@scope/pkg/sub",
+            &scoped,
+            Some("@other/x")
+        ));
     }
 
     // ─── normalize_path tests ──────────────────────────────────

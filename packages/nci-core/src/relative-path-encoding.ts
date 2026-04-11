@@ -1,6 +1,6 @@
 /**
  * Encodes `path.relative` output when a file is outside the package root so `..` never appears in
- * stored paths (matches nci-engine `encode_outside_package_relative`).
+ * stored paths.
  */
 export function encodeOutsidePackageRelative(relativePath: string): string {
   let rest = relativePath.replace(/\\/g, "/");
