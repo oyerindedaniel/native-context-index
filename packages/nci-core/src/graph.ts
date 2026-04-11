@@ -1,4 +1,5 @@
 import path from "node:path";
+import { encodeOutsidePackageRelative } from "./relative-path-encoding.js";
 import ts from "typescript";
 import type {
   PackageGraph,
@@ -794,7 +795,8 @@ function makeRelative(absPath: string, packageDir: string): string {
   if (normalized.startsWith(normalizedDir)) {
     return normalized.slice(normalizedDir.length + 1);
   }
-  return path.relative(packageDir, absPath).replace(/\\/g, "/");
+  const rel = path.relative(packageDir, absPath).replace(/\\/g, "/");
+  return encodeOutsidePackageRelative(rel);
 }
 
 function kindMatchesResolutionHint(kind: ts.SyntaxKind, hint: "type" | "value" | undefined): boolean {

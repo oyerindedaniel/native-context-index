@@ -1142,6 +1142,36 @@ fn flatten_inherited_members(
     symbols.extend(synthetic);
 }
 
+/// Encodes `path.relative` / `pathdiff` output when a file is outside the package root so `..` never
+/// appears in stored paths (avoids agents misreading `../../` as a normal navigable path).
+fn encode_outside_package_relative(relative_path: &str) -> String {
+    let normalized = relative_path.replace('\\', "/");
+    let mut rest = normalized.as_str();
+    while rest.starts_with("./") {
+        rest = rest.get(2..).unwrap_or("");
+        rest = rest.trim_start_matches('/');
+    }
+    let mut up_count = 0usize;
+    while rest.starts_with("../") {
+        up_count += 1;
+        rest = rest.get(3..).unwrap_or("");
+    }
+    if rest == ".." {
+        up_count += 1;
+        rest = "";
+    }
+    let tail = rest.trim_start_matches('/');
+    let mut out = String::from("__nci_external__");
+    for _ in 0..up_count {
+        out.push_str("/__up__");
+    }
+    if !tail.is_empty() {
+        out.push('/');
+        out.push_str(tail);
+    }
+    out
+}
+
 /// `normalized_package_dir` must equal `package_dir.replace('\\', "/")` so prefix checks match `abs_path` normalization.
 fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str) -> String {
     let normalized = abs_path.replace('\\', "/");
@@ -1154,7 +1184,10 @@ fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str
     }
 
     pathdiff::diff_paths(abs_path, package_dir)
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .map(|path| {
+            let raw = path.to_string_lossy().replace('\\', "/");
+            encode_outside_package_relative(&raw)
+        })
         .unwrap_or_else(|| normalized)
 }
 
@@ -1180,6 +1213,40 @@ mod tests {
         assert_eq!(
             make_relative("C:\\pkg\\src\\index.d.ts", "C:\\pkg", "C:/pkg"),
             "src/index.d.ts"
+        );
+    }
+
+    #[test]
+    fn encode_outside_package_relative_replaces_dot_dot_segments() {
+        assert_eq!(
+            encode_outside_package_relative("../other/x.d.ts"),
+            "__nci_external__/__up__/other/x.d.ts"
+        );
+        assert_eq!(
+            encode_outside_package_relative("../../a/b"),
+            "__nci_external__/__up__/__up__/a/b"
+        );
+        assert_eq!(
+            encode_outside_package_relative("sub/no-ups.d.ts"),
+            "__nci_external__/sub/no-ups.d.ts"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn make_relative_outside_package_root_uses_encoded_path() {
+        assert_eq!(
+            make_relative("/other/x.d.ts", "/pkg", "/pkg"),
+            "__nci_external__/__up__/other/x.d.ts"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn make_relative_outside_package_root_uses_encoded_path_windows() {
+        assert_eq!(
+            make_relative(r"C:\other\x.d.ts", r"C:\pkg", "C:/pkg"),
+            "__nci_external__/__up__/other/x.d.ts"
         );
     }
 
