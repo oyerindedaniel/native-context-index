@@ -48,11 +48,12 @@ fn try_write_npm_package_root_lowercase(specifier: &str, dest: &mut String) -> b
     {
         return false;
     }
-    if trimmed.starts_with("node:")
-        || trimmed
-            .get(..5)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
-    {
+    if trimmed.get(..5).is_some_and(|prefix| {
+        prefix.eq_ignore_ascii_case("node:") || prefix.eq_ignore_ascii_case("file:")
+    }) {
+        return false;
+    }
+    if trimmed.contains("://") {
         return false;
     }
     if spec_bytes.len() >= 2 && spec_bytes[0].is_ascii_alphabetic() && spec_bytes[1] == b':' {
@@ -999,7 +1000,6 @@ mod tests {
     fn resolve_types_entry_from_types_field() {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Create package.json with types field
         fs::write(
             temp_dir.path().join("package.json"),
             serde_json::to_string(&serde_json::json!({
@@ -1011,7 +1011,6 @@ mod tests {
         )
         .unwrap();
 
-        // Create the .d.ts file
         fs::write(temp_dir.path().join("index.d.ts"), "export {};").unwrap();
 
         let entry = resolve_types_entry(temp_dir.path()).unwrap();
@@ -1066,7 +1065,9 @@ mod tests {
     fn npm_package_root_unscoped_and_subpath() {
         assert_eq!(npm_package_root("zod"), Some("zod".into()));
         assert_eq!(npm_package_root("zod/v4"), Some("zod".into()));
+        assert_eq!(npm_package_root("zod\\v4"), Some("zod".into()));
         assert_eq!(npm_package_root("Lodash"), Some("lodash".into()));
+        assert_eq!(npm_package_root("lodash.merge"), Some("lodash.merge".into()));
     }
 
     #[test]
@@ -1079,6 +1080,14 @@ mod tests {
             npm_package_root("@SCOPE/pkg/subpath"),
             Some("@scope/pkg".into())
         );
+        assert_eq!(
+            npm_package_root("@SCOPE/pkg\\deep"),
+            Some("@scope/pkg".into())
+        );
+        assert_eq!(
+            npm_package_root("@123/456"),
+            Some("@123/456".into())
+        );
     }
 
     #[test]
@@ -1087,7 +1096,16 @@ mod tests {
         assert_eq!(npm_package_root("../y"), None);
         assert_eq!(npm_package_root("/abs"), None);
         assert_eq!(npm_package_root("node:fs"), None);
+        assert_eq!(npm_package_root("NODE:fs"), None);
         assert_eq!(npm_package_root("file:///tmp/x"), None);
+        assert_eq!(npm_package_root("https://a/b"), None);
+        assert_eq!(npm_package_root("x:y"), None);
+        assert_eq!(npm_package_root("C:rel"), None);
+        assert_eq!(npm_package_root("\\foo"), None);
+        assert_eq!(npm_package_root("\\\\server\\share\\x"), None);
+        assert_eq!(npm_package_root("@"), None);
+        assert_eq!(npm_package_root("@scope"), None);
+        assert_eq!(npm_package_root("@scope//pkg"), None);
     }
 
     #[test]

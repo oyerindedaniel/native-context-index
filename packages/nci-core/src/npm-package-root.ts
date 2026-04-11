@@ -29,14 +29,19 @@ export function npmPackageRoot(specifier: string): string | null {
   ) {
     return null;
   }
-  if (trimmed.startsWith("node:")) {
+  // Node built-ins are case-insensitive (`NODE:fs` is still `node:`).
+  if (trimmed.length >= 5 && trimmed.slice(0, 5).toLowerCase() === "node:") {
     return null;
   }
   // `file:` specifiers are not npm package names; without this, `file:///…` would parse as root `file:`.
   if (trimmed.length >= 5 && trimmed.slice(0, 5).toLowerCase() === "file:") {
     return null;
   }
-  // Remaining `letter:...` forms (e.g. `https:`, unknown schemes) are not bare package roots.
+  // `http(s)://`, `file://`, and other URI forms are never bare npm package ids.
+  if (trimmed.includes("://")) {
+    return null;
+  }
+  // Remaining `letter:...` forms (e.g. unknown `x:` schemes) are not bare package roots.
   if (trimmed.length >= 2 && isAsciiAlphabetic(trimmed[0]!) && trimmed[1] === ":") {
     return null;
   }
