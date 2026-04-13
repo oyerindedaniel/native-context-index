@@ -346,7 +346,6 @@ pub fn index_packages(
     let crawl_max_hops = index_opts.max_hops;
     let crawl_parallel_resolve_deps = index_opts.parallel_resolve_deps;
     let crawl_profile_phases = phases_enabled();
-    let crawl_stub_roots = Arc::clone(&dependency_stub_roots);
     let crawl_options_factory = move |package: &PackageInfo| {
         Some(CrawlOptions {
             max_hops: crawl_max_hops,
