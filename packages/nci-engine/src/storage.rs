@@ -1,6 +1,8 @@
 //! SQLite-backed NCI index: packages, symbols, and FTS5 search.
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use rusqlite::types::ValueRef;
@@ -14,27 +16,6 @@ use crate::types::{
     DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
     SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
 };
-
-#[derive(Debug, thiserror::Error)]
-pub enum StorageError {
-    #[error(
-        "database schema version {found} is newer than this engine supports ({max}); upgrade nci-engine"
-    )]
-    SchemaTooNew { found: u32, max: u32 },
-
-    #[error(transparent)]
-    Sqlite(#[from] rusqlite::Error),
-
-    #[error("only read-only SQL is allowed (for example SELECT or EXPLAIN QUERY PLAN)")]
-    StatementNotReadOnly,
-
-    #[error("sql output: {0}")]
-    SqlOutput(String),
-}
-
-pub type StorageResult<T> = Result<T, StorageError>;
-
-pub use crate::storage_migrations::SCHEMA_VERSION;
 
 /// Result of streaming a user SQL query via [`NciDatabase::for_each_readonly_sql_row`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,6 +39,71 @@ pub struct DatabaseStatusReport {
     /// Value of `NCI_CACHE_DIR` when that env var is set in this process.
     /// Independent of [`Self::path`]: `--database` may point elsewhere.
     pub nci_cache_dir_env: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StorageError {
+    #[error(
+        "database schema version {found} is newer than this engine supports ({max}); upgrade nci-engine"
+    )]
+    SchemaTooNew { found: u32, max: u32 },
+
+    #[error(transparent)]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("only read-only SQL is allowed (for example SELECT or EXPLAIN QUERY PLAN)")]
+    StatementNotReadOnly,
+
+    #[error("sql output: {0}")]
+    SqlOutput(String),
+
+    #[error("not a SQLite database file at {path}: {reason}")]
+    InvalidDatabaseFile { path: PathBuf, reason: String },
+
+    #[error("remove-glob pattern must not be empty")]
+    EmptyGlobPattern,
+
+    #[error("remove-glob pattern '*' matches every package; use `nci db clear` instead")]
+    GlobPatternTooBroad,
+}
+
+pub type StorageResult<T> = Result<T, StorageError>;
+
+pub use crate::storage_migrations::SCHEMA_VERSION;
+
+/// First 16 bytes of every SQLite 3 database file.
+const SQLITE3_FILE_HEADER: &[u8; 16] = b"SQLite format 3\0";
+
+/// Ensures `path` is a regular file whose content starts with the SQLite 3 magic header.
+/// Used by `nci db destroy` so a misconfigured path cannot delete an arbitrary file.
+pub fn verify_sqlite_file_header(path: &Path) -> StorageResult<()> {
+    let meta = std::fs::metadata(path).map_err(|err| StorageError::InvalidDatabaseFile {
+        path: path.to_path_buf(),
+        reason: err.to_string(),
+    })?;
+    if !meta.is_file() {
+        return Err(StorageError::InvalidDatabaseFile {
+            path: path.to_path_buf(),
+            reason: "not a regular file".to_string(),
+        });
+    }
+    let mut file = File::open(path).map_err(|err| StorageError::InvalidDatabaseFile {
+        path: path.to_path_buf(),
+        reason: err.to_string(),
+    })?;
+    // SQLite file identity is the first 16 bytes on disk; compare to SQLITE3_FILE_HEADER.
+    let mut header_prefix = [0u8; 16];
+    let bytes_read = file.read(&mut header_prefix).map_err(|err| StorageError::InvalidDatabaseFile {
+        path: path.to_path_buf(),
+        reason: err.to_string(),
+    })?;
+    if bytes_read < 16 || header_prefix != *SQLITE3_FILE_HEADER {
+        return Err(StorageError::InvalidDatabaseFile {
+            path: path.to_path_buf(),
+            reason: "file does not start with SQLite format 3 header".to_string(),
+        });
+    }
+    Ok(())
 }
 
 fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
@@ -702,7 +748,6 @@ impl NciDatabase {
         Ok(())
     }
 
-    /// All symbols for a package (same logical shape as `load_package` but returns nodes only).
     pub fn list_package_symbols(
         &self,
         package_name: &str,
@@ -720,7 +765,6 @@ impl NciDatabase {
             .unwrap_or_default())
     }
 
-    /// Full-text search across indexed symbols (FTS5 `MATCH` syntax).
     pub fn find_symbols_fts(
         &self,
         fts_match_query: &str,
@@ -1041,6 +1085,23 @@ impl NciDatabase {
             rusqlite::params![package_name, package_version],
         )?;
         Ok(())
+    }
+
+    /// Delete every indexed package row whose `name` matches SQLite `GLOB` `pattern`
+    /// (all versions). Child symbol rows cascade. Returns the number of package rows removed.
+    pub fn delete_packages_matching_name_glob(&self, pattern: &str) -> StorageResult<usize> {
+        let pattern = pattern.trim();
+        if pattern.is_empty() {
+            return Err(StorageError::EmptyGlobPattern);
+        }
+        if pattern == "*" {
+            return Err(StorageError::GlobPatternTooBroad);
+        }
+        let rows_removed = self.connection.execute(
+            "DELETE FROM packages WHERE name GLOB ?1",
+            rusqlite::params![pattern],
+        )?;
+        Ok(rows_removed)
     }
 
     /// Delete all indexed data and FTS; re-run would require migrations (schema stays).

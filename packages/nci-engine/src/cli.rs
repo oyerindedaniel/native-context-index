@@ -3,6 +3,9 @@
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
@@ -16,7 +19,9 @@ use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, find_package_in_node_modules, ScanError};
-use nci_engine::storage::{DatabaseStatusReport, NciDatabase, StorageError};
+use nci_engine::storage::{
+    verify_sqlite_file_header, DatabaseStatusReport, NciDatabase, StorageError,
+};
 use serde_json::Value;
 
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, ValueEnum)]
@@ -148,6 +153,14 @@ enum DbCommands {
     Clear,
     #[command(about = "Remove one package from the index")]
     Remove { name: String, version: String },
+    #[command(
+        name = "remove-glob",
+        about = "Remove packages whose name matches a SQLite GLOB (* and ?, case-sensitive). Example: react* deletes all react-prefixed names for every indexed version."
+    )]
+    RemoveGlob {
+        #[arg(value_name = "PATTERN")]
+        pattern: String,
+    },
     #[command(about = "Delete the SQLite file on disk (requires --force)")]
     Destroy {
         #[arg(long, help = "Confirm destructive deletion of the database file")]
@@ -546,6 +559,20 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             }
             Ok(())
         }
+        DbCommands::RemoveGlob { pattern } => {
+            let (_, db) = open_database(cli, file.as_ref())?;
+            let n = db
+                .delete_packages_matching_name_glob(pattern.as_str())
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => println!("removed {n} package(s) matching {pattern}"),
+                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({
+                    "ok": true,
+                    "data": { "pattern": pattern, "removed": n }
+                }))?,
+            }
+            Ok(())
+        }
         DbCommands::Destroy { force } => {
             if !force {
                 return emit_error(
@@ -554,6 +581,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 );
             }
             let path = resolve_database_path(cli, file.as_ref())?;
+            verify_sqlite_file_header(&path).map_err(|err| err.to_string())?;
             // Drop any connection by not opening; remove file
             fs::remove_file(&path).map_err(|err| err.to_string())?;
             match fmt {
@@ -641,6 +669,31 @@ fn build_index_options(
     })
 }
 
+/// Per-package stderr progress for `nci index` plain output only ([`OutputFormat::Plain`]).
+fn with_plain_index_progress(mut opts: IndexOptions, total: usize, fmt: OutputFormat) -> IndexOptions {
+    if fmt != OutputFormat::Plain || total == 0 {
+        return opts;
+    }
+    let start = Instant::now();
+    let packages_completed = Arc::new(AtomicUsize::new(0));
+    let packages_completed_for_callback = Arc::clone(&packages_completed);
+    opts.on_package_done = Some(Arc::new(move |p: pipeline::PackageProgress| {
+        let one_based_index =
+            packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
+        let elapsed = start.elapsed();
+        let src = match p.source {
+            GraphSource::Cached => "cached",
+            GraphSource::Crawled => "crawled",
+        };
+        eprintln!(
+            "[{one_based_index}/{total}] {} {} ({src}) +{elapsed:?}",
+            p.name, p.version,
+        );
+        let _ = io::stderr().flush();
+    }));
+    opts
+}
+
 fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> Result<(), String> {
     let discovery = index_config_discovery_dir(bulk)?;
     let file = load_file_for_root(&discovery);
@@ -689,6 +742,7 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
             let package = find_package_in_node_modules(&node_modules, name, version)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
             let opts = build_index_options(cli, file.as_ref(), project_root.clone(), bulk)?;
+            let opts = with_plain_index_progress(opts, 1, fmt);
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
             print_index_summary(fmt, &out)?;
         }
@@ -701,9 +755,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 );
             }
             let opts = build_index_options(cli, file.as_ref(), project_root, bulk)?;
-            let indexed =
-                pipeline::index_all(&node_modules, Some(opts))
-                    .map_err(|scan_err: ScanError| scan_err.to_string())?;
+            let packages = pipeline::scan_filtered_packages(&node_modules, &opts)
+                .map_err(|scan_err: ScanError| scan_err.to_string())?;
+            let opts = with_plain_index_progress(opts, packages.len(), fmt);
+            let indexed = pipeline::index_packages(&packages, Some(opts));
             print_index_summary(fmt, &indexed)?;
         }
     }

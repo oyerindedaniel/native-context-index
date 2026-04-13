@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -18,16 +19,36 @@ use crate::profile::phases_enabled;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
 use crate::storage::NciDatabase;
-use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo};
+use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo, SharedString};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphSource {
+    Cached,
+    Crawled,
+}
+
+/// Per-package progress for CLI plain output (after outcome is final for this run).
+#[derive(Clone)]
+pub struct PackageProgress {
+    pub name: SharedString,
+    pub version: SharedString,
+    pub source: GraphSource,
+}
+
+#[derive(Debug)]
+pub struct IndexedGraph {
+    pub graph: Option<PackageGraph>,
+    pub source: GraphSource,
+    pub cache_metadata: Option<PackageIndexMetadata>,
+}
+
+#[derive(Clone)]
 pub struct IndexOptions {
     /// Upper bound on discovery edges from each package entry (default: 10).
     /// Use [`usize::MAX`] for no hop cap (CLI / `.nci.toml` use `max_hops = -1` → [`crate::constants::MAX_HOPS_UNLIMITED`]).
     pub max_hops: usize,
 
     /// Whether to run in parallel (default: true).
-    /// Set to false for deterministic output ordering in tests.
     pub parallel: bool,
 
     /// Read/write per-package graphs to SQLite under the OS cache dir (`NCI_CACHE_DIR` overrides).
@@ -71,6 +92,10 @@ pub struct IndexOptions {
 
     /// Normalized npm package roots for dependency stubbing (merged from `.nci.toml` and CLI).
     pub dependency_stub_packages: Vec<String>,
+
+    /// Optional hook after each package’s index outcome is final (cache hit, persist skipped,
+    /// send failure, or writer finished crawl+SQLite). Used by `nci index` plain output only.
+    pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
 }
 
 impl Default for IndexOptions {
@@ -88,7 +113,35 @@ impl Default for IndexOptions {
             save_queue_capacity: None,
             save_retry_count: 0,
             dependency_stub_packages: Vec::new(),
+            on_package_done: None,
         }
+    }
+}
+
+impl Debug for IndexOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        f.debug_struct("IndexOptions")
+            .field("max_hops", &self.max_hops)
+            .field("parallel", &self.parallel)
+            .field("enable_package_cache", &self.enable_package_cache)
+            .field("db_path", &self.db_path)
+            .field("project_root", &self.project_root)
+            .field("filter", &self.filter)
+            .field("parallel_resolve_deps", &self.parallel_resolve_deps)
+            .field("hydrate_cache_hits", &self.hydrate_cache_hits)
+            .field("retain_graph_after_save", &self.retain_graph_after_save)
+            .field("save_queue_capacity", &self.save_queue_capacity)
+            .field("save_retry_count", &self.save_retry_count)
+            .field("dependency_stub_packages", &self.dependency_stub_packages)
+            .field(
+                "on_package_done",
+                &self
+                    .on_package_done
+                    .as_ref()
+                    .map(|_| "<callback>")
+                    .unwrap_or("<none>"),
+            )
+            .finish()
     }
 }
 
@@ -117,12 +170,26 @@ fn index_metadata_from_graph(graph: &PackageGraph) -> PackageIndexMetadata {
     }
 }
 
-// Rayon has no `ThreadLocal` type (see rayon 1.11 docs). Worker threads are normal OS threads, so
-// `std::thread_local!` gives one read-only `rusqlite` connection per thread without a global mutex.
-// The path is stored alongside the handle so a different `nci.sqlite` path on a later index run
-// reopens correctly on that thread.
+// One read-only `NciDatabase` per OS thread for cache probes (Rayon workers). Path is tracked so a
+// different `nci.sqlite` on a later run reopens. See `release_read_only_sqlite_thread_local`.
 thread_local! {
     static INDEX_RO_SQLITE: RefCell<Option<(PathBuf, Option<NciDatabase>)>> = const { RefCell::new(None) };
+}
+
+/// Drop the per-thread read-only handle before crawl / writer handoff so the writer is not blocked
+/// by a lingering reader on the same file (cache **miss** paths only; hits keep reuse).
+/// No-op if this thread never got a live read-only connection (avoids clearing a failed-open slot
+/// so the next probe retries after the writer creates the file).
+fn release_read_only_sqlite_thread_local() {
+    INDEX_RO_SQLITE.with(|cell| {
+        let has_open_db = cell
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, db)| db.is_some());
+        if has_open_db {
+            *cell.borrow_mut() = None;
+        }
+    });
 }
 
 fn with_read_only_index_db<T>(sqlite_path: &Path, f: impl FnOnce(Option<&NciDatabase>) -> T) -> T {
@@ -131,7 +198,7 @@ fn with_read_only_index_db<T>(sqlite_path: &Path, f: impl FnOnce(Option<&NciData
         let path_buf = sqlite_path.to_path_buf();
         let need_open = match slot.as_ref() {
             None => true,
-            Some((cached_path, _)) => cached_path != &path_buf,
+            Some((cached_path, db)) => cached_path != &path_buf || db.is_none(),
         };
         if need_open {
             match NciDatabase::open_read_only(sqlite_path) {
@@ -160,7 +227,7 @@ fn try_package_cache_hit(
     if cache::package_dir_is_symlink(package) {
         return None;
     }
-    with_read_only_index_db(sqlite_path, |db| {
+    let indexed_from_cache = with_read_only_index_db(sqlite_path, |db| {
         let db = db?;
         if !db.has_cached_package(package, engine_cache_key) {
             trace!(
@@ -205,7 +272,11 @@ fn try_package_cache_hit(
             );
             None
         }
-    })
+    });
+    if indexed_from_cache.is_none() {
+        release_read_only_sqlite_thread_local();
+    }
+    indexed_from_cache
 }
 
 fn merge_filter_for_scan(project_root: Option<&Path>, mut filter: FilterConfig) -> FilterConfig {
@@ -215,24 +286,27 @@ fn merge_filter_for_scan(project_root: Option<&Path>, mut filter: FilterConfig) 
     filter
 }
 
+/// Scan `node_modules` and apply the same filtering as [`index_all`] (including `.nciignore` when
+/// `project_root` is set on `options`).
+pub fn scan_filtered_packages(
+    node_modules: &Path,
+    options: &IndexOptions,
+) -> Result<Vec<PackageInfo>, ScanError> {
+    let packages = scan_packages(node_modules)?;
+    let filter = merge_filter_for_scan(
+        options.project_root.as_deref(),
+        options.filter.clone(),
+    );
+    Ok(filter.apply(packages))
+}
+
 /// Index all packages in a `node_modules` directory.
-///
-/// Scans for packages, resolves types entry points, crawls `.d.ts` files,
-/// and builds a symbol graph for each package.
-///
-/// When `parallel` is true (default), packages are processed concurrently
 pub fn index_all(
     node_modules: &Path,
     options: Option<IndexOptions>,
 ) -> Result<Vec<IndexedGraph>, ScanError> {
     let index_opts = options.unwrap_or_default();
-    let packages = scan_packages(node_modules)?;
-    let filter = merge_filter_for_scan(
-        index_opts.project_root.as_deref(),
-        index_opts.filter.clone(),
-    );
-    let packages = filter.apply(packages);
-
+    let packages = scan_filtered_packages(node_modules, &index_opts)?;
     Ok(index_packages(&packages, Some(index_opts)))
 }
 
@@ -251,19 +325,6 @@ pub fn dedupe_packages_by_canonical_dir(packages: Vec<PackageInfo>) -> Vec<Packa
     unique
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GraphSource {
-    Cached,
-    Crawled,
-}
-
-#[derive(Debug)]
-pub struct IndexedGraph {
-    pub graph: Option<PackageGraph>,
-    pub source: GraphSource,
-    pub cache_metadata: Option<PackageIndexMetadata>,
-}
-
 /// Builds a graph for each discovered package, optionally in parallel (Rayon).
 ///
 /// Use this when packages were collected from several `node_modules` trees and deduped with
@@ -273,8 +334,9 @@ pub fn index_packages(
     options: Option<IndexOptions>,
 ) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
+    let on_package_done = index_opts.on_package_done.clone();
     let index_engine_cache_key = cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
-    let dependency_stub_roots: Arc<HashSet<String>> = Arc::new(
+    let crawl_stub_roots: Arc<HashSet<String>> = Arc::new(
         index_opts
             .dependency_stub_packages
             .iter()
@@ -305,23 +367,15 @@ pub fn index_packages(
     }
 
     // `None` means no SQLite sidecar for this run (probes + saves disabled).
+    // When enabled, we only ensure the parent directory exists; the writer thread's `NciDatabase::open`
+    // validates the path (read-only probes retry until the file exists).
     let cache_sqlite_path: Option<PathBuf> = if index_opts.enable_package_cache {
         if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
             debug!(path = %path.display(), "package cache enabled");
-            match NciDatabase::open(&path) {
-                Ok(_) => Some(path),
-                Err(open_error) => {
-                    warn!(
-                        path = %path.display(),
-                        error = %open_error,
-                        "NciDatabase::open failed; indexing without sqlite cache"
-                    );
-                    None
-                }
-            }
+            Some(path)
         } else {
             warn!("enable_package_cache is true but no sqlite path resolved (cache dir missing?)");
             None
@@ -351,6 +405,7 @@ pub fn index_packages(
         let retain = index_opts.retain_graph_after_save;
         let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
         let engine_cache_key_for_writer = index_engine_cache_key.clone();
+        let package_done_writer = on_package_done.clone();
         let join = std::thread::spawn(move || {
             let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
                 Ok(database) => Some(database),
@@ -428,6 +483,13 @@ pub fn index_packages(
                     }
                 };
                 *slot.lock().expect("indexed result mutex poisoned") = Some(indexed);
+                if let Some(cb) = package_done_writer.as_ref() {
+                    cb(PackageProgress {
+                        name: package.name.clone(),
+                        version: package.version.clone(),
+                        source: GraphSource::Crawled,
+                    });
+                }
             }
         });
         (Some(join), Some(save_tx_thread))
@@ -442,6 +504,13 @@ pub fn index_packages(
                 try_package_cache_hit(package, path.as_path(), hydrate, index_engine_cache_key.as_str())
             {
                 *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
+                if let Some(cb) = on_package_done.as_ref() {
+                    cb(PackageProgress {
+                        name: package.name.clone(),
+                        version: package.version.clone(),
+                        source: GraphSource::Cached,
+                    });
+                }
                 return;
             }
         }
@@ -455,6 +524,13 @@ pub fn index_packages(
                 source: GraphSource::Crawled,
                 cache_metadata: None,
             });
+            if let Some(cb) = on_package_done.as_ref() {
+                cb(PackageProgress {
+                    name: package.name.clone(),
+                    version: package.version.clone(),
+                    source: GraphSource::Crawled,
+                });
+            }
             return;
         }
 
@@ -471,6 +547,13 @@ pub fn index_packages(
                 source: GraphSource::Crawled,
                 cache_metadata: None,
             });
+            if let Some(cb) = on_package_done.as_ref() {
+                cb(PackageProgress {
+                    name: package.name.clone(),
+                    version: package.version.clone(),
+                    source: GraphSource::Crawled,
+                });
+            }
         }
     };
 
@@ -501,9 +584,6 @@ pub fn index_packages(
 }
 
 /// Index a single package by its directory path.
-///
-/// Useful for targeted indexing of a specific package without scanning
-/// all of `node_modules`.
 pub fn index_single(
     package_dir: &Path,
     name: &str,
@@ -537,7 +617,13 @@ mod tests {
     #[test]
     fn index_all_handles_empty_node_modules() {
         let temp_dir = TempDir::new().unwrap();
-        let result = index_all(temp_dir.path(), None);
+        let result = index_all(
+            temp_dir.path(),
+            Some(IndexOptions {
+                enable_package_cache: false,
+                ..Default::default()
+            }),
+        );
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
     }
