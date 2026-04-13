@@ -366,15 +366,25 @@ pub fn index_packages(
     }
 
     // `None` means no SQLite sidecar for this run (probes + saves disabled).
-    // When enabled, we only ensure the parent directory exists; the writer thread's `NciDatabase::open`
-    // validates the path (read-only probes retry until the file exists).
+    // Open once here so the DB exists and is migrated before parallel read-only cache probes (avoids
+    // workers missing cache until the writer creates the file). The writer opens the same path again.
     let cache_sqlite_path: Option<PathBuf> = if index_opts.enable_package_cache {
         if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
             debug!(path = %path.display(), "package cache enabled");
-            Some(path)
+            match NciDatabase::open(&path) {
+                Ok(_) => Some(path),
+                Err(open_error) => {
+                    warn!(
+                        path = %path.display(),
+                        error = %open_error,
+                        "NciDatabase::open failed; indexing without sqlite cache"
+                    );
+                    None
+                }
+            }
         } else {
             warn!("enable_package_cache is true but no sqlite path resolved (cache dir missing?)");
             None
