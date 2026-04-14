@@ -613,10 +613,26 @@ pub fn index_single(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
+    use crate::cache;
     use crate::scanner::scan_packages;
+
+    fn indexed_package_name(indexed: &IndexedGraph) -> SharedString {
+        indexed
+            .graph
+            .as_ref()
+            .map(|graph| graph.package.clone())
+            .or_else(|| {
+                indexed
+                    .cache_metadata
+                    .as_ref()
+                    .map(|meta| meta.package.clone())
+            })
+            .expect("indexed graph or cache metadata should name the package")
+    }
 
     #[test]
     fn index_all_returns_error_for_missing_dir() {
@@ -785,5 +801,91 @@ mod tests {
         let graph = indexed[0].graph.as_ref().expect("graph retained");
         assert_eq!(graph.package, "tiny-pkg2".into());
         assert!(indexed[0].cache_metadata.is_none());
+    }
+
+    /// Parallel index with SQLite: one package already in DB (cache hit) and one new (crawl + writer).
+    #[test]
+    fn index_packages_parallel_mixed_cache_hit_and_crawl() {
+        let temp_dir = TempDir::new().unwrap();
+        let node_modules_dir = temp_dir.path();
+        let db_path = temp_dir.path().join("nci.sqlite");
+
+        let pkg_a = node_modules_dir.join("pkg-a");
+        fs::create_dir_all(&pkg_a).unwrap();
+        fs::write(
+            pkg_a.join("package.json"),
+            r#"{"name":"pkg-a","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(pkg_a.join("index.d.ts"), "export declare const A: number;").unwrap();
+
+        let packages_one = scan_packages(node_modules_dir).unwrap();
+        assert_eq!(packages_one.len(), 1);
+        let first_run = index_packages(
+            &packages_one,
+            Some(IndexOptions {
+                parallel: true,
+                enable_package_cache: true,
+                db_path: Some(db_path.clone()),
+                ..Default::default()
+            }),
+        );
+        assert_eq!(first_run.len(), 1);
+        assert_eq!(first_run[0].source, GraphSource::Crawled);
+
+        let pkg_b = node_modules_dir.join("pkg-b");
+        fs::create_dir_all(&pkg_b).unwrap();
+        fs::write(
+            pkg_b.join("package.json"),
+            r#"{"name":"pkg-b","version":"1.0.0","types":"./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(pkg_b.join("index.d.ts"), "export declare const B: number;").unwrap();
+
+        let packages_two = scan_packages(node_modules_dir).unwrap();
+        assert_eq!(packages_two.len(), 2);
+        let second_run = index_packages(
+            &packages_two,
+            Some(IndexOptions {
+                parallel: true,
+                enable_package_cache: true,
+                db_path: Some(db_path.clone()),
+                ..Default::default()
+            }),
+        );
+        assert_eq!(second_run.len(), 2);
+
+        let cached_n = second_run
+            .iter()
+            .filter(|g| g.source == GraphSource::Cached)
+            .count();
+        let crawled_n = second_run
+            .iter()
+            .filter(|g| g.source == GraphSource::Crawled)
+            .count();
+        assert_eq!(cached_n, 1, "expected one cache hit");
+        assert_eq!(crawled_n, 1, "expected one fresh crawl");
+
+        let by_name: HashMap<String, GraphSource> = second_run
+            .iter()
+            .map(|g| (indexed_package_name(g).to_string(), g.source))
+            .collect();
+        assert_eq!(by_name.get("pkg-a"), Some(&GraphSource::Cached));
+        assert_eq!(by_name.get("pkg-b"), Some(&GraphSource::Crawled));
+
+        let cache_key = cache::index_engine_cache_key(&[]);
+        let ro = NciDatabase::open_read_only(&db_path).expect("read-only after mixed run");
+        for (name, dir) in [("pkg-a", pkg_a.as_path()), ("pkg-b", pkg_b.as_path())] {
+            let info = PackageInfo {
+                name: SharedString::from(name),
+                version: SharedString::from("1.0.0"),
+                dir: normalize_path(dir),
+                is_scoped: false,
+            };
+            assert!(
+                ro.has_cached_package(&info, cache_key.as_str()),
+                "expected {name} in sqlite after mixed parallel index"
+            );
+        }
     }
 }
