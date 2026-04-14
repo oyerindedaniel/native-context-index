@@ -176,8 +176,10 @@ thread_local! {
     static INDEX_RO_SQLITE: RefCell<Option<(PathBuf, Option<NciDatabase>)>> = const { RefCell::new(None) };
 }
 
-/// Drop the per-thread read-only handle before crawl / writer handoff so the writer is not blocked
-/// by a lingering reader on the same file (cache **miss** paths only; hits keep reuse).
+/// Drop the per-thread read-only handle on cache **miss** after a probe that had a live RO
+/// connection (hits keep reuse). Miss paths soon crawl and may enqueue a save; closing here avoids
+/// holding an idle handle through that work and trims extra concurrent readers (minor WAL
+/// checkpoint / `BUSY` hygiene), not because an open RO connection continuously locks the DB.
 /// No-op if this thread never got a live read-only connection (avoids clearing a failed-open slot
 /// so the next probe retries after the writer creates the file).
 fn release_read_only_sqlite_thread_local() {
@@ -360,14 +362,13 @@ pub fn index_packages(
         })
     };
 
-    let n = packages.len();
-    if n == 0 {
+    let package_count = packages.len();
+    if package_count == 0 {
         return Vec::new();
     }
 
     // `None` means no SQLite sidecar for this run (probes + saves disabled).
-    // Open once here so the DB exists and is migrated before parallel read-only cache probes (avoids
-    // workers missing cache until the writer creates the file). The writer opens the same path again.
+    // Open once here to create/migrate before parallel read-only probes; the writer opens the same path again.
     let cache_sqlite_path: Option<PathBuf> = if index_opts.enable_package_cache {
         if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
             if let Some(parent) = path.parent() {
@@ -399,7 +400,7 @@ pub fn index_packages(
         .unwrap_or_else(default_save_queue_depth);
 
     let results: Arc<Vec<Mutex<Option<IndexedGraph>>>> =
-        Arc::new((0..n).map(|_| Mutex::new(None)).collect());
+        Arc::new((0..package_count).map(|_| Mutex::new(None)).collect());
 
     type SaveMsg = (usize, PackageInfo, PackageGraph);
     let (writer_join, save_tx_shared): (
