@@ -1,0 +1,289 @@
+{
+  "package": "triple-slash-scope-cases",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModulePair",
+      "name": "ModulePair",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-a.d.ts",
+      "signature": "export namespace ModulePair {\n  export const left = 1;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModulePair.left",
+      "name": "ModulePair.left",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-a.d.ts",
+      "signature": "declare const left: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::MixedScope",
+      "name": "MixedScope",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-a.d.ts",
+      "signature": "export namespace MixedScope {\n  export const fromModule: \"module\";\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::MixedScope.fromModule",
+      "name": "MixedScope.fromModule",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-a.d.ts",
+      "signature": "declare const fromModule: \"module\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::MixedScope"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModulePair#2",
+      "name": "ModulePair",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-b.d.ts",
+      "signature": "export namespace ModulePair {\n  export const right = 2;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModulePair.right",
+      "name": "ModulePair.right",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-b.d.ts",
+      "signature": "declare const right: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair#2"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModuleReachPair",
+      "name": "ModuleReachPair",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-reach-core.d.ts",
+      "signature": "export namespace ModuleReachPair {\n  export const core = 1;\n}\nexport namespace ModuleReachPair {\n  export const extra = 2;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "additionalFiles": [
+        "module-reach-extra.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ModuleReachPair.core",
+      "name": "ModuleReachPair.core",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-reach-core.d.ts",
+      "signature": "declare const core: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModuleReachPair"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::MixedScope#2",
+      "name": "MixedScope",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-bridge.d.ts",
+      "signature": "declare namespace MixedScope {\n  const fromScript: \"script\";\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::MixedScope.fromScript",
+      "name": "MixedScope.fromScript",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-bridge.d.ts",
+      "signature": "declare const fromScript: \"script\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::MixedScope#2"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ScriptPair",
+      "name": "ScriptPair",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-entry.d.ts",
+      "signature": "declare namespace ScriptPair {\n  const alpha: \"a\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "additionalFiles": [
+        "script-peer.d.ts"
+      ]
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ScriptPair.alpha",
+      "name": "ScriptPair.alpha",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-entry.d.ts",
+      "signature": "declare const alpha: \"a\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ScriptPair"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::ScriptPair.beta",
+      "name": "ScriptPair.beta",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-entry.d.ts",
+      "signature": "declare const beta: \"b\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ScriptPair"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::module-reach-extra.d.ts::ModuleReachPair.extra",
+      "name": "ModuleReachPair.extra",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "module-reach-extra.d.ts",
+      "signature": "declare const extra: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModuleReachPair"
+    },
+    {
+      "id": "triple-slash-scope-cases@1.0.0::script-peer.d.ts::ScriptPair.beta",
+      "name": "ScriptPair.beta",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "triple-slash-scope-cases",
+      "filePath": "script-peer.d.ts",
+      "signature": "declare const beta: \"b\"",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ScriptPair"
+    }
+  ],
+  "totalSymbols": 15,
+  "totalFiles": 8,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

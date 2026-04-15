@@ -63,52 +63,69 @@ fn uf_union(parent: &mut [usize], index_a: usize, index_b: usize) {
     }
 }
 
-/// Per **package-relative** file path: stable merge scope id (`m:` + rel for ES modules, `s:` + lex-min rel in triple-slash CC for scripts).
+/// Per **package-relative** file path: module scope is `m:<rel>` or `mcc:<rep>` (triple-slash-connected modules),
+/// scripts use `s:<rep>` from their triple-slash connected component.
 fn compute_merge_scope_ids(
     visited_files: &[SharedString],
     triple_slash: &HashMap<SharedString, Vec<SharedString>>,
     file_is_external_module: &HashMap<SharedString, bool>,
     abs_to_rel: &HashMap<SharedString, SharedString>,
 ) -> HashMap<SharedString, SharedString> {
-    let is_script_file = |abs: &SharedString| -> bool {
-        !file_is_external_module
+    let mut script_abs: Vec<SharedString> = Vec::new();
+    let mut module_abs: Vec<SharedString> = Vec::new();
+    let mut script_index: HashMap<SharedString, usize> = HashMap::new();
+    let mut module_index: HashMap<SharedString, usize> = HashMap::new();
+    for abs in visited_files {
+        let is_external_module = file_is_external_module
             .get(abs)
             .copied()
-            .unwrap_or(true)
-    };
-
-    let mut script_abs: Vec<SharedString> = Vec::new();
-    for abs in visited_files {
-        if is_script_file(abs) {
+            .unwrap_or(true);
+        if is_external_module {
+            let module_idx = module_abs.len();
+            module_index.insert(abs.clone(), module_idx);
+            module_abs.push(abs.clone());
+        } else {
+            let script_idx = script_abs.len();
+            script_index.insert(abs.clone(), script_idx);
             script_abs.push(abs.clone());
         }
     }
 
     let script_count = script_abs.len();
-    let mut script_index: HashMap<SharedString, usize> = HashMap::with_capacity(script_count);
-    for (script_idx, script_abs_path) in script_abs.iter().enumerate() {
-        script_index.insert(script_abs_path.clone(), script_idx);
-    }
+    let module_count = module_abs.len();
+    script_index.reserve(script_count.saturating_sub(script_index.len()));
+    module_index.reserve(module_count.saturating_sub(module_index.len()));
 
     let mut parent: Vec<usize> = if script_count > 0 {
         (0..script_count).collect()
     } else {
         Vec::new()
     };
-
-    if script_count > 0 {
-        for (from_abs, targets) in triple_slash {
-            for to_abs in targets {
-                if let (Some(&from_idx), Some(&to_idx)) =
-                    (script_index.get(from_abs), script_index.get(to_abs))
-                {
-                    uf_union(&mut parent, from_idx, to_idx);
-                }
+    let mut module_parent: Vec<usize> = if module_count > 0 {
+        (0..module_count).collect()
+    } else {
+        Vec::new()
+    };
+    for (from_abs, targets) in triple_slash {
+        let from_script_idx = script_index.get(from_abs).copied();
+        let from_module_idx = module_index.get(from_abs).copied();
+        for to_abs in targets {
+            if let Some(from_idx) = from_script_idx
+                && let Some(&to_idx) = script_index.get(to_abs)
+            {
+                uf_union(&mut parent, from_idx, to_idx);
+            }
+            if let Some(from_idx) = from_module_idx
+                && let Some(&to_idx) = module_index.get(to_abs)
+            {
+                uf_union(&mut module_parent, from_idx, to_idx);
             }
         }
     }
 
     let mut root_min_rel: HashMap<usize, SharedString> = HashMap::new();
+    let mut module_root_min_rel: HashMap<usize, SharedString> = HashMap::new();
+    let mut module_root_size: HashMap<usize, usize> = HashMap::new();
     if script_count > 0 {
         for script_idx in 0..script_count {
             let root = uf_find(&mut parent, script_idx);
@@ -126,41 +143,55 @@ fn compute_merge_scope_ids(
                 .or_insert(rel);
         }
     }
+    if module_count > 0 {
+        for module_idx in 0..module_count {
+            let root = uf_find(&mut module_parent, module_idx);
+            let rel = abs_to_rel
+                .get(&module_abs[module_idx])
+                .cloned()
+                .unwrap_or_else(|| SharedString::from("."));
+            module_root_min_rel
+                .entry(root)
+                .and_modify(|cur| {
+                    if rel.as_ref() < cur.as_ref() {
+                        *cur = rel.clone();
+                    }
+                })
+                .or_insert(rel);
+            *module_root_size.entry(root).or_insert(0) += 1;
+        }
+    }
 
     let mut merge_scope_by_rel: HashMap<SharedString, SharedString> =
         HashMap::with_capacity(visited_files.len());
-    if script_count == 0 {
-        for abs in visited_files {
-            let rel = abs_to_rel
-                .get(abs)
+    for abs in visited_files {
+        let rel = abs_to_rel
+            .get(abs)
+            .cloned()
+            .unwrap_or_else(|| SharedString::from("."));
+        let scope_id = if let Some(&script_idx) = script_index.get(abs) {
+            let root = uf_find(&mut parent, script_idx);
+            let rep = root_min_rel
+                .get(&root)
                 .cloned()
-                .unwrap_or_else(|| SharedString::from("."));
-            merge_scope_by_rel.insert(
-                rel.clone(),
-                SharedString::from(format!("m:{}", rel.as_ref())),
-            );
-        }
-    } else {
-        for abs in visited_files {
-            let rel = abs_to_rel
-                .get(abs)
-                .cloned()
-                .unwrap_or_else(|| SharedString::from("."));
-            let scope_id = if is_script_file(abs) {
-                let idx = *script_index
-                    .get(abs)
-                    .expect("script visited file must be in script_index");
-                let root = uf_find(&mut parent, idx);
-                let rep = root_min_rel
+                .unwrap_or_else(|| rel.clone());
+            SharedString::from(format!("s:{}", rep.as_ref()))
+        } else if let Some(&module_idx) = module_index.get(abs) {
+            let root = uf_find(&mut module_parent, module_idx);
+            let component_size = module_root_size.get(&root).copied().unwrap_or(1);
+            if component_size > 1 {
+                let representative_rel = module_root_min_rel
                     .get(&root)
                     .cloned()
                     .unwrap_or_else(|| rel.clone());
-                SharedString::from(format!("s:{}", rep.as_ref()))
+                SharedString::from(format!("mcc:{}", representative_rel.as_ref()))
             } else {
                 SharedString::from(format!("m:{}", rel.as_ref()))
-            };
-            merge_scope_by_rel.insert(rel, scope_id);
-        }
+            }
+        } else {
+            SharedString::from(format!("m:{}", rel.as_ref()))
+        };
+        merge_scope_by_rel.insert(rel, scope_id);
     }
     merge_scope_by_rel
 }
@@ -1824,6 +1855,121 @@ mod tests {
             "expected index + inner on disk, total_files={}",
             graph.total_files
         );
+    }
+
+    #[test]
+    fn triple_slash_scope_rules_cover_script_merges_without_module_module_collapse() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join("triple-slash-scope-cases");
+        let info = PackageInfo {
+            name: "triple-slash-scope-cases".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(&fixture),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+
+        let module_reach_rows: Vec<&SymbolNode> = graph
+            .symbols
+            .iter()
+            .filter(|symbol_node| {
+                symbol_node.name.as_ref() == "ModuleReachPair"
+                    && symbol_node.kind == SymbolKind::Namespace
+            })
+            .collect();
+        assert_eq!(
+            module_reach_rows.len(),
+            1,
+            "module+module with triple-slash reachability should merge"
+        );
+        assert_eq!(module_reach_rows[0].file_path.as_ref(), "module-reach-core.d.ts");
+        assert!(
+            module_reach_rows[0]
+                .additional_files
+                .as_ref()
+                .map(|files| files
+                    .iter()
+                    .any(|file_path| file_path.as_ref() == "module-reach-extra.d.ts"))
+                .unwrap_or(false),
+            "merged module namespace should include module-reach-extra.d.ts"
+        );
+        let module_reach_parent_id = module_reach_rows[0].id.clone();
+        let module_reach_core = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "ModuleReachPair.core")
+            .expect("ModuleReachPair.core symbol should exist");
+        let module_reach_extra = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "ModuleReachPair.extra")
+            .expect("ModuleReachPair.extra symbol should exist");
+        assert_eq!(
+            module_reach_core.parent_symbol_id.as_ref(),
+            Some(&module_reach_parent_id)
+        );
+        assert_eq!(
+            module_reach_extra.parent_symbol_id.as_ref(),
+            Some(&module_reach_parent_id)
+        );
+
+        let module_pair_rows: Vec<&SymbolNode> = graph
+            .symbols
+            .iter()
+            .filter(|symbol_node| {
+                symbol_node.name.as_ref() == "ModulePair" && symbol_node.kind == SymbolKind::Namespace
+            })
+            .collect();
+        assert_eq!(module_pair_rows.len(), 2, "module+module should remain separate rows");
+        assert!(
+            module_pair_rows
+                .iter()
+                .any(|symbol_node| symbol_node.file_path.as_ref() == "module-a.d.ts")
+        );
+        assert!(
+            module_pair_rows
+                .iter()
+                .any(|symbol_node| symbol_node.file_path.as_ref() == "module-b.d.ts")
+        );
+
+        let mixed_scope_rows: Vec<&SymbolNode> = graph
+            .symbols
+            .iter()
+            .filter(|symbol_node| {
+                symbol_node.name.as_ref() == "MixedScope" && symbol_node.kind == SymbolKind::Namespace
+            })
+            .collect();
+        assert_eq!(
+            mixed_scope_rows.len(),
+            2,
+            "module+script should remain as separate namespace rows"
+        );
+
+        let script_pair_rows: Vec<&SymbolNode> = graph
+            .symbols
+            .iter()
+            .filter(|symbol_node| {
+                symbol_node.name.as_ref() == "ScriptPair" && symbol_node.kind == SymbolKind::Namespace
+            })
+            .collect();
+        assert_eq!(script_pair_rows.len(), 1, "script+script should merge by script component scope");
+        let script_pair_id = script_pair_rows[0].id.clone();
+        let script_alpha = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "ScriptPair.alpha")
+            .expect("ScriptPair.alpha symbol should exist");
+        let script_beta = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "ScriptPair.beta")
+            .expect("ScriptPair.beta symbol should exist");
+        assert_eq!(script_alpha.parent_symbol_id.as_ref(), Some(&script_pair_id));
+        assert_eq!(script_beta.parent_symbol_id.as_ref(), Some(&script_pair_id));
     }
 
     #[test]

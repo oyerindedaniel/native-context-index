@@ -57,7 +57,7 @@ function fuseMergedSignatures(
   return `${existing}\n${incoming}`;
 }
 
-/** Per package-relative path: `m:` + rel for modules, `s:` + lex-min rel in triple-slash CC for scripts. */
+/** Per package-relative path: module scope is `m:<rel>` or `mcc:<rep>` (triple-slash-connected modules), scripts use `s:<rep>`. */
 function computeMergeScopeIds(
   visitedFiles: string[],
   tripleSlash: Record<string, string[]>,
@@ -66,33 +66,50 @@ function computeMergeScopeIds(
   absoluteToPackageRelativeFromCrawl?: Record<string, string>
 ): [Map<string, string>, Map<string, string>] {
   const absToRel = new Map<string, string>();
-  const isScriptFile = (abs: string) => !(fileIsExternalModule[abs] ?? true);
   const scriptAbs: string[] = [];
+  const moduleAbs: string[] = [];
+  const scriptIndex = new Map<string, number>();
+  const moduleIndex = new Map<string, number>();
   for (const abs of visitedFiles) {
     const rel =
       absoluteToPackageRelativeFromCrawl?.[abs] ?? makePackageRelativePath(abs, packageDir);
     absToRel.set(abs, rel);
-    if (isScriptFile(abs)) scriptAbs.push(abs);
+    const isExternalModule = fileIsExternalModule[abs] ?? true;
+    if (isExternalModule) {
+      moduleIndex.set(abs, moduleAbs.length);
+      moduleAbs.push(abs);
+    } else {
+      scriptIndex.set(abs, scriptAbs.length);
+      scriptAbs.push(abs);
+    }
   }
   const scriptCount = scriptAbs.length;
-  const scriptIndex = new Map<string, number>();
-  for (let scriptIdx = 0; scriptIdx < scriptCount; scriptIdx++) {
-    scriptIndex.set(scriptAbs[scriptIdx]!, scriptIdx);
-  }
+  const moduleCount = moduleAbs.length;
   const parent =
     scriptCount > 0 ? Array.from({ length: scriptCount }, (_, idx) => idx) : [];
-  if (scriptCount > 0) {
-    for (const [fromAbs, targets] of Object.entries(tripleSlash)) {
-      for (const toAbs of targets) {
-        const fromIdx = scriptIndex.get(fromAbs);
-        const toIdx = scriptIndex.get(toAbs);
-        if (fromIdx !== undefined && toIdx !== undefined) {
-          ufUnion(parent, fromIdx, toIdx);
+  const moduleParent =
+    moduleCount > 0 ? Array.from({ length: moduleCount }, (_, idx) => idx) : [];
+  for (const [fromAbs, targets] of Object.entries(tripleSlash)) {
+    const fromScriptIdx = scriptIndex.get(fromAbs);
+    const fromModuleIdx = moduleIndex.get(fromAbs);
+    for (const toAbs of targets) {
+      if (fromScriptIdx !== undefined) {
+        const toScriptIdx = scriptIndex.get(toAbs);
+        if (toScriptIdx !== undefined) {
+          ufUnion(parent, fromScriptIdx, toScriptIdx);
+        }
+      }
+      if (fromModuleIdx !== undefined) {
+        const toModuleIdx = moduleIndex.get(toAbs);
+        if (toModuleIdx !== undefined) {
+          ufUnion(moduleParent, fromModuleIdx, toModuleIdx);
         }
       }
     }
   }
   const rootMinRel = new Map<number, string>();
+  const moduleRootMinRel = new Map<number, string>();
+  const moduleRootSize = new Map<number, number>();
   if (scriptCount > 0) {
     for (let scriptIdx = 0; scriptIdx < scriptCount; scriptIdx++) {
       const root = ufFind(parent, scriptIdx);
@@ -101,30 +118,40 @@ function computeMergeScopeIds(
       if (cur === undefined || rel < cur) rootMinRel.set(root, rel);
     }
   }
+  if (moduleCount > 0) {
+    for (let moduleIdx = 0; moduleIdx < moduleCount; moduleIdx++) {
+      const root = ufFind(moduleParent, moduleIdx);
+      const rel = absToRel.get(moduleAbs[moduleIdx]!) ?? ".";
+      const cur = moduleRootMinRel.get(root);
+      if (cur === undefined || rel < cur) moduleRootMinRel.set(root, rel);
+      moduleRootSize.set(root, (moduleRootSize.get(root) ?? 0) + 1);
+    }
+  }
   const mergeScopeByRel = new Map<string, string>();
-  if (scriptCount === 0) {
-    for (const abs of visitedFiles) {
-      const rel = absToRel.get(abs) ?? ".";
-      mergeScopeByRel.set(rel, `m:${rel}`);
-    }
-  } else {
-    for (const abs of visitedFiles) {
-      const rel = absToRel.get(abs) ?? ".";
-      let scopeId: string;
-      if (isScriptFile(abs)) {
-        const idx = scriptIndex.get(abs);
-        if (idx === undefined) {
-          scopeId = `m:${rel}`;
-        } else {
-          const root = ufFind(parent, idx);
-          const rep = rootMinRel.get(root) ?? rel;
-          scopeId = `s:${rep}`;
-        }
-      } else {
+  for (const abs of visitedFiles) {
+    const rel = absToRel.get(abs)!;
+    let scopeId: string;
+    const scriptIdx = scriptIndex.get(abs);
+    if (scriptIdx !== undefined) {
+      const root = ufFind(parent, scriptIdx);
+      const rep = rootMinRel.get(root) ?? rel;
+      scopeId = `s:${rep}`;
+    } else {
+      const moduleIdx = moduleIndex.get(abs);
+      if (moduleIdx === undefined) {
         scopeId = `m:${rel}`;
+      } else {
+        const root = ufFind(moduleParent, moduleIdx);
+        const componentSize = moduleRootSize.get(root) ?? 1;
+        if (componentSize > 1) {
+          const representativeRel = moduleRootMinRel.get(root) ?? rel;
+          scopeId = `mcc:${representativeRel}`;
+        } else {
+          scopeId = `m:${rel}`;
+        }
       }
-      mergeScopeByRel.set(rel, scopeId);
     }
+    mergeScopeByRel.set(rel, scopeId);
   }
   return [mergeScopeByRel, absToRel];
 }

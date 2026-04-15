@@ -562,13 +562,59 @@ describe("buildPackageGraph", () => {
     expect(makeMember?.parentSymbolId).toBe(namespaceContainer?.id);
   });
 
-  it("keeps per-module namespace rows across files unless identical-signature fold applies", () => {
+  it("applies triple-slash script scope merges while keeping module files separate", () => {
+    const graphResult = buildPackageGraph(makePackageInfo("triple-slash-scope-cases"));
+
+    const moduleReachRows = graphResult.symbols.filter(
+      (symbolNode) => symbolNode.name === "ModuleReachPair" && symbolNode.kindName === "ModuleDeclaration"
+    );
+    expect(moduleReachRows).toHaveLength(1);
+    expect(moduleReachRows[0]?.filePath).toBe("module-reach-core.d.ts");
+    expect(moduleReachRows[0]?.additionalFiles).toEqual(expect.arrayContaining(["module-reach-extra.d.ts"]));
+
+    const moduleReachCore = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "ModuleReachPair.core"
+    );
+    const moduleReachExtra = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "ModuleReachPair.extra"
+    );
+    expect(moduleReachCore?.parentSymbolId).toBe(moduleReachRows[0]?.id);
+    expect(moduleReachExtra?.parentSymbolId).toBe(moduleReachRows[0]?.id);
+
+    const modulePairRows = graphResult.symbols.filter(
+      (symbolNode) => symbolNode.name === "ModulePair" && symbolNode.kindName === "ModuleDeclaration"
+    );
+    expect(modulePairRows).toHaveLength(2);
+    expect(modulePairRows.some((symbolNode) => symbolNode.filePath === "module-a.d.ts")).toBe(true);
+    expect(modulePairRows.some((symbolNode) => symbolNode.filePath === "module-b.d.ts")).toBe(true);
+
+    const mixedScopeRows = graphResult.symbols.filter(
+      (symbolNode) => symbolNode.name === "MixedScope" && symbolNode.kindName === "ModuleDeclaration"
+    );
+    expect(mixedScopeRows).toHaveLength(2);
+    const mixedIds = mixedScopeRows.map((symbolNode) => symbolNode.id).sort();
+    expect(mixedIds[0]).toBe("triple-slash-scope-cases@1.0.0::MixedScope");
+    expect(mixedIds[1]).toBe("triple-slash-scope-cases@1.0.0::MixedScope#2");
+
+    const scriptPairRows = graphResult.symbols.filter(
+      (symbolNode) => symbolNode.name === "ScriptPair" && symbolNode.kindName === "ModuleDeclaration"
+    );
+    expect(scriptPairRows).toHaveLength(1);
+    expect(scriptPairRows[0]?.additionalFiles).toEqual(expect.arrayContaining(["script-peer.d.ts"]));
+
+    const scriptPairAlpha = graphResult.symbols.find((symbolNode) => symbolNode.name === "ScriptPair.alpha");
+    const scriptPairBeta = graphResult.symbols.find((symbolNode) => symbolNode.name === "ScriptPair.beta");
+    expect(scriptPairAlpha?.parentSymbolId).toBe(scriptPairRows[0]?.id);
+    expect(scriptPairBeta?.parentSymbolId).toBe(scriptPairRows[0]?.id);
+  });
+
+  it("keeps module+script namespaces separate in namespace-merging fixture", () => {
     const graphResult = buildPackageGraph(makePackageInfo("namespace-merging"));
 
     const mergedEntries = graphResult.symbols.filter((symbolNode) => symbolNode.name === "MergedNS");
 
-    // Two `export namespace MergedNS` blocks (core vs extra) have different bodies ⇒ two ModuleDeclaration
-    // rows plus the homonym FunctionDeclaration ⇒3 symbols named `MergedNS`.
+    // `core.d.ts` is module scope while `extra.d.ts` is script scope, so they stay split.
+    // The function homonym produces the third `MergedNS` row.
     expect(mergedEntries.length).toBe(3);
 
     const namespaceNodes = mergedEntries.filter((node) => node.kindName === "ModuleDeclaration");
@@ -577,20 +623,21 @@ describe("buildPackageGraph", () => {
     expect(namespaceNodes).toHaveLength(2);
     expect(functionNode).toBeDefined();
 
-    const nsFilePaths = namespaceNodes.map((n) => n.filePath).sort();
+    const nsFilePaths = namespaceNodes.map((node) => node.filePath).sort();
     expect(nsFilePaths).toEqual(["core.d.ts", "extra.d.ts"]);
 
     const originalMember = graphResult.symbols.find((symbolNode) => symbolNode.name === "MergedNS.original");
     const extraMember = graphResult.symbols.find((symbolNode) => symbolNode.name === "MergedNS.extra");
     expect(originalMember?.parentSymbolId).toMatch(/MergedNS$/);
     expect(originalMember?.parentSymbolId).not.toContain("#2");
-    expect(extraMember?.parentSymbolId).toMatch(/MergedNS$/);
+    expect(extraMember?.parentSymbolId).toContain("MergedNS");
+    expect(extraMember?.parentSymbolId).not.toBe(originalMember?.parentSymbolId);
 
     const symbolNames = graphResult.symbols.map((symbolNode) => symbolNode.name);
     expect(symbolNames).toContain("MergedNS.original");
     expect(symbolNames).toContain("MergedNS.extra");
 
-    const nsWithSince = namespaceNodes.find((n) => n.since === "1.0.0");
+    const nsWithSince = namespaceNodes.find((node) => node.since === "1.0.0");
     expect(nsWithSince).toBeDefined();
   });
 

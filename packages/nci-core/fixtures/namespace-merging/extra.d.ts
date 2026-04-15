@@ -1,4 +1,4 @@
 /** @since 2.0.0 */
-export namespace MergedNS {
+declare namespace MergedNS {
   export const extra = 2;
 }
