@@ -48,7 +48,7 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
+      "parentSymbolId": "merged-symbols@1.0.0::merged#2"
     },
     {
       "id": "merged-symbols@1.0.0::merged.options",
@@ -63,7 +63,7 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
+      "parentSymbolId": "merged-symbols@1.0.0::merged#2"
     },
     {
       "id": "merged-symbols@1.0.0::merged.options.verbose",
@@ -95,7 +95,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "merged-symbols@1.0.0::index.d.ts::merged"
+      "parentSymbolId": "merged-symbols@1.0.0::merged#2"
     },
     {
       "id": "merged-symbols@1.0.0::merged.Config.debug",

@@ -168,7 +168,7 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite#2"
     },
     {
       "id": "multi-declaration-heritage@1.0.0::bridgeComposite",
@@ -279,7 +279,7 @@
       "inheritedFromSources": [
         "multi-declaration-heritage@1.0.0::Base.prototype.baseOnly"
       ],
-      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite"
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite#2"
     }
   ],
   "totalSymbols": 16,

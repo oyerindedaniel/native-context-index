@@ -1,5 +1,5 @@
 import path from "node:path";
-import { encodeOutsidePackageRelative } from "./relative-path-encoding.js";
+import { makePackageRelativePath } from "./relative-path-encoding.js";
 import ts from "typescript";
 import type {
   PackageGraph,
@@ -29,6 +29,104 @@ function specifierMatchesDependencyStubRoots(
     return false;
   }
   return stubRoots.has(root);
+}
+
+function ufFind(parent: number[], index: number): number {
+  while (parent[index] !== index) {
+    parent[index] = parent[parent[index]!]!;
+    index = parent[index]!;
+  }
+  return index;
+}
+
+function ufUnion(parent: number[], indexA: number, indexB: number): void {
+  const rootA = ufFind(parent, indexA);
+  const rootB = ufFind(parent, indexB);
+  if (rootA !== rootB) parent[rootB] = rootA;
+}
+
+function fuseMergedSignatures(
+  existing: string | undefined,
+  incoming: string | undefined
+): string | undefined {
+  if (incoming === undefined) return existing;
+  if (existing === undefined) return incoming;
+  if (existing === incoming) return existing;
+  if (incoming.trim() === "") return existing;
+  if (existing.trim() === "") return incoming;
+  return `${existing}\n${incoming}`;
+}
+
+/** Per package-relative path: `m:` + rel for modules, `s:` + lex-min rel in triple-slash CC for scripts. */
+function computeMergeScopeIds(
+  visitedFiles: string[],
+  tripleSlash: Record<string, string[]>,
+  fileIsExternalModule: Record<string, boolean>,
+  packageDir: string,
+  absoluteToPackageRelativeFromCrawl?: Record<string, string>
+): [Map<string, string>, Map<string, string>] {
+  const absToRel = new Map<string, string>();
+  const isScriptFile = (abs: string) => !(fileIsExternalModule[abs] ?? true);
+  const scriptAbs: string[] = [];
+  for (const abs of visitedFiles) {
+    const rel =
+      absoluteToPackageRelativeFromCrawl?.[abs] ?? makePackageRelativePath(abs, packageDir);
+    absToRel.set(abs, rel);
+    if (isScriptFile(abs)) scriptAbs.push(abs);
+  }
+  const scriptCount = scriptAbs.length;
+  const scriptIndex = new Map<string, number>();
+  for (let scriptIdx = 0; scriptIdx < scriptCount; scriptIdx++) {
+    scriptIndex.set(scriptAbs[scriptIdx]!, scriptIdx);
+  }
+  const parent =
+    scriptCount > 0 ? Array.from({ length: scriptCount }, (_, idx) => idx) : [];
+  if (scriptCount > 0) {
+    for (const [fromAbs, targets] of Object.entries(tripleSlash)) {
+      for (const toAbs of targets) {
+        const fromIdx = scriptIndex.get(fromAbs);
+        const toIdx = scriptIndex.get(toAbs);
+        if (fromIdx !== undefined && toIdx !== undefined) {
+          ufUnion(parent, fromIdx, toIdx);
+        }
+      }
+    }
+  }
+  const rootMinRel = new Map<number, string>();
+  if (scriptCount > 0) {
+    for (let scriptIdx = 0; scriptIdx < scriptCount; scriptIdx++) {
+      const root = ufFind(parent, scriptIdx);
+      const rel = absToRel.get(scriptAbs[scriptIdx]!) ?? ".";
+      const cur = rootMinRel.get(root);
+      if (cur === undefined || rel < cur) rootMinRel.set(root, rel);
+    }
+  }
+  const mergeScopeByRel = new Map<string, string>();
+  if (scriptCount === 0) {
+    for (const abs of visitedFiles) {
+      const rel = absToRel.get(abs) ?? ".";
+      mergeScopeByRel.set(rel, `m:${rel}`);
+    }
+  } else {
+    for (const abs of visitedFiles) {
+      const rel = absToRel.get(abs) ?? ".";
+      let scopeId: string;
+      if (isScriptFile(abs)) {
+        const idx = scriptIndex.get(abs);
+        if (idx === undefined) {
+          scopeId = `m:${rel}`;
+        } else {
+          const root = ufFind(parent, idx);
+          const rep = rootMinRel.get(root) ?? rel;
+          scopeId = `s:${rep}`;
+        }
+      } else {
+        scopeId = `m:${rel}`;
+      }
+      mergeScopeByRel.set(rel, scopeId);
+    }
+  }
+  return [mergeScopeByRel, absToRel];
 }
 
 /** Build a symbol graph for a single package. */
@@ -66,6 +164,7 @@ export function buildPackageGraph(
   const mergedCrawlOptions: CrawlOptions = {
     ...(crawlOptions ?? {}),
     dependencyStubSelfExemptRoot: stubSelfExemptRoot ?? undefined,
+    packageRootForRelativePaths: packageInfo.dir,
   };
 
   const crawlPhaseStart = performance.now();
@@ -86,15 +185,25 @@ export function buildPackageGraph(
   const visited = new Set(crawlResult.visitedFiles);
 
   const entryFiles = new Set(
-    entry.typesEntries.map((entryFilePath) => makeRelative(entryFilePath, packageInfo.dir))
+    entry.typesEntries.map((entryFilePath) => makePackageRelativePath(entryFilePath, packageInfo.dir))
   );
 
   const merged = new Map<string, SymbolNode>();
 
-  const isCrossFileMergeable = (kind: ts.SyntaxKind): boolean =>
-    kind === ts.SyntaxKind.ModuleDeclaration ||
-    kind === ts.SyntaxKind.InterfaceDeclaration ||
-    kind === ts.SyntaxKind.EnumDeclaration;
+  const [mergeScopeByRel, absToRel] = computeMergeScopeIds(
+    crawlResult.visitedFiles,
+    crawlResult.tripleSlashReferenceTargets,
+    crawlResult.fileIsExternalModule,
+    packageInfo.dir,
+    crawlResult.absoluteToPackageRelative
+  );
+  const moduleIdenticalFold = new Map<string, string>();
+
+  const isInterfaceOrTypeAliasMergeScoped = (kind: ts.SyntaxKind): boolean =>
+    kind === ts.SyntaxKind.InterfaceDeclaration || kind === ts.SyntaxKind.TypeAliasDeclaration;
+
+  const isNamespaceOrEnumCrossFileMergeable = (kind: ts.SyntaxKind): boolean =>
+    kind === ts.SyntaxKind.ModuleDeclaration || kind === ts.SyntaxKind.EnumDeclaration;
 
   const isOverloadMergeable = (kind: ts.SyntaxKind): boolean =>
     kind === ts.SyntaxKind.MethodSignature ||
@@ -111,7 +220,7 @@ export function buildPackageGraph(
       visibility.push(symbolFilePath);
     }
     if (resolved.resolvedFromPackageEntry) {
-      const rel = makeRelative(resolved.resolvedFromPackageEntry, packageInfo.dir);
+      const rel = makePackageRelativePath(resolved.resolvedFromPackageEntry, packageInfo.dir);
       if (entryFiles.has(rel) && !visibility.includes(rel)) {
         visibility.push(rel);
       }
@@ -126,72 +235,107 @@ export function buildPackageGraph(
     }
   };
 
-  for (const resolved of allSymbols) {
-    const symbolFilePath = makeRelative(resolved.definedIn, packageInfo.dir);
-    const isEntryFile = entryFiles.has(symbolFilePath);
-    let mergeKey: string;
+  function mergeContribution(
+    existing: SymbolNode,
+    resolved: ResolvedSymbol,
+    symbolFilePath: string,
+    isEntryFile: boolean
+  ): void {
+    if (symbolFilePath !== existing.filePath) {
+      existing.additionalFiles = existing.additionalFiles || [];
+      if (!existing.additionalFiles.includes(symbolFilePath)) {
+        existing.additionalFiles.push(symbolFilePath);
+      }
 
-    if (isCrossFileMergeable(resolved.kind)) {
-      // Mergeable types (Interfaces, Namespaces) merge by name package-wide.
-      mergeKey = resolved.name;
+      const existingIsEntry = entryFiles.has(existing.filePath);
+      if (
+        existingIsEntry &&
+        !isEntryFile &&
+        (isOverloadMergeable(resolved.kind) ||
+          isNamespaceOrEnumCrossFileMergeable(resolved.kind) ||
+          isInterfaceOrTypeAliasMergeScoped(resolved.kind))
+      ) {
+        const prev = existing.filePath;
+        existing.filePath = symbolFilePath;
+        if (!existing.additionalFiles.includes(prev)) {
+          existing.additionalFiles.push(prev);
+        }
+      }
+    }
+
+    existing.signature = fuseMergedSignatures(existing.signature, resolved.signature);
+
+    for (const visPath of entryVisibilityContributions(resolved, symbolFilePath)) {
+      existing.entryVisibility = existing.entryVisibility || [];
+      if (!existing.entryVisibility.includes(visPath)) {
+        existing.entryVisibility.push(visPath);
+      }
+    }
+
+    if (resolved.dependencies && resolved.dependencies.length > 0) {
+      existing.rawDependencies = existing.rawDependencies || [];
+      const existingDeps = new Set(
+        existing.rawDependencies.map((dep) => `${dep.name}::${dep.importPath || ""}`)
+      );
+      for (const rawDep of resolved.dependencies) {
+        const depKey = `${rawDep.name}::${rawDep.importPath || ""}`;
+        if (!existingDeps.has(depKey)) {
+          existingDeps.add(depKey);
+          existing.rawDependencies.push(rawDep);
+        }
+      }
+    }
+
+    if (resolved.deprecated && !existing.deprecated) existing.deprecated = resolved.deprecated;
+    if (resolved.visibility && !existing.visibility) existing.visibility = resolved.visibility;
+    if (resolved.since && !existing.since) existing.since = resolved.since;
+    if (resolved.modifiers && !existing.modifiers) existing.modifiers = resolved.modifiers;
+    if (resolved.isGlobalAugmentation) existing.isGlobalAugmentation = true;
+  }
+
+  for (const resolved of allSymbols) {
+    const symbolFilePath =
+      absToRel.get(resolved.definedIn) ??
+      makePackageRelativePath(resolved.definedIn, packageInfo.dir);
+    const isEntryFile = entryFiles.has(symbolFilePath);
+    const isExt = crawlResult.fileIsExternalModule[resolved.definedIn] ?? true;
+    const normSig = normalizeSignature(resolved.signature);
+
+    let mergeKey: string;
+    if (isInterfaceOrTypeAliasMergeScoped(resolved.kind)) {
+      const scopeKey = mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
+      mergeKey = `${scopeKey}::${resolved.name}::${resolved.kind}`;
+    } else if (isNamespaceOrEnumCrossFileMergeable(resolved.kind)) {
+      const scopeKey = mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
+      mergeKey = `${scopeKey}::${resolved.name}::${resolved.kind}`;
     } else if (isOverloadMergeable(resolved.kind)) {
-      // Overload-like members merge by (name, kind, signature) across files.
-      mergeKey = `${resolved.name}::${resolved.kind}::${normalizeSignature(resolved.signature)}`;
+      mergeKey = `${resolved.name}::${resolved.kind}::${normSig}`;
     } else {
-      mergeKey = `${resolved.name}::${resolved.kind}::${symbolFilePath}::${normalizeSignature(resolved.signature)}`;
+      mergeKey = `${resolved.name}::${resolved.kind}::${symbolFilePath}::${normSig}`;
+    }
+
+    const canIdenticalFoldAcrossModules =
+      isExt &&
+      (isInterfaceOrTypeAliasMergeScoped(resolved.kind) ||
+        isNamespaceOrEnumCrossFileMergeable(resolved.kind));
+    if (canIdenticalFoldAcrossModules) {
+      const foldKey = `${resolved.name}::${resolved.kind}::${normSig}`;
+      const canonKey = moduleIdenticalFold.get(foldKey);
+      if (canonKey !== undefined) {
+        const foldExisting = merged.get(canonKey);
+        if (foldExisting !== undefined && foldExisting.filePath !== symbolFilePath) {
+          mergeContribution(foldExisting, resolved, symbolFilePath, isEntryFile);
+          continue;
+        }
+      }
     }
 
     const existing = merged.get(mergeKey);
     if (existing) {
-      if (symbolFilePath !== existing.filePath) {
-        existing.additionalFiles = existing.additionalFiles || [];
-        if (!existing.additionalFiles.includes(symbolFilePath)) {
-          existing.additionalFiles.push(symbolFilePath);
-        }
-
-        const existingIsEntry = entryFiles.has(existing.filePath);
-        if (
-          existingIsEntry &&
-          !isEntryFile &&
-          (isOverloadMergeable(resolved.kind) || isCrossFileMergeable(resolved.kind))
-        ) {
-          const prev = existing.filePath;
-          existing.filePath = symbolFilePath;
-          if (!existing.additionalFiles.includes(prev)) {
-            existing.additionalFiles.push(prev);
-          }
-        }
-      }
-
-      for (const visPath of entryVisibilityContributions(resolved, symbolFilePath)) {
-        existing.entryVisibility = existing.entryVisibility || [];
-        if (!existing.entryVisibility.includes(visPath)) {
-          existing.entryVisibility.push(visPath);
-        }
-      }
-
-      if (resolved.dependencies && resolved.dependencies.length > 0) {
-        existing.rawDependencies = existing.rawDependencies || [];
-        const existingDeps = new Set(
-          existing.rawDependencies.map((dep) => `${dep.name}::${dep.importPath || ""}`)
-        );
-        for (const rawDep of resolved.dependencies) {
-          const depKey = `${rawDep.name}::${rawDep.importPath || ""}`;
-          if (!existingDeps.has(depKey)) {
-            existingDeps.add(depKey);
-            existing.rawDependencies.push(rawDep);
-          }
-        }
-      }
-
-      if (resolved.deprecated && !existing.deprecated) existing.deprecated = resolved.deprecated;
-      if (resolved.visibility && !existing.visibility) existing.visibility = resolved.visibility;
-      if (resolved.since && !existing.since) existing.since = resolved.since;
-      if (resolved.modifiers && !existing.modifiers) existing.modifiers = resolved.modifiers;
-      if (resolved.isGlobalAugmentation) existing.isGlobalAugmentation = true;
+      mergeContribution(existing, resolved, symbolFilePath, isEntryFile);
     } else {
       const reExportSource = resolved.reExportChain?.[0]
-        ? makeRelative(resolved.reExportChain[0], packageInfo.dir)
+        ? makePackageRelativePath(resolved.reExportChain[0], packageInfo.dir)
         : undefined;
       const visContrib = entryVisibilityContributions(resolved, symbolFilePath);
 
@@ -218,6 +362,10 @@ export function buildPackageGraph(
         modifiers: resolved.modifiers,
         entryVisibility: visContrib.length > 0 ? visContrib : undefined,
       });
+      if (canIdenticalFoldAcrossModules) {
+        const foldKey = `${resolved.name}::${resolved.kind}::${normSig}`;
+        moduleIdenticalFold.set(foldKey, mergeKey);
+      }
     }
   }
 
@@ -269,12 +417,23 @@ export function buildPackageGraph(
   }
 
   // Same-name value + type (e.g. zod schemas): inheritance flattening must follow the interface/class.
+  // Package-level `name → id`: prefer Interface/TypeAlias, then Class, then Namespace, then backfill.
   nameToId.clear();
   for (const symbolNode of symbols) {
     if (
-      symbolNode.kind === ts.SyntaxKind.ClassDeclaration ||
-      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
+      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration ||
+      symbolNode.kind === ts.SyntaxKind.TypeAliasDeclaration
     ) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (const symbolNode of symbols) {
+    if (symbolNode.kind === ts.SyntaxKind.ClassDeclaration && !nameToId.has(symbolNode.name)) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (const symbolNode of symbols) {
+    if (symbolNode.kind === ts.SyntaxKind.ModuleDeclaration && !nameToId.has(symbolNode.name)) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
@@ -467,7 +626,7 @@ export function buildPackageGraph(
         if (rawDep.importPath) {
           const absPaths = getCachedModuleSpecifier(rawDep.importPath, symbolNode.filePath);
           if (absPaths.length > 0) {
-            const relPath = makeRelative(absPaths[0]!, packageInfo.dir);
+            const relPath = makePackageRelativePath(absPaths[0]!, packageInfo.dir);
             targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
           }
         } else {
@@ -481,7 +640,7 @@ export function buildPackageGraph(
             if (matchingImport) {
               const absSourcePaths = getCachedModuleSpecifier(matchingImport.source, symbolNode.filePath);
               if (absSourcePaths.length > 0) {
-                const relSourcePath = makeRelative(absSourcePaths[0]!, packageInfo.dir);
+                const relSourcePath = makePackageRelativePath(absSourcePaths[0]!, packageInfo.dir);
                 const originalName = matchingImport.originalName || rawDep.name;
                 targetIds = fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
               }
@@ -494,11 +653,11 @@ export function buildPackageGraph(
               const absSourcePaths = getCachedModuleSpecifier(nsImport.source, symbolNode.filePath);
               namespaceTargetFilesResolved = absSourcePaths.length > 0;
               for (const resolvedAbsPath of absSourcePaths) {
-                const relativeForRoot = makeRelative(resolvedAbsPath, packageInfo.dir);
+                const relativeForRoot = makePackageRelativePath(resolvedAbsPath, packageInfo.dir);
                 namespaceFallbackRoots.push(path.posix.dirname(relativeForRoot));
               }
               for (const resolvedAbsPath of absSourcePaths) {
-                const relSourcePath = makeRelative(resolvedAbsPath, packageInfo.dir);
+                const relSourcePath = makePackageRelativePath(resolvedAbsPath, packageInfo.dir);
                 for (const symbolId of fileLocalToIds.get(`${relSourcePath}::${namespaceQual.memberPath}`) || []) {
                   targetIds.push(symbolId);
                 }
@@ -509,7 +668,7 @@ export function buildPackageGraph(
             const closure = getCachedClosure(symbolNode.filePath);
             const fromClosure = new Set<string>();
             for (const reachableFileAbs of closure) {
-              const rel = makeRelative(reachableFileAbs, packageInfo.dir);
+              const rel = makePackageRelativePath(reachableFileAbs, packageInfo.dir);
               if (rel === symbolNode.filePath) continue;
               for (const symbolId of fileLocalToIds.get(`${rel}::${rawDep.name}`) || []) {
                 fromClosure.add(symbolId);
@@ -617,6 +776,7 @@ export function buildPackageGraph(
 
   for (let i = preFlattenLen; i < symbols.length; i++) {
     const symbolNode = symbols[i]!;
+    idToKind.set(symbolNode.id, symbolNode.kind);
     const shortKey = `${symbolNode.filePath}::${symbolNode.name}`;
     const existingShort = fileLocalToIds.get(shortKey) || [];
     existingShort.push(symbolNode.id);
@@ -625,9 +785,21 @@ export function buildPackageGraph(
   for (let i = preFlattenLen; i < symbols.length; i++) {
     const symbolNode = symbols[i]!;
     if (
-      symbolNode.kind === ts.SyntaxKind.ClassDeclaration ||
-      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration
+      symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration ||
+      symbolNode.kind === ts.SyntaxKind.TypeAliasDeclaration
     ) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (let i = preFlattenLen; i < symbols.length; i++) {
+    const symbolNode = symbols[i]!;
+    if (symbolNode.kind === ts.SyntaxKind.ClassDeclaration && !nameToId.has(symbolNode.name)) {
+      nameToId.set(symbolNode.name, symbolNode.id);
+    }
+  }
+  for (let i = preFlattenLen; i < symbols.length; i++) {
+    const symbolNode = symbols[i]!;
+    if (symbolNode.kind === ts.SyntaxKind.ModuleDeclaration && !nameToId.has(symbolNode.name)) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
@@ -640,7 +812,7 @@ export function buildPackageGraph(
   for (const ids of fileLocalToIds.values()) {
     ids.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   }
-  assignParentSymbolIds(symbols, fileLocalToIds, nameToId);
+  assignParentSymbolIds(symbols, fileLocalToIds, nameToId, idToKind);
 
   const afterFlatten = performance.now();
   clearParserCache();
@@ -810,18 +982,6 @@ function tripleSlashReferenceClosure(startAbs: string, edges: Record<string, str
     }
   }
   return [...visited].sort();
-}
-
-/** Make a path relative to the package root. */
-function makeRelative(absPath: string, packageDir: string): string {
-  const normalized = absPath.replace(/\\/g, "/");
-  const normalizedDir = packageDir.replace(/\\/g, "/");
-
-  if (normalized.startsWith(normalizedDir)) {
-    return normalized.slice(normalizedDir.length + 1);
-  }
-  const rel = path.relative(packageDir, absPath).replace(/\\/g, "/");
-  return encodeOutsidePackageRelative(rel);
 }
 
 function kindMatchesResolutionHint(kind: ts.SyntaxKind, hint: "type" | "value" | undefined): boolean {

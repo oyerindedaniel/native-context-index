@@ -1,0 +1,84 @@
+{
+  "package": "stub-root-pkg",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "stub-root-pkg@1.0.0::combined",
+      "name": "combined",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "stub-root-pkg",
+      "filePath": "index.d.ts",
+      "signature": "export declare function combined(first: ListedType, second: OtherType): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "stub-root-pkg@1.0.0::node_modules/@stub-listed/core/index.d.ts::ListedType",
+        "stub-root-pkg@1.0.0::node_modules/other-dep/index.d.ts::OtherType"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "stub-root-pkg@1.0.0::node_modules/@stub-listed/core/index.d.ts::ListedType",
+      "name": "ListedType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "stub-root-pkg",
+      "filePath": "node_modules/@stub-listed/core/index.d.ts",
+      "signature": "export interface ListedType {\r\n  v: number;\r\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "stub-root-pkg@1.0.0::node_modules/@stub-listed/core/index.d.ts::ListedType.v",
+      "name": "ListedType.v",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "stub-root-pkg",
+      "filePath": "node_modules/@stub-listed/core/index.d.ts",
+      "signature": "v: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "stub-root-pkg@1.0.0::node_modules/@stub-listed/core/index.d.ts::ListedType"
+    },
+    {
+      "id": "stub-root-pkg@1.0.0::node_modules/other-dep/index.d.ts::OtherType",
+      "name": "OtherType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "stub-root-pkg",
+      "filePath": "node_modules/other-dep/index.d.ts",
+      "signature": "export interface OtherType {\r\n  w: string;\r\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "stub-root-pkg@1.0.0::node_modules/other-dep/index.d.ts::OtherType.w",
+      "name": "OtherType.w",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "stub-root-pkg",
+      "filePath": "node_modules/other-dep/index.d.ts",
+      "signature": "w: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "stub-root-pkg@1.0.0::node_modules/other-dep/index.d.ts::OtherType"
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -357,6 +357,12 @@ pub struct CrawlResult {
 
     /// Direct `/// <reference path` edges: normalized absolute path → referenced paths (one hop each).
     pub triple_slash_reference_targets: HashMap<SharedString, Vec<SharedString>>,
+
+    /// Per visited file (normalized absolute path): whether the file is a TypeScript external module.
+    pub file_is_external_module: HashMap<SharedString, bool>,
+
+    /// When [`CrawlOptions::package_dir_for_relative_paths`] is set: absolute path → path relative to that root (same rules as graph `make_relative`).
+    pub absolute_to_package_relative: HashMap<SharedString, SharedString>,
 }
 
 #[derive(Debug, Clone)]

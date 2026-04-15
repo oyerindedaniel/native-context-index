@@ -147,6 +147,13 @@ export interface CrawlResult {
    * Keys and values are absolute paths (forward slashes, `normalizePath`); each value is one hop from the key.
    */
   tripleSlashReferenceTargets: Record<string, string[]>;
+  /** Absolute path → whether the file is a TS external module (has top-level import/export). */
+  fileIsExternalModule: Record<string, boolean>;
+  /**
+   * When [`CrawlOptions.packageRootForRelativePaths`] was set: absolute → path relative to that root.
+   * Omitted or empty when crawl was run without a package root (e.g. standalone tests).
+   */
+  absoluteToPackageRelative?: Record<string, string>;
 }
 
 /** A fully resolved symbol (after following all re-exports) */
@@ -201,13 +208,18 @@ export interface ResolvedSymbol {
 
 /** A node in the symbol graph */
 export interface SymbolNode {
-  /** Unique ID: "package@version::symbolName" */
+  /**
+   * Unique ID. Public symbols: `package@version::name` (or `#n` when the short name collides).
+   * Internal symbols: `package@version::filePath::name` (declaration site). See `graph-merge.md`
+   * (internal id vs `parentSymbolId`).
+   */
   id: string;
   /** Symbol name */
   name: string;
   /**
-   * Lexical container symbol id when `name` encodes a member path (e.g. `Foo.bar` → parent's `id`).
-   * Not `dependencies` (references) or `inheritedFromSources` (inheritance flattening).
+   * Lexical container when `name` is dotted (e.g. `Foo.bar` → container for `Foo`). Kind-aware when
+   * several symbols share the same short name in one file (namespace vs interface vs class). Not
+   * `dependencies` or `inheritedFromSources`.
    */
   parentSymbolId?: string;
   /** AST node kind */

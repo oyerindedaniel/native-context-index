@@ -125,7 +125,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "class-statics@1.0.0::Cache"
+      "parentSymbolId": "class-statics@1.0.0::Cache#2"
     },
     {
       "id": "class-statics@1.0.0::Cache.Options.ttl",

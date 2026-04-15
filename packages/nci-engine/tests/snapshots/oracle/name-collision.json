@@ -33,6 +33,37 @@
       "parentSymbolId": "name-collision@1.0.0::ChannelConfig"
     },
     {
+      "id": "name-collision@1.0.0::DupShape",
+      "name": "DupShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "export interface DupShape {\n  channelSide: boolean;\n}",
+      "jsDoc": "Same short name as in stream.d.ts, different shape — separate graph rows.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupShape.channelSide",
+      "name": "DupShape.channelSide",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/channel.d.ts",
+      "signature": "channelSide: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupShape"
+    },
+    {
       "id": "name-collision@1.0.0::identity",
       "name": "identity",
       "kind": 244,
@@ -51,6 +82,229 @@
         "export",
         "declare"
       ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupEnumDiffShape",
+      "name": "DupEnumDiffShape",
+      "kind": 267,
+      "kindName": "EnumDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-enum-diff-a.d.ts",
+      "signature": "export enum DupEnumDiffShape {\n  A = 1,\n}",
+      "jsDoc": "Same enum short name as dup-enum-diff-b, different members — separate ES modules.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupEnumDiffShape#2",
+      "name": "DupEnumDiffShape",
+      "kind": 267,
+      "kindName": "EnumDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-enum-diff-b.d.ts",
+      "signature": "export enum DupEnumDiffShape {\n  B = 2,\n}",
+      "jsDoc": "Same enum short name as dup-enum-diff-a, different members — separate ES modules.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupEnumIdentical",
+      "name": "DupEnumIdentical",
+      "kind": 267,
+      "kindName": "EnumDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-enum-identical-a.d.ts",
+      "signature": "export enum DupEnumIdentical {\n  X = 0,\n}",
+      "jsDoc": "Identical enum body — second half in dup-enum-identical-b.d.ts",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "dist/dup-enum-identical-a.d.ts",
+        "dist/dup-enum-identical-b.d.ts"
+      ],
+      "additionalFiles": [
+        "dist/dup-enum-identical-b.d.ts"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceSameFileTwice",
+      "name": "DupIfaceSameFileTwice",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-same-file-twice.d.ts",
+      "signature": "export interface DupIfaceSameFileTwice {\n  alpha: number;\n}\nexport interface DupIfaceSameFileTwice {\n  beta: string;\n}",
+      "jsDoc": "Two `interface` blocks, same name, one file — TS merges.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceSameFileTwice.alpha",
+      "name": "DupIfaceSameFileTwice.alpha",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-same-file-twice.d.ts",
+      "signature": "alpha: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupIfaceSameFileTwice"
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceSameFileTwice.beta",
+      "name": "DupIfaceSameFileTwice.beta",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-same-file-twice.d.ts",
+      "signature": "beta: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupIfaceSameFileTwice"
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceUser",
+      "name": "DupIfaceUser",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-user-a.d.ts",
+      "signature": "export interface DupIfaceUser {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceUser.id",
+      "name": "DupIfaceUser.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-user-a.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupIfaceUser"
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceUser#2",
+      "name": "DupIfaceUser",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-user-b.d.ts",
+      "signature": "export interface DupIfaceUser {\n  name: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupIfaceUser.name",
+      "name": "DupIfaceUser.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-iface-user-b.d.ts",
+      "signature": "name: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupIfaceUser#2"
+    },
+    {
+      "id": "name-collision@1.0.0::DupTypeUser",
+      "name": "DupTypeUser",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-type-user-a.d.ts",
+      "signature": "export type DupTypeUser = { id: string };",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupTypeUser.id",
+      "name": "DupTypeUser.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-type-user-a.d.ts",
+      "signature": "id: string",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupTypeUser"
+    },
+    {
+      "id": "name-collision@1.0.0::DupTypeUser#2",
+      "name": "DupTypeUser",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-type-user-b.d.ts",
+      "signature": "export type DupTypeUser = { name: string };",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupTypeUser.name",
+      "name": "DupTypeUser.name",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-type-user-b.d.ts",
+      "signature": "name: string",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupTypeUser#2"
     },
     {
       "id": "name-collision@1.0.0::identity#2",
@@ -101,6 +355,260 @@
       "parentSymbolId": "name-collision@1.0.0::Config"
     },
     {
+      "id": "name-collision@1.0.0::DupIdentical",
+      "name": "DupIdentical",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/dup-identical-a.d.ts",
+      "signature": "export interface DupIdentical {\n  x: number;\n}",
+      "jsDoc": "Identical interface half A — should fold with dup-identical-b.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "dist/index.d.ts"
+      ],
+      "additionalFiles": [
+        "dist/dup-identical-b.d.ts"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupIdentical.x",
+      "name": "DupIdentical.x",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/dup-identical-a.d.ts",
+      "signature": "x: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "entryVisibility": [
+        "dist/index.d.ts"
+      ],
+      "additionalFiles": [
+        "dist/dup-identical-b.d.ts"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::DupIdentical"
+    },
+    {
+      "id": "name-collision@1.0.0::MergedBox",
+      "name": "MergedBox",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/merged-box-ns-iface.d.ts",
+      "signature": "export namespace MergedBox {\n  export function make(): void;\n}",
+      "jsDoc": "Same name: `namespace` + `interface` in one file — TS merges declaration spaces.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::MergedBox.make",
+      "name": "MergedBox.make",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/merged-box-ns-iface.d.ts",
+      "signature": "export function make(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::MergedBox"
+    },
+    {
+      "id": "name-collision@1.0.0::MergedBox#2",
+      "name": "MergedBox",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/merged-box-ns-iface.d.ts",
+      "signature": "export interface MergedBox {\n  width: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::MergedBox.width",
+      "name": "MergedBox.width",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/merged-box-ns-iface.d.ts",
+      "signature": "width: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::MergedBox#2"
+    },
+    {
+      "id": "name-collision@1.0.0::NsCrossFileMerge",
+      "name": "NsCrossFileMerge",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/ns-cross-a.d.ts",
+      "signature": "export namespace NsCrossFileMerge {\n  export const fromA = \"a\";\n}",
+      "jsDoc": "Cross-file namespace merge — part A.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::NsCrossFileMerge.fromA",
+      "name": "NsCrossFileMerge.fromA",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
+      "filePath": "dist/ns-cross-a.d.ts",
+      "signature": "declare const fromA: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge"
+    },
+    {
+      "id": "name-collision@1.0.0::NsCrossFileMerge#2",
+      "name": "NsCrossFileMerge",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/ns-cross-b.d.ts",
+      "signature": "export namespace NsCrossFileMerge {\n  export interface FromB {\n    b: boolean;\n  }\n}",
+      "jsDoc": "Cross-file namespace merge — part B.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::NsCrossFileMerge.FromB",
+      "name": "NsCrossFileMerge.FromB",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/ns-cross-b.d.ts",
+      "signature": "export interface FromB {\n    b: boolean;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge#2"
+    },
+    {
+      "id": "name-collision@1.0.0::NsCrossFileMerge.FromB.b",
+      "name": "NsCrossFileMerge.FromB.b",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/ns-cross-b.d.ts",
+      "signature": "b: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge.FromB"
+    },
+    {
+      "id": "name-collision@1.0.0::NsSameFileMerge",
+      "name": "NsSameFileMerge",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/ns-same-file-merge.d.ts",
+      "signature": "export namespace NsSameFileMerge {\n  export const k = 1;\n}\nexport namespace NsSameFileMerge {\n  export interface Inner {\n    n: number;\n  }\n}",
+      "jsDoc": "Two `namespace` blocks, same name, one file — TS merges into one namespace.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::NsSameFileMerge.k",
+      "name": "NsSameFileMerge.k",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "name-collision",
+      "filePath": "dist/ns-same-file-merge.d.ts",
+      "signature": "declare const k: any",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge"
+    },
+    {
+      "id": "name-collision@1.0.0::NsSameFileMerge.Inner",
+      "name": "NsSameFileMerge.Inner",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/ns-same-file-merge.d.ts",
+      "signature": "export interface Inner {\n    n: number;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge"
+    },
+    {
+      "id": "name-collision@1.0.0::NsSameFileMerge.Inner.n",
+      "name": "NsSameFileMerge.Inner.n",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/ns-same-file-merge.d.ts",
+      "signature": "n: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge.Inner"
+    },
+    {
       "id": "name-collision@1.0.0::StreamConfig",
       "name": "StreamConfig",
       "kind": 265,
@@ -131,6 +639,37 @@
       "parentSymbolId": "name-collision@1.0.0::StreamConfig"
     },
     {
+      "id": "name-collision@1.0.0::DupShape#2",
+      "name": "DupShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "name-collision",
+      "filePath": "dist/stream.d.ts",
+      "signature": "export interface DupShape {\n  streamSide: boolean;\n}",
+      "jsDoc": "Same short name as in channel.d.ts, different shape — separate graph rows.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "name-collision@1.0.0::DupShape.streamSide",
+      "name": "DupShape.streamSide",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "name-collision",
+      "filePath": "dist/stream.d.ts",
+      "signature": "streamSide: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "name-collision@1.0.0::DupShape#2"
+    },
+    {
       "id": "name-collision@1.0.0::identity#3",
       "name": "identity",
       "kind": 244,
@@ -151,8 +690,8 @@
       ]
     }
   ],
-  "totalSymbols": 9,
-  "totalFiles": 3,
+  "totalSymbols": 42,
+  "totalFiles": 18,
   "crawlDurationMs": 0,
   "buildDurationMs": 0
 }

@@ -8,7 +8,7 @@
       "kind": 268,
       "kindName": "ModuleDeclaration",
       "package": "namespace-merging",
-      "filePath": "extra.d.ts",
+      "filePath": "core.d.ts",
       "signature": "export namespace MergedNS {\n  export const original = 1;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -17,13 +17,6 @@
       "since": "1.0.0",
       "modifiers": [
         "export"
-      ],
-      "entryVisibility": [
-        "core.d.ts"
-      ],
-      "additionalFiles": [
-        "extra.d.ts",
-        "core.d.ts"
       ]
     },
     {
@@ -41,7 +34,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "namespace-merging@1.0.0::MergedNS#2"
+      "parentSymbolId": "namespace-merging@1.0.0::MergedNS"
     },
     {
       "id": "namespace-merging@1.0.0::MergedNS#2",
@@ -60,6 +53,20 @@
       ]
     },
     {
+      "id": "namespace-merging@1.0.0::extra.d.ts::MergedNS",
+      "name": "MergedNS",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-merging",
+      "filePath": "extra.d.ts",
+      "signature": "export namespace MergedNS {\n  export const extra = 2;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true,
+      "since": "2.0.0"
+    },
+    {
       "id": "namespace-merging@1.0.0::extra.d.ts::MergedNS.extra",
       "name": "MergedNS.extra",
       "kind": 244,
@@ -71,10 +78,10 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "namespace-merging@1.0.0::MergedNS"
+      "parentSymbolId": "namespace-merging@1.0.0::extra.d.ts::MergedNS"
     }
   ],
-  "totalSymbols": 4,
+  "totalSymbols": 5,
   "totalFiles": 2,
   "crawlDurationMs": 0,
   "buildDurationMs": 0

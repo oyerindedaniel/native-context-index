@@ -546,31 +546,52 @@ describe("buildPackageGraph", () => {
     expect(fromChannel!.dependencies).not.toContain("name-collision@1.0.0::StreamConfig");
   });
 
-  it("merges the same namespace across different files in the same package", () => {
+  it("resolves homonym parents: namespace vs function, and interface vs namespace in one file", () => {
+    const graph = buildPackageGraph(makePackageInfo("name-collision"));
+    const widthMember = graph.symbols.find((symbolNode) => symbolNode.name === "MergedBox.width");
+    const makeMember = graph.symbols.find((symbolNode) => symbolNode.name === "MergedBox.make");
+    const interfaceContainer = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "MergedBox" && symbolNode.kindName === "InterfaceDeclaration"
+    );
+    const namespaceContainer = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "MergedBox" && symbolNode.kindName === "ModuleDeclaration"
+    );
+    expect(widthMember?.parentSymbolId).toBe(interfaceContainer?.id);
+    expect(makeMember?.parentSymbolId).toBe(namespaceContainer?.id);
+  });
+
+  it("keeps per-module namespace rows across files unless identical-signature fold applies", () => {
     const graphResult = buildPackageGraph(makePackageInfo("namespace-merging"));
 
     const mergedEntries = graphResult.symbols.filter((symbolNode) => symbolNode.name === "MergedNS");
-    
-    // We expect 2 nodes: 1 for the Namespace (merged across files) and 1 for the Function.
-    expect(mergedEntries.length).toBe(2);
 
-    const namespaceNode = mergedEntries.find(node => node.kindName === "ModuleDeclaration");
-    const functionNode = mergedEntries.find(node => node.kindName === "FunctionDeclaration");
+    // Two `export namespace MergedNS` blocks (core vs extra) have different bodies ⇒ two ModuleDeclaration
+    // rows plus the homonym FunctionDeclaration ⇒3 symbols named `MergedNS`.
+    expect(mergedEntries.length).toBe(3);
 
-    expect(namespaceNode).toBeDefined();
+    const namespaceNodes = mergedEntries.filter((node) => node.kindName === "ModuleDeclaration");
+    const functionNode = mergedEntries.find((node) => node.kindName === "FunctionDeclaration");
+
+    expect(namespaceNodes).toHaveLength(2);
     expect(functionNode).toBeDefined();
 
-    // Verify cross-file merging still happened for the namespace part:
-    // one canonical filePath, the other contributing file recorded in additionalFiles.
-    const nsFiles = [namespaceNode!.filePath, ...(namespaceNode!.additionalFiles ?? [])];
-    const uniqueNsFiles = Array.from(new Set(nsFiles)).sort();
-    expect(uniqueNsFiles).toEqual(["core.d.ts", "extra.d.ts"].sort());
+    const nsFilePaths = namespaceNodes.map((n) => n.filePath).sort();
+    expect(nsFilePaths).toEqual(["core.d.ts", "extra.d.ts"]);
+
+    const originalMember = graphResult.symbols.find((symbolNode) => symbolNode.name === "MergedNS.original");
+    const extraMember = graphResult.symbols.find((symbolNode) => symbolNode.name === "MergedNS.extra");
+    expect(originalMember?.parentSymbolId).toMatch(/MergedNS$/);
+    expect(originalMember?.parentSymbolId).not.toContain("#2");
+    expect(extraMember?.parentSymbolId).toMatch(/MergedNS$/);
 
     const symbolNames = graphResult.symbols.map((symbolNode) => symbolNode.name);
     expect(symbolNames).toContain("MergedNS.original");
     expect(symbolNames).toContain("MergedNS.extra");
 
-    expect(namespaceNode!.since).toBe("1.0.0");
+    const nsWithSince = namespaceNodes.find((n) => n.since === "1.0.0");
+    expect(nsWithSince).toBeDefined();
   });
 
   it("handles duplicate symbol names from the SAME file (e.g. overloads) and assigns unique IDs", () => {

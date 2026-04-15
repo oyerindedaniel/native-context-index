@@ -1,5 +1,3 @@
-//! SQLite-backed NCI index: packages, symbols, and FTS5 search.
-
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -74,8 +72,6 @@ pub use crate::storage_migrations::SCHEMA_VERSION;
 /// First 16 bytes of every SQLite 3 database file.
 const SQLITE3_FILE_HEADER: &[u8; 16] = b"SQLite format 3\0";
 
-/// Ensures `path` is a regular file whose content starts with the SQLite 3 magic header.
-/// Used by `nci db destroy` so a misconfigured path cannot delete an arbitrary file.
 pub fn verify_sqlite_file_header(path: &Path) -> StorageResult<()> {
     let meta = std::fs::metadata(path).map_err(|err| StorageError::InvalidDatabaseFile {
         path: path.to_path_buf(),

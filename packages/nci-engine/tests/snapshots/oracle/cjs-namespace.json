@@ -17,7 +17,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::index.d.ts::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.Node.kind",
@@ -48,7 +48,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::index.d.ts::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.server",
@@ -65,7 +65,7 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::index.d.ts::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.server.Project",

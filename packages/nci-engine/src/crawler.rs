@@ -12,8 +12,8 @@ use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
 use crate::resolver::{
-    normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
-    specifier_is_dependency_stub,
+    make_relative_to_package, normalize_path, normalize_path_with_dashmap,
+    resolve_module_specifier, specifier_is_dependency_stub,
 };
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
@@ -33,6 +33,10 @@ pub struct CrawlOptions {
     /// When set, bare imports whose [`crate::resolver::npm_package_root`] equals this string are not stubbed
     /// (the package being crawled can resolve itself).
     pub dependency_stub_self_exempt_root: Option<String>,
+
+    /// When set (e.g. by `build_package_graph`), crawl fills [`CrawlResult::absolute_to_package_relative`]
+    /// so graph merge-scope does not recompute package-relative paths.
+    pub package_dir_for_relative_paths: Option<String>,
 }
 
 impl Default for CrawlOptions {
@@ -43,6 +47,7 @@ impl Default for CrawlOptions {
             parallel_resolve_deps: true,
             dependency_stub_roots: Arc::new(HashSet::new()),
             dependency_stub_self_exempt_root: None,
+            package_dir_for_relative_paths: None,
         }
     }
 }
@@ -183,6 +188,23 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let mut type_ref_packages: Vec<SharedString> = session.type_ref_packages.into_iter().collect();
     type_ref_packages.sort();
 
+    let absolute_to_package_relative =
+        if let Some(ref pkg_dir) = crawl_options.package_dir_for_relative_paths {
+            let norm_pkg = pkg_dir.replace('\\', "/");
+            let mut relative_by_absolute = HashMap::with_capacity(visited_files.len());
+            for visited_abs in &visited_files {
+                let rel = make_relative_to_package(
+                    visited_abs.as_ref(),
+                    pkg_dir.as_ref(),
+                    norm_pkg.as_str(),
+                );
+                relative_by_absolute.insert(visited_abs.clone(), SharedString::from(rel.as_str()));
+            }
+            relative_by_absolute
+        } else {
+            HashMap::new()
+        };
+
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
         exports: resolved_symbols,
@@ -191,6 +213,8 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         type_reference_packages: type_ref_packages,
         circular_refs: session.circular_refs,
         triple_slash_reference_targets,
+        file_is_external_module: session.file_is_external_module,
+        absolute_to_package_relative,
     }
 }
 

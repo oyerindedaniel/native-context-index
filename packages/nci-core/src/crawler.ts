@@ -8,6 +8,7 @@ import type { CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol } from "./
 import { DEFAULT_MAX_HOPS, MAX_HOPS_UNLIMITED } from "./constants.js";
 import { normalizeSignature, symbolDedupeKey } from "./dedupe.js";
 import { nciProfileEnabled, profileLog, profileStat } from "./nci-log-flags.js";
+import { makePackageRelativePath } from "./relative-path-encoding.js";
 
 export interface CrawlOptions {
   /**
@@ -25,6 +26,11 @@ export interface CrawlOptions {
    * being crawled can resolve its own name). `buildPackageGraph` sets this from `npmPackageRoot(packageInfo.name)`.
    */
   dependencyStubSelfExemptRoot?: string;
+  /**
+   * When set (e.g. by `buildPackageGraph`), crawl fills `absoluteToPackageRelative` on the result
+   * so graph merge-scope does not recompute package-relative paths.
+   */
+  packageRootForRelativePaths?: string;
 }
 
 function normalizeMaxHops(raw?: number): number {
@@ -62,6 +68,7 @@ export function crawl(
 
   const dependencyStubRootsForCrawl = options.dependencyStubRoots;
   const dependencyStubSelfExemptRoot = options.dependencyStubSelfExemptRoot;
+  const packageRootForRelativePaths = options.packageRootForRelativePaths;
   const moduleSpecifierResolutionCache = new Map<string, string[]>();
 
   function specifierIsDependencyStubForCrawl(specifier: string): boolean {
@@ -218,6 +225,10 @@ export function crawl(
         leftSourceAbs.localeCompare(rightSourceAbs)
       )
       .map(([from, toSet]) => [from, [...toSet].sort()])
+  );
+
+  const fileIsExternalModuleRecord: Record<string, boolean> = Object.fromEntries(
+    [...fileIsExternalModule.entries()].sort(([left], [right]) => left.localeCompare(right))
   );
 
   const importsSorted = [...allRawImports.entries()].sort(([left], [right]) =>
@@ -646,14 +657,28 @@ export function crawl(
     return results;
   }
 
+  const visitedFiles = [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  let absoluteToPackageRelative: Record<string, string> | undefined;
+  if (packageRootForRelativePaths) {
+    absoluteToPackageRelative = {};
+    for (const visitedAbs of visitedFiles) {
+      absoluteToPackageRelative[visitedAbs] = makePackageRelativePath(
+        visitedAbs,
+        packageRootForRelativePaths
+      );
+    }
+  }
+
   return {
     filePath: primaryEntry,
     exports: resolvedSymbols,
     imports: Object.fromEntries(importsSorted),
-    visitedFiles: [...visited].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    visitedFiles,
     typeReferencePackages: [...typeRefPackages].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     circularRefs: [...new Set(circularRefs)].sort((a, b) => a.localeCompare(b)),
     tripleSlashReferenceTargets,
+    fileIsExternalModule: fileIsExternalModuleRecord,
+    absoluteToPackageRelative,
   };
 }
 

@@ -1,0 +1,44 @@
+{
+  "package": "self-stub-pkg",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "self-stub-pkg@1.0.0::Inner",
+      "name": "Inner",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "self-stub-pkg",
+      "filePath": "node_modules/self-stub-pkg/inner.d.ts",
+      "signature": "export interface Inner { marker: true }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "self-stub-pkg@1.0.0::node_modules/self-stub-pkg/inner.d.ts::Inner.marker",
+      "name": "Inner.marker",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "self-stub-pkg",
+      "filePath": "node_modules/self-stub-pkg/inner.d.ts",
+      "signature": "marker: true",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "self-stub-pkg@1.0.0::Inner"
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

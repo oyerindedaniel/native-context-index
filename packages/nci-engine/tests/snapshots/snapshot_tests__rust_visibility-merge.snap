@@ -13,7 +13,7 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "visibility-merge",
       "filePath": "index.d.ts",
-      "signature": "export interface Merged { a: string; }",
+      "signature": "export interface Merged { a: string; }\nexport interface Merged { b: string; }",
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],

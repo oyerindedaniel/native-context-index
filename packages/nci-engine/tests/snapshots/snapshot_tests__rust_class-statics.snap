@@ -43,7 +43,7 @@ expression: "& rust_graph"
     {
       "id": "class-statics@1.0.0::Cache.Options",
       "name": "Cache.Options",
-      "parentSymbolId": "class-statics@1.0.0::Cache",
+      "parentSymbolId": "class-statics@1.0.0::Cache#2",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "class-statics",

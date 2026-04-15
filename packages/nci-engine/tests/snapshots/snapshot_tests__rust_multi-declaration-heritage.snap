@@ -114,7 +114,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.prototype.baseOnly",
       "name": "Composite.prototype.baseOnly",
-      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite#2",
       "kind": 175,
       "kindName": "MethodDeclaration",
       "package": "multi-declaration-heritage",
@@ -132,7 +132,7 @@ expression: "& rust_graph"
     {
       "id": "multi-declaration-heritage@1.0.0::Composite.prototype.ownProp",
       "name": "Composite.prototype.ownProp",
-      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite",
+      "parentSymbolId": "multi-declaration-heritage@1.0.0::Composite#2",
       "kind": 173,
       "kindName": "PropertyDeclaration",
       "package": "multi-declaration-heritage",

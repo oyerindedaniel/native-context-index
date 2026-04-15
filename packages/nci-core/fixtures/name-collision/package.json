@@ -4,6 +4,19 @@
   "exports": {
     ".": { "types": "./dist/index.d.ts" },
     "./stream": { "types": "./dist/stream.d.ts" },
-    "./channel": { "types": "./dist/channel.d.ts" }
+    "./channel": { "types": "./dist/channel.d.ts" },
+    "./ns-same-file-merge": { "types": "./dist/ns-same-file-merge.d.ts" },
+    "./ns-cross-a": { "types": "./dist/ns-cross-a.d.ts" },
+    "./ns-cross-b": { "types": "./dist/ns-cross-b.d.ts" },
+    "./merged-box-ns-iface": { "types": "./dist/merged-box-ns-iface.d.ts" },
+    "./dup-enum-diff-a": { "types": "./dist/dup-enum-diff-a.d.ts" },
+    "./dup-enum-diff-b": { "types": "./dist/dup-enum-diff-b.d.ts" },
+    "./dup-enum-identical-a": { "types": "./dist/dup-enum-identical-a.d.ts" },
+    "./dup-enum-identical-b": { "types": "./dist/dup-enum-identical-b.d.ts" },
+    "./dup-type-user-a": { "types": "./dist/dup-type-user-a.d.ts" },
+    "./dup-type-user-b": { "types": "./dist/dup-type-user-b.d.ts" },
+    "./dup-iface-user-a": { "types": "./dist/dup-iface-user-a.d.ts" },
+    "./dup-iface-user-b": { "types": "./dist/dup-iface-user-b.d.ts" },
+    "./dup-iface-same-file-twice": { "types": "./dist/dup-iface-same-file-twice.d.ts" }
   }
 }

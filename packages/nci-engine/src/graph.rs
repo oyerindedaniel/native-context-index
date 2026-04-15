@@ -15,15 +15,15 @@ use crate::crawler::{CrawlOptions, crawl};
 use crate::dedupe::normalize_signature;
 use crate::profile;
 use crate::resolver::{
-    normalize_path, npm_package_root, resolve_module_specifier, resolve_types_entry,
-    specifier_is_dependency_stub,
+    make_relative_to_package, normalize_path, npm_package_root, resolve_module_specifier,
+    resolve_types_entry, specifier_is_dependency_stub,
 };
 use crate::types::{
-    PackageEntry, PackageGraph, PackageInfo, ParsedImport, SharedString, SharedVec, SymbolKind,
-    SymbolNode, Visibility,
+    PackageEntry, PackageGraph, PackageInfo, ParsedImport, ResolvedSymbol, SharedString, SharedVec,
+    SymbolKind, SymbolNode, SymbolSpace, Visibility,
 };
 
-/// Parent directory of a package-relative path (already forward-slash normalized by `make_relative`).
+/// Parent directory of a package-relative path (already forward-slash normalized by [`make_relative_to_package`]).
 /// Returns `"."` for root-level files.
 fn rel_parent_dir(relative_path: &str) -> SharedString {
     match relative_path.rfind('/') {
@@ -45,6 +45,260 @@ fn file_path_under_namespace_root(file_path: &str, namespace_root: &str) -> bool
 
 fn graph_profile_label(package: &SharedString, phase: &str) -> String {
     format!("[{}] {}", package.as_ref(), phase)
+}
+
+fn uf_find(parent: &mut [usize], mut index: usize) -> usize {
+    while parent[index] != index {
+        parent[index] = parent[parent[index]];
+        index = parent[index];
+    }
+    index
+}
+
+fn uf_union(parent: &mut [usize], index_a: usize, index_b: usize) {
+    let root_a = uf_find(parent, index_a);
+    let root_b = uf_find(parent, index_b);
+    if root_a != root_b {
+        parent[root_b] = root_a;
+    }
+}
+
+/// Per **package-relative** file path: stable merge scope id (`m:` + rel for ES modules, `s:` + lex-min rel in triple-slash CC for scripts).
+fn compute_merge_scope_ids(
+    visited_files: &[SharedString],
+    triple_slash: &HashMap<SharedString, Vec<SharedString>>,
+    file_is_external_module: &HashMap<SharedString, bool>,
+    abs_to_rel: &HashMap<SharedString, SharedString>,
+) -> HashMap<SharedString, SharedString> {
+    let is_script_file = |abs: &SharedString| -> bool {
+        !file_is_external_module
+            .get(abs)
+            .copied()
+            .unwrap_or(true)
+    };
+
+    let mut script_abs: Vec<SharedString> = Vec::new();
+    for abs in visited_files {
+        if is_script_file(abs) {
+            script_abs.push(abs.clone());
+        }
+    }
+
+    let script_count = script_abs.len();
+    let mut script_index: HashMap<SharedString, usize> = HashMap::with_capacity(script_count);
+    for (script_idx, script_abs_path) in script_abs.iter().enumerate() {
+        script_index.insert(script_abs_path.clone(), script_idx);
+    }
+
+    let mut parent: Vec<usize> = if script_count > 0 {
+        (0..script_count).collect()
+    } else {
+        Vec::new()
+    };
+
+    if script_count > 0 {
+        for (from_abs, targets) in triple_slash {
+            for to_abs in targets {
+                if let (Some(&from_idx), Some(&to_idx)) =
+                    (script_index.get(from_abs), script_index.get(to_abs))
+                {
+                    uf_union(&mut parent, from_idx, to_idx);
+                }
+            }
+        }
+    }
+
+    let mut root_min_rel: HashMap<usize, SharedString> = HashMap::new();
+    if script_count > 0 {
+        for script_idx in 0..script_count {
+            let root = uf_find(&mut parent, script_idx);
+            let rel = abs_to_rel
+                .get(&script_abs[script_idx])
+                .cloned()
+                .unwrap_or_else(|| SharedString::from("."));
+            root_min_rel
+                .entry(root)
+                .and_modify(|cur| {
+                    if rel.as_ref() < cur.as_ref() {
+                        *cur = rel.clone();
+                    }
+                })
+                .or_insert(rel);
+        }
+    }
+
+    let mut merge_scope_by_rel: HashMap<SharedString, SharedString> =
+        HashMap::with_capacity(visited_files.len());
+    if script_count == 0 {
+        for abs in visited_files {
+            let rel = abs_to_rel
+                .get(abs)
+                .cloned()
+                .unwrap_or_else(|| SharedString::from("."));
+            merge_scope_by_rel.insert(
+                rel.clone(),
+                SharedString::from(format!("m:{}", rel.as_ref())),
+            );
+        }
+    } else {
+        for abs in visited_files {
+            let rel = abs_to_rel
+                .get(abs)
+                .cloned()
+                .unwrap_or_else(|| SharedString::from("."));
+            let scope_id = if is_script_file(abs) {
+                let idx = *script_index
+                    .get(abs)
+                    .expect("script visited file must be in script_index");
+                let root = uf_find(&mut parent, idx);
+                let rep = root_min_rel
+                    .get(&root)
+                    .cloned()
+                    .unwrap_or_else(|| rel.clone());
+                SharedString::from(format!("s:{}", rep.as_ref()))
+            } else {
+                SharedString::from(format!("m:{}", rel.as_ref()))
+            };
+            merge_scope_by_rel.insert(rel, scope_id);
+        }
+    }
+    merge_scope_by_rel
+}
+
+fn build_abs_to_rel_map_for_visited(
+    visited_files: &[SharedString],
+    package_dir_str: &str,
+    normalized_pkg_dir: &str,
+) -> HashMap<SharedString, SharedString> {
+    let mut m = HashMap::with_capacity(visited_files.len());
+    for abs in visited_files {
+        let rel = make_relative_to_package(abs.as_ref(), package_dir_str, normalized_pkg_dir);
+        m.insert(abs.clone(), SharedString::from(rel.as_str()));
+    }
+    m
+}
+
+#[inline]
+fn is_interface_or_type_alias_merge_scoped(kind: SymbolKind) -> bool {
+    matches!(kind, SymbolKind::Interface | SymbolKind::TypeAlias)
+}
+
+/// Namespace and enum use the same merge-scope key as interface/type (`merge_scope_by_rel` + name + kind),
+/// with identical `normalize_signature` fold across external modules (see `graph-merge.md`).
+#[inline]
+fn is_namespace_or_enum_cross_file_mergeable(kind: SymbolKind) -> bool {
+    matches!(kind, SymbolKind::Namespace | SymbolKind::Enum)
+}
+
+/// Member/overload-shaped kinds: merge key omits file path so the same logical overload can coalesce across files.
+#[inline]
+fn is_member_overload_mergeable(kind: SymbolKind) -> bool {
+    matches!(
+        kind,
+        SymbolKind::MethodSignature
+            | SymbolKind::PropertySignature
+            | SymbolKind::GetAccessor
+            | SymbolKind::SetAccessor
+    )
+}
+
+fn fuse_merged_signatures(existing: &mut Option<SharedString>, incoming: Option<&SharedString>) {
+    match (existing.as_ref(), incoming) {
+        (_, None) => {}
+        (None, Some(incoming_sig)) => *existing = Some(incoming_sig.clone()),
+        (Some(existing_sig), Some(incoming_sig)) if existing_sig == incoming_sig => {}
+        (Some(_existing_sig), Some(incoming_sig)) if incoming_sig.as_ref().is_empty() => {}
+        (Some(existing_sig), Some(incoming_sig)) if existing_sig.as_ref().is_empty() => {
+            *existing = Some(incoming_sig.clone());
+        }
+        (Some(existing_sig), Some(incoming_sig)) => {
+            let mut fused = String::with_capacity(existing_sig.len() + incoming_sig.len() + 1);
+            fused.push_str(existing_sig.as_ref());
+            fused.push('\n');
+            fused.push_str(incoming_sig.as_ref());
+            *existing = Some(SharedString::from(fused));
+        }
+    }
+}
+
+fn merge_resolved_into_node(
+    existing: &mut SymbolNode,
+    resolved: &ResolvedSymbol,
+    symbol_file_path: &SharedString,
+    merged_index: usize,
+    additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
+) {
+    if symbol_file_path != &existing.file_path {
+        let seen = additional_files_seen.entry(merged_index).or_insert_with(|| {
+            let mut known_paths = HashSet::new();
+            known_paths.insert(existing.file_path.clone());
+            if let Some(files) = &existing.additional_files {
+                for path in files.iter() {
+                    known_paths.insert(path.clone());
+                }
+            }
+            known_paths
+        });
+        if seen.insert(symbol_file_path.clone()) {
+            match &mut existing.additional_files {
+                Some(files) => {
+                    let mut paths_with_new: Vec<SharedString> = files.iter().cloned().collect();
+                    paths_with_new.push(symbol_file_path.clone());
+                    existing.additional_files = Some(SharedVec::from(paths_with_new));
+                }
+                None => {
+                    existing.additional_files = Some(SharedVec::from([symbol_file_path.clone()]));
+                }
+            }
+        }
+    }
+
+    fuse_merged_signatures(&mut existing.signature, resolved.signature.as_ref());
+
+    if !resolved.dependencies.is_empty() {
+        let set = existing.dep_dedupe_keys.get_or_insert_with(|| {
+            existing
+                .raw_dependencies
+                .iter()
+                .map(|dep| {
+                    (
+                        dep.name.clone(),
+                        dep.import_path
+                            .clone()
+                            .unwrap_or_else(|| SharedString::from("")),
+                    )
+                })
+                .collect()
+        });
+        for raw_dep in resolved.dependencies.iter() {
+            let key = (
+                raw_dep.name.clone(),
+                raw_dep
+                    .import_path
+                    .clone()
+                    .unwrap_or_else(|| SharedString::from("")),
+            );
+            if set.insert(key) {
+                existing.raw_dependencies.push(raw_dep.clone());
+            }
+        }
+    }
+
+    if resolved.deprecated.is_some() && existing.deprecated.is_none() {
+        existing.deprecated = resolved.deprecated.clone();
+    }
+    if resolved.visibility.is_some() && existing.visibility.is_none() {
+        existing.visibility = resolved.visibility.clone();
+    }
+    if resolved.since.is_some() && existing.since.is_none() {
+        existing.since = resolved.since.clone();
+    }
+    if !resolved.modifiers.is_empty() && existing.modifiers.is_empty() {
+        existing.modifiers = resolved.modifiers.clone();
+    }
+    if resolved.is_global_augmentation {
+        existing.is_global_augmentation = true;
+    }
 }
 
 fn triple_slash_reachable(
@@ -215,7 +469,7 @@ fn resolve_dependency_ids_for_symbol(
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
             let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
             if !abs_paths.is_empty() {
-                let rel_path = make_relative(&abs_paths[0], package_dir_str, normalized_pkg_dir);
+                let rel_path = make_relative_to_package(&abs_paths[0], package_dir_str, normalized_pkg_dir);
                 let key: SharedString = format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
                 if let Some(ids) = file_local_to_ids.get(&key) {
                     target_ids.extend(ids.iter().cloned());
@@ -246,7 +500,7 @@ fn resolve_dependency_ids_for_symbol(
                     dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
                 if !abs_source_paths.is_empty() {
                     let rel_source_path =
-                        make_relative(&abs_source_paths[0], package_dir_str, normalized_pkg_dir);
+                        make_relative_to_package(&abs_source_paths[0], package_dir_str, normalized_pkg_dir);
                     let original_name = matching_import
                         .original_name
                         .as_deref()
@@ -270,7 +524,7 @@ fn resolve_dependency_ids_for_symbol(
                 namespace_target_files_resolved = !abs_source_paths.is_empty();
                 namespace_fallback_roots.clear();
                 for absolute_source_path in &abs_source_paths {
-                    let rel_source_path = make_relative(
+                    let rel_source_path = make_relative_to_package(
                         absolute_source_path.as_ref(),
                         package_dir_str,
                         normalized_pkg_dir,
@@ -278,7 +532,7 @@ fn resolve_dependency_ids_for_symbol(
                     namespace_fallback_roots.push(rel_parent_dir(rel_source_path.as_ref()));
                 }
                 for absolute_source_path in &abs_source_paths {
-                    let rel_source_path = make_relative(
+                    let rel_source_path = make_relative_to_package(
                         absolute_source_path.as_ref(),
                         package_dir_str,
                         normalized_pkg_dir,
@@ -301,7 +555,7 @@ fn resolve_dependency_ids_for_symbol(
                 let mut from_closure: HashSet<SharedString> = HashSet::new();
                 for reachable_abs in closure {
                     let relative_file_path =
-                        make_relative(reachable_abs.as_ref(), package_dir_str, normalized_pkg_dir);
+                        make_relative_to_package(reachable_abs.as_ref(), package_dir_str, normalized_pkg_dir);
                     if relative_file_path == symbol_node.file_path.as_ref() {
                         continue;
                     }
@@ -460,6 +714,7 @@ pub fn build_package_graph(
 
     let mut merged_crawl_opts = crawl_options.as_ref().cloned().unwrap_or_default();
     merged_crawl_opts.dependency_stub_self_exempt_root = stub_self_exempt_root.clone();
+    merged_crawl_opts.package_dir_for_relative_paths = Some(package_info.dir.as_ref().to_string());
 
     let dependency_stub_roots_arc = if merged_crawl_opts.dependency_stub_roots.is_empty() {
         None
@@ -484,29 +739,86 @@ pub fn build_package_graph(
     let all_imports_per_file = crawl_result.imports;
     let import_maps_per_file = index_imports_by_local_name(&all_imports_per_file);
     let triple_slash_edges = crawl_result.triple_slash_reference_targets;
+    let file_is_external = crawl_result.file_is_external_module;
+    let package_dir_str = package_info.dir.as_ref();
+    let normalized_pkg_dir = package_dir_str.replace('\\', "/");
+    let abs_to_rel_fallback;
+    let abs_to_rel: &HashMap<SharedString, SharedString> =
+        if !crawl_result.absolute_to_package_relative.is_empty() {
+            &crawl_result.absolute_to_package_relative
+        } else {
+            abs_to_rel_fallback = build_abs_to_rel_map_for_visited(
+                &crawl_result.visited_files,
+                package_dir_str,
+                normalized_pkg_dir.as_str(),
+            );
+            &abs_to_rel_fallback
+        };
+    let merge_scope_by_rel = compute_merge_scope_ids(
+        &crawl_result.visited_files,
+        &triple_slash_edges,
+        &file_is_external,
+        abs_to_rel,
+    );
     let visited: HashSet<SharedString> = crawl_result.visited_files.into_iter().collect();
 
     let mut merged: Vec<(SharedString, SymbolNode)> = Vec::new();
     let mut merge_index: HashMap<SharedString, usize> =
         HashMap::with_capacity(all_symbols.len().min(65536));
     let mut additional_files_seen: HashMap<usize, HashSet<SharedString>> = HashMap::new();
-    let package_dir_str = package_info.dir.as_ref();
-    let normalized_pkg_dir = package_dir_str.replace('\\', "/");
+    // External-module Interface / TypeAlias: fold files when kind + name + normalized signature match.
+    let mut module_identical_fold: HashMap<(SharedString, u32, String), usize> =
+        HashMap::with_capacity(all_symbols.len().min(4096));
 
     let merge_phase_start = Instant::now();
     for resolved in &all_symbols {
-        let symbol_file_path = SharedString::from(
-            make_relative(
-                &resolved.defined_in,
-                package_dir_str,
-                normalized_pkg_dir.as_str(),
-            )
-            .as_str(),
-        );
+        let symbol_file_path = abs_to_rel
+            .get(&resolved.defined_in)
+            .cloned()
+            .unwrap_or_else(|| {
+                SharedString::from(
+                    make_relative_to_package(
+                        resolved.defined_in.as_ref(),
+                        package_dir_str,
+                        normalized_pkg_dir.as_str(),
+                    )
+                    .as_str(),
+                )
+            });
+        let is_ext = file_is_external
+            .get(resolved.defined_in.as_ref())
+            .copied()
+            .unwrap_or(true);
         let norm_sig = normalize_signature(resolved.signature.as_deref());
-        let merge_key: SharedString = if is_cross_file_mergeable(resolved.kind) {
-            resolved.name.clone()
-        } else if is_overload_mergeable(resolved.kind) {
+        let merge_key: SharedString = if is_interface_or_type_alias_merge_scoped(resolved.kind) {
+            let scope_key = merge_scope_by_rel
+                .get(&symbol_file_path)
+                .cloned()
+                .unwrap_or_else(|| {
+                    SharedString::from(format!("m:{}", symbol_file_path.as_ref()))
+                });
+            format!(
+                "{}::{}::{}",
+                scope_key.as_ref(),
+                resolved.name.as_ref(),
+                resolved.kind.numeric_kind()
+            )
+            .into()
+        } else if is_namespace_or_enum_cross_file_mergeable(resolved.kind) {
+            let scope_key = merge_scope_by_rel
+                .get(&symbol_file_path)
+                .cloned()
+                .unwrap_or_else(|| {
+                    SharedString::from(format!("m:{}", symbol_file_path.as_ref()))
+                });
+            format!(
+                "{}::{}::{}",
+                scope_key.as_ref(),
+                resolved.name.as_ref(),
+                resolved.kind.numeric_kind()
+            )
+            .into()
+        } else if is_member_overload_mergeable(resolved.kind) {
             format!(
                 "{}::{}::{}",
                 resolved.name.as_ref(),
@@ -525,83 +837,40 @@ pub fn build_package_graph(
             .into()
         };
 
-        if let Some(&index) = merge_index.get(&merge_key) {
-            let existing = &mut merged[index].1;
-
-            if symbol_file_path != existing.file_path {
-                let seen = additional_files_seen.entry(index).or_insert_with(|| {
-                    let mut known_paths = HashSet::new();
-                    known_paths.insert(existing.file_path.clone());
-                    if let Some(files) = &existing.additional_files {
-                        for path in files.iter() {
-                            known_paths.insert(path.clone());
-                        }
-                    }
-                    known_paths
-                });
-                if seen.insert(symbol_file_path.clone()) {
-                    match &mut existing.additional_files {
-                        Some(files) => {
-                            let mut paths_with_new: Vec<SharedString> =
-                                files.iter().cloned().collect();
-                            paths_with_new.push(symbol_file_path.clone());
-                            existing.additional_files = Some(SharedVec::from(paths_with_new));
-                        }
-                        None => {
-                            existing.additional_files =
-                                Some(SharedVec::from([symbol_file_path.clone()]));
-                        }
-                    }
-                }
-            }
-
-            if !resolved.dependencies.is_empty() {
-                let set = existing.dep_dedupe_keys.get_or_insert_with(|| {
-                    existing
-                        .raw_dependencies
-                        .iter()
-                        .map(|dep| {
-                            (
-                                dep.name.clone(),
-                                dep.import_path
-                                    .clone()
-                                    .unwrap_or_else(|| SharedString::from("")),
-                            )
-                        })
-                        .collect()
-                });
-                for raw_dep in resolved.dependencies.iter() {
-                    let key = (
-                        raw_dep.name.clone(),
-                        raw_dep
-                            .import_path
-                            .clone()
-                            .unwrap_or_else(|| SharedString::from("")),
+        let can_identical_fold_across_modules = is_ext
+            && (is_interface_or_type_alias_merge_scoped(resolved.kind)
+                || is_namespace_or_enum_cross_file_mergeable(resolved.kind));
+        if can_identical_fold_across_modules {
+            let fold_key = (
+                resolved.name.clone(),
+                resolved.kind.numeric_kind(),
+                norm_sig.clone(),
+            );
+            if let Some(&fold_idx) = module_identical_fold.get(&fold_key) {
+                if merged[fold_idx].1.file_path != symbol_file_path {
+                    merge_resolved_into_node(
+                        &mut merged[fold_idx].1,
+                        resolved,
+                        &symbol_file_path,
+                        fold_idx,
+                        &mut additional_files_seen,
                     );
-                    if set.insert(key) {
-                        existing.raw_dependencies.push(raw_dep.clone());
-                    }
+                    continue;
                 }
             }
+        }
 
-            if resolved.deprecated.is_some() && existing.deprecated.is_none() {
-                existing.deprecated = resolved.deprecated.clone();
-            }
-            if resolved.visibility.is_some() && existing.visibility.is_none() {
-                existing.visibility = resolved.visibility.clone();
-            }
-            if resolved.since.is_some() && existing.since.is_none() {
-                existing.since = resolved.since.clone();
-            }
-            if !resolved.modifiers.is_empty() && existing.modifiers.is_empty() {
-                existing.modifiers = resolved.modifiers.clone();
-            }
-            if resolved.is_global_augmentation {
-                existing.is_global_augmentation = true;
-            }
+        if let Some(&index) = merge_index.get(&merge_key) {
+            merge_resolved_into_node(
+                &mut merged[index].1,
+                resolved,
+                &symbol_file_path,
+                index,
+                &mut additional_files_seen,
+            );
         } else {
             let re_export_source = resolved.re_export_chain.first().map(|chain_start| {
-                make_relative(chain_start, package_dir_str, normalized_pkg_dir.as_str())
+                make_relative_to_package(chain_start, package_dir_str, normalized_pkg_dir.as_str())
             });
 
             let re_exported_from = match &re_export_source {
@@ -640,6 +909,16 @@ pub fn build_package_graph(
 
             let index = merged.len();
             merge_index.insert(merge_key, index);
+            if can_identical_fold_across_modules {
+                module_identical_fold.insert(
+                    (
+                        resolved.name.clone(),
+                        resolved.kind.numeric_kind(),
+                        norm_sig,
+                    ),
+                    index,
+                );
+            }
             merged.push((SharedString::from(""), node));
         }
     }
@@ -720,10 +999,24 @@ pub fn build_package_graph(
             .push(symbol_node.id.clone());
     }
 
-    // must resolve heritage on the class/interface, not the value. Prefer type declarations, then backfill.
+    // Package-level name → id: Interface/TypeAlias, then Class, then Namespace, then backfill.
     name_to_id.clear();
     for symbol_node in &symbols {
-        if matches!(symbol_node.kind, SymbolKind::Class | SymbolKind::Interface) {
+        if matches!(symbol_node.kind, SymbolKind::Interface | SymbolKind::TypeAlias) {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols {
+        if matches!(symbol_node.kind, SymbolKind::Class)
+            && !name_to_id.contains_key(symbol_node.name.as_ref())
+        {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols {
+        if matches!(symbol_node.kind, SymbolKind::Namespace)
+            && !name_to_id.contains_key(symbol_node.name.as_ref())
+        {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
     }
@@ -731,6 +1024,12 @@ pub fn build_package_graph(
         if !name_to_id.contains_key(symbol_node.name.as_ref()) {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
+    }
+
+    let mut id_to_kind: HashMap<SharedString, SymbolKind> =
+        HashMap::with_capacity(symbols.len().min(65536));
+    for symbol_node in &symbols {
+        id_to_kind.insert(symbol_node.id.clone(), symbol_node.kind);
     }
 
     let mut id_to_file_path: HashMap<SharedString, SharedString> =
@@ -836,6 +1135,7 @@ pub fn build_package_graph(
     );
 
     for symbol_node in &symbols[pre_flatten_len..] {
+        id_to_kind.insert(symbol_node.id.clone(), symbol_node.kind);
         let short_key: SharedString =
             format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
         file_local_to_ids
@@ -844,7 +1144,21 @@ pub fn build_package_graph(
             .push(symbol_node.id.clone());
     }
     for symbol_node in &symbols[pre_flatten_len..] {
-        if matches!(symbol_node.kind, SymbolKind::Class | SymbolKind::Interface) {
+        if matches!(symbol_node.kind, SymbolKind::Interface | SymbolKind::TypeAlias) {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols[pre_flatten_len..] {
+        if matches!(symbol_node.kind, SymbolKind::Class)
+            && !name_to_id.contains_key(symbol_node.name.as_ref())
+        {
+            name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
+        }
+    }
+    for symbol_node in &symbols[pre_flatten_len..] {
+        if matches!(symbol_node.kind, SymbolKind::Namespace)
+            && !name_to_id.contains_key(symbol_node.name.as_ref())
+        {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
     }
@@ -856,7 +1170,12 @@ pub fn build_package_graph(
     for ids in file_local_to_ids.values_mut() {
         ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
     }
-    assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id);
+    assign_parent_symbol_ids(
+        &mut symbols,
+        &file_local_to_ids,
+        &name_to_id,
+        &id_to_kind,
+    );
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -877,24 +1196,6 @@ pub fn build_package_graph(
         crawl_duration_ms,
         build_duration_ms,
     }
-}
-
-fn is_cross_file_mergeable(kind: SymbolKind) -> bool {
-    matches!(
-        kind,
-        SymbolKind::Namespace | SymbolKind::Interface | SymbolKind::Enum
-    )
-}
-
-// Member/overload-shaped kinds: merge key omits file path so the same logical overload can coalesce across files.
-fn is_overload_mergeable(kind: SymbolKind) -> bool {
-    matches!(
-        kind,
-        SymbolKind::MethodSignature
-            | SymbolKind::PropertySignature
-            | SymbolKind::GetAccessor
-            | SymbolKind::SetAccessor
-    )
 }
 
 fn resolve_external_dep_id(source: &str, name: &str, protocol_regex: &Regex) -> Option<String> {
@@ -954,6 +1255,84 @@ fn try_external_module_stub_id(
     Some(format!("npm::{specifier}::{member}"))
 }
 
+/// Prefer a parent container when `filePath::parentName` maps to multiple symbol ids.
+fn rank_parent_kind_for_member(parent_kind: SymbolKind, member: &SymbolNode) -> u8 {
+    use SymbolKind::*;
+    use SymbolSpace::Type;
+
+    if matches!(member.kind, MethodDeclaration | PropertyDeclaration) {
+        return match parent_kind {
+            Class => 0,
+            Interface => 1,
+            Namespace => 2,
+            Function => 3,
+            _ => 5,
+        };
+    }
+
+    if matches!(
+        member.kind,
+        Interface | Class | Enum | TypeAlias
+    ) {
+        return match parent_kind {
+            Namespace => 0,
+            Class => 1,
+            Enum => 2,
+            Interface => 3,
+            Function => 4,
+            _ => 5,
+        };
+    }
+
+    let type_shape_member = matches!(member.symbol_space, Type)
+        || matches!(
+            member.kind,
+            PropertySignature | MethodSignature | GetAccessor | SetAccessor
+        );
+
+    if type_shape_member {
+        return match parent_kind {
+            Interface => 0,
+            TypeAlias => 1,
+            Class => 2,
+            Namespace => 3,
+            Function => 4,
+            _ => 5,
+        };
+    }
+
+    match parent_kind {
+        Namespace => 0,
+        Class => 1,
+        Enum => 2,
+        Function => 3,
+        Interface => 4,
+        _ => 5,
+    }
+}
+
+fn pick_preferred_parent_id(
+    candidate_ids: &[SharedString],
+    member: &SymbolNode,
+    id_to_kind: &HashMap<SharedString, SymbolKind>,
+) -> Option<SharedString> {
+    if candidate_ids.is_empty() {
+        return None;
+    }
+    if candidate_ids.len() == 1 {
+        return Some(candidate_ids[0].clone());
+    }
+    let mut ranked: Vec<SharedString> = candidate_ids.to_vec();
+    ranked.sort_by(|a, b| {
+        let ka = id_to_kind.get(a).copied().unwrap_or(SymbolKind::Unknown);
+        let kb = id_to_kind.get(b).copied().unwrap_or(SymbolKind::Unknown);
+        let ra = rank_parent_kind_for_member(ka, member);
+        let rb = rank_parent_kind_for_member(kb, member);
+        ra.cmp(&rb).then_with(|| a.as_ref().cmp(b.as_ref()))
+    });
+    ranked.first().cloned()
+}
+
 /// Sets [`SymbolNode::parent_symbol_id`] for dotted names using the same `file_local_to_ids` /
 /// `name_to_id` maps built during id assignment (extended after heritage flatten for synthetic rows).
 ///
@@ -963,6 +1342,7 @@ fn assign_parent_symbol_ids(
     symbols: &mut [SymbolNode],
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     name_to_id: &HashMap<SharedString, SharedString>,
+    id_to_kind: &HashMap<SharedString, SymbolKind>,
 ) {
     for node in symbols.iter_mut() {
         let Some(parent_name) = parent_name_for_dotted_member(node.name.as_ref()) else {
@@ -972,8 +1352,8 @@ fn assign_parent_symbol_ids(
         let file_key: SharedString =
             format!("{}::{}", node.file_path.as_ref(), parent_name.as_ref()).into();
         if let Some(ids) = file_local_to_ids.get(&file_key) {
-            if let Some(first) = ids.first() {
-                node.parent_symbol_id = Some(first.clone());
+            if let Some(chosen) = pick_preferred_parent_id(ids, node, id_to_kind) {
+                node.parent_symbol_id = Some(chosen);
                 continue;
             }
         }
@@ -1158,55 +1538,6 @@ fn flatten_inherited_members(
     symbols.extend(synthetic);
 }
 
-/// Encodes `path.relative` / `pathdiff` output when a file is outside the package root so `..` never
-/// appears in stored paths (avoids agents misreading `../../` as a normal navigable path).
-fn encode_outside_package_relative(relative_path: &str) -> String {
-    let normalized = relative_path.replace('\\', "/");
-    let mut rest = normalized.as_str();
-    while rest.starts_with("./") {
-        rest = rest.get(2..).unwrap_or("");
-        rest = rest.trim_start_matches('/');
-    }
-    let mut up_count = 0usize;
-    while rest.starts_with("../") {
-        up_count += 1;
-        rest = rest.get(3..).unwrap_or("");
-    }
-    if rest == ".." {
-        up_count += 1;
-        rest = "";
-    }
-    let tail = rest.trim_start_matches('/');
-    let mut out = String::from("__nci_external__");
-    for _ in 0..up_count {
-        out.push_str("/__up__");
-    }
-    if !tail.is_empty() {
-        out.push('/');
-        out.push_str(tail);
-    }
-    out
-}
-
-/// `normalized_package_dir` must equal `package_dir.replace('\\', "/")` so prefix checks match `abs_path` normalization.
-fn make_relative(abs_path: &str, package_dir: &str, normalized_package_dir: &str) -> String {
-    let normalized = abs_path.replace('\\', "/");
-
-    if let Some(rest) = normalized.strip_prefix(normalized_package_dir) {
-        if let Some(no_slash) = rest.strip_prefix('/') {
-            return no_slash.to_string();
-        }
-        return rest.to_string();
-    }
-
-    pathdiff::diff_paths(abs_path, package_dir)
-        .map(|path| {
-            let raw = path.to_string_lossy().replace('\\', "/");
-            encode_outside_package_relative(&raw)
-        })
-        .unwrap_or_else(|| normalized)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1217,73 +1548,31 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
-    fn make_relative_strips_prefix() {
-        assert_eq!(
-            make_relative("/pkg/src/index.d.ts", "/pkg", "/pkg"),
-            "src/index.d.ts"
-        );
+    fn namespace_enum_cross_file_mergeable_matches_expectation() {
+        assert!(is_namespace_or_enum_cross_file_mergeable(SymbolKind::Namespace));
+        assert!(is_namespace_or_enum_cross_file_mergeable(SymbolKind::Enum));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Interface));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::TypeAlias));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Function));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Class));
     }
 
     #[test]
-    fn make_relative_handles_windows_paths() {
-        assert_eq!(
-            make_relative("C:\\pkg\\src\\index.d.ts", "C:\\pkg", "C:/pkg"),
-            "src/index.d.ts"
-        );
+    fn interface_type_alias_use_distinct_merge_scope_helpers() {
+        assert!(is_interface_or_type_alias_merge_scoped(SymbolKind::Interface));
+        assert!(is_interface_or_type_alias_merge_scoped(SymbolKind::TypeAlias));
+        assert!(!is_interface_or_type_alias_merge_scoped(SymbolKind::Class));
     }
 
     #[test]
-    fn encode_outside_package_relative_replaces_dot_dot_segments() {
-        assert_eq!(
-            encode_outside_package_relative("../other/x.d.ts"),
-            "__nci_external__/__up__/other/x.d.ts"
-        );
-        assert_eq!(
-            encode_outside_package_relative("../../a/b"),
-            "__nci_external__/__up__/__up__/a/b"
-        );
-        assert_eq!(
-            encode_outside_package_relative("sub/no-ups.d.ts"),
-            "__nci_external__/sub/no-ups.d.ts"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn make_relative_outside_package_root_uses_encoded_path() {
-        assert_eq!(
-            make_relative("/other/x.d.ts", "/pkg", "/pkg"),
-            "__nci_external__/__up__/other/x.d.ts"
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn make_relative_outside_package_root_uses_encoded_path_windows() {
-        assert_eq!(
-            make_relative(r"C:\other\x.d.ts", r"C:\pkg", "C:/pkg"),
-            "__nci_external__/__up__/other/x.d.ts"
-        );
-    }
-
-    #[test]
-    fn is_cross_file_mergeable_correct() {
-        assert!(is_cross_file_mergeable(SymbolKind::Interface));
-        assert!(is_cross_file_mergeable(SymbolKind::Namespace));
-        assert!(is_cross_file_mergeable(SymbolKind::Enum));
-        assert!(!is_cross_file_mergeable(SymbolKind::Function));
-        assert!(!is_cross_file_mergeable(SymbolKind::Class));
-    }
-
-    #[test]
-    fn is_overload_mergeable_includes_member_signature_kinds() {
-        assert!(is_overload_mergeable(SymbolKind::MethodSignature));
-        assert!(is_overload_mergeable(SymbolKind::PropertySignature));
-        assert!(is_overload_mergeable(SymbolKind::GetAccessor));
-        assert!(is_overload_mergeable(SymbolKind::SetAccessor));
-        assert!(!is_overload_mergeable(SymbolKind::Function));
-        assert!(!is_overload_mergeable(SymbolKind::Variable));
-        assert!(!is_overload_mergeable(SymbolKind::Class));
+    fn member_overload_mergeable_includes_member_signature_kinds() {
+        assert!(is_member_overload_mergeable(SymbolKind::MethodSignature));
+        assert!(is_member_overload_mergeable(SymbolKind::PropertySignature));
+        assert!(is_member_overload_mergeable(SymbolKind::GetAccessor));
+        assert!(is_member_overload_mergeable(SymbolKind::SetAccessor));
+        assert!(!is_member_overload_mergeable(SymbolKind::Function));
+        assert!(!is_member_overload_mergeable(SymbolKind::Variable));
+        assert!(!is_member_overload_mergeable(SymbolKind::Class));
     }
 
     #[test]
