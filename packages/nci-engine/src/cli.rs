@@ -273,17 +273,17 @@ fn index_effective_project_root(
     if bulk.project_root.is_some() {
         return Ok(discovery_dir.to_path_buf());
     }
-    if let Some(toml_cfg) = file {
-        if let Some(root_str) = &toml_cfg.project_root {
-            let path = Path::new(root_str);
-            let joined = if path.is_absolute() {
-                path.to_path_buf()
-            } else {
-                discovery_dir.join(path)
-            };
-            return fs::canonicalize(&joined)
-                .map_err(|err| format!("config project_root {}: {err}", joined.display()));
-        }
+    if let Some(toml_cfg) = file
+        && let Some(root_str) = &toml_cfg.project_root
+    {
+        let path = Path::new(root_str);
+        let joined = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            discovery_dir.join(path)
+        };
+        return fs::canonicalize(&joined)
+            .map_err(|err| format!("config project_root {}: {err}", joined.display()));
     }
     Ok(discovery_dir.to_path_buf())
 }
@@ -292,15 +292,15 @@ fn effective_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<OutputFor
     if let Some(fmt_flag) = cli.format {
         return Ok(fmt_flag);
     }
-    if let Some(toml_cfg) = file {
-        if let Some(format_str) = &toml_cfg.format {
-            if let Some(parsed) = OutputFormat::parse_config(format_str) {
-                return Ok(parsed);
-            }
-            return Err(format!(
-                "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
-            ));
+    if let Some(toml_cfg) = file
+        && let Some(format_str) = &toml_cfg.format
+    {
+        if let Some(parsed) = OutputFormat::parse_config(format_str) {
+            return Ok(parsed);
         }
+        return Err(format!(
+            "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
+        ));
     }
     Ok(OutputFormat::Plain)
 }
@@ -320,17 +320,17 @@ fn sql_rows_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<SqlRowsFor
             OutputFormat::Jsonl => SqlRowsFormat::Jsonl,
         });
     }
-    if let Some(toml_cfg) = file {
-        if let Some(format_str) = &toml_cfg.format {
-            return match format_str.trim().to_ascii_lowercase().as_str() {
-                "plain" => Ok(SqlRowsFormat::Plain),
-                "json" => Ok(SqlRowsFormat::Json),
-                "jsonl" => Ok(SqlRowsFormat::Jsonl),
-                _ => Err(format!(
-                    "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
-                )),
-            };
-        }
+    if let Some(toml_cfg) = file
+        && let Some(format_str) = &toml_cfg.format
+    {
+        return match format_str.trim().to_ascii_lowercase().as_str() {
+            "plain" => Ok(SqlRowsFormat::Plain),
+            "json" => Ok(SqlRowsFormat::Json),
+            "jsonl" => Ok(SqlRowsFormat::Jsonl),
+            _ => Err(format!(
+                "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
+            )),
+        };
     }
     Ok(SqlRowsFormat::default())
 }
@@ -629,10 +629,10 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
 fn build_filter(file: Option<&NciConfigFile>, package_globs_cli: &[String]) -> FilterConfig {
     let mut filter = FilterConfig::default();
     let mut globs: Vec<String> = Vec::new();
-    if let Some(toml_cfg) = file {
-        if let Some(pkgs) = &toml_cfg.packages {
-            globs.extend(pkgs.iter().cloned());
-        }
+    if let Some(toml_cfg) = file
+        && let Some(pkgs) = &toml_cfg.packages
+    {
+        globs.extend(pkgs.iter().cloned());
     }
     globs.extend(package_globs_cli.iter().cloned());
     filter.include_globs = globs;
@@ -659,10 +659,10 @@ fn build_index_options(
     let filter = build_filter(file, &bulk.package_globs);
 
     let mut stub_list_from_config: Vec<String> = Vec::new();
-    if let Some(config_file) = file {
-        if let Some(list) = &config_file.dependency_stub_packages {
-            stub_list_from_config.extend(list.iter().cloned());
-        }
+    if let Some(config_file) = file
+        && let Some(list) = &config_file.dependency_stub_packages
+    {
+        stub_list_from_config.extend(list.iter().cloned());
     }
     stub_list_from_config.extend(bulk.dependency_stub_packages.iter().cloned());
     let dependency_stub_packages = normalize_dependency_stub_list(stub_list_from_config);

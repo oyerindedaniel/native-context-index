@@ -17,7 +17,7 @@ use crate::types::{PackageEntry, SharedString};
 
 thread_local! {
     /// Reused for [`specifier_is_dependency_stub`] so hot paths do not allocate per lookup.
-    static STUB_ROOT_MATCH_SCRATCH: RefCell<String> = RefCell::new(String::new());
+    static STUB_ROOT_MATCH_SCRATCH: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
 fn push_lower_ascii_package_segment(dest: &mut String, segment: &str) {
@@ -69,9 +69,7 @@ fn try_write_npm_package_root_lowercase(specifier: &str, dest: &mut String) -> b
         }
         let scope_segment = &after_at[..scope_delim];
         let after_scope = &after_at[scope_delim + 1..];
-        let package_name_end = after_scope
-            .find(|separator| separator == '/' || separator == '\\')
-            .unwrap_or(after_scope.len());
+        let package_name_end = after_scope.find(['/', '\\']).unwrap_or(after_scope.len());
         if package_name_end == 0 {
             return false;
         }
@@ -83,9 +81,7 @@ fn try_write_npm_package_root_lowercase(specifier: &str, dest: &mut String) -> b
         return true;
     }
 
-    let root_end = trimmed
-        .find(|separator| separator == '/' || separator == '\\')
-        .unwrap_or(trimmed.len());
+    let root_end = trimmed.find(['/', '\\']).unwrap_or(trimmed.len());
     if root_end == 0 {
         return false;
     }
@@ -117,10 +113,10 @@ pub fn specifier_is_dependency_stub(
         if !try_write_npm_package_root_lowercase(specifier, scratch) {
             return false;
         }
-        if let Some(exempt) = self_stub_exempt_root {
-            if scratch.as_str() == exempt {
-                return false;
-            }
+        if let Some(exempt) = self_stub_exempt_root
+            && scratch.as_str() == exempt
+        {
+            return false;
         }
         stub_roots.contains(scratch.as_str())
     })

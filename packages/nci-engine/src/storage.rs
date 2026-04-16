@@ -1166,13 +1166,13 @@ impl NciDatabase {
         let mut truncated = false;
 
         while let Some(row) = rows.next()? {
-            if let Some(limit) = max_rows {
-                if row_count >= limit {
-                    truncated = true;
-                    break;
-                }
+            if let Some(limit) = max_rows
+                && row_count >= limit
+            {
+                truncated = true;
+                break;
             }
-            let object = row_to_json_object(&row, &column_keys)?;
+            let object = row_to_json_object(row, &column_keys)?;
             on_row(&column_keys, object)?;
             row_count += 1;
         }

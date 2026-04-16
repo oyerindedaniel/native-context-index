@@ -124,10 +124,10 @@ fn compute_merge_scope_ids(
     let mut module_root_min_rel: HashMap<usize, SharedString> = HashMap::new();
     let mut module_root_size: HashMap<usize, usize> = HashMap::new();
     if script_count > 0 {
-        for script_idx in 0..script_count {
+        for (script_idx, script_file) in script_abs.iter().enumerate().take(script_count) {
             let root = uf_find(&mut parent, script_idx);
             let rel = abs_to_rel
-                .get(&script_abs[script_idx])
+                .get(script_file)
                 .cloned()
                 .unwrap_or_else(|| SharedString::from("."));
             root_min_rel
@@ -141,10 +141,10 @@ fn compute_merge_scope_ids(
         }
     }
     if module_count > 0 {
-        for module_idx in 0..module_count {
+        for (module_idx, module_file) in module_abs.iter().enumerate().take(module_count) {
             let root = uf_find(&mut module_parent, module_idx);
             let rel = abs_to_rel
-                .get(&module_abs[module_idx])
+                .get(module_file)
                 .cloned()
                 .unwrap_or_else(|| SharedString::from("."));
             module_root_min_rel
@@ -457,13 +457,12 @@ fn resolve_dependency_ids_for_symbol(
 
         if let Some(stub_roots) = stub_roots_nonempty {
             if let Some(spec) = raw_dep.import_path.as_deref() {
-                if specifier_is_dependency_stub(spec, stub_roots, stub_self_exempt_root) {
-                    if let Some(stub) =
+                if specifier_is_dependency_stub(spec, stub_roots, stub_self_exempt_root)
+                    && let Some(stub) =
                         try_external_module_stub_id(spec, raw_dep.name.as_ref(), protocol_regex)
-                    {
-                        resolved_ids.insert(stub.into());
-                        continue;
-                    }
+                {
+                    resolved_ids.insert(stub.into());
+                    continue;
                 }
             } else if let Some(import_map) = import_maps_per_file.get(abs_lookup.as_ref()) {
                 if let Some(matching_import) = import_map.get(raw_dep.name.as_ref()) {
@@ -481,17 +480,16 @@ fn resolve_dependency_ids_for_symbol(
                         }
                     }
                 }
-                if let Some((qualifier, member_path)) = namespace_qual {
-                    if let Some(ns_import) = import_map.get(qualifier) {
-                        let source = ns_import.source.as_ref();
-                        if specifier_is_dependency_stub(source, stub_roots, stub_self_exempt_root) {
-                            if let Some(stub) =
-                                try_external_module_stub_id(source, member_path, protocol_regex)
-                            {
-                                resolved_ids.insert(stub.into());
-                                continue;
-                            }
-                        }
+                if let Some((qualifier, member_path)) = namespace_qual
+                    && let Some(ns_import) = import_map.get(qualifier)
+                {
+                    let source = ns_import.source.as_ref();
+                    if specifier_is_dependency_stub(source, stub_roots, stub_self_exempt_root)
+                        && let Some(stub) =
+                            try_external_module_stub_id(source, member_path, protocol_regex)
+                    {
+                        resolved_ids.insert(stub.into());
+                        continue;
                     }
                 }
             }
@@ -880,17 +878,17 @@ pub fn build_package_graph(
                 resolved.kind.numeric_kind(),
                 norm_sig.clone(),
             );
-            if let Some(&fold_idx) = module_identical_fold.get(&fold_key) {
-                if merged[fold_idx].1.file_path != symbol_file_path {
-                    merge_resolved_into_node(
-                        &mut merged[fold_idx].1,
-                        resolved,
-                        &symbol_file_path,
-                        fold_idx,
-                        &mut additional_files_seen,
-                    );
-                    continue;
-                }
+            if let Some(&fold_idx) = module_identical_fold.get(&fold_key)
+                && merged[fold_idx].1.file_path != symbol_file_path
+            {
+                merge_resolved_into_node(
+                    &mut merged[fold_idx].1,
+                    resolved,
+                    &symbol_file_path,
+                    fold_idx,
+                    &mut additional_files_seen,
+                );
+                continue;
             }
         }
 
@@ -1383,11 +1381,11 @@ fn assign_parent_symbol_ids(
         let parent_name: SharedString = parent_name.into();
         let file_key: SharedString =
             format!("{}::{}", node.file_path.as_ref(), parent_name.as_ref()).into();
-        if let Some(ids) = file_local_to_ids.get(&file_key) {
-            if let Some(chosen) = pick_preferred_parent_id(ids, node, id_to_kind) {
-                node.parent_symbol_id = Some(chosen);
-                continue;
-            }
+        if let Some(ids) = file_local_to_ids.get(&file_key)
+            && let Some(chosen) = pick_preferred_parent_id(ids, node, id_to_kind)
+        {
+            node.parent_symbol_id = Some(chosen);
+            continue;
         }
         if let Some(pid) = name_to_id.get(parent_name.as_ref()) {
             node.parent_symbol_id = Some(pid.clone());

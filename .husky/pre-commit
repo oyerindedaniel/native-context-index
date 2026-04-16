@@ -3,6 +3,7 @@
 echo "Running pre-commit checks..."
 pnpm run format:check || exit 1
 pnpm run rust:fmt:check || exit 1
+pnpm run rust:clippy || exit 1
 pnpm run lint || exit 1
 pnpm run check-types || exit 1
 pnpm run test || exit 1

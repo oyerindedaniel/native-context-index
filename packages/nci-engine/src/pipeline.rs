@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::fs;
+use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
@@ -313,7 +316,7 @@ pub fn dedupe_packages_by_canonical_dir(packages: Vec<PackageInfo>) -> Vec<Packa
     let mut unique: Vec<PackageInfo> = Vec::with_capacity(packages.len());
     for package in packages {
         let path = Path::new(package.dir.as_ref());
-        let canonical_key = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let canonical_key = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
         if seen_dirs.insert(canonical_key) {
             unique.push(package);
         }
@@ -367,7 +370,7 @@ pub fn index_packages(
     let cache_sqlite_path: Option<PathBuf> = if index_opts.enable_package_cache {
         if let Some(path) = index_opts.db_path.clone().or_else(cache::nci_sqlite_path) {
             if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
+                let _ = fs::create_dir_all(parent);
             }
             debug!(path = %path.display(), "package cache enabled");
             match NciDatabase::open(&path) {
@@ -399,7 +402,7 @@ pub fn index_packages(
 
     type SaveMsg = (usize, PackageInfo, PackageGraph);
     let (writer_join, save_tx_shared): (
-        Option<std::thread::JoinHandle<()>>,
+        Option<JoinHandle<()>>,
         Option<Arc<mpsc::SyncSender<SaveMsg>>>,
     ) = if let Some(ref sqlite_path) = cache_sqlite_path {
         let (save_tx, save_rx) = mpsc::sync_channel::<SaveMsg>(queue_capacity);
@@ -411,7 +414,7 @@ pub fn index_packages(
         let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
         let engine_cache_key_for_writer = index_engine_cache_key.clone();
         let package_done_writer = on_package_done.clone();
-        let join = std::thread::spawn(move || {
+        let join = thread::spawn(move || {
             let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
                 Ok(database) => Some(database),
                 Err(open_error) => {
@@ -508,23 +511,23 @@ pub fn index_packages(
 
     let hydrate = index_opts.hydrate_cache_hits;
     let process_index = |i: usize, package: &PackageInfo| {
-        if let Some(ref path) = cache_sqlite_path {
-            if let Some(indexed) = try_package_cache_hit(
+        if let Some(ref path) = cache_sqlite_path
+            && let Some(indexed) = try_package_cache_hit(
                 package,
                 path.as_path(),
                 hydrate,
                 index_engine_cache_key.as_str(),
-            ) {
-                *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
-                if let Some(cb) = on_package_done.as_ref() {
-                    cb(PackageProgress {
-                        name: package.name.clone(),
-                        version: package.version.clone(),
-                        source: GraphSource::Cached,
-                    });
-                }
-                return;
+            )
+        {
+            *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
+            if let Some(cb) = on_package_done.as_ref() {
+                cb(PackageProgress {
+                    name: package.name.clone(),
+                    version: package.version.clone(),
+                    source: GraphSource::Cached,
+                });
             }
+            return;
         }
 
         let graph = build_package_graph(package, crawl_options_factory(package));
@@ -584,10 +587,10 @@ pub fn index_packages(
 
     drop(save_tx_shared);
 
-    if let Some(join) = writer_join {
-        if let Err(join_error) = join.join() {
-            std::panic::resume_unwind(join_error);
-        }
+    if let Some(join) = writer_join
+        && let Err(join_error) = join.join()
+    {
+        panic::resume_unwind(join_error);
     }
 
     Arc::try_unwrap(results)

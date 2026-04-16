@@ -12,6 +12,7 @@
     "test:watch": "turbo run test:watch",
     "nci:sync-npm-version": "tsx scripts/sync-npm-version.ts",
     "rust:fmt:check": "cargo fmt --all -- --check",
+    "rust:clippy": "cargo clippy --workspace --all-targets -- -D warnings",
     "rust:test:snapshots": "cargo test -p nci-engine --test snapshot_tests",
     "prepare": "husky"
   },

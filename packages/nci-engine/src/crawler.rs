@@ -961,6 +961,7 @@ mod tests {
     use std::collections::HashSet;
     use std::fs;
     use std::path::PathBuf;
+    use std::slice;
     use std::sync::Arc;
     use tempfile::TempDir;
 
@@ -1128,7 +1129,7 @@ mod tests {
             "import type { StubExported } from \"stub-npm-pkg\";\nexport declare function useStub(x: StubExported): void;\n",
         );
 
-        let baseline = crawl(&[entry.clone()], None);
+        let baseline = crawl(slice::from_ref(&entry), None);
         assert!(
             baseline
                 .visited_files
@@ -1203,7 +1204,7 @@ mod tests {
         stub_roots.insert("self-stub-pkg".to_string());
 
         let blocked = crawl(
-            &[entry.clone()],
+            slice::from_ref(&entry),
             Some(CrawlOptions {
                 dependency_stub_roots: Arc::new(stub_roots.clone()),
                 dependency_stub_self_exempt_root: None,
@@ -1259,7 +1260,7 @@ mod tests {
     #[test]
     fn crawl_unlimited_max_hops_matches_default_for_deep_chain() {
         let entry = hop_limit_chain_entry();
-        let baseline = crawl(&[entry.clone()], None);
+        let baseline = crawl(slice::from_ref(&entry), None);
         let unlimited = crawl(
             &[entry],
             Some(CrawlOptions {
