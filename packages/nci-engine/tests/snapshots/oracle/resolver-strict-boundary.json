@@ -9,7 +9,7 @@
       "kindName": "VariableStatement",
       "package": "resolver-strict-boundary",
       "filePath": "index.d.ts",
-      "signature": "declare const result: any",
+      "signature": "declare const result: number",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

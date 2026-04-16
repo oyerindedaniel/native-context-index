@@ -677,12 +677,16 @@ fn extract_export_default<'a>(
             }
         }
         ExportDefaultDeclarationKind::ClassDeclaration(class_decl) => {
-            if let Some(id) = &class_decl.id {
-                let class_name = SharedString::from(id.name.to_string());
-                let signature = get_span_text(source_text, class_decl.span);
-                let jsdoc = extract_jsdoc_from_leading_comments(source_text, class_decl.span);
-                let dependencies = extract_type_refs_from_class(class_decl);
-                let heritage = extract_heritage_from_class(source_text, class_decl);
+            let class_name = class_decl
+                .id
+                .as_ref()
+                .map(|ident| SharedString::from(ident.name.to_string()))
+                .unwrap_or_else(|| name.clone());
+            let signature = get_span_text(source_text, class_decl.span);
+            let jsdoc = extract_jsdoc_from_leading_comments(source_text, class_decl.span);
+            let dependencies = extract_type_refs_from_class(class_decl);
+            let heritage = extract_heritage_from_class(source_text, class_decl);
+            if class_decl.id.is_some() {
                 exports.push(ParsedExport {
                     name: class_name.clone(),
                     kind: SymbolKind::Class,
@@ -695,17 +699,17 @@ fn extract_export_default<'a>(
                     heritage: heritage.into(),
                     ..Default::default()
                 });
-                extract_class_members(
-                    class_decl,
-                    source_text,
-                    current_file,
-                    class_name.as_ref(),
-                    false,
-                    &jsdoc,
-                    exports,
-                    local_decls,
-                );
             }
+            extract_class_members(
+                class_decl,
+                source_text,
+                current_file,
+                class_name.as_ref(),
+                true,
+                &jsdoc,
+                exports,
+                local_decls,
+            );
         }
         ExportDefaultDeclarationKind::TSInterfaceDeclaration(iface_decl) => {
             let iface_name = SharedString::from(iface_decl.id.name.to_string());

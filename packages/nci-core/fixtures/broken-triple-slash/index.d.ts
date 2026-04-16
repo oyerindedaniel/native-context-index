@@ -1,2 +1,2 @@
 /// <reference path="./non-existent.d.ts" />
-export const x = 1;
+export const x: 1;

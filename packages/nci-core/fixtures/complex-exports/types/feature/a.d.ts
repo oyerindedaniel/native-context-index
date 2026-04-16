@@ -1,1 +1,1 @@
-export const featureA = true;
+export const featureA: true;

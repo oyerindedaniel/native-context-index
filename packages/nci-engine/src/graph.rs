@@ -201,12 +201,12 @@ fn build_abs_to_rel_map_for_visited(
     package_dir_str: &str,
     normalized_pkg_dir: &str,
 ) -> HashMap<SharedString, SharedString> {
-    let mut m = HashMap::with_capacity(visited_files.len());
+    let mut absolute_to_relative = HashMap::with_capacity(visited_files.len());
     for abs in visited_files {
         let rel = make_relative_to_package(abs.as_ref(), package_dir_str, normalized_pkg_dir);
-        m.insert(abs.clone(), SharedString::from(rel.as_str()));
+        absolute_to_relative.insert(abs.clone(), SharedString::from(rel.as_str()));
     }
-    m
+    absolute_to_relative
 }
 
 #[inline]
@@ -1970,6 +1970,44 @@ mod tests {
             .expect("ScriptPair.beta symbol should exist");
         assert_eq!(script_alpha.parent_symbol_id.as_ref(), Some(&script_pair_id));
         assert_eq!(script_beta.parent_symbol_id.as_ref(), Some(&script_pair_id));
+    }
+
+    #[test]
+    fn parser_edge_case_emits_default_class_member_rows() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join("parser-edge-case");
+        let info = PackageInfo {
+            name: "parser-edge-case".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(&fixture),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+
+        let default_class = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| {
+                symbol_node.name.as_ref() == "default"
+                    && symbol_node.kind == SymbolKind::Class
+            })
+            .expect("default class symbol should exist");
+
+        let default_key = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| symbol_node.name.as_ref() == "default.prototype.key")
+            .expect("default.prototype.key should exist");
+
+        assert_eq!(default_key.kind, SymbolKind::PropertyDeclaration);
+        assert_eq!(
+            default_key.parent_symbol_id.as_ref(),
+            Some(&default_class.id)
+        );
     }
 
     #[test]

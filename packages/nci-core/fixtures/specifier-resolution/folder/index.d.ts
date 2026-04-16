@@ -1,1 +1,1 @@
-export const folder = 1;
+export const folder: 1;

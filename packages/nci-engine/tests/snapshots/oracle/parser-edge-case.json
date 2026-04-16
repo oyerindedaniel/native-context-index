@@ -9,11 +9,45 @@
       "kindName": "VariableStatement",
       "package": "parser-edge-case",
       "filePath": "index.d.ts",
-      "signature": "declare const localRef: any",
+      "signature": "declare const localRef: \"test\"",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false
+    },
+    {
+      "id": "parser-edge-case@1.0.0::default",
+      "name": "default",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "export default class {\n  readonly key: \"val\";\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "default"
+      ]
+    },
+    {
+      "id": "parser-edge-case@1.0.0::default.prototype.key",
+      "name": "default.prototype.key",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "readonly key: \"val\";",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "parser-edge-case@1.0.0::default"
     },
     {
       "id": "parser-edge-case@1.0.0::MyType",
@@ -55,19 +89,6 @@
       "isInternal": true
     },
     {
-      "id": "parser-edge-case@1.0.0::index.d.ts::default",
-      "name": "default",
-      "kind": 278,
-      "kindName": "ExportAssignment",
-      "package": "parser-edge-case",
-      "filePath": "index.d.ts",
-      "signature": "export default { key: 'val' };",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": true
-    },
-    {
       "id": "parser-edge-case@1.0.0::index.d.ts::TypeA",
       "name": "TypeA",
       "kind": 266,
@@ -99,7 +120,7 @@
       ]
     }
   ],
-  "totalSymbols": 7,
+  "totalSymbols": 8,
   "totalFiles": 1,
   "crawlDurationMs": 0,
   "buildDurationMs": 0

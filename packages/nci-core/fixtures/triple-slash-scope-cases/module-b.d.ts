@@ -1,3 +1,3 @@
 export namespace ModulePair {
-  export const right = 2;
+  export const right: 2;
 }

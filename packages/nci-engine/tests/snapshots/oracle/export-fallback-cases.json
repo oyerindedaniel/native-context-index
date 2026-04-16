@@ -9,7 +9,7 @@
       "kindName": "VariableStatement",
       "package": "final-coverage",
       "filePath": "index.d.ts",
-      "signature": "declare const x: any",
+      "signature": "declare const x: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

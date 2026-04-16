@@ -1,1 +1,1 @@
-export const multi = true;
+export const multi: true;

@@ -1,3 +1,3 @@
 export namespace ModuleReachPair {
-  export const extra = 2;
+  export const extra: 2;
 }

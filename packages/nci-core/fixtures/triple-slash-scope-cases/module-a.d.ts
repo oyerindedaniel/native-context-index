@@ -1,5 +1,5 @@
 export namespace ModulePair {
-  export const left = 1;
+  export const left: 1;
 }
 
 export namespace MixedScope {

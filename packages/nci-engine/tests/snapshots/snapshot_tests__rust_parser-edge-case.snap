@@ -51,17 +51,31 @@ expression: "& rust_graph"
       "isInternal": true
     },
     {
-      "id": "parser-edge-case@1.0.0::index.d.ts::default",
+      "id": "parser-edge-case@1.0.0::default",
       "name": "default",
-      "kind": 278,
-      "kindName": "ExportAssignment",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
       "package": "parser-edge-case",
       "filePath": "index.d.ts",
-      "signature": "export default { key: 'val' };",
+      "signature": "export default class {\n  readonly key: \"val\";\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": false
+    },
+    {
+      "id": "parser-edge-case@1.0.0::default.prototype.key",
+      "name": "default.prototype.key",
+      "parentSymbolId": "parser-edge-case@1.0.0::default",
+      "kind": 173,
+      "kindName": "PropertyDeclaration",
+      "package": "parser-edge-case",
+      "filePath": "index.d.ts",
+      "signature": "readonly key: \"val\";",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
     },
     {
       "id": "parser-edge-case@1.0.0::localRef",
@@ -70,7 +84,7 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "parser-edge-case",
       "filePath": "index.d.ts",
-      "signature": "declare const localRef: any",
+      "signature": "declare const localRef: \"test\"",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
@@ -103,7 +117,7 @@ expression: "& rust_graph"
       "isInternal": false
     }
   ],
-  "totalSymbols": 7,
+  "totalSymbols": 8,
   "totalFiles": 1,
   "crawlDurationMs": 0,
   "buildDurationMs": 0

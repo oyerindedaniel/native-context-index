@@ -41,7 +41,7 @@
       "kindName": "VariableStatement",
       "package": "specifier-resolution",
       "filePath": "mod.d.ts",
-      "signature": "declare const mod: any",
+      "signature": "declare const mod: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

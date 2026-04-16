@@ -1,1 +1,1 @@
-export const root = true;
+export const root: true;

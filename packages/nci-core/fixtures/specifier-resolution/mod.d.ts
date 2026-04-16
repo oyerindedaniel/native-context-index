@@ -1,1 +1,1 @@
-export const mod = 1;
+export const mod: 1;
