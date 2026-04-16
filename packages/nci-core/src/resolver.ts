@@ -12,7 +12,7 @@ import { NODE_BUILTINS } from "./constants.js";
  */
 export function resolveTypesEntry(packageDir: string): PackageEntry {
   const pkgJsonPath = path.join(packageDir, "package.json");
-  const pkg = fs.existsSync(pkgJsonPath) 
+  const pkg = fs.existsSync(pkgJsonPath)
     ? JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"))
     : {};
 
@@ -80,13 +80,17 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
 function resolveAllExports(
   packageDir: string,
   exports: unknown,
-  subpaths: Record<string, string>
+  subpaths: Record<string, string>,
 ): string[] {
   const entries: string[] = [];
   const seen = new Set<string>();
 
   if (typeof exports === "string") {
-    if (exports.endsWith(".d.ts") || exports.endsWith(".d.mts") || exports.endsWith(".d.cts")) {
+    if (
+      exports.endsWith(".d.ts") ||
+      exports.endsWith(".d.mts") ||
+      exports.endsWith(".d.cts")
+    ) {
       const resolved = resolveFile(packageDir, exports);
       if (resolved) {
         entries.push(resolved);
@@ -99,7 +103,9 @@ function resolveAllExports(
   if (typeof exports === "object" && exports !== null) {
     const exportsMap = exports as Record<string, unknown>;
 
-    const hasSubpaths = Object.keys(exportsMap).some((key) => key.startsWith("."));
+    const hasSubpaths = Object.keys(exportsMap).some((key) =>
+      key.startsWith("."),
+    );
 
     if (hasSubpaths) {
       for (const [subpath, value] of Object.entries(exportsMap)) {
@@ -160,10 +166,14 @@ function resolveAllExports(
  */
 function resolveExportCondition(
   packageDir: string,
-  entry: unknown
+  entry: unknown,
 ): string | null {
   if (typeof entry === "string") {
-    if (entry.endsWith(".d.ts") || entry.endsWith(".d.mts") || entry.endsWith(".d.cts")) {
+    if (
+      entry.endsWith(".d.ts") ||
+      entry.endsWith(".d.mts") ||
+      entry.endsWith(".d.cts")
+    ) {
       return resolveFile(packageDir, entry);
     }
     return null;
@@ -222,7 +232,7 @@ function resolveExportCondition(
  */
 function resolveTypesVersions(
   packageDir: string,
-  typesVersions: Record<string, Record<string, string[]>>
+  typesVersions: Record<string, Record<string, string[]>>,
 ): string | null {
   const currentVersion = ts.version;
 
@@ -272,7 +282,6 @@ function matchesVersionRange(version: string, range: string): boolean {
   return false;
 }
 
-
 /**
  * Resolves a relative file path against the package root and verifies its existence.
  *
@@ -285,7 +294,6 @@ function resolveFile(packageDir: string, relativePath: string): string | null {
   return isFileSafe(absPath) ? normalizePath(absPath) : null;
 }
 
-
 /**
  * Expands a wildcard export pattern (e.g., "./*") into a list of absolute .d.ts files.
  * Iterates through the filesystem based on the provided pattern template.
@@ -294,10 +302,7 @@ function resolveFile(packageDir: string, relativePath: string): string | null {
  * @param value The raw wildcard pattern or conditional object containing it.
  * @returns Array of absolute paths matching the expanded wildcard.
  */
-function expandWildcardSubpath(
-  packageDir: string,
-  value: unknown
-): string[] {
+function expandWildcardSubpath(packageDir: string, value: unknown): string[] {
   const matchingEntries: string[] = [];
 
   const pattern = extractWildcardPattern(value);
@@ -307,7 +312,10 @@ function expandWildcardSubpath(
   const beforeFirstStar = pattern.slice(0, firstStarIndex);
   const lastSlashBeforeStar = beforeFirstStar.lastIndexOf("/");
 
-  const dirPart = lastSlashBeforeStar >= 0 ? beforeFirstStar.slice(0, lastSlashBeforeStar) : ".";
+  const dirPart =
+    lastSlashBeforeStar >= 0
+      ? beforeFirstStar.slice(0, lastSlashBeforeStar)
+      : ".";
   const scanDirectory = path.resolve(packageDir, dirPart);
 
   if (!fs.existsSync(scanDirectory)) return matchingEntries;
@@ -316,10 +324,17 @@ function expandWildcardSubpath(
   const fileCandidates = scanDirectoryRecursive(scanDirectory);
 
   for (const candidatePath of fileCandidates) {
-    const relativeToPackage = path.relative(packageDir, candidatePath).replace(/\\/g, "/");
-    const normalizedRelative = relativeToPackage.startsWith("./") ? relativeToPackage : `./${relativeToPackage}`;
+    const relativeToPackage = path
+      .relative(packageDir, candidatePath)
+      .replace(/\\/g, "/");
+    const normalizedRelative = relativeToPackage.startsWith("./")
+      ? relativeToPackage
+      : `./${relativeToPackage}`;
 
-    if (globRegex.test(normalizedRelative) || globRegex.test(relativeToPackage)) {
+    if (
+      globRegex.test(normalizedRelative) ||
+      globRegex.test(relativeToPackage)
+    ) {
       if (
         candidatePath.endsWith(".d.ts") ||
         candidatePath.endsWith(".d.mts") ||
@@ -346,7 +361,6 @@ function globToRegExp(pattern: string): RegExp {
   const regexStr = escaped.replace(/\*/g, "([^/]+)"); // * matches anything except /
   return new RegExp(`^${regexStr}$`);
 }
-
 
 /**
  * Scans a directory recursively to identify all candidate files for pattern matching.
@@ -397,9 +411,12 @@ function extractWildcardPattern(value: unknown): string | null {
  */
 export function resolveModuleSpecifier(
   specifier: string,
-  currentFile: string
+  currentFile: string,
 ): string[] {
-  if ((specifier.includes(":") || NODE_BUILTINS.has(specifier)) && !specifier.startsWith(".")) {
+  if (
+    (specifier.includes(":") || NODE_BUILTINS.has(specifier)) &&
+    !specifier.startsWith(".")
+  ) {
     return [specifier];
   }
 
@@ -442,7 +459,6 @@ export function resolveModuleSpecifier(
 
   return resolvePackageEntry(specifier, currentFile);
 }
-
 
 /** Resolve a package-level entry point from node_modules. */
 function resolvePackageEntry(specifier: string, currentFile: string): string[] {
@@ -500,7 +516,6 @@ function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   return [];
 }
 
-
 /**
  * Matches a target subpath (e.g. "./utils/math") against a wildcard export map.
  * Performs replacement of capturing groups into the target path template.
@@ -509,7 +524,10 @@ function resolvePackageEntry(specifier: string, currentFile: string): string[] {
  * @param exports The raw exports map.
  * @returns The resulting mapped value or null if no match is found.
  */
-function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null {
+function matchWildcardSubpath(
+  subpath: string,
+  exports: unknown,
+): unknown | null {
   if (typeof exports !== "object" || exports === null) return null;
 
   const exportsMap = exports as Record<string, unknown>;
@@ -524,7 +542,10 @@ function matchWildcardSubpath(subpath: string, exports: unknown): unknown | null
     const suffix = keyParts[1]!;
 
     if (subpath.startsWith(prefix) && subpath.endsWith(suffix)) {
-      const captured = subpath.slice(prefix.length, subpath.length - suffix.length);
+      const captured = subpath.slice(
+        prefix.length,
+        subpath.length - suffix.length,
+      );
 
       if (typeof value === "string") {
         return value.replace("*", captured);
@@ -551,7 +572,7 @@ function replaceWildcardInValue(value: unknown, replacement: string): unknown {
     return value.replace("*", replacement);
   }
   if (Array.isArray(value)) {
-    return value.map(item => replaceWildcardInValue(item, replacement));
+    return value.map((item) => replaceWildcardInValue(item, replacement));
   }
   if (typeof value === "object" && value !== null) {
     const result: Record<string, unknown> = {};

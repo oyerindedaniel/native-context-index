@@ -49,7 +49,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
         const pkgDir = fs.realpathSync(symlinkPath);
         const info = readPackageInfo(
           pkgDir,
-          `${entry.name}/${scopedEntry.name}`
+          `${entry.name}/${scopedEntry.name}`,
         );
         if (info) {
           packages.push(info);
@@ -72,7 +72,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
 /** Read and parse package.json from a directory to extract core metadata. */
 function readPackageInfo(
   pkgDir: string,
-  fallbackName: string
+  fallbackName: string,
 ): PackageInfo | null {
   const pkgJsonPath = path.join(pkgDir, "package.json");
 

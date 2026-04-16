@@ -18,7 +18,7 @@ function readPkgVersion(): string {
 
 const nciSqlDescription =
   "Run read-only SQL against an NCI SQLite database (same as `nci sql`). " +
-  "With `--format json` (default), stdout is a **raw JSON array** of row objects — not wrapped in {\"ok\":...}. " +
+  'With `--format json` (default), stdout is a **raw JSON array** of row objects — not wrapped in {"ok":...}. ' +
   "Use schema: true to print table DDL instead of running SQL.";
 
 const nciSqlInputSchema = z
@@ -35,7 +35,9 @@ const nciSqlInputSchema = z
     sql_parts: z
       .array(z.string())
       .optional()
-      .describe("Extra words joined as SQL after command; use when SQL starts with '-' (passed after --)"),
+      .describe(
+        "Extra words joined as SQL after command; use when SQL starts with '-' (passed after --)",
+      ),
     max_rows: z
       .number()
       .int()
@@ -91,7 +93,13 @@ const nciQueryInputSchema = z.discriminatedUnion("subcommand", [
 ]);
 
 function buildSqlArgv(input: z.infer<typeof nciSqlInputSchema>): string[] {
-  const args: string[] = ["--database", input.database, "--format", input.format, "sql"];
+  const args: string[] = [
+    "--database",
+    input.database,
+    "--format",
+    input.format,
+    "sql",
+  ];
   if (input.schema) {
     args.push("--schema");
   }

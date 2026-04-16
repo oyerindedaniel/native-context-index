@@ -160,9 +160,7 @@ fn write_minimal_pkg(root: &Path, name: &str, version: &str) {
     fs::create_dir_all(&pkg).unwrap();
     fs::write(
         pkg.join("package.json"),
-        format!(
-            r#"{{"name":"{name}","version":"{version}","types":"./index.d.ts"}}"#
-        ),
+        format!(r#"{{"name":"{name}","version":"{version}","types":"./index.d.ts"}}"#),
     )
     .unwrap();
     fs::write(pkg.join("index.d.ts"), "export declare const x: number;\n").unwrap();
@@ -377,12 +375,7 @@ fn index_one_package_smoke() {
 
     nci_cmd()
         .current_dir(proj.path())
-        .args([
-            "query",
-            "--database",
-            db_path.to_str().unwrap(),
-            "packages",
-        ])
+        .args(["query", "--database", db_path.to_str().unwrap(), "packages"])
         .assert()
         .success()
         .stdout(predicate::str::contains("smoke-pkg"));

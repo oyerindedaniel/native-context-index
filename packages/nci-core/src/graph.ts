@@ -8,7 +8,11 @@ import type {
   ResolvedSymbol,
 } from "./types.js";
 import { NODE_BUILTINS } from "./constants.js";
-import { resolveTypesEntry, resolveModuleSpecifier, normalizePath } from "./resolver.js";
+import {
+  resolveTypesEntry,
+  resolveModuleSpecifier,
+  normalizePath,
+} from "./resolver.js";
 import { npmPackageRoot } from "./npm-package-root.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
@@ -19,7 +23,7 @@ import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
 function specifierMatchesDependencyStubRoots(
   specifier: string,
   stubRoots: ReadonlySet<string>,
-  selfStubExemptRoot: string | null
+  selfStubExemptRoot: string | null,
 ): boolean {
   const root = npmPackageRoot(specifier);
   if (root === null) {
@@ -47,7 +51,7 @@ function ufUnion(parent: number[], indexA: number, indexB: number): void {
 
 function fuseMergedSignatures(
   existing: string | undefined,
-  incoming: string | undefined
+  incoming: string | undefined,
 ): string | undefined {
   if (incoming === undefined) return existing;
   if (existing === undefined) return incoming;
@@ -63,7 +67,7 @@ function computeMergeScopeIds(
   tripleSlash: Record<string, string[]>,
   fileIsExternalModule: Record<string, boolean>,
   packageDir: string,
-  absoluteToPackageRelativeFromCrawl?: Record<string, string>
+  absoluteToPackageRelativeFromCrawl?: Record<string, string>,
 ): [Map<string, string>, Map<string, string>] {
   const absToRel = new Map<string, string>();
   const scriptAbs: string[] = [];
@@ -72,7 +76,8 @@ function computeMergeScopeIds(
   const moduleIndex = new Map<string, number>();
   for (const abs of visitedFiles) {
     const rel =
-      absoluteToPackageRelativeFromCrawl?.[abs] ?? makePackageRelativePath(abs, packageDir);
+      absoluteToPackageRelativeFromCrawl?.[abs] ??
+      makePackageRelativePath(abs, packageDir);
     absToRel.set(abs, rel);
     const isExternalModule = fileIsExternalModule[abs] ?? true;
     if (isExternalModule) {
@@ -159,7 +164,7 @@ function computeMergeScopeIds(
 /** Build a symbol graph for a single package. */
 export function buildPackageGraph(
   packageInfo: PackageInfo,
-  crawlOptions?: CrawlOptions
+  crawlOptions?: CrawlOptions,
 ): PackageGraph {
   const profiling = nciProfileEnabled();
   const startTime = performance.now();
@@ -212,7 +217,9 @@ export function buildPackageGraph(
   const visited = new Set(crawlResult.visitedFiles);
 
   const entryFiles = new Set(
-    entry.typesEntries.map((entryFilePath) => makePackageRelativePath(entryFilePath, packageInfo.dir))
+    entry.typesEntries.map((entryFilePath) =>
+      makePackageRelativePath(entryFilePath, packageInfo.dir),
+    ),
   );
 
   const merged = new Map<string, SymbolNode>();
@@ -222,15 +229,17 @@ export function buildPackageGraph(
     crawlResult.tripleSlashReferenceTargets,
     crawlResult.fileIsExternalModule,
     packageInfo.dir,
-    crawlResult.absoluteToPackageRelative
+    crawlResult.absoluteToPackageRelative,
   );
   const moduleIdenticalFold = new Map<string, string>();
 
   const isInterfaceOrTypeAliasMergeScoped = (kind: ts.SyntaxKind): boolean =>
-    kind === ts.SyntaxKind.InterfaceDeclaration || kind === ts.SyntaxKind.TypeAliasDeclaration;
+    kind === ts.SyntaxKind.InterfaceDeclaration ||
+    kind === ts.SyntaxKind.TypeAliasDeclaration;
 
   const isNamespaceOrEnumCrossFileMergeable = (kind: ts.SyntaxKind): boolean =>
-    kind === ts.SyntaxKind.ModuleDeclaration || kind === ts.SyntaxKind.EnumDeclaration;
+    kind === ts.SyntaxKind.ModuleDeclaration ||
+    kind === ts.SyntaxKind.EnumDeclaration;
 
   const isOverloadMergeable = (kind: ts.SyntaxKind): boolean =>
     kind === ts.SyntaxKind.MethodSignature ||
@@ -240,14 +249,17 @@ export function buildPackageGraph(
 
   const entryVisibilityContributions = (
     resolved: ResolvedSymbol,
-    symbolFilePath: string
+    symbolFilePath: string,
   ): string[] => {
     const visibility: string[] = [];
     if (entryFiles.has(symbolFilePath)) {
       visibility.push(symbolFilePath);
     }
     if (resolved.resolvedFromPackageEntry) {
-      const rel = makePackageRelativePath(resolved.resolvedFromPackageEntry, packageInfo.dir);
+      const rel = makePackageRelativePath(
+        resolved.resolvedFromPackageEntry,
+        packageInfo.dir,
+      );
       if (entryFiles.has(rel) && !visibility.includes(rel)) {
         visibility.push(rel);
       }
@@ -266,7 +278,7 @@ export function buildPackageGraph(
     existing: SymbolNode,
     resolved: ResolvedSymbol,
     symbolFilePath: string,
-    isEntryFile: boolean
+    isEntryFile: boolean,
   ): void {
     if (symbolFilePath !== existing.filePath) {
       existing.additionalFiles = existing.additionalFiles || [];
@@ -290,9 +302,15 @@ export function buildPackageGraph(
       }
     }
 
-    existing.signature = fuseMergedSignatures(existing.signature, resolved.signature);
+    existing.signature = fuseMergedSignatures(
+      existing.signature,
+      resolved.signature,
+    );
 
-    for (const visPath of entryVisibilityContributions(resolved, symbolFilePath)) {
+    for (const visPath of entryVisibilityContributions(
+      resolved,
+      symbolFilePath,
+    )) {
       existing.entryVisibility = existing.entryVisibility || [];
       if (!existing.entryVisibility.includes(visPath)) {
         existing.entryVisibility.push(visPath);
@@ -302,7 +320,9 @@ export function buildPackageGraph(
     if (resolved.dependencies && resolved.dependencies.length > 0) {
       existing.rawDependencies = existing.rawDependencies || [];
       const existingDeps = new Set(
-        existing.rawDependencies.map((dep) => `${dep.name}::${dep.importPath || ""}`)
+        existing.rawDependencies.map(
+          (dep) => `${dep.name}::${dep.importPath || ""}`,
+        ),
       );
       for (const rawDep of resolved.dependencies) {
         const depKey = `${rawDep.name}::${rawDep.importPath || ""}`;
@@ -313,10 +333,13 @@ export function buildPackageGraph(
       }
     }
 
-    if (resolved.deprecated && !existing.deprecated) existing.deprecated = resolved.deprecated;
-    if (resolved.visibility && !existing.visibility) existing.visibility = resolved.visibility;
+    if (resolved.deprecated && !existing.deprecated)
+      existing.deprecated = resolved.deprecated;
+    if (resolved.visibility && !existing.visibility)
+      existing.visibility = resolved.visibility;
     if (resolved.since && !existing.since) existing.since = resolved.since;
-    if (resolved.modifiers && !existing.modifiers) existing.modifiers = resolved.modifiers;
+    if (resolved.modifiers && !existing.modifiers)
+      existing.modifiers = resolved.modifiers;
     if (resolved.isGlobalAugmentation) existing.isGlobalAugmentation = true;
   }
 
@@ -330,10 +353,12 @@ export function buildPackageGraph(
 
     let mergeKey: string;
     if (isInterfaceOrTypeAliasMergeScoped(resolved.kind)) {
-      const scopeKey = mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
+      const scopeKey =
+        mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
       mergeKey = `${scopeKey}::${resolved.name}::${resolved.kind}`;
     } else if (isNamespaceOrEnumCrossFileMergeable(resolved.kind)) {
-      const scopeKey = mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
+      const scopeKey =
+        mergeScopeByRel.get(symbolFilePath) ?? `m:${symbolFilePath}`;
       mergeKey = `${scopeKey}::${resolved.name}::${resolved.kind}`;
     } else if (isOverloadMergeable(resolved.kind)) {
       mergeKey = `${resolved.name}::${resolved.kind}::${normSig}`;
@@ -350,8 +375,16 @@ export function buildPackageGraph(
       const canonKey = moduleIdenticalFold.get(foldKey);
       if (canonKey !== undefined) {
         const foldExisting = merged.get(canonKey);
-        if (foldExisting !== undefined && foldExisting.filePath !== symbolFilePath) {
-          mergeContribution(foldExisting, resolved, symbolFilePath, isEntryFile);
+        if (
+          foldExisting !== undefined &&
+          foldExisting.filePath !== symbolFilePath
+        ) {
+          mergeContribution(
+            foldExisting,
+            resolved,
+            symbolFilePath,
+            isEntryFile,
+          );
           continue;
         }
       }
@@ -381,7 +414,8 @@ export function buildPackageGraph(
         rawDependencies: resolved.dependencies,
         isInternal: resolved.isInternal,
         isGlobalAugmentation: resolved.isGlobalAugmentation,
-        reExportedFrom: reExportSource !== symbolFilePath ? reExportSource : undefined,
+        reExportedFrom:
+          reExportSource !== symbolFilePath ? reExportSource : undefined,
         deprecated: resolved.deprecated,
         visibility: resolved.visibility,
         since: resolved.since,
@@ -420,7 +454,8 @@ export function buildPackageGraph(
 
     if (symbolNode.isInternal) {
       const internalFileNameKey = `${symbolNode.filePath}::${symbolNode.name}`;
-      const internalOccurrenceCount = (internalFileNameCount.get(internalFileNameKey) ?? 0) + 1;
+      const internalOccurrenceCount =
+        (internalFileNameCount.get(internalFileNameKey) ?? 0) + 1;
       internalFileNameCount.set(internalFileNameKey, internalOccurrenceCount);
       symbolNode.id =
         internalOccurrenceCount === 1
@@ -455,12 +490,18 @@ export function buildPackageGraph(
     }
   }
   for (const symbolNode of symbols) {
-    if (symbolNode.kind === ts.SyntaxKind.ClassDeclaration && !nameToId.has(symbolNode.name)) {
+    if (
+      symbolNode.kind === ts.SyntaxKind.ClassDeclaration &&
+      !nameToId.has(symbolNode.name)
+    ) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
   for (const symbolNode of symbols) {
-    if (symbolNode.kind === ts.SyntaxKind.ModuleDeclaration && !nameToId.has(symbolNode.name)) {
+    if (
+      symbolNode.kind === ts.SyntaxKind.ModuleDeclaration &&
+      !nameToId.has(symbolNode.name)
+    ) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
@@ -510,7 +551,10 @@ export function buildPackageGraph(
   const stubSelfExemptForResolve = stubSelfExemptRoot;
   const moduleSpecifierCache = new Map<string, string[]>();
   const absPathCache = new Map<string, string>();
-  const importsByNameCache = new Map<string, Map<string, { source: string; originalName?: string }>>();
+  const importsByNameCache = new Map<
+    string,
+    Map<string, { source: string; originalName?: string }>
+  >();
 
   function getCachedAbsPath(relFilePath: string): string {
     let cached = absPathCache.get(relFilePath);
@@ -521,24 +565,35 @@ export function buildPackageGraph(
     return cached;
   }
 
-  function getCachedModuleSpecifier(specifier: string, fromRelFile: string): string[] {
+  function getCachedModuleSpecifier(
+    specifier: string,
+    fromRelFile: string,
+  ): string[] {
     const cacheKey = `${fromRelFile}\0${specifier}`;
     let cached = moduleSpecifierCache.get(cacheKey);
     if (cached === undefined) {
-      cached = resolveModuleSpecifier(specifier, path.join(packageInfo.dir, fromRelFile));
+      cached = resolveModuleSpecifier(
+        specifier,
+        path.join(packageInfo.dir, fromRelFile),
+      );
       moduleSpecifierCache.set(cacheKey, cached);
     }
     return cached;
   }
 
-  function getImportsByName(absFilePath: string): Map<string, { source: string; originalName?: string }> {
+  function getImportsByName(
+    absFilePath: string,
+  ): Map<string, { source: string; originalName?: string }> {
     let cached = importsByNameCache.get(absFilePath);
     if (cached === undefined) {
       cached = new Map();
       const fileImports = allImportsPerFile[absFilePath] || [];
       for (const imp of fileImports) {
         if (!cached.has(imp.name)) {
-          cached.set(imp.name, { source: imp.source, originalName: imp.originalName });
+          cached.set(imp.name, {
+            source: imp.source,
+            originalName: imp.originalName,
+          });
         }
       }
       importsByNameCache.set(absFilePath, cached);
@@ -550,25 +605,37 @@ export function buildPackageGraph(
     const isBuiltin = NODE_BUILTINS.has(importPath);
     if (!isBuiltin && !protocolRegex.test(importPath)) return null;
     const match = importPath.match(protocolRegex);
-    const protocol = isBuiltin ? "node" : (match ? match[1] : "unknown");
+    const protocol = isBuiltin ? "node" : match ? match[1] : "unknown";
     const source = isBuiltin
       ? importPath
-      : (match && match[2] ? (match[2].startsWith("//") ? match[2].slice(2) : match[2]) : "unknown");
+      : match && match[2]
+        ? match[2].startsWith("//")
+          ? match[2].slice(2)
+          : match[2]
+        : "unknown";
     return `${protocol}::${source}::${depName}`;
   }
 
   /** `Foo.Bar.Baz` with `import * as Foo` → qualifier `Foo`, member path `Bar.Baz`. */
-  function splitImportNamespaceMember(qualifiedName: string): { qualifier: string; memberPath: string } | null {
+  function splitImportNamespaceMember(
+    qualifiedName: string,
+  ): { qualifier: string; memberPath: string } | null {
     const dot = qualifiedName.indexOf(".");
     if (dot <= 0 || dot === qualifiedName.length - 1) return null;
-    return { qualifier: qualifiedName.slice(0, dot), memberPath: qualifiedName.slice(dot + 1) };
+    return {
+      qualifier: qualifiedName.slice(0, dot),
+      memberPath: qualifiedName.slice(dot + 1),
+    };
   }
 
   /**
    * Edge id for a dependency that is not indexed in this package graph: `npm::specifier::memberPath`.
    * Relative specifiers return null (caller resolves via visited files / imports only).
    */
-  function resolveExternalModuleStubId(specifier: string, memberName: string): string | null {
+  function resolveExternalModuleStubId(
+    specifier: string,
+    memberName: string,
+  ): string | null {
     const proto = resolveProtocol(specifier, memberName);
     if (proto) return proto;
     if (specifier.startsWith(".") || specifier.startsWith("/")) return null;
@@ -586,7 +653,9 @@ export function buildPackageGraph(
       const symAbsPath = getCachedAbsPath(symbolNode.filePath);
 
       for (const rawDep of symbolNode.rawDependencies) {
-        const namespaceQual = !rawDep.importPath ? splitImportNamespaceMember(rawDep.name) : null;
+        const namespaceQual = !rawDep.importPath
+          ? splitImportNamespaceMember(rawDep.name)
+          : null;
         let targetIds: string[] = [];
         const namespaceFallbackRoots: string[] = [];
 
@@ -596,10 +665,13 @@ export function buildPackageGraph(
               specifierMatchesDependencyStubRoots(
                 rawDep.importPath,
                 dependencyStubRootsRef,
-                stubSelfExemptForResolve
+                stubSelfExemptForResolve,
               )
             ) {
-              const stubOnly = resolveExternalModuleStubId(rawDep.importPath, rawDep.name);
+              const stubOnly = resolveExternalModuleStubId(
+                rawDep.importPath,
+                rawDep.name,
+              );
               if (stubOnly) {
                 resolvedIds.add(stubOnly);
                 continue;
@@ -613,13 +685,14 @@ export function buildPackageGraph(
                 specifierMatchesDependencyStubRoots(
                   stubMatchingImport.source,
                   dependencyStubRootsRef,
-                  stubSelfExemptForResolve
+                  stubSelfExemptForResolve,
                 )
               ) {
-                const originalStubName = stubMatchingImport.originalName || rawDep.name;
+                const originalStubName =
+                  stubMatchingImport.originalName || rawDep.name;
                 const stubOnly = resolveExternalModuleStubId(
                   stubMatchingImport.source,
-                  originalStubName
+                  originalStubName,
                 );
                 if (stubOnly) {
                   resolvedIds.add(stubOnly);
@@ -628,18 +701,20 @@ export function buildPackageGraph(
               }
             }
             if (namespaceQual) {
-              const stubNsImport = importMapForStub.get(namespaceQual.qualifier);
+              const stubNsImport = importMapForStub.get(
+                namespaceQual.qualifier,
+              );
               if (
                 stubNsImport &&
                 specifierMatchesDependencyStubRoots(
                   stubNsImport.source,
                   dependencyStubRootsRef,
-                  stubSelfExemptForResolve
+                  stubSelfExemptForResolve,
                 )
               ) {
                 const stubOnly = resolveExternalModuleStubId(
                   stubNsImport.source,
-                  namespaceQual.memberPath
+                  namespaceQual.memberPath,
                 );
                 if (stubOnly) {
                   resolvedIds.add(stubOnly);
@@ -651,25 +726,39 @@ export function buildPackageGraph(
         }
 
         if (rawDep.importPath) {
-          const absPaths = getCachedModuleSpecifier(rawDep.importPath, symbolNode.filePath);
+          const absPaths = getCachedModuleSpecifier(
+            rawDep.importPath,
+            symbolNode.filePath,
+          );
           if (absPaths.length > 0) {
-            const relPath = makePackageRelativePath(absPaths[0]!, packageInfo.dir);
+            const relPath = makePackageRelativePath(
+              absPaths[0]!,
+              packageInfo.dir,
+            );
             targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
           }
         } else {
           let namespaceTargetFilesResolved = false;
-          targetIds = fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
+          targetIds =
+            fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
 
           if (targetIds.length === 0) {
             const importMap = getImportsByName(symAbsPath);
             const matchingImport = importMap.get(rawDep.name);
 
             if (matchingImport) {
-              const absSourcePaths = getCachedModuleSpecifier(matchingImport.source, symbolNode.filePath);
+              const absSourcePaths = getCachedModuleSpecifier(
+                matchingImport.source,
+                symbolNode.filePath,
+              );
               if (absSourcePaths.length > 0) {
-                const relSourcePath = makePackageRelativePath(absSourcePaths[0]!, packageInfo.dir);
+                const relSourcePath = makePackageRelativePath(
+                  absSourcePaths[0]!,
+                  packageInfo.dir,
+                );
                 const originalName = matchingImport.originalName || rawDep.name;
-                targetIds = fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
+                targetIds =
+                  fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
               }
             }
           }
@@ -677,15 +766,28 @@ export function buildPackageGraph(
             const importMap = getImportsByName(symAbsPath);
             const nsImport = importMap.get(namespaceQual.qualifier);
             if (nsImport) {
-              const absSourcePaths = getCachedModuleSpecifier(nsImport.source, symbolNode.filePath);
+              const absSourcePaths = getCachedModuleSpecifier(
+                nsImport.source,
+                symbolNode.filePath,
+              );
               namespaceTargetFilesResolved = absSourcePaths.length > 0;
               for (const resolvedAbsPath of absSourcePaths) {
-                const relativeForRoot = makePackageRelativePath(resolvedAbsPath, packageInfo.dir);
-                namespaceFallbackRoots.push(path.posix.dirname(relativeForRoot));
+                const relativeForRoot = makePackageRelativePath(
+                  resolvedAbsPath,
+                  packageInfo.dir,
+                );
+                namespaceFallbackRoots.push(
+                  path.posix.dirname(relativeForRoot),
+                );
               }
               for (const resolvedAbsPath of absSourcePaths) {
-                const relSourcePath = makePackageRelativePath(resolvedAbsPath, packageInfo.dir);
-                for (const symbolId of fileLocalToIds.get(`${relSourcePath}::${namespaceQual.memberPath}`) || []) {
+                const relSourcePath = makePackageRelativePath(
+                  resolvedAbsPath,
+                  packageInfo.dir,
+                );
+                for (const symbolId of fileLocalToIds.get(
+                  `${relSourcePath}::${namespaceQual.memberPath}`,
+                ) || []) {
                   targetIds.push(symbolId);
                 }
               }
@@ -695,13 +797,20 @@ export function buildPackageGraph(
             const closure = getCachedClosure(symbolNode.filePath);
             const fromClosure = new Set<string>();
             for (const reachableFileAbs of closure) {
-              const rel = makePackageRelativePath(reachableFileAbs, packageInfo.dir);
+              const rel = makePackageRelativePath(
+                reachableFileAbs,
+                packageInfo.dir,
+              );
               if (rel === symbolNode.filePath) continue;
-              for (const symbolId of fileLocalToIds.get(`${rel}::${rawDep.name}`) || []) {
+              for (const symbolId of fileLocalToIds.get(
+                `${rel}::${rawDep.name}`,
+              ) || []) {
                 fromClosure.add(symbolId);
               }
               if (namespaceQual) {
-                for (const symbolId of fileLocalToIds.get(`${rel}::${namespaceQual.memberPath}`) || []) {
+                for (const symbolId of fileLocalToIds.get(
+                  `${rel}::${namespaceQual.memberPath}`,
+                ) || []) {
                   fromClosure.add(symbolId);
                 }
               }
@@ -711,22 +820,29 @@ export function buildPackageGraph(
           if (targetIds.length === 0) {
             targetIds = nameToIds.get(rawDep.name) || [];
           }
-          if (targetIds.length === 0 && namespaceQual && namespaceTargetFilesResolved) {
+          if (
+            targetIds.length === 0 &&
+            namespaceQual &&
+            namespaceTargetFilesResolved
+          ) {
             let candidates = nameToIds.get(namespaceQual.memberPath) || [];
             const skipNamespaceRootFilter =
               namespaceFallbackRoots.length === 0 ||
               namespaceFallbackRoots.some(
-                (namespaceRootDir) => namespaceRootDir === "." || namespaceRootDir === ""
+                (namespaceRootDir) =>
+                  namespaceRootDir === "." || namespaceRootDir === "",
               );
             if (!skipNamespaceRootFilter) {
-              const distinctNamespaceRoots = [...new Set(namespaceFallbackRoots)];
+              const distinctNamespaceRoots = [
+                ...new Set(namespaceFallbackRoots),
+              ];
               candidates = candidates.filter((candidateId) => {
                 const definingFilePath = idToFilePath.get(candidateId);
                 if (!definingFilePath) return false;
                 return distinctNamespaceRoots.some(
                   (namespaceRootDir) =>
                     definingFilePath === namespaceRootDir ||
-                    definingFilePath.startsWith(`${namespaceRootDir}/`)
+                    definingFilePath.startsWith(`${namespaceRootDir}/`),
                 );
               });
             }
@@ -739,13 +855,15 @@ export function buildPackageGraph(
               isExternalDependencyStub(symbolId) ||
               kindMatchesResolutionHint(
                 idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
-                rawDep.resolutionHint
-              )
+                rawDep.resolutionHint,
+              ),
           );
         }
 
         if (targetIds.length > 0) {
-          targetIds = targetIds.filter((symbolId) => symbolId !== symbolNode.id);
+          targetIds = targetIds.filter(
+            (symbolId) => symbolId !== symbolNode.id,
+          );
         }
 
         if (targetIds.length > 0) {
@@ -757,19 +875,25 @@ export function buildPackageGraph(
             const resolved = resolveProtocol(rawDep.importPath, rawDep.name);
             if (resolved) resolvedIds.add(resolved);
             else {
-              const stub = resolveExternalModuleStubId(rawDep.importPath, rawDep.name);
+              const stub = resolveExternalModuleStubId(
+                rawDep.importPath,
+                rawDep.name,
+              );
               if (stub) resolvedIds.add(stub);
             }
           } else {
             const importMap = getImportsByName(symAbsPath);
             const matchingImport = importMap.get(rawDep.name);
             if (matchingImport) {
-              const resolved = resolveProtocol(matchingImport.source, matchingImport.originalName || rawDep.name);
+              const resolved = resolveProtocol(
+                matchingImport.source,
+                matchingImport.originalName || rawDep.name,
+              );
               if (resolved) resolvedIds.add(resolved);
               else {
                 const stub = resolveExternalModuleStubId(
                   matchingImport.source,
-                  matchingImport.originalName || rawDep.name
+                  matchingImport.originalName || rawDep.name,
                 );
                 if (stub) resolvedIds.add(stub);
               }
@@ -777,14 +901,19 @@ export function buildPackageGraph(
             if (namespaceQual) {
               const nsImport = importMap.get(namespaceQual.qualifier);
               if (nsImport) {
-                const stub = resolveExternalModuleStubId(nsImport.source, namespaceQual.memberPath);
+                const stub = resolveExternalModuleStubId(
+                  nsImport.source,
+                  namespaceQual.memberPath,
+                );
                 if (stub) resolvedIds.add(stub);
               }
             }
           }
         }
       }
-      symbolNode.dependencies = Array.from(resolvedIds).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      symbolNode.dependencies = Array.from(resolvedIds).sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+      );
     }
     delete symbolNode.rawDependencies;
   }
@@ -795,7 +924,12 @@ export function buildPackageGraph(
   }
 
   const preFlattenLen = symbols.length;
-  flattenInheritedMembers(symbols, nameToId, packageInfo.name, packageInfo.version);
+  flattenInheritedMembers(
+    symbols,
+    nameToId,
+    packageInfo.name,
+    packageInfo.version,
+  );
 
   if (profiling) {
     profileLog("flattenInherited", performance.now() - phaseStart);
@@ -820,13 +954,19 @@ export function buildPackageGraph(
   }
   for (let i = preFlattenLen; i < symbols.length; i++) {
     const symbolNode = symbols[i]!;
-    if (symbolNode.kind === ts.SyntaxKind.ClassDeclaration && !nameToId.has(symbolNode.name)) {
+    if (
+      symbolNode.kind === ts.SyntaxKind.ClassDeclaration &&
+      !nameToId.has(symbolNode.name)
+    ) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
   for (let i = preFlattenLen; i < symbols.length; i++) {
     const symbolNode = symbols[i]!;
-    if (symbolNode.kind === ts.SyntaxKind.ModuleDeclaration && !nameToId.has(symbolNode.name)) {
+    if (
+      symbolNode.kind === ts.SyntaxKind.ModuleDeclaration &&
+      !nameToId.has(symbolNode.name)
+    ) {
       nameToId.set(symbolNode.name, symbolNode.id);
     }
   }
@@ -877,20 +1017,20 @@ function flattenInheritedMembers(
   symbols: SymbolNode[],
   nameToId: Map<string, string>,
   pkgName: string,
-  pkgVersion: string
+  pkgVersion: string,
 ): void {
   const idToNode = new Map<string, SymbolNode>();
   const membersByParentName = new Map<string, SymbolNode[]>();
-  
+
   for (const symbolNode of symbols) {
     idToNode.set(symbolNode.id, symbolNode);
     const parts = symbolNode.name.split(".");
     if (parts.length > 1) {
       const isPrototype = parts.includes("prototype");
-      const parentName = isPrototype 
-        ? parts.slice(0, parts.indexOf("prototype")).join(".") 
+      const parentName = isPrototype
+        ? parts.slice(0, parts.indexOf("prototype")).join(".")
         : parts.slice(0, -1).join(".");
-      
+
       let list = membersByParentName.get(parentName);
       if (!list) {
         list = [];
@@ -926,7 +1066,7 @@ function flattenInheritedMembers(
   for (const [nodeName, heritage] of mergedHeritage) {
     const childMembers = membersByParentName.get(nodeName) || [];
     const directChildShortNames = new Set(
-      childMembers.map(member => member.name.split(".").pop()!)
+      childMembers.map((member) => member.name.split(".").pop()!),
     );
     const inheritedByLeaf = new Map<string, SymbolNode>();
 
@@ -995,7 +1135,10 @@ function flattenInheritedMembers(
 }
 
 /** All declaration files reachable from `startAbs` by following only `/// <reference path` edges. */
-function tripleSlashReferenceClosure(startAbs: string, edges: Record<string, string[]>): string[] {
+function tripleSlashReferenceClosure(
+  startAbs: string,
+  edges: Record<string, string[]>,
+): string[] {
   const visited = new Set<string>();
   const queue: string[] = [startAbs];
   visited.add(startAbs);
@@ -1011,7 +1154,10 @@ function tripleSlashReferenceClosure(startAbs: string, edges: Record<string, str
   return [...visited].sort();
 }
 
-function kindMatchesResolutionHint(kind: ts.SyntaxKind, hint: "type" | "value" | undefined): boolean {
+function kindMatchesResolutionHint(
+  kind: ts.SyntaxKind,
+  hint: "type" | "value" | undefined,
+): boolean {
   if (!hint) return true;
   if (hint === "value") {
     return (

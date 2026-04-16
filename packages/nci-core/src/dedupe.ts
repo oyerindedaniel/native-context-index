@@ -13,7 +13,7 @@ export function symbolDedupeKey(
   file: string,
   name: string,
   kind: number,
-  signature: string | undefined
+  signature: string | undefined,
 ): string {
   return `${file}::${name}::${kind}::${normalizeSignature(signature)}`;
 }

@@ -5,14 +5,19 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format": "prettier --write \"{apps,packages,tooling,scripts}/**/*.{ts,tsx,md}\" \"!packages/nci-core/fixtures/**/*.d.ts\"",
+    "format:check": "prettier --check \"{apps,packages,tooling,scripts}/**/*.{ts,tsx,md}\" \"!packages/nci-core/fixtures/**/*.d.ts\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
-    "nci:sync-npm-version": "tsx scripts/sync-npm-version.ts"
+    "nci:sync-npm-version": "tsx scripts/sync-npm-version.ts",
+    "rust:fmt:check": "cargo fmt --all -- --check",
+    "rust:test:snapshots": "cargo test -p nci-engine --test snapshot_tests",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
+    "husky": "^9.1.7",
     "prettier": "^3.7.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",

@@ -1,8 +1,8 @@
 //! Cache locations on disk (`nci.sqlite` under the OS cache dir).
 
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 

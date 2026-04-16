@@ -95,12 +95,16 @@ function validateReport(report: ReportRoot): string[] {
     }
 
     const symbolIds = symbols.map((symbolEntry) =>
-      typeof symbolEntry === "object" && symbolEntry !== null && "id" in symbolEntry
+      typeof symbolEntry === "object" &&
+      symbolEntry !== null &&
+      "id" in symbolEntry
         ? String((symbolEntry as ReportSymbol).id ?? "")
         : "",
     );
 
-    for (const duplicateId of distinctDuplicates(symbolIds.filter((id) => id.length > 0))) {
+    for (const duplicateId of distinctDuplicates(
+      symbolIds.filter((id) => id.length > 0),
+    )) {
       violations.push(
         `${packageName}: duplicate symbol id ${JSON.stringify(duplicateId)} ` +
           `(SQLite UNIQUE(package_id, id)).`,
@@ -111,7 +115,9 @@ function validateReport(report: ReportRoot): string[] {
     for (const symbolEntry of symbols) {
       if (symbolEntry === null || typeof symbolEntry !== "object") {
         symbolIndex += 1;
-        violations.push(`${packageName}: symbol entry at index ${symbolIndex} is not an object.`);
+        violations.push(
+          `${packageName}: symbol entry at index ${symbolIndex} is not an object.`,
+        );
         continue;
       }
 
@@ -121,10 +127,34 @@ function validateReport(report: ReportRoot): string[] {
           ? String(typedSymbol.id)
           : `<no-id-at-index-${symbolIndex}>`;
 
-      checkListField(packageName, symbolId, "dependencies", typedSymbol.dependencies, violations);
-      checkListField(packageName, symbolId, "heritage", typedSymbol.heritage, violations);
-      checkListField(packageName, symbolId, "modifiers", typedSymbol.modifiers, violations);
-      checkListField(packageName, symbolId, "additionalFiles", typedSymbol.additionalFiles, violations);
+      checkListField(
+        packageName,
+        symbolId,
+        "dependencies",
+        typedSymbol.dependencies,
+        violations,
+      );
+      checkListField(
+        packageName,
+        symbolId,
+        "heritage",
+        typedSymbol.heritage,
+        violations,
+      );
+      checkListField(
+        packageName,
+        symbolId,
+        "modifiers",
+        typedSymbol.modifiers,
+        violations,
+      );
+      checkListField(
+        packageName,
+        symbolId,
+        "additionalFiles",
+        typedSymbol.additionalFiles,
+        violations,
+      );
 
       symbolIndex += 1;
     }
@@ -169,7 +199,9 @@ function main(): number {
   console.log(`Report: ${reportPath}`);
 
   if (violationLines.length === 0) {
-    console.log("OK — no duplicate keys that would violate Nci SQLite constraints.");
+    console.log(
+      "OK — no duplicate keys that would violate Nci SQLite constraints.",
+    );
     return 0;
   }
 

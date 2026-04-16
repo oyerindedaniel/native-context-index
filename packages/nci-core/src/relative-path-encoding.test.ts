@@ -6,15 +6,21 @@ describe("encodeOutsidePackageRelative", () => {
     expect(encodeOutsidePackageRelative("../other/x.d.ts")).toBe(
       "__nci_external__/__up__/other/x.d.ts",
     );
-    expect(encodeOutsidePackageRelative("../../a/b")).toBe("__nci_external__/__up__/__up__/a/b");
+    expect(encodeOutsidePackageRelative("../../a/b")).toBe(
+      "__nci_external__/__up__/__up__/a/b",
+    );
   });
 
   it("strips leading ./ before counting ups", () => {
-    expect(encodeOutsidePackageRelative("./../x")).toBe("__nci_external__/__up__/x");
+    expect(encodeOutsidePackageRelative("./../x")).toBe(
+      "__nci_external__/__up__/x",
+    );
   });
 
   it("uses __nci_external__ only when there are no parent hops", () => {
-    expect(encodeOutsidePackageRelative("sub/no-ups.d.ts")).toBe("__nci_external__/sub/no-ups.d.ts");
+    expect(encodeOutsidePackageRelative("sub/no-ups.d.ts")).toBe(
+      "__nci_external__/sub/no-ups.d.ts",
+    );
   });
 
   it("normalizes backslashes", () => {

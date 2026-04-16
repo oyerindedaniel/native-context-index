@@ -14,12 +14,12 @@ pub mod storage;
 mod storage_migrations;
 pub mod types;
 
-pub use cache::{index_engine_cache_key, NCI_ENGINE_VERSION, nci_sqlite_path};
+pub use cache::{NCI_ENGINE_VERSION, index_engine_cache_key, nci_sqlite_path};
+pub use filter::{DepKindFilter, FilterConfig, IgnoreRule};
 pub use resolver::{
     normalize_dependency_stub_list, npm_package_root, specifier_is_dependency_stub,
 };
-pub use filter::{DepKindFilter, FilterConfig, IgnoreRule};
 pub use storage::{
-    DatabaseStatusReport, NciDatabase, SqlRunSummary, SCHEMA_VERSION, StorageError, StorageResult,
+    DatabaseStatusReport, NciDatabase, SCHEMA_VERSION, SqlRunSummary, StorageError, StorageResult,
 };
 pub use types::PackageIndexMetadata;

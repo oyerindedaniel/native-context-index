@@ -40,7 +40,11 @@ export function runNciSync(executable: string, args: string[]): CallToolResult {
       content: [
         {
           type: "text",
-          text: [stderr.trimEnd(), stdout.trimEnd(), "nci process was interrupted (null exit code)"]
+          text: [
+            stderr.trimEnd(),
+            stdout.trimEnd(),
+            "nci process was interrupted (null exit code)",
+          ]
             .filter(Boolean)
             .join("\n\n"),
         },

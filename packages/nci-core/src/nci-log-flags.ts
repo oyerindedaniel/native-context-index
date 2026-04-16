@@ -29,7 +29,9 @@ export function nciProfileEnabled(): boolean {
 /** Log a phase timing to stderr when profiling is enabled. */
 export function profileLog(label: string, ms: number): void {
   if (nciProfileEnabled()) {
-    process.stderr.write(`  [profile] ${label.padEnd(24)} ${ms.toFixed(1)}ms\n`);
+    process.stderr.write(
+      `  [profile] ${label.padEnd(24)} ${ms.toFixed(1)}ms\n`,
+    );
   }
 }
 

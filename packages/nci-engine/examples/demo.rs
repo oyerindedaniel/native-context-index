@@ -407,12 +407,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "\n   {:<36} {:>8} {:>9} {:>7} {:>12} {:>12}",
-        "Package",
-        "Source",
-        "Symbols",
-        "Files",
-        "Crawl",
-        "Build"
+        "Package", "Source", "Symbols", "Files", "Crawl", "Build"
     );
     println!("   {}", "─".repeat(98));
 

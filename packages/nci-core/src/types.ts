@@ -64,7 +64,10 @@ export interface TypeReference {
 }
 
 /** Union of AST nodes that can be expanded for member extraction (Spread, Mixin) */
-export type CompositionNode = ts.TypeNode | ts.ClassDeclaration | ts.InterfaceDeclaration;
+export type CompositionNode =
+  | ts.TypeNode
+  | ts.ClassDeclaration
+  | ts.InterfaceDeclaration;
 
 /** A single export statement parsed from a .d.ts file */
 export interface ParsedExport {

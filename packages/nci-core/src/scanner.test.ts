@@ -34,11 +34,15 @@ describe("scanPackages", () => {
   it("marks scoped packages correctly", () => {
     const packages = scanPackages(FAKE_NODE_MODULES);
 
-    const scopedPkg = packages.find((packageItem) => packageItem.name === "@myorg/core");
+    const scopedPkg = packages.find(
+      (packageItem) => packageItem.name === "@myorg/core",
+    );
     expect(scopedPkg).toBeDefined();
     expect(scopedPkg!.isScoped).toBe(true);
 
-    const regularPkg = packages.find((packageItem) => packageItem.name === "simple-pkg");
+    const regularPkg = packages.find(
+      (packageItem) => packageItem.name === "simple-pkg",
+    );
     expect(regularPkg).toBeDefined();
     expect(regularPkg!.isScoped).toBe(false);
   });
@@ -46,10 +50,14 @@ describe("scanPackages", () => {
   it("reads version from package.json", () => {
     const packages = scanPackages(FAKE_NODE_MODULES);
 
-    const pkg = packages.find((packageItem) => packageItem.name === "simple-pkg");
+    const pkg = packages.find(
+      (packageItem) => packageItem.name === "simple-pkg",
+    );
     expect(pkg?.version).toBe("1.0.0");
 
-    const scoped = packages.find((packageItem) => packageItem.name === "@myorg/core");
+    const scoped = packages.find(
+      (packageItem) => packageItem.name === "@myorg/core",
+    );
     expect(scoped?.version).toBe("3.0.0");
   });
 
@@ -77,9 +85,9 @@ describe("scanPackages", () => {
   });
 
   it("throws for non-existent node_modules path", () => {
-    expect(() =>
-      scanPackages("/nonexistent/path/node_modules")
-    ).toThrow("node_modules not found");
+    expect(() => scanPackages("/nonexistent/path/node_modules")).toThrow(
+      "node_modules not found",
+    );
   });
 
   it("skips ALL package manager artifacts (npm, pnpm, yarn, bun)", () => {
@@ -108,7 +116,9 @@ describe("scanPackages", () => {
 
     expect(packages.length).toBeGreaterThan(0);
 
-    const typesNode = packages.find((packageItem) => packageItem.name === "@types/node");
+    const typesNode = packages.find(
+      (packageItem) => packageItem.name === "@types/node",
+    );
     if (typesNode) {
       expect(typesNode.isScoped).toBe(true);
       expect(typesNode.version).toBeTruthy();
@@ -130,16 +140,19 @@ describe("scanPackages", () => {
 
   it("handles broken symlinks gracefully", () => {
     const tmpDir = makeTmpDir("broken-symlink");
-    
+
     const target = path.join(tmpDir, "non-existent-at-all");
     const link = path.join(tmpDir, "broken-link");
-    
+
     try {
       fs.symlinkSync(target, link, "dir");
       const packages = scanPackages(tmpDir);
       expect(packages).toHaveLength(0);
     } catch (error: unknown) {
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code === "EPERM") {
+      if (
+        error instanceof Error &&
+        (error as NodeJS.ErrnoException).code === "EPERM"
+      ) {
         console.log("Skipping symlink test: No permission to create symlinks");
       } else {
         throw error;
@@ -168,10 +181,12 @@ describe("scanPackages", () => {
     const scopeDir = path.join(tmpDir, "@myscope");
     fs.mkdirSync(scopeDir, { recursive: true });
     fs.writeFileSync(path.join(scopeDir, "not-a-package.txt"), "hello");
-    
+
     try {
       const packages = scanPackages(tmpDir);
-      const scopedPackages = packages.filter((pkg) => pkg.name.startsWith("@myscope"));
+      const scopedPackages = packages.filter((pkg) =>
+        pkg.name.startsWith("@myscope"),
+      );
       expect(scopedPackages).toHaveLength(0);
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
@@ -182,11 +197,14 @@ describe("scanPackages", () => {
     const parentDir = makeTmpDir("no-name-parent");
     const pkgDir = path.join(parentDir, "nameless-pkg");
     fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({ version: "1.0.0" }));
-    
+    fs.writeFileSync(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({ version: "1.0.0" }),
+    );
+
     try {
       const packages = scanPackages(parentDir);
-      expect(packages.some(pkg => pkg.name === "nameless-pkg")).toBe(true);
+      expect(packages.some((pkg) => pkg.name === "nameless-pkg")).toBe(true);
     } finally {
       fs.rmSync(parentDir, { recursive: true });
     }
@@ -198,15 +216,18 @@ describe("scanPackages", () => {
     const tmpDir = makeTmpDir("symlink-dir");
     const targetDir = path.join(tmpDir, "target");
     const linkDir = path.join(tmpDir, "link");
-    
+
     fs.mkdirSync(targetDir, { recursive: true });
-    fs.writeFileSync(path.join(targetDir, "package.json"), JSON.stringify({ name: "target", version: "1.0.0" }));
-    
+    fs.writeFileSync(
+      path.join(targetDir, "package.json"),
+      JSON.stringify({ name: "target", version: "1.0.0" }),
+    );
+
     fs.symlinkSync(targetDir, linkDir, "dir");
-    
+
     try {
       const packages = scanPackages(tmpDir);
-      expect(packages.some(pkg => pkg.name === "target")).toBe(true);
+      expect(packages.some((pkg) => pkg.name === "target")).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
     }
@@ -217,10 +238,10 @@ describe("scanPackages", () => {
     const corruptDir = path.join(parentDir, "corrupt-pkg");
     fs.mkdirSync(corruptDir, { recursive: true });
     fs.writeFileSync(path.join(corruptDir, "package.json"), "{ invalid json");
-    
+
     try {
       const packages = scanPackages(parentDir);
-      expect(packages.find(pkg => pkg.dir === corruptDir)).toBeUndefined();
+      expect(packages.find((pkg) => pkg.dir === corruptDir)).toBeUndefined();
     } finally {
       fs.rmSync(parentDir, { recursive: true });
     }

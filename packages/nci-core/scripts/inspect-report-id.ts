@@ -14,7 +14,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 type Report = {
-  packages?: Array<{ package: string; version: string; symbols: ReportSymbol[] }>;
+  packages?: Array<{
+    package: string;
+    version: string;
+    symbols: ReportSymbol[];
+  }>;
 };
 
 type ReportSymbol = {
@@ -57,7 +61,7 @@ function parseArgs() {
 function main() {
   const args = parseArgs();
   const reportPath = path.resolve(
-    args.report ?? path.join(__dirname, "..", "nci-report.json")
+    args.report ?? path.join(__dirname, "..", "nci-report.json"),
   );
 
   if (!fs.existsSync(reportPath)) {
@@ -89,16 +93,16 @@ function main() {
   if (args.name && args.pkg) {
     const needle = `${args.pkg}@`;
     const matches = allSymbols.filter(
-      (s) => s.name === args.name && s.id.startsWith(needle)
+      (s) => s.name === args.name && s.id.startsWith(needle),
     );
     matches.sort((a, b) => a.id.localeCompare(b.id));
     console.log(
-      `\n--- All symbols named "${args.name}" in package "${args.pkg}" (${matches.length}) ---\n`
+      `\n--- All symbols named "${args.name}" in package "${args.pkg}" (${matches.length}) ---\n`,
     );
     for (const m of matches) {
       console.log(m.id);
       console.log(
-        `  kind=${m.kindName} file=${m.filePath}\n  sig=${(m.signature ?? "").slice(0, 120)}${(m.signature?.length ?? 0) > 120 ? "…" : ""}\n`
+        `  kind=${m.kindName} file=${m.filePath}\n  sig=${(m.signature ?? "").slice(0, 120)}${(m.signature?.length ?? 0) > 120 ? "…" : ""}\n`,
       );
     }
   }
@@ -117,7 +121,9 @@ function main() {
     }
     const text = fs.readFileSync(schemaPath, "utf-8");
     const lines = text.split("\n");
-    console.log(`\n--- Lines mentioning interface/function filter in ${sub} ---\n`);
+    console.log(
+      `\n--- Lines mentioning interface/function filter in ${sub} ---\n`,
+    );
     let n = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
@@ -126,7 +132,9 @@ function main() {
         /declare function filter/.test(line) ||
         /interface filterEffect/.test(line)
       ) {
-        console.log(`${i + 1}: ${line.slice(0, 160)}${line.length > 160 ? "…" : ""}`);
+        console.log(
+          `${i + 1}: ${line.slice(0, 160)}${line.length > 160 ? "…" : ""}`,
+        );
         if (++n >= 30) break;
       }
     }
@@ -137,7 +145,7 @@ function main() {
 
   if (!args.id && !args.name && !args.grep) {
     console.log(
-      "Usage: --id <id> | --name <name> --package <pkg> [--grep-node-modules <packageDir>]"
+      "Usage: --id <id> | --name <name> --package <pkg> [--grep-node-modules <packageDir>]",
     );
   }
 }

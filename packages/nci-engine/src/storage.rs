@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
 
-use crate::storage_migrations::{read_schema_version, MIGRATIONS, META_SCHEMA_KEY};
+use crate::storage_migrations::{META_SCHEMA_KEY, MIGRATIONS, read_schema_version};
 use crate::types::{
     DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
     SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
@@ -89,10 +89,12 @@ pub fn verify_sqlite_file_header(path: &Path) -> StorageResult<()> {
     })?;
     // SQLite file identity is the first 16 bytes on disk; compare to SQLITE3_FILE_HEADER.
     let mut header_prefix = [0u8; 16];
-    let bytes_read = file.read(&mut header_prefix).map_err(|err| StorageError::InvalidDatabaseFile {
-        path: path.to_path_buf(),
-        reason: err.to_string(),
-    })?;
+    let bytes_read =
+        file.read(&mut header_prefix)
+            .map_err(|err| StorageError::InvalidDatabaseFile {
+                path: path.to_path_buf(),
+                reason: err.to_string(),
+            })?;
     if bytes_read < 16 || header_prefix != *SQLITE3_FILE_HEADER {
         return Err(StorageError::InvalidDatabaseFile {
             path: path.to_path_buf(),
@@ -150,10 +152,7 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
             }
             transaction.execute(
                 "INSERT OR REPLACE INTO nci_meta (key, value) VALUES (?1, ?2)",
-                rusqlite::params![
-                    META_SCHEMA_KEY,
-                    migration.version.to_string(),
-                ],
+                rusqlite::params![META_SCHEMA_KEY, migration.version.to_string(),],
             )?;
             debug!(applied = migration.version, "migration applied");
         }
@@ -263,8 +262,8 @@ impl NciDatabase {
         let journal_mode = self.journal_mode_label()?;
         let schema_version = self.stored_schema_version()?;
         let integrity_check = self.pragma_integrity_check_line()?;
-        let nci_cache_dir_env = std::env::var_os("NCI_CACHE_DIR")
-            .map(|value| value.to_string_lossy().into_owned());
+        let nci_cache_dir_env =
+            std::env::var_os("NCI_CACHE_DIR").map(|value| value.to_string_lossy().into_owned());
         Ok(DatabaseStatusReport {
             path: db_path.to_path_buf(),
             file_size_bytes,
@@ -304,10 +303,7 @@ impl NciDatabase {
                 "SELECT total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
                  WHERE name = ?1 AND version = ?2",
-                rusqlite::params![
-                    package_info.name.as_ref(),
-                    package_info.version.as_ref(),
-                ],
+                rusqlite::params![package_info.name.as_ref(), package_info.version.as_ref(),],
                 |package_row| {
                     Ok(PackageIndexMetadata {
                         package: package_info.name.clone(),
@@ -325,9 +321,9 @@ impl NciDatabase {
     }
 
     pub fn list_indexed_packages(&self) -> StorageResult<Vec<(String, String)>> {
-        let mut statement = self.connection.prepare(
-            "SELECT name, version FROM packages ORDER BY name, version",
-        )?;
+        let mut statement = self
+            .connection
+            .prepare("SELECT name, version FROM packages ORDER BY name, version")?;
         let rows = statement.query_map([], |package_row| {
             Ok((
                 package_row.get::<_, String>(0)?,
@@ -1215,7 +1211,9 @@ fn value_ref_to_json(value_ref: ValueRef<'_>) -> Result<Value, rusqlite::Error> 
         ValueRef::Text(bytes) => Value::String(String::from_utf8_lossy(bytes).into_owned()),
         ValueRef::Blob(blob) => Value::String(format!(
             "hex:{}",
-            blob.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+            blob.iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
         )),
     })
 }
@@ -1346,7 +1344,10 @@ mod tests {
             parse_since_semver_triple("v1.2.3-rc.1"),
             (Some(1), Some(2), Some(3))
         );
-        assert_eq!(parse_since_semver_triple("12"), (Some(12), Some(0), Some(0)));
+        assert_eq!(
+            parse_since_semver_triple("12"),
+            (Some(12), Some(0), Some(0))
+        );
         assert_eq!(
             parse_since_semver_triple("not-a-version"),
             (None, None, None)
@@ -1377,11 +1378,7 @@ mod tests {
             build_duration_ms: 0.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(
@@ -1453,11 +1450,7 @@ mod tests {
         };
 
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
 
         let cache_key = index_engine_cache_key(&[]);
@@ -1504,11 +1497,7 @@ mod tests {
         };
 
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(loaded.symbols.len(), 1);
@@ -1558,22 +1547,19 @@ mod tests {
         };
         let started = Instant::now();
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let ms = started.elapsed().as_secs_f64() * 1000.0;
-        eprintln!(
-            "save_package profile: {N} symbols in {ms:.1} ms (batch FTS + integrity-check)"
-        );
+        eprintln!("save_package profile: {N} symbols in {ms:.1} ms (batch FTS + integrity-check)");
         let hits = database.find_symbols_fts("uniquefts", 50).expect("fts");
         assert!(
             !hits.is_empty(),
             "FTS should find indexed js_doc tokens after batch populate"
         );
-        assert!(ms < 600_000.0, "sanity: save should finish in under 10 minutes");
+        assert!(
+            ms < 600_000.0,
+            "sanity: save should finish in under 10 minutes"
+        );
     }
 
     #[test]
@@ -1596,13 +1582,14 @@ mod tests {
             build_duration_ms: 0.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph1,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph1, index_engine_cache_key(&[]).as_str())
             .expect("save1");
-        assert!(!database.find_symbols_fts("Hello", 5).expect("fts").is_empty());
+        assert!(
+            !database
+                .find_symbols_fts("Hello", 5)
+                .expect("fts")
+                .is_empty()
+        );
 
         let mut sym2 = minimal_symbol("b", "beta");
         sym2.js_doc = Some(SharedString::from("ResaveUniqueToken"));
@@ -1616,11 +1603,7 @@ mod tests {
             build_duration_ms: 0.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph2,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph2, index_engine_cache_key(&[]).as_str())
             .expect("save2");
         let hits = database
             .find_symbols_fts("ResaveUniqueToken", 10)
@@ -1653,11 +1636,7 @@ mod tests {
             build_duration_ms: 1.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let hits = database.find_symbols_fts("Hello", 10).expect("fts");
         assert!(!hits.is_empty());
@@ -1700,11 +1679,7 @@ mod tests {
             build_duration_ms: 1.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
 
         let shared = Arc::new(Mutex::new(database));
@@ -1758,14 +1733,10 @@ mod tests {
 
         let mut n = 0;
         let summary = database
-            .for_each_readonly_sql_row(
-                "SELECT 1 AS x UNION SELECT 2 AS x",
-                Some(1),
-                |_, _| {
-                    n += 1;
-                    Ok(())
-                },
-            )
+            .for_each_readonly_sql_row("SELECT 1 AS x UNION SELECT 2 AS x", Some(1), |_, _| {
+                n += 1;
+                Ok(())
+            })
             .expect("run");
         assert_eq!(n, 1);
         assert!(summary.truncated);
@@ -1791,11 +1762,7 @@ mod tests {
             build_duration_ms: 1.0,
         };
         database
-            .save_package(
-                &package_info,
-                &graph,
-                index_engine_cache_key(&[]).as_str(),
-            )
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let cache_key = index_engine_cache_key(&[]);
         assert!(database.has_cached_package(&package_info, cache_key.as_str()));

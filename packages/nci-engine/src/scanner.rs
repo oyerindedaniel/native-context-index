@@ -77,7 +77,6 @@ fn package_install_subpath(node_modules_path: &Path, name: &str) -> Option<PathB
     }
 }
 
-
 /// Direct path resolution under `node_modules`, then `read_package_info` + version check.
 pub fn find_package_in_node_modules(
     node_modules_path: &Path,
@@ -362,8 +361,7 @@ mod tests {
         )
         .unwrap();
 
-        let info =
-            find_package_in_node_modules(&node_modules, "@acme/widget", "2.1.0").unwrap();
+        let info = find_package_in_node_modules(&node_modules, "@acme/widget", "2.1.0").unwrap();
         assert_eq!(info.name.as_ref(), "@acme/widget");
         assert_eq!(info.version.as_ref(), "2.1.0");
         assert!(info.is_scoped);
@@ -387,7 +385,10 @@ mod tests {
         .unwrap();
 
         let err = find_package_in_node_modules(&node_modules, "foo", "9.9.9").unwrap_err();
-        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+        assert!(matches!(
+            err,
+            ScanError::PackageVersionNotInNodeModules { .. }
+        ));
     }
 
     #[test]
@@ -397,7 +398,10 @@ mod tests {
         fs::create_dir(&node_modules).unwrap();
 
         let err = find_package_in_node_modules(&node_modules, "nope", "1.0.0").unwrap_err();
-        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+        assert!(matches!(
+            err,
+            ScanError::PackageVersionNotInNodeModules { .. }
+        ));
     }
 
     #[test]
@@ -408,9 +412,11 @@ mod tests {
         let bogus = node_modules.join("not-a-dir");
         fs::write(&bogus, b"not a package folder").unwrap();
 
-        let err =
-            find_package_in_node_modules(&node_modules, "not-a-dir", "1.0.0").unwrap_err();
-        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+        let err = find_package_in_node_modules(&node_modules, "not-a-dir", "1.0.0").unwrap_err();
+        assert!(matches!(
+            err,
+            ScanError::PackageVersionNotInNodeModules { .. }
+        ));
     }
 
     #[test]
@@ -420,7 +426,10 @@ mod tests {
         fs::create_dir(&node_modules).unwrap();
 
         let err = find_package_in_node_modules(&node_modules, "@only-scope", "1.0.0").unwrap_err();
-        assert!(matches!(err, ScanError::PackageVersionNotInNodeModules { .. }));
+        assert!(matches!(
+            err,
+            ScanError::PackageVersionNotInNodeModules { .. }
+        ));
     }
 
     #[test]

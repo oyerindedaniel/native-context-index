@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cargoPath = join(root, "packages", "nci-engine", "Cargo.toml");
 const cargoText = readFileSync(cargoPath, "utf8");
-const versionLine = cargoText.split(/\r?\n/).find((line) => line.startsWith("version = "));
+const versionLine = cargoText
+  .split(/\r?\n/)
+  .find((line) => line.startsWith("version = "));
 if (!versionLine) {
   throw new Error(`no version = in ${cargoPath}`);
 }
@@ -20,4 +22,6 @@ const meta = JSON.parse(readFileSync(metaPkg, "utf8")) as { version: string };
 meta.version = version;
 writeFileSync(metaPkg, `${JSON.stringify(meta, null, 2)}\n`, "utf8");
 
-console.log(`synced packages/nci version to ${version} (from nci-engine Cargo.toml)`);
+console.log(
+  `synced packages/nci version to ${version} (from nci-engine Cargo.toml)`,
+);

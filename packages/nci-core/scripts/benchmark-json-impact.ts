@@ -25,15 +25,21 @@ function heapUsedMb(): number {
   return Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
 }
 
-function runCase(
-  produceString: () => string
-): { millis: number; heapDeltaMb: number; outLen: number } {
+function runCase(produceString: () => string): {
+  millis: number;
+  heapDeltaMb: number;
+  outLen: number;
+} {
   const heapBeforeMb = heapUsedMb();
   const timeStart = performance.now();
   const serialized = produceString();
   const millis = Math.round(performance.now() - timeStart);
   const heapAfterMb = heapUsedMb();
-  return { millis, heapDeltaMb: heapAfterMb - heapBeforeMb, outLen: serialized.length };
+  return {
+    millis,
+    heapDeltaMb: heapAfterMb - heapBeforeMb,
+    outLen: serialized.length,
+  };
 }
 
 const args = process.argv.slice(2);
@@ -52,7 +58,8 @@ let info: PackageInfo;
 
 if (pkgName) {
   const all: PackageInfo[] = [];
-  if (fs.existsSync(rootNodeModules)) all.push(...scanPackages(rootNodeModules));
+  if (fs.existsSync(rootNodeModules))
+    all.push(...scanPackages(rootNodeModules));
   if (fs.existsSync(localNodeModules)) {
     const names = new Set(all.map((packageInfo) => packageInfo.name));
     for (const packageInfo of scanPackages(localNodeModules)) {
@@ -82,7 +89,9 @@ console.log(`Package: ${info.name}@${info.version}`);
 const buildStart = performance.now();
 const graph = buildPackageGraph(info, { maxHops: 10 });
 const buildMillis = Math.round(performance.now() - buildStart);
-console.log(`buildPackageGraph: ${buildMillis}ms | symbols=${graph.totalSymbols} files=${graph.totalFiles}`);
+console.log(
+  `buildPackageGraph: ${buildMillis}ms | symbols=${graph.totalSymbols} files=${graph.totalFiles}`,
+);
 
 const payload = {
   generatedAt: new Date().toISOString(),
@@ -92,20 +101,26 @@ const payload = {
 const compact = runCase(() => JSON.stringify(payload));
 const pretty = runCase(() => JSON.stringify(payload, null, 2));
 
-console.log("\nJSON.stringify (one graph in memory; demo avoids duplicating graphs in an extra wrapper):\n");
 console.log(
-  `  compact: ${compact.millis}ms  len=${compact.outLen.toLocaleString()} chars  heap delta ~${compact.heapDeltaMb} MiB`
+  "\nJSON.stringify (one graph in memory; demo avoids duplicating graphs in an extra wrapper):\n",
 );
 console.log(
-  `  pretty:  ${pretty.millis}ms  len=${pretty.outLen.toLocaleString()} chars  heap delta ~${pretty.heapDeltaMb} MiB`
+  `  compact: ${compact.millis}ms  len=${compact.outLen.toLocaleString()} chars  heap delta ~${compact.heapDeltaMb} MiB`,
+);
+console.log(
+  `  pretty:  ${pretty.millis}ms  len=${pretty.outLen.toLocaleString()} chars  heap delta ~${pretty.heapDeltaMb} MiB`,
 );
 if (compact.millis > 0) {
-  console.log(`  pretty / compact time ratio: ${(pretty.millis / compact.millis).toFixed(2)}×`);
+  console.log(
+    `  pretty / compact time ratio: ${(pretty.millis / compact.millis).toFixed(2)}×`,
+  );
 }
 
 try {
   const stats = v8.getHeapStatistics();
-  console.log(`\nV8 heap limit: ${Math.round(stats.heap_size_limit / 1024 / 1024)} MiB`);
+  console.log(
+    `\nV8 heap limit: ${Math.round(stats.heap_size_limit / 1024 / 1024)} MiB`,
+  );
 } catch {
   /* ignore */
 }

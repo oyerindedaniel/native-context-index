@@ -32,7 +32,9 @@ function findPackageRoot(fromFileOrDir: string): string {
     if (parent === dir) break;
     dir = parent;
   }
-  return fromFileOrDir.endsWith(".d.ts") ? path.dirname(fromFileOrDir) : fromFileOrDir;
+  return fromFileOrDir.endsWith(".d.ts")
+    ? path.dirname(fromFileOrDir)
+    : fromFileOrDir;
 }
 
 function readPackageInfo(packageDir: string): PackageInfo {
@@ -59,7 +61,10 @@ function readPackageInfo(packageDir: string): PackageInfo {
 }
 
 function resolveTargetPath(userArg: string | undefined): string {
-  const defaultDir = path.resolve(__dirname, "../fixtures/internal-overload-ref");
+  const defaultDir = path.resolve(
+    __dirname,
+    "../fixtures/internal-overload-ref",
+  );
   return userArg ? path.resolve(userArg) : defaultDir;
 }
 
@@ -73,13 +78,13 @@ async function main(): Promise<void> {
   const info = readPackageInfo(packageDir);
 
   console.error(
-    `[nci] ${NCI_LOG_ALL_RAW_EXPORTS}=1 — building graph for ${info.name}@${info.version} (${info.dir})`
+    `[nci] ${NCI_LOG_ALL_RAW_EXPORTS}=1 — building graph for ${info.name}@${info.version} (${info.dir})`,
   );
 
   const graph = buildPackageGraph(info);
 
   console.error(
-    `[nci] done: ${graph.symbols.length} symbols, ${graph.totalFiles} files, crawl ${graph.crawlDurationMs.toFixed(1)}ms build ${graph.buildDurationMs.toFixed(1)}ms`
+    `[nci] done: ${graph.symbols.length} symbols, ${graph.totalFiles} files, crawl ${graph.crawlDurationMs.toFixed(1)}ms build ${graph.buildDurationMs.toFixed(1)}ms`,
   );
 }
 

@@ -76,10 +76,7 @@ fn compute_merge_scope_ids(
     let mut script_index: HashMap<SharedString, usize> = HashMap::new();
     let mut module_index: HashMap<SharedString, usize> = HashMap::new();
     for abs in visited_files {
-        let is_external_module = file_is_external_module
-            .get(abs)
-            .copied()
-            .unwrap_or(true);
+        let is_external_module = file_is_external_module.get(abs).copied().unwrap_or(true);
         if is_external_module {
             let module_idx = module_abs.len();
             module_index.insert(abs.clone(), module_idx);
@@ -260,16 +257,18 @@ fn merge_resolved_into_node(
     additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
 ) {
     if symbol_file_path != &existing.file_path {
-        let seen = additional_files_seen.entry(merged_index).or_insert_with(|| {
-            let mut known_paths = HashSet::new();
-            known_paths.insert(existing.file_path.clone());
-            if let Some(files) = &existing.additional_files {
-                for path in files.iter() {
-                    known_paths.insert(path.clone());
+        let seen = additional_files_seen
+            .entry(merged_index)
+            .or_insert_with(|| {
+                let mut known_paths = HashSet::new();
+                known_paths.insert(existing.file_path.clone());
+                if let Some(files) = &existing.additional_files {
+                    for path in files.iter() {
+                        known_paths.insert(path.clone());
+                    }
                 }
-            }
-            known_paths
-        });
+                known_paths
+            });
         if seen.insert(symbol_file_path.clone()) {
             match &mut existing.additional_files {
                 Some(files) => {
@@ -364,7 +363,9 @@ fn index_imports_by_local_name(
         let mut by_name: HashMap<SharedString, ParsedImport> =
             HashMap::with_capacity(imports.len());
         for import in imports {
-            by_name.entry(import.name.clone()).or_insert_with(|| import.clone());
+            by_name
+                .entry(import.name.clone())
+                .or_insert_with(|| import.clone());
         }
         out.insert(abs_path.clone(), by_name);
     }
@@ -500,7 +501,8 @@ fn resolve_dependency_ids_for_symbol(
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
             let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
             if !abs_paths.is_empty() {
-                let rel_path = make_relative_to_package(&abs_paths[0], package_dir_str, normalized_pkg_dir);
+                let rel_path =
+                    make_relative_to_package(&abs_paths[0], package_dir_str, normalized_pkg_dir);
                 let key: SharedString = format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
                 if let Some(ids) = file_local_to_ids.get(&key) {
                     target_ids.extend(ids.iter().cloned());
@@ -530,8 +532,11 @@ fn resolve_dependency_ids_for_symbol(
                 let abs_source_paths =
                     dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
                 if !abs_source_paths.is_empty() {
-                    let rel_source_path =
-                        make_relative_to_package(&abs_source_paths[0], package_dir_str, normalized_pkg_dir);
+                    let rel_source_path = make_relative_to_package(
+                        &abs_source_paths[0],
+                        package_dir_str,
+                        normalized_pkg_dir,
+                    );
                     let original_name = matching_import
                         .original_name
                         .as_deref()
@@ -545,8 +550,10 @@ fn resolve_dependency_ids_for_symbol(
             }
 
             if target_ids.is_empty()
-                && let (Some(import_map), Some((qualifier, member_path))) =
-                    (import_maps_per_file.get(abs_lookup.as_ref()), namespace_qual)
+                && let (Some(import_map), Some((qualifier, member_path))) = (
+                    import_maps_per_file.get(abs_lookup.as_ref()),
+                    namespace_qual,
+                )
                 && let Some(ns_import) = import_map.get(qualifier)
             {
                 let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
@@ -585,8 +592,11 @@ fn resolve_dependency_ids_for_symbol(
                 );
                 let mut from_closure: HashSet<SharedString> = HashSet::new();
                 for reachable_abs in closure {
-                    let relative_file_path =
-                        make_relative_to_package(reachable_abs.as_ref(), package_dir_str, normalized_pkg_dir);
+                    let relative_file_path = make_relative_to_package(
+                        reachable_abs.as_ref(),
+                        package_dir_str,
+                        normalized_pkg_dir,
+                    );
                     if relative_file_path == symbol_node.file_path.as_ref() {
                         continue;
                     }
@@ -754,10 +764,7 @@ pub fn build_package_graph(
     };
 
     let crawl_phase_start = Instant::now();
-    let crawl_result = crawl(
-        &entry.types_entries,
-        Some(merged_crawl_opts),
-    );
+    let crawl_result = crawl(&entry.types_entries, Some(merged_crawl_opts));
     let crawl_duration_ms = crawl_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
         &graph_profile_label(&package_info.name, "graph.crawl_total"),
@@ -825,9 +832,7 @@ pub fn build_package_graph(
             let scope_key = merge_scope_by_rel
                 .get(&symbol_file_path)
                 .cloned()
-                .unwrap_or_else(|| {
-                    SharedString::from(format!("m:{}", symbol_file_path.as_ref()))
-                });
+                .unwrap_or_else(|| SharedString::from(format!("m:{}", symbol_file_path.as_ref())));
             format!(
                 "{}::{}::{}",
                 scope_key.as_ref(),
@@ -839,9 +844,7 @@ pub fn build_package_graph(
             let scope_key = merge_scope_by_rel
                 .get(&symbol_file_path)
                 .cloned()
-                .unwrap_or_else(|| {
-                    SharedString::from(format!("m:{}", symbol_file_path.as_ref()))
-                });
+                .unwrap_or_else(|| SharedString::from(format!("m:{}", symbol_file_path.as_ref())));
             format!(
                 "{}::{}::{}",
                 scope_key.as_ref(),
@@ -1033,7 +1036,10 @@ pub fn build_package_graph(
     // Package-level name → id: Interface/TypeAlias, then Class, then Namespace, then backfill.
     name_to_id.clear();
     for symbol_node in &symbols {
-        if matches!(symbol_node.kind, SymbolKind::Interface | SymbolKind::TypeAlias) {
+        if matches!(
+            symbol_node.kind,
+            SymbolKind::Interface | SymbolKind::TypeAlias
+        ) {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
     }
@@ -1175,7 +1181,10 @@ pub fn build_package_graph(
             .push(symbol_node.id.clone());
     }
     for symbol_node in &symbols[pre_flatten_len..] {
-        if matches!(symbol_node.kind, SymbolKind::Interface | SymbolKind::TypeAlias) {
+        if matches!(
+            symbol_node.kind,
+            SymbolKind::Interface | SymbolKind::TypeAlias
+        ) {
             name_to_id.insert(symbol_node.name.clone(), symbol_node.id.clone());
         }
     }
@@ -1201,12 +1210,7 @@ pub fn build_package_graph(
     for ids in file_local_to_ids.values_mut() {
         ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
     }
-    assign_parent_symbol_ids(
-        &mut symbols,
-        &file_local_to_ids,
-        &name_to_id,
-        &id_to_kind,
-    );
+    assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id, &id_to_kind);
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -1301,10 +1305,7 @@ fn rank_parent_kind_for_member(parent_kind: SymbolKind, member: &SymbolNode) -> 
         };
     }
 
-    if matches!(
-        member.kind,
-        Interface | Class | Enum | TypeAlias
-    ) {
+    if matches!(member.kind, Interface | Class | Enum | TypeAlias) {
         return match parent_kind {
             Namespace => 0,
             Class => 1,
@@ -1580,18 +1581,32 @@ mod tests {
 
     #[test]
     fn namespace_enum_cross_file_mergeable_matches_expectation() {
-        assert!(is_namespace_or_enum_cross_file_mergeable(SymbolKind::Namespace));
+        assert!(is_namespace_or_enum_cross_file_mergeable(
+            SymbolKind::Namespace
+        ));
         assert!(is_namespace_or_enum_cross_file_mergeable(SymbolKind::Enum));
-        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Interface));
-        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::TypeAlias));
-        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Function));
-        assert!(!is_namespace_or_enum_cross_file_mergeable(SymbolKind::Class));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(
+            SymbolKind::Interface
+        ));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(
+            SymbolKind::TypeAlias
+        ));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(
+            SymbolKind::Function
+        ));
+        assert!(!is_namespace_or_enum_cross_file_mergeable(
+            SymbolKind::Class
+        ));
     }
 
     #[test]
     fn interface_type_alias_use_distinct_merge_scope_helpers() {
-        assert!(is_interface_or_type_alias_merge_scoped(SymbolKind::Interface));
-        assert!(is_interface_or_type_alias_merge_scoped(SymbolKind::TypeAlias));
+        assert!(is_interface_or_type_alias_merge_scoped(
+            SymbolKind::Interface
+        ));
+        assert!(is_interface_or_type_alias_merge_scoped(
+            SymbolKind::TypeAlias
+        ));
         assert!(!is_interface_or_type_alias_merge_scoped(SymbolKind::Class));
     }
 
@@ -1767,15 +1782,17 @@ mod tests {
             "with stub list, listed-dep should be npm stub"
         );
         assert!(
-            combined_stubbed.dependencies.iter().any(|dependency_id| {
-                dependency_id.as_ref().contains("other-dep")
-            }),
+            combined_stubbed
+                .dependencies
+                .iter()
+                .any(|dependency_id| { dependency_id.as_ref().contains("other-dep") }),
             "non-listed dependency still in-graph"
         );
         assert!(
-            graph_stubbed.symbols.iter().any(|symbol_node| {
-                symbol_node.file_path.as_ref().contains("other-dep")
-            }),
+            graph_stubbed
+                .symbols
+                .iter()
+                .any(|symbol_node| { symbol_node.file_path.as_ref().contains("other-dep") }),
             "non-stubbed dependency files remain in the graph"
         );
         for symbol_node in &graph_stubbed.symbols {
@@ -1886,7 +1903,10 @@ mod tests {
             1,
             "module+module with triple-slash reachability should merge"
         );
-        assert_eq!(module_reach_rows[0].file_path.as_ref(), "module-reach-core.d.ts");
+        assert_eq!(
+            module_reach_rows[0].file_path.as_ref(),
+            "module-reach-core.d.ts"
+        );
         assert!(
             module_reach_rows[0]
                 .additional_files
@@ -1921,10 +1941,15 @@ mod tests {
             .symbols
             .iter()
             .filter(|symbol_node| {
-                symbol_node.name.as_ref() == "ModulePair" && symbol_node.kind == SymbolKind::Namespace
+                symbol_node.name.as_ref() == "ModulePair"
+                    && symbol_node.kind == SymbolKind::Namespace
             })
             .collect();
-        assert_eq!(module_pair_rows.len(), 2, "module+module should remain separate rows");
+        assert_eq!(
+            module_pair_rows.len(),
+            2,
+            "module+module should remain separate rows"
+        );
         assert!(
             module_pair_rows
                 .iter()
@@ -1940,7 +1965,8 @@ mod tests {
             .symbols
             .iter()
             .filter(|symbol_node| {
-                symbol_node.name.as_ref() == "MixedScope" && symbol_node.kind == SymbolKind::Namespace
+                symbol_node.name.as_ref() == "MixedScope"
+                    && symbol_node.kind == SymbolKind::Namespace
             })
             .collect();
         assert_eq!(
@@ -1953,10 +1979,15 @@ mod tests {
             .symbols
             .iter()
             .filter(|symbol_node| {
-                symbol_node.name.as_ref() == "ScriptPair" && symbol_node.kind == SymbolKind::Namespace
+                symbol_node.name.as_ref() == "ScriptPair"
+                    && symbol_node.kind == SymbolKind::Namespace
             })
             .collect();
-        assert_eq!(script_pair_rows.len(), 1, "script+script should merge by script component scope");
+        assert_eq!(
+            script_pair_rows.len(),
+            1,
+            "script+script should merge by script component scope"
+        );
         let script_pair_id = script_pair_rows[0].id.clone();
         let script_alpha = graph
             .symbols
@@ -1968,7 +1999,10 @@ mod tests {
             .iter()
             .find(|symbol_node| symbol_node.name.as_ref() == "ScriptPair.beta")
             .expect("ScriptPair.beta symbol should exist");
-        assert_eq!(script_alpha.parent_symbol_id.as_ref(), Some(&script_pair_id));
+        assert_eq!(
+            script_alpha.parent_symbol_id.as_ref(),
+            Some(&script_pair_id)
+        );
         assert_eq!(script_beta.parent_symbol_id.as_ref(), Some(&script_pair_id));
     }
 
@@ -1992,8 +2026,7 @@ mod tests {
             .symbols
             .iter()
             .find(|symbol_node| {
-                symbol_node.name.as_ref() == "default"
-                    && symbol_node.kind == SymbolKind::Class
+                symbol_node.name.as_ref() == "default" && symbol_node.kind == SymbolKind::Class
             })
             .expect("default class symbol should exist");
 
@@ -2124,7 +2157,10 @@ mod tests {
         let es_tree_map = find("ParserServices.esTreeNodeToTSNodeMap");
         assert_eq!(es_tree_map.kind, SymbolKind::PropertySignature);
         assert_eq!(
-            es_tree_map.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            es_tree_map
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(parser_services.id.as_ref())
         );
 
@@ -2132,14 +2168,20 @@ mod tests {
         let on_flush = find("MethodSigParent.onFlush");
         assert_eq!(on_flush.kind, SymbolKind::MethodSignature);
         assert_eq!(
-            on_flush.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            on_flush
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(method_parent.id.as_ref())
         );
 
         let caliper_ns = find("CaliperNS");
         let bench_opts = find("CaliperNS.BenchOpts");
         assert_eq!(
-            bench_opts.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            bench_opts
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(caliper_ns.id.as_ref())
         );
         let label = find("CaliperNS.BenchOpts.label");
@@ -2152,11 +2194,17 @@ mod tests {
             Some(bench_opts.id.as_ref())
         );
         assert_eq!(
-            refresh.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            refresh
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(bench_opts.id.as_ref())
         );
         assert_eq!(
-            snapshot_fn.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            snapshot_fn
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(caliper_ns.id.as_ref())
         );
 
@@ -2164,18 +2212,27 @@ mod tests {
         let debug_level = find("ParserOptions.prototype.debugLevel");
         let get_parser = find("ParserOptions.prototype.getParser");
         assert_eq!(
-            debug_level.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            debug_level
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(parser_options.id.as_ref())
         );
         assert_eq!(
-            get_parser.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            get_parser
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(parser_options.id.as_ref())
         );
 
         let outer_ns = find("OuterNS");
         let inner_widget = find("OuterNS.InnerWidget");
         assert_eq!(
-            inner_widget.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            inner_widget
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(outer_ns.id.as_ref())
         );
         let slot = find("OuterNS.InnerWidget.prototype.slot");
@@ -2197,7 +2254,10 @@ mod tests {
             Some(bridge.id.as_ref())
         );
         assert_eq!(
-            measure.parent_symbol_id.as_ref().map(|value| value.as_ref()),
+            measure
+                .parent_symbol_id
+                .as_ref()
+                .map(|value| value.as_ref()),
             Some(bridge.id.as_ref())
         );
         assert!(bridge.parent_symbol_id.is_none());

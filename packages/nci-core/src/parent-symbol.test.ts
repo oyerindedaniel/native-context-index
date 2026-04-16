@@ -16,7 +16,9 @@ describe("parentNameForDottedMember", () => {
   });
 
   it("maps Outer.Inner.prototype.member to parent Outer.Inner (qualified class before prototype)", () => {
-    expect(parentNameForDottedMember("Outer.Inner.prototype.slot")).toBe("Outer.Inner");
+    expect(parentNameForDottedMember("Outer.Inner.prototype.slot")).toBe(
+      "Outer.Inner",
+    );
   });
 
   it("maps nested namespace-style paths before prototype", () => {

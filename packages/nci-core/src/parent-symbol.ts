@@ -5,11 +5,17 @@ import type { SymbolNode } from "./types.js";
  * Prefer a parent container when `filePath::parentName` maps to multiple symbol ids (namespace vs
  * function homonyms, namespace vs interface, etc.).
  */
-function rankParentKindForMember(parentKind: ts.SyntaxKind, member: SymbolNode): number {
+function rankParentKindForMember(
+  parentKind: ts.SyntaxKind,
+  member: SymbolNode,
+): number {
   const memberKind = member.kind;
 
   // Class instance/static body (homonym namespace + class): prefer Class.
-  if (memberKind === ts.SyntaxKind.MethodDeclaration || memberKind === ts.SyntaxKind.PropertyDeclaration) {
+  if (
+    memberKind === ts.SyntaxKind.MethodDeclaration ||
+    memberKind === ts.SyntaxKind.PropertyDeclaration
+  ) {
     if (parentKind === ts.SyntaxKind.ClassDeclaration) return 0;
     if (parentKind === ts.SyntaxKind.InterfaceDeclaration) return 1;
     if (parentKind === ts.SyntaxKind.ModuleDeclaration) return 2;
@@ -63,7 +69,7 @@ function rankParentKindForMember(parentKind: ts.SyntaxKind, member: SymbolNode):
 function pickPreferredParentId(
   candidateIds: string[],
   member: SymbolNode,
-  idToKind: Map<string, ts.SyntaxKind>
+  idToKind: Map<string, ts.SyntaxKind>,
 ): string | undefined {
   if (candidateIds.length === 0) return undefined;
   const ranked = [...candidateIds].sort((leftId, rightId) => {
@@ -86,7 +92,7 @@ export function assignParentSymbolIds(
   symbols: SymbolNode[],
   fileLocalToIds: Map<string, string[]>,
   nameToId: Map<string, string>,
-  idToKind: Map<string, ts.SyntaxKind>
+  idToKind: Map<string, ts.SyntaxKind>,
 ): void {
   for (const node of symbols) {
     const parentName = parentNameForDottedMember(node.name);

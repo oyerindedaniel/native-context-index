@@ -3,24 +3,24 @@
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::{generate, Shell};
-use dialoguer::{theme::ColorfulTheme, Input};
+use clap_complete::{Shell, generate};
+use dialoguer::{Input, theme::ColorfulTheme};
 use serde::Serialize;
 
 use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
-use nci_engine::constants::{max_hops_from_user_value, DEFAULT_MAX_HOPS};
+use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
 use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::resolver::normalize_dependency_stub_list;
-use nci_engine::scanner::{self, find_package_in_node_modules, ScanError};
+use nci_engine::scanner::{self, ScanError, find_package_in_node_modules};
 use nci_engine::storage::{
-    verify_sqlite_file_header, DatabaseStatusReport, NciDatabase, StorageError,
+    DatabaseStatusReport, NciDatabase, StorageError, verify_sqlite_file_header,
 };
 use serde_json::Value;
 
@@ -81,9 +81,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(
-        about = "Interactive setup (or -y): create .nci.toml and open the database"
-    )]
+    #[command(about = "Interactive setup (or -y): create .nci.toml and open the database")]
     Init {
         #[arg(short = 'y', long, help = "Accept all defaults (non-interactive)")]
         defaults: bool,
@@ -175,10 +173,7 @@ enum DbCommands {
 #[derive(Subcommand)]
 enum IndexTarget {
     #[command(about = "Index one package from node_modules (exact name and version)")]
-    Package {
-        name: String,
-        version: String,
-    },
+    Package { name: String, version: String },
 }
 
 #[derive(Parser, Clone)]
@@ -362,7 +357,10 @@ fn open_database_at(path: &Path) -> Result<NciDatabase, String> {
     NciDatabase::open(path).map_err(|err| err.to_string())
 }
 
-fn open_database(cli: &Cli, file: Option<&NciConfigFile>) -> Result<(PathBuf, NciDatabase), String> {
+fn open_database(
+    cli: &Cli,
+    file: Option<&NciConfigFile>,
+) -> Result<(PathBuf, NciDatabase), String> {
     let path = resolve_database_path(cli, file)?;
     let db = open_database_at(&path)?;
     Ok((path, db))
@@ -465,7 +463,9 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
             .map_err(|err| err.to_string())?;
         let fmt = fmt_line.trim().to_ascii_lowercase();
         if fmt != "plain" && fmt != "json" && fmt != "jsonl" {
-            return Err(format!("unknown format {fmt:?}; choose plain, json, or jsonl"));
+            return Err(format!(
+                "unknown format {fmt:?}; choose plain, json, or jsonl"
+            ));
         }
         file_cfg.format = Some(fmt);
 
@@ -489,7 +489,9 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         .clone()
         .ok_or_else(|| "database path missing after init".to_string())?;
     let database = open_database_at(&db_path)?;
-    let schema = database.stored_schema_version().map_err(|err| err.to_string())?;
+    let schema = database
+        .stored_schema_version()
+        .map_err(|err| err.to_string())?;
     println!("{}", db_path.display());
     println!("sqlite schema version {schema}");
     println!(
@@ -507,7 +509,9 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
     match cmd {
         DbCommands::Init => {
             let (path, database) = open_database(cli, file.as_ref())?;
-            let schema = database.stored_schema_version().map_err(|err| err.to_string())?;
+            let schema = database
+                .stored_schema_version()
+                .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => {
                     println!("{}", path.display());
@@ -528,7 +532,9 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
         DbCommands::Status => {
             let path = resolve_database_path(cli, file.as_ref())?;
             let database = open_database_at(&path)?;
-            let report = database.status_report(&path).map_err(|err| err.to_string())?;
+            let report = database
+                .status_report(&path)
+                .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => print_status_plain(&report),
                 OutputFormat::Json | OutputFormat::Jsonl => {
@@ -542,7 +548,9 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.clear_all_packages().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("cleared all packages"),
-                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "cleared" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({ "ok": true, "data": "cleared" }))?
+                }
             }
             Ok(())
         }
@@ -586,7 +594,9 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             fs::remove_file(&path).map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("removed {}", path.display()),
-                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": { "path": path } }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({ "ok": true, "data": { "path": path } }))?
+                }
             }
             Ok(())
         }
@@ -595,16 +605,21 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.vacuum().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("vacuum complete"),
-                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "vacuum" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({ "ok": true, "data": "vacuum" }))?
+                }
             }
             Ok(())
         }
         DbCommands::WalCheckpoint => {
             let (_, db) = open_database(cli, file.as_ref())?;
-            db.wal_checkpoint_truncate().map_err(|err| err.to_string())?;
+            db.wal_checkpoint_truncate()
+                .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("wal_checkpoint(TRUNCATE) complete"),
-                OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({ "ok": true, "data": "wal_checkpoint" }))?,
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({ "ok": true, "data": "wal_checkpoint" }))?
+                }
             }
             Ok(())
         }
@@ -631,11 +646,7 @@ fn build_index_options(
     bulk: &BulkIndexArgs,
 ) -> Result<IndexOptions, String> {
     let db_path = merge_database_path(cli, file);
-    let max_hops = max_hops_from_user_value(
-        bulk
-            .max_hops
-            .or(file.and_then(|toml| toml.max_hops)),
-    )?;
+    let max_hops = max_hops_from_user_value(bulk.max_hops.or(file.and_then(|toml| toml.max_hops)))?;
     let parallel = bulk
         .parallel
         .or(file.and_then(|toml| toml.parallel))
@@ -670,7 +681,11 @@ fn build_index_options(
 }
 
 /// Per-package stderr progress for `nci index` plain output only ([`OutputFormat::Plain`]).
-fn with_plain_index_progress(mut opts: IndexOptions, total: usize, fmt: OutputFormat) -> IndexOptions {
+fn with_plain_index_progress(
+    mut opts: IndexOptions,
+    total: usize,
+    fmt: OutputFormat,
+) -> IndexOptions {
     if fmt != OutputFormat::Plain || total == 0 {
         return opts;
     }
@@ -678,8 +693,7 @@ fn with_plain_index_progress(mut opts: IndexOptions, total: usize, fmt: OutputFo
     let packages_completed = Arc::new(AtomicUsize::new(0));
     let packages_completed_for_callback = Arc::clone(&packages_completed);
     opts.on_package_done = Some(Arc::new(move |p: pipeline::PackageProgress| {
-        let one_based_index =
-            packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
+        let one_based_index = packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
         let elapsed = start.elapsed();
         let src = match p.source {
             GraphSource::Cached => "cached",
@@ -702,10 +716,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
 
     if bulk.dry_run {
         let node_modules = project_root.join("node_modules");
-        let packages =
-            scanner::scan_packages(&node_modules)
-                .map_err(|scan_err: ScanError| scan_err.to_string())?;
-        let filter = build_filter(file.as_ref(), &bulk.package_globs).with_nciignore_file(&project_root);
+        let packages = scanner::scan_packages(&node_modules)
+            .map_err(|scan_err: ScanError| scan_err.to_string())?;
+        let filter =
+            build_filter(file.as_ref(), &bulk.package_globs).with_nciignore_file(&project_root);
         let filtered = filter.apply(packages);
         match fmt {
             OutputFormat::Plain => {
@@ -778,9 +792,7 @@ fn print_index_summary(
     let crawled = n - cached;
     match fmt {
         OutputFormat::Plain => {
-            println!(
-                "{n} packages indexed (cached: {cached}, crawled: {crawled})"
-            );
+            println!("{n} packages indexed (cached: {cached}, crawled: {crawled})");
         }
         OutputFormat::Json | OutputFormat::Jsonl => {
             print_json(&serde_json::json!({
@@ -823,7 +835,9 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
             }
         }
         QueryCommands::Packages => {
-            let rows = database.list_indexed_packages().map_err(|err| err.to_string())?;
+            let rows = database
+                .list_indexed_packages()
+                .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => {
                     for (name, ver) in rows {
@@ -938,19 +952,16 @@ fn run_sql(
                 SqlRowsFormat::Jsonl => {
                     serde_json::to_writer(&mut out, &row_obj)
                         .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
-                    writeln!(&mut out)
-                        .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
+                    writeln!(&mut out).map_err(|err| StorageError::SqlOutput(err.to_string()))?;
                 }
                 SqlRowsFormat::Json => {
                     if !json_array_open {
-                        write!(&mut out, "[").map_err(|err| {
-                            StorageError::SqlOutput(err.to_string())
-                        })?;
+                        write!(&mut out, "[")
+                            .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
                         json_array_open = true;
                     } else {
-                        write!(&mut out, ",").map_err(|err| {
-                            StorageError::SqlOutput(err.to_string())
-                        })?;
+                        write!(&mut out, ",")
+                            .map_err(|err| StorageError::SqlOutput(err.to_string()))?;
                     }
                     serde_json::to_writer(&mut out, &row_obj)
                         .map_err(|err| StorageError::SqlOutput(err.to_string()))?;

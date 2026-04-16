@@ -188,22 +188,20 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let mut type_ref_packages: Vec<SharedString> = session.type_ref_packages.into_iter().collect();
     type_ref_packages.sort();
 
-    let absolute_to_package_relative =
-        if let Some(ref pkg_dir) = crawl_options.package_dir_for_relative_paths {
-            let norm_pkg = pkg_dir.replace('\\', "/");
-            let mut relative_by_absolute = HashMap::with_capacity(visited_files.len());
-            for visited_abs in &visited_files {
-                let rel = make_relative_to_package(
-                    visited_abs.as_ref(),
-                    pkg_dir.as_ref(),
-                    norm_pkg.as_str(),
-                );
-                relative_by_absolute.insert(visited_abs.clone(), SharedString::from(rel.as_str()));
-            }
-            relative_by_absolute
-        } else {
-            HashMap::new()
-        };
+    let absolute_to_package_relative = if let Some(ref pkg_dir) =
+        crawl_options.package_dir_for_relative_paths
+    {
+        let norm_pkg = pkg_dir.replace('\\', "/");
+        let mut relative_by_absolute = HashMap::with_capacity(visited_files.len());
+        for visited_abs in &visited_files {
+            let rel =
+                make_relative_to_package(visited_abs.as_ref(), pkg_dir.as_ref(), norm_pkg.as_str());
+            relative_by_absolute.insert(visited_abs.clone(), SharedString::from(rel.as_str()));
+        }
+        relative_by_absolute
+    } else {
+        HashMap::new()
+    };
 
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
@@ -1132,9 +1130,10 @@ mod tests {
 
         let baseline = crawl(&[entry.clone()], None);
         assert!(
-            baseline.visited_files.iter().any(|visited_path| {
-                visited_path.as_ref().contains("stub-npm-pkg")
-            }),
+            baseline
+                .visited_files
+                .iter()
+                .any(|visited_path| { visited_path.as_ref().contains("stub-npm-pkg") }),
             "without stub roots, dependency package should be visited: {:?}",
             baseline.visited_files
         );
@@ -1149,9 +1148,10 @@ mod tests {
             }),
         );
         assert!(
-            !stubbed.visited_files.iter().any(|visited_path| {
-                visited_path.as_ref().contains("stub-npm-pkg")
-            }),
+            !stubbed
+                .visited_files
+                .iter()
+                .any(|visited_path| { visited_path.as_ref().contains("stub-npm-pkg") }),
             "stub-listed roots must not add stub package files to visited set: {:?}",
             stubbed.visited_files
         );
@@ -1228,12 +1228,18 @@ mod tests {
             }),
         );
         assert!(
-            unblocked.visited_files.iter().any(|path| path.as_ref().contains("inner")),
+            unblocked
+                .visited_files
+                .iter()
+                .any(|path| path.as_ref().contains("inner")),
             "with self-exempt, inner.d.ts must be visited: {:?}",
             unblocked.visited_files
         );
         assert!(
-            unblocked.exports.iter().any(|symbol| symbol.name.as_ref() == "Inner"),
+            unblocked
+                .exports
+                .iter()
+                .any(|symbol| symbol.name.as_ref() == "Inner"),
             "Inner symbol should be extracted"
         );
     }
@@ -1241,8 +1247,12 @@ mod tests {
     fn hop_limit_chain_entry() -> SharedString {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../nci-core/fixtures/hop-limit-chain/index.d.ts");
-        let path = fs::canonicalize(&path)
-            .unwrap_or_else(|err| panic!("hop-limit-chain fixture missing at {}: {err}", path.display()));
+        let path = fs::canonicalize(&path).unwrap_or_else(|err| {
+            panic!(
+                "hop-limit-chain fixture missing at {}: {err}",
+                path.display()
+            )
+        });
         normalize_path(&path)
     }
 

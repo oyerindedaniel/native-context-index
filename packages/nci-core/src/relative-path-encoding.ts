@@ -30,7 +30,10 @@ export function encodeOutsidePackageRelative(relativePath: string): string {
 }
 
 /** Package root–relative path (same rules as the Rust engine `make_relative_to_package`). */
-export function makePackageRelativePath(absPath: string, packageDir: string): string {
+export function makePackageRelativePath(
+  absPath: string,
+  packageDir: string,
+): string {
   const normalized = absPath.replace(/\\/g, "/");
   const normalizedDir = packageDir.replace(/\\/g, "/");
 

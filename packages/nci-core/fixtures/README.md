@@ -9,6 +9,7 @@ This directory contains test fixtures for the `nci-core` package.
 Stable, reusable test scenarios live as committed directories (e.g., `simple-export/`, `re-export-chain/`). Each directory represents a minimal package structure with a `package.json` and `.d.ts` files.
 
 Use static fixtures when the test data is:
+
 - Deterministic and reproducible
 - Reused across multiple tests
 - Worth inspecting manually during debugging
@@ -18,6 +19,7 @@ Use static fixtures when the test data is:
 Edge cases that cannot be committed (broken symlinks, corrupt JSON, platform-specific scenarios) are created at runtime using `os.tmpdir()` and cleaned up in `finally` blocks.
 
 Use dynamic temps when:
+
 - The scenario involves OS-level operations (symlinks, permissions)
 - The file content is intentionally invalid (corrupt JSON)
 - The test is platform-specific
@@ -37,5 +39,6 @@ All fixtures and test symbols must use **functional, purpose-driven notation**. 
 `describe` and `it` blocks must use generic, purpose-driven language. They should describe **what** the code solves or **how** it behaves, rather than referencing internal metrics like "coverage" or implementation details like "testing the if statement."
 
 **Example**:
+
 - ❌ `it("hits the else branch in parseFile for coverage")`
 - ✅ `it("handles missing module specifiers gracefully")`

@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 const fixturesDir = path.resolve(__dirname, "../fixtures");
 const snapshotDir = path.resolve(
   __dirname,
-  "../../nci-engine/tests/snapshots/oracle"
+  "../../nci-engine/tests/snapshots/oracle",
 );
 
 const args = process.argv.slice(2);
@@ -92,6 +92,8 @@ for (const fixtureName of fixtures) {
     fs.writeFileSync(outputPath, JSON.stringify(normalised, null, 2) + "\n");
     console.log(`   ✅ ${fixtureName}`);
   } catch (err) {
-    console.log(`   ❌ ${fixtureName} — ${err instanceof Error ? err.message : err}`);
+    console.log(
+      `   ❌ ${fixtureName} — ${err instanceof Error ? err.message : err}`,
+    );
   }
 }

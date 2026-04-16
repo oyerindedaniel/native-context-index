@@ -26,9 +26,10 @@ const __dirname = path.dirname(__filename);
 
 const args = process.argv.slice(2);
 const outputIdx = args.indexOf("--output");
-const outputPath = outputIdx !== -1 && args[outputIdx + 1]
-  ? path.resolve(args[outputIdx + 1])
-  : path.resolve(__dirname, "../nci-report.json");
+const outputPath =
+  outputIdx !== -1 && args[outputIdx + 1]
+    ? path.resolve(args[outputIdx + 1])
+    : path.resolve(__dirname, "../nci-report.json");
 
 const prettyPrint = args.includes("--pretty");
 if (args.includes("--profile")) {
@@ -86,9 +87,13 @@ const scanMs = Math.round(performance.now() - scanStart);
 
 let packagesToIndex = allPackages;
 if (targetPackages.length > 0) {
-  packagesToIndex = allPackages.filter((pkg) => targetPackages.includes(pkg.name));
+  packagesToIndex = allPackages.filter((pkg) =>
+    targetPackages.includes(pkg.name),
+  );
   if (packagesToIndex.length === 0) {
-    console.error(`❌ No packages found matching: ${targetPackages.join(", ")}`);
+    console.error(
+      `❌ No packages found matching: ${targetPackages.join(", ")}`,
+    );
     process.exit(1);
   }
 }
@@ -141,11 +146,19 @@ console.log("\n" + "═".repeat(70));
 console.log("📊 SUMMARY\n");
 console.log(`   Scan time:       ${scanMs}ms`);
 console.log(`   Total packages:  ${reports.length}`);
-console.log(`   With types:      ${reports.filter((report) => report.totalSymbols > 0).length}`);
-console.log(`   Without types:   ${reports.filter((report) => report.totalSymbols === 0).length}`);
+console.log(
+  `   With types:      ${reports.filter((report) => report.totalSymbols > 0).length}`,
+);
+console.log(
+  `   Without types:   ${reports.filter((report) => report.totalSymbols === 0).length}`,
+);
 console.log(`   Errors:          ${errors.length}`);
-console.log(`   Total symbols:   ${reports.reduce((sum, report) => sum + report.totalSymbols, 0)}`);
-console.log(`   Total files:     ${reports.reduce((sum, report) => sum + report.totalFiles, 0)}`);
+console.log(
+  `   Total symbols:   ${reports.reduce((sum, report) => sum + report.totalSymbols, 0)}`,
+);
+console.log(
+  `   Total files:     ${reports.reduce((sum, report) => sum + report.totalFiles, 0)}`,
+);
 console.log(`   Graph time:      ${totalTime}ms\n`);
 
 console.log(
@@ -187,7 +200,9 @@ const output = {
 };
 
 const stringifyStart = performance.now();
-const jsonStr = prettyPrint ? JSON.stringify(output, null, 2) : JSON.stringify(output);
+const jsonStr = prettyPrint
+  ? JSON.stringify(output, null, 2)
+  : JSON.stringify(output);
 const stringifyMs = Math.round(performance.now() - stringifyStart);
 
 const writeStart = performance.now();
@@ -197,4 +212,6 @@ const fileSizeKB = (fs.statSync(outputPath).size / 1024).toFixed(1);
 
 console.log(`\n💾 Report saved to: ${outputPath}`);
 console.log(`   File size: ${fileSizeKB} KB`);
-console.log(`   Stringify: ${stringifyMs}ms | Write: ${writeMs}ms${prettyPrint ? " (pretty)" : " (compact)"}\n`);
+console.log(
+  `   Stringify: ${stringifyMs}ms | Write: ${writeMs}ms${prettyPrint ? " (pretty)" : " (compact)"}\n`,
+);

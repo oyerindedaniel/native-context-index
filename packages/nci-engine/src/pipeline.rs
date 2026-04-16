@@ -184,10 +184,7 @@ thread_local! {
 /// so the next probe retries after the writer creates the file).
 fn release_read_only_sqlite_thread_local() {
     INDEX_RO_SQLITE.with(|cell| {
-        let has_open_db = cell
-            .borrow()
-            .as_ref()
-            .is_some_and(|(_, db)| db.is_some());
+        let has_open_db = cell.borrow().as_ref().is_some_and(|(_, db)| db.is_some());
         if has_open_db {
             *cell.borrow_mut() = None;
         }
@@ -295,10 +292,7 @@ pub fn scan_filtered_packages(
     options: &IndexOptions,
 ) -> Result<Vec<PackageInfo>, ScanError> {
     let packages = scan_packages(node_modules)?;
-    let filter = merge_filter_for_scan(
-        options.project_root.as_deref(),
-        options.filter.clone(),
-    );
+    let filter = merge_filter_for_scan(options.project_root.as_deref(), options.filter.clone());
     Ok(filter.apply(packages))
 }
 
@@ -337,7 +331,8 @@ pub fn index_packages(
 ) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
     let on_package_done = index_opts.on_package_done.clone();
-    let index_engine_cache_key = cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
+    let index_engine_cache_key =
+        cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
     let crawl_stub_roots: Arc<HashSet<String>> = Arc::new(
         index_opts
             .dependency_stub_packages
@@ -434,7 +429,11 @@ pub fn index_packages(
                     let mut last_err = None;
                     let mut saved = false;
                     for attempt in 0..save_attempts {
-                        match db.save_package(&package, &graph, engine_cache_key_for_writer.as_str()) {
+                        match db.save_package(
+                            &package,
+                            &graph,
+                            engine_cache_key_for_writer.as_str(),
+                        ) {
                             Ok(()) => {
                                 saved = true;
                                 break;
@@ -510,9 +509,12 @@ pub fn index_packages(
     let hydrate = index_opts.hydrate_cache_hits;
     let process_index = |i: usize, package: &PackageInfo| {
         if let Some(ref path) = cache_sqlite_path {
-            if let Some(indexed) =
-                try_package_cache_hit(package, path.as_path(), hydrate, index_engine_cache_key.as_str())
-            {
+            if let Some(indexed) = try_package_cache_hit(
+                package,
+                path.as_path(),
+                hydrate,
+                index_engine_cache_key.as_str(),
+            ) {
                 *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
                 if let Some(cb) = on_package_done.as_ref() {
                     cb(PackageProgress {
@@ -544,7 +546,9 @@ pub fn index_packages(
             return;
         }
 
-        let save_tx = save_tx_shared.as_ref().expect("save channel when sqlite path set");
+        let save_tx = save_tx_shared
+            .as_ref()
+            .expect("save channel when sqlite path set");
         let save_tx = Arc::clone(save_tx);
         if let Err(send_error) = save_tx.send((i, package.clone(), graph)) {
             let (_i, _pkg, graph) = send_error.0;
@@ -589,7 +593,12 @@ pub fn index_packages(
     Arc::try_unwrap(results)
         .expect("results Arc still held")
         .into_iter()
-        .map(|mutex| mutex.into_inner().expect("indexed result mutex poisoned").expect("indexed slot empty"))
+        .map(|mutex| {
+            mutex
+                .into_inner()
+                .expect("indexed result mutex poisoned")
+                .expect("indexed slot empty")
+        })
         .collect()
 }
 
@@ -761,7 +770,10 @@ mod tests {
             indexed[0].graph.is_none(),
             "expected no graph in RAM after save when retain_graph_after_save is false"
         );
-        let meta = indexed[0].cache_metadata.as_ref().expect("metadata after crawl+save");
+        let meta = indexed[0]
+            .cache_metadata
+            .as_ref()
+            .expect("metadata after crawl+save");
         assert_eq!(meta.package, "tiny-pkg".into());
         assert!(meta.total_symbols >= 1);
     }

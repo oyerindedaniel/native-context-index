@@ -10,18 +10,18 @@ try {
   fs.mkdirSync(realPkgDir);
   fs.writeFileSync(
     path.join(realPkgDir, "index.d.ts"),
-    `export type SharedType = { value: string };\nexport type AnotherType = { count: number };\n`
+    `export type SharedType = { value: string };\nexport type AnotherType = { count: number };\n`,
   );
   fs.writeFileSync(
     path.join(realPkgDir, "package.json"),
-    JSON.stringify({ name: "real-pkg", types: "index.d.ts" })
+    JSON.stringify({ name: "real-pkg", types: "index.d.ts" }),
   );
 
   const mainPkgDir = path.join(tempRoot, "main-pkg");
   fs.mkdirSync(mainPkgDir);
   fs.writeFileSync(
     path.join(mainPkgDir, "package.json"),
-    JSON.stringify({ name: "main-pkg", types: "index.d.ts" })
+    JSON.stringify({ name: "main-pkg", types: "index.d.ts" }),
   );
 
   const nodeModulesDir = path.join(mainPkgDir, "node_modules");
@@ -30,14 +30,14 @@ try {
 
   fs.writeFileSync(
     path.join(mainPkgDir, "index.d.ts"),
-    `export * from "../real-pkg/index";\nexport * from "real-pkg";\n`
+    `export * from "../real-pkg/index";\nexport * from "real-pkg";\n`,
   );
 
   const entryFile = path.join(mainPkgDir, "index.d.ts");
   const crawlResult = crawl(entryFile, { maxHops: 5 });
 
   const sharedTypeSymbols = crawlResult.exports.filter(
-    (symbolEntry) => symbolEntry.name === "SharedType"
+    (symbolEntry) => symbolEntry.name === "SharedType",
   );
 
   console.log(`Total symbols:      ${crawlResult.exports.length}`);

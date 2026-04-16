@@ -42,7 +42,11 @@ export function npmPackageRoot(specifier: string): string | null {
     return null;
   }
   // Remaining `letter:...` forms (e.g. unknown `x:` schemes) are not bare package roots.
-  if (trimmed.length >= 2 && isAsciiAlphabetic(trimmed[0]!) && trimmed[1] === ":") {
+  if (
+    trimmed.length >= 2 &&
+    isAsciiAlphabetic(trimmed[0]!) &&
+    trimmed[1] === ":"
+  ) {
     return null;
   }
 
@@ -55,7 +59,8 @@ export function npmPackageRoot(specifier: string): string | null {
     const scopeSegment = afterAt.slice(0, scopeDelim);
     const afterScope = afterAt.slice(scopeDelim + 1);
     const sepInPackage = afterScope.search(/[/\\]/);
-    const packageNameEnd = sepInPackage === -1 ? afterScope.length : sepInPackage;
+    const packageNameEnd =
+      sepInPackage === -1 ? afterScope.length : sepInPackage;
     if (packageNameEnd === 0) {
       return null;
     }

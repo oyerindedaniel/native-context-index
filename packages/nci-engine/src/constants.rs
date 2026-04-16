@@ -14,7 +14,9 @@ pub fn max_hops_from_user_value(opt: Option<i64>) -> Result<usize, String> {
             "max-hops must be {} (unlimited) or a non-negative integer, got {hops}",
             MAX_HOPS_UNLIMITED
         )),
-        hops => usize::try_from(hops).map_err(|_| format!("max-hops value {hops} does not fit usize")),
+        hops => {
+            usize::try_from(hops).map_err(|_| format!("max-hops value {hops} does not fit usize"))
+        }
     }
 }
 
@@ -127,15 +129,15 @@ mod tests {
 
     #[test]
     fn max_hops_from_user_value_unlimited() {
-        assert_eq!(max_hops_from_user_value(Some(MAX_HOPS_UNLIMITED)).unwrap(), usize::MAX);
+        assert_eq!(
+            max_hops_from_user_value(Some(MAX_HOPS_UNLIMITED)).unwrap(),
+            usize::MAX
+        );
     }
 
     #[test]
     fn max_hops_from_user_value_default_when_none() {
-        assert_eq!(
-            max_hops_from_user_value(None).unwrap(),
-            DEFAULT_MAX_HOPS
-        );
+        assert_eq!(max_hops_from_user_value(None).unwrap(), DEFAULT_MAX_HOPS);
     }
 
     #[test]

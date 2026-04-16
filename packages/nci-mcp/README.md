@@ -90,7 +90,9 @@ On Windows, use a Windows path for `NCI_BINARY`, e.g. `C:\\path\\to\\nci.exe`.
   "mcpServers": {
     "nci": {
       "command": "node",
-      "args": ["C:/path/to/native-context-modules/packages/nci-mcp/dist/index.js"],
+      "args": [
+        "C:/path/to/native-context-modules/packages/nci-mcp/dist/index.js"
+      ],
       "env": {
         "NCI_BINARY": "C:/path/to/native-context-modules/packages/nci/vendor/nci.exe"
       }

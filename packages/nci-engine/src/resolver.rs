@@ -142,8 +142,10 @@ pub fn normalize_dependency_stub_list(
             continue;
         }
         if trimmed.starts_with('@') {
-            let segments: Vec<&str> =
-                trimmed.split('/').filter(|segment| !segment.is_empty()).collect();
+            let segments: Vec<&str> = trimmed
+                .split('/')
+                .filter(|segment| !segment.is_empty())
+                .collect();
             if segments.len() == 2 && segments[0].starts_with('@') {
                 norm_buf.clear();
                 norm_buf.push('@');
@@ -1130,15 +1132,15 @@ mod tests {
         assert_eq!(npm_package_root("zod/v4"), Some("zod".into()));
         assert_eq!(npm_package_root("zod\\v4"), Some("zod".into()));
         assert_eq!(npm_package_root("Lodash"), Some("lodash".into()));
-        assert_eq!(npm_package_root("lodash.merge"), Some("lodash.merge".into()));
+        assert_eq!(
+            npm_package_root("lodash.merge"),
+            Some("lodash.merge".into())
+        );
     }
 
     #[test]
     fn npm_package_root_scoped() {
-        assert_eq!(
-            npm_package_root("@Foo/Bar"),
-            Some("@foo/bar".into())
-        );
+        assert_eq!(npm_package_root("@Foo/Bar"), Some("@foo/bar".into()));
         assert_eq!(
             npm_package_root("@SCOPE/pkg/subpath"),
             Some("@scope/pkg".into())
@@ -1147,10 +1149,7 @@ mod tests {
             npm_package_root("@SCOPE/pkg\\deep"),
             Some("@scope/pkg".into())
         );
-        assert_eq!(
-            npm_package_root("@123/456"),
-            Some("@123/456".into())
-        );
+        assert_eq!(npm_package_root("@123/456"), Some("@123/456".into()));
     }
 
     #[test]
@@ -1173,8 +1172,7 @@ mod tests {
 
     #[test]
     fn normalize_dependency_stub_list_sort_dedupes() {
-        let normalized_stubs =
-            normalize_dependency_stub_list(["zod", "A", "zod", "@B/C"]);
+        let normalized_stubs = normalize_dependency_stub_list(["zod", "A", "zod", "@B/C"]);
         assert_eq!(normalized_stubs, vec!["@b/c", "a", "zod"]);
     }
 
@@ -1182,7 +1180,11 @@ mod tests {
     fn specifier_is_dependency_stub_matches_normalized_roots() {
         let mut stub_roots = HashSet::new();
         stub_roots.insert("zod".to_string());
-        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots, None));
+        assert!(specifier_is_dependency_stub(
+            "zod/v4/classic",
+            &stub_roots,
+            None
+        ));
         assert!(!specifier_is_dependency_stub("./local", &stub_roots, None));
         assert!(!specifier_is_dependency_stub("zod", &HashSet::new(), None));
     }
@@ -1191,8 +1193,16 @@ mod tests {
     fn specifier_is_dependency_stub_self_exempt_skips_own_package_root() {
         let mut stub_roots = HashSet::new();
         stub_roots.insert("zod".to_string());
-        assert!(!specifier_is_dependency_stub("zod/v4/classic", &stub_roots, Some("zod")));
-        assert!(specifier_is_dependency_stub("zod/v4/classic", &stub_roots, Some("other-pkg")));
+        assert!(!specifier_is_dependency_stub(
+            "zod/v4/classic",
+            &stub_roots,
+            Some("zod")
+        ));
+        assert!(specifier_is_dependency_stub(
+            "zod/v4/classic",
+            &stub_roots,
+            Some("other-pkg")
+        ));
 
         let mut scoped = HashSet::new();
         scoped.insert("@scope/pkg".to_string());
@@ -1302,11 +1312,7 @@ mod tests {
         fs::write(typings.join("b.d.ts"), "export const b = 1;").unwrap();
         fs::write(typings.join("skipped.ts"), "").unwrap();
         for noise_file_index in 0..15u8 {
-            fs::write(
-                typings.join(format!("extra{noise_file_index}.js")),
-                "",
-            )
-            .unwrap();
+            fs::write(typings.join(format!("extra{noise_file_index}.js")), "").unwrap();
         }
 
         let entry = resolve_types_entry(pkg).unwrap();
@@ -1317,8 +1323,6 @@ mod tests {
             .collect();
         paths.sort();
         assert_eq!(paths.len(), 2, "expected two .d.ts matches, got {paths:?}");
-        assert!(paths
-            .iter()
-            .all(|entry_path| entry_path.ends_with(".d.ts")));
+        assert!(paths.iter().all(|entry_path| entry_path.ends_with(".d.ts")));
     }
 }
