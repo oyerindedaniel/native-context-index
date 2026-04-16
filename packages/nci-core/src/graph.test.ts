@@ -706,6 +706,43 @@ describe("buildPackageGraph", () => {
     expect(nsWithSince).toBeDefined();
   });
 
+  it("keeps relative string-module declarations distinct across external module files", () => {
+    const graphResult = buildPackageGraph(
+      makePackageInfo("relative-string-module-collision"),
+    );
+
+    const effectRows = graphResult.symbols.filter(
+      (symbolNode) =>
+        symbolNode.name === "./Effect.js" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+    const contextRows = graphResult.symbols.filter(
+      (symbolNode) =>
+        symbolNode.name === "./Context.js" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+
+    expect(effectRows).toHaveLength(2);
+    expect(contextRows).toHaveLength(2);
+
+    expect(
+      effectRows.some((symbolNode) => symbolNode.filePath === "effect-a.d.ts"),
+    ).toBe(true);
+    expect(
+      effectRows.some((symbolNode) => symbolNode.filePath === "effect-b.d.ts"),
+    ).toBe(true);
+    expect(
+      contextRows.some(
+        (symbolNode) => symbolNode.filePath === "context-a.d.ts",
+      ),
+    ).toBe(true);
+    expect(
+      contextRows.some(
+        (symbolNode) => symbolNode.filePath === "context-b.d.ts",
+      ),
+    ).toBe(true);
+  });
+
   it("handles duplicate symbol names from the SAME file (e.g. overloads) and assigns unique IDs", () => {
     const graphResult = buildPackageGraph(
       makePackageInfo("computed-properties"),

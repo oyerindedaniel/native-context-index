@@ -1,0 +1,326 @@
+{
+  "package": "relative-string-module-collision",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "relative-string-module-collision@1.0.0::EffectABase",
+      "name": "EffectABase",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-a.d.ts",
+      "signature": "export interface EffectABase {\n  readonly source: \"effect-a\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::EffectABase.source",
+      "name": "EffectABase.source",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-a.d.ts",
+      "signature": "readonly source: \"effect-a\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "relative-string-module-collision@1.0.0::EffectABase"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::EffectBBase",
+      "name": "EffectBBase",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-b.d.ts",
+      "signature": "export interface EffectBBase {\n  readonly source: \"effect-b\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::EffectBBase.source",
+      "name": "EffectBBase.source",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-b.d.ts",
+      "signature": "readonly source: \"effect-b\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "relative-string-module-collision@1.0.0::EffectBBase"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::ContextABase",
+      "name": "ContextABase",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-a.d.ts",
+      "signature": "export interface ContextABase {\n  readonly source: \"context-a\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::ContextABase.source",
+      "name": "ContextABase.source",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "context-a.d.ts",
+      "signature": "readonly source: \"context-a\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "relative-string-module-collision@1.0.0::ContextABase"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::ContextBBase",
+      "name": "ContextBBase",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-b.d.ts",
+      "signature": "export interface ContextBBase {\n  readonly source: \"context-b\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::ContextBBase.source",
+      "name": "ContextBBase.source",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "context-b.d.ts",
+      "signature": "readonly source: \"context-b\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "relative-string-module-collision@1.0.0::ContextBBase"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-a.d.ts::./Context.js",
+      "name": "./Context.js",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-a.d.ts",
+      "signature": "declare module \"./Context.js\" {\n  interface TagFromA {\n    readonly tagA: true;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA",
+      "name": "TagFromA",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-a.d.ts",
+      "signature": "interface TagFromA {\n    readonly tagA: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA.tagA",
+      "name": "TagFromA.tagA",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "context-a.d.ts",
+      "signature": "readonly tagA: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-b.d.ts::./Context.js",
+      "name": "./Context.js",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-b.d.ts",
+      "signature": "declare module \"./Context.js\" {\n  interface TagFromB {\n    readonly tagB: true;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB",
+      "name": "TagFromB",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "context-b.d.ts",
+      "signature": "interface TagFromB {\n    readonly tagB: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB.tagB",
+      "name": "TagFromB.tagB",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "context-b.d.ts",
+      "signature": "readonly tagB: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::./Effect.js",
+      "name": "./Effect.js",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-a.d.ts",
+      "signature": "declare module \"./Effect.js\" {\n  interface EffectFromA {\n    readonly fromA: true;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA",
+      "name": "EffectFromA",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-a.d.ts",
+      "signature": "interface EffectFromA {\n    readonly fromA: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA.fromA",
+      "name": "EffectFromA.fromA",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-a.d.ts",
+      "signature": "readonly fromA: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA"
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::./Effect.js",
+      "name": "./Effect.js",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-b.d.ts",
+      "signature": "declare module \"./Effect.js\" {\n  interface EffectFromB {\n    readonly fromB: true;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB",
+      "name": "EffectFromB",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-b.d.ts",
+      "signature": "interface EffectFromB {\n    readonly fromB: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB.fromB",
+      "name": "EffectFromB.fromB",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "relative-string-module-collision",
+      "filePath": "effect-b.d.ts",
+      "signature": "readonly fromB: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB"
+    }
+  ],
+  "totalSymbols": 20,
+  "totalFiles": 5,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -39,10 +39,7 @@ use nci_engine::scanner::scan_packages;
 
 /// Package roots for dependency stubbing (`npm::…` edges). Edit this slice; leave empty for default
 /// in-graph resolution. Not wired to CLI flags in this example.
-const DEMO_DEPENDENCY_STUB_PACKAGES: &[&str] = &[
-    "zod",
-    // "@types/node",
-];
+const DEMO_DEPENDENCY_STUB_PACKAGES: &[&str] = &[];
 struct IndexedSummary<'a> {
     package: &'a str,
     total_symbols: usize,

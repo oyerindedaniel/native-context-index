@@ -168,8 +168,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           symbolSpace: "value",
           isGlobalAugmentation: true,
           isExplicitExport: false,
-          signature:
-            statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
+          signature: statement.getText(sourceFile).trim(),
           ...jsdoc,
         });
         if (statement.body && ts.isModuleBlock(statement.body)) {
@@ -193,8 +192,7 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
           isTypeOnly: false,
           symbolSpace: "value",
           isExplicitExport: false,
-          signature:
-            statement.getText(sourceFile).split("{")[0]!.trim() + " { ... }",
+          signature: statement.getText(sourceFile).trim(),
           ...jsdoc,
         });
 
