@@ -324,6 +324,10 @@ macro_rules! snapshot_test {
 snapshot_test!(snapshot_simple_export, "simple-export");
 snapshot_test!(snapshot_re_export_chain, "re-export-chain");
 snapshot_test!(snapshot_namespace_cases, "namespace-cases");
+snapshot_test!(
+    snapshot_namespace_interface_same_name,
+    "namespace-interface-same-name"
+);
 snapshot_test!(snapshot_class_instance, "class-instance");
 snapshot_test!(
     snapshot_inherited_member_flattening,

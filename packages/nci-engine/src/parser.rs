@@ -1092,12 +1092,8 @@ fn extract_global_declaration<'a>(
             for export_item in &mut decl_exports {
                 export_item.is_explicit_export = true;
                 export_item.is_global_augmentation = global_decl_is_augmentation;
-                if needs_namespace_qualifier(export_item.name.as_ref(), member_prefix.as_ref()) {
-                    export_item.name = SharedString::from(
-                        format!("{}.{}", member_prefix.as_ref(), export_item.name).as_ref(),
-                    );
-                }
             }
+            apply_namespace_qualifier_to_exports(member_prefix.as_ref(), &mut decl_exports);
             exports.extend(decl_exports);
             continue;
         }
@@ -1113,12 +1109,8 @@ fn extract_global_declaration<'a>(
             for export_item in &mut decl_exports {
                 export_item.is_explicit_export = is_exported;
                 export_item.is_global_augmentation = global_decl_is_augmentation;
-                if needs_namespace_qualifier(export_item.name.as_ref(), member_prefix.as_ref()) {
-                    export_item.name = SharedString::from(
-                        format!("{}.{}", member_prefix.as_ref(), export_item.name).as_ref(),
-                    );
-                }
             }
+            apply_namespace_qualifier_to_exports(member_prefix.as_ref(), &mut decl_exports);
             exports.extend(decl_exports);
         }
     }
@@ -1137,6 +1129,45 @@ fn needs_namespace_qualifier(name: &str, parent: &str) -> bool {
         Some(rest) if rest.starts_with('.') => false,
         Some(_) => true,
         None => true,
+    }
+}
+
+/// Applies `parent.` to declaration roots inside a namespace block, then extends that prefix to
+/// member rows that still use the **pre-qualification** root (`Foo.bar` → `Ns.Foo.bar`).
+///
+/// Without the second step, `namespace Scope { interface Scope { x } }` leaves members as
+/// `Scope.x` (because `needs_namespace_qualifier` treats them as already under `Scope`) while the
+/// interface row becomes `Scope.Scope`, diverging from TS merge naming (`Scope.Scope.x`).
+fn apply_namespace_qualifier_to_exports(parent_name: &str, exports: &mut [ParsedExport]) {
+    let mut qualified_roots: Vec<(SharedString, SharedString)> = Vec::new();
+    for export_item in exports.iter_mut() {
+        if !needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
+            continue;
+        }
+        let old_root_name = export_item.name.clone();
+        let new_root_name: SharedString =
+            format!("{}.{}", parent_name, old_root_name.as_ref()).into();
+        if matches!(
+            export_item.kind,
+            SymbolKind::Interface | SymbolKind::Class | SymbolKind::TypeAlias | SymbolKind::Enum
+        ) {
+            qualified_roots.push((old_root_name, new_root_name.clone()));
+        }
+        export_item.name = new_root_name;
+    }
+    for (old_prefix, new_prefix) in qualified_roots {
+        let old_prefix_dot = format!("{}.", old_prefix.as_ref());
+        let new_prefix_dot = format!("{}.", new_prefix.as_ref());
+        for export_item in exports.iter_mut() {
+            let full_name = export_item.name.as_ref();
+            if full_name == new_prefix.as_ref() {
+                continue;
+            }
+            if full_name.starts_with(&old_prefix_dot) && !full_name.starts_with(&new_prefix_dot) {
+                let suffix = &full_name[old_prefix_dot.len()..];
+                export_item.name = format!("{}{}", new_prefix_dot, suffix).into();
+            }
+        }
     }
 }
 
@@ -1171,13 +1202,7 @@ fn extract_module_body<'a>(
                         local_decls,
                         ambient_innermost.clone(),
                     );
-                    for export_item in &mut decl_exports {
-                        if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
-                            export_item.name = SharedString::from(
-                                format!("{}.{}", parent_name, export_item.name).as_ref(),
-                            );
-                        }
-                    }
+                    apply_namespace_qualifier_to_exports(parent_name, &mut decl_exports);
                     exports.extend(decl_exports);
                     continue;
                 }
@@ -1194,12 +1219,8 @@ fn extract_module_body<'a>(
                 ) {
                     for export_item in &mut decl_exports {
                         export_item.is_explicit_export = is_exported;
-                        if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
-                            export_item.name = SharedString::from(
-                                format!("{}.{}", parent_name, export_item.name).as_ref(),
-                            );
-                        }
                     }
+                    apply_namespace_qualifier_to_exports(parent_name, &mut decl_exports);
                     exports.extend(decl_exports);
                 }
                 // `TSGlobalDeclaration` is handled inside `extract_direct_statement` — do not duplicate here.
