@@ -96,7 +96,8 @@
         "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls"
       ],
       "isInternal": true,
-      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS"
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS",
+      "enclosingModuleDeclarationId": "typeof-import-type-query@1.0.0::index.d.ts::NS"
     },
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::NS.box.ping",
@@ -110,7 +111,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS.box"
+      "parentSymbolId": "typeof-import-type-query@1.0.0::index.d.ts::NS.box",
+      "enclosingModuleDeclarationId": "typeof-import-type-query@1.0.0::index.d.ts::NS"
     },
     {
       "id": "typeof-import-type-query@1.0.0::index.d.ts::box.ping",

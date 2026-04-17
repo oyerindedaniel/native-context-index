@@ -229,6 +229,8 @@ export function crawl(
         since: exportEntry.since,
         heritage: exportEntry.heritage,
         isGlobalAugmentation: exportEntry.isGlobalAugmentation,
+        enclosingModuleDeclarationName:
+          exportEntry.enclosingModuleDeclarationName,
         isInternal: true,
       });
       seenResolvedKeys.add(dedupKey);
@@ -530,6 +532,8 @@ export function crawl(
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
           isGlobalAugmentation: exportEntry.isGlobalAugmentation,
+          enclosingModuleDeclarationName:
+            exportEntry.enclosingModuleDeclarationName,
         });
       }
     }
@@ -579,6 +583,8 @@ export function crawl(
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
           isGlobalAugmentation: exportEntry.isGlobalAugmentation,
+          enclosingModuleDeclarationName:
+            exportEntry.enclosingModuleDeclarationName,
         });
       }
       return results;
@@ -652,6 +658,8 @@ export function crawl(
           decorators: exportEntry.decorators,
           modifiers: exportEntry.modifiers,
           isGlobalAugmentation: exportEntry.isGlobalAugmentation,
+          enclosingModuleDeclarationName:
+            exportEntry.enclosingModuleDeclarationName,
         });
       }
     }
@@ -696,6 +704,7 @@ export function crawl(
         decorators: target.decorators,
         modifiers: target.modifiers,
         isGlobalAugmentation: target.isGlobalAugmentation,
+        enclosingModuleDeclarationName: target.enclosingModuleDeclarationName,
       });
     }
 
@@ -730,6 +739,7 @@ export function crawl(
           decorators: member.decorators,
           modifiers: member.modifiers,
           isGlobalAugmentation: member.isGlobalAugmentation,
+          enclosingModuleDeclarationName: member.enclosingModuleDeclarationName,
         });
       }
     }

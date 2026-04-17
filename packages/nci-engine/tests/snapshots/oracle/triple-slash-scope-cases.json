@@ -39,7 +39,8 @@
       "entryVisibility": [
         "index.d.ts"
       ],
-      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair"
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair",
+      "enclosingModuleDeclarationId": "triple-slash-scope-cases@1.0.0::ModulePair"
     },
     {
       "id": "triple-slash-scope-cases@1.0.0::MixedScope",
@@ -78,7 +79,8 @@
       "entryVisibility": [
         "index.d.ts"
       ],
-      "parentSymbolId": "triple-slash-scope-cases@1.0.0::MixedScope"
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::MixedScope",
+      "enclosingModuleDeclarationId": "triple-slash-scope-cases@1.0.0::MixedScope"
     },
     {
       "id": "triple-slash-scope-cases@1.0.0::ModulePair#2",
@@ -117,7 +119,8 @@
       "entryVisibility": [
         "index.d.ts"
       ],
-      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair#2"
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModulePair#2",
+      "enclosingModuleDeclarationId": "triple-slash-scope-cases@1.0.0::ModulePair#2"
     },
     {
       "id": "triple-slash-scope-cases@1.0.0::ModuleReachPair",
@@ -159,7 +162,8 @@
       "entryVisibility": [
         "index.d.ts"
       ],
-      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModuleReachPair"
+      "parentSymbolId": "triple-slash-scope-cases@1.0.0::ModuleReachPair",
+      "enclosingModuleDeclarationId": "triple-slash-scope-cases@1.0.0::ModuleReachPair"
     },
     {
       "id": "triple-slash-scope-cases@1.0.0::MixedScope#2",

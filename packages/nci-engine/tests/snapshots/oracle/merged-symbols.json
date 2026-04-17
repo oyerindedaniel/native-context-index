@@ -95,7 +95,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "merged-symbols@1.0.0::merged#2"
+      "parentSymbolId": "merged-symbols@1.0.0::merged#2",
+      "enclosingModuleDeclarationId": "merged-symbols@1.0.0::merged#2"
     },
     {
       "id": "merged-symbols@1.0.0::merged.Config.debug",
@@ -109,7 +110,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "merged-symbols@1.0.0::merged.Config"
+      "parentSymbolId": "merged-symbols@1.0.0::merged.Config",
+      "enclosingModuleDeclarationId": "merged-symbols@1.0.0::merged#2"
     },
     {
       "id": "merged-symbols@1.0.0::index.d.ts::merged",

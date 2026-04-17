@@ -341,7 +341,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib"
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib",
+      "enclosingModuleDeclarationId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib"
     },
     {
       "id": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual.pick",
@@ -355,7 +356,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual"
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual",
+      "enclosingModuleDeclarationId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib"
     },
     {
       "id": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual.pick#2",
@@ -369,7 +371,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual"
+      "parentSymbolId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual",
+      "enclosingModuleDeclarationId": "internal-overload-ref@1.0.0::ref.d.ts::RefLib"
     }
   ],
   "totalSymbols": 22,

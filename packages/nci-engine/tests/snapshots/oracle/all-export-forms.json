@@ -335,7 +335,8 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "enclosingModuleDeclarationId": "all-export-forms@1.0.0::index.d.ts::my-plugin"
     },
     {
       "id": "all-export-forms@1.0.0::PluginOptions.name",
@@ -349,7 +350,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "all-export-forms@1.0.0::PluginOptions"
+      "parentSymbolId": "all-export-forms@1.0.0::PluginOptions",
+      "enclosingModuleDeclarationId": "all-export-forms@1.0.0::index.d.ts::my-plugin"
     },
     {
       "id": "all-export-forms@1.0.0::helpers.d.ts::encode",
@@ -397,7 +399,7 @@
       "kindName": "ModuleDeclaration",
       "package": "all-export-forms",
       "filePath": "index.d.ts",
-      "signature": "declare module \"my-plugin\" { ... }",
+      "signature": "declare module \"my-plugin\" {\n  export interface PluginOptions {\n    name: string;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

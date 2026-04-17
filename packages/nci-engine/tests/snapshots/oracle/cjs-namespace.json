@@ -17,7 +17,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts",
+      "enclosingModuleDeclarationId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.Node.kind",
@@ -31,7 +32,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "cjs-namespace@1.0.0::ts.Node"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts.Node",
+      "enclosingModuleDeclarationId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.createNode",
@@ -48,7 +50,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts",
+      "enclosingModuleDeclarationId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.server",
@@ -65,7 +68,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::ts"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts",
+      "enclosingModuleDeclarationId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts.server.Project",
@@ -82,7 +86,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "cjs-namespace@1.0.0::ts.server"
+      "parentSymbolId": "cjs-namespace@1.0.0::ts.server",
+      "enclosingModuleDeclarationId": "cjs-namespace@1.0.0::ts"
     },
     {
       "id": "cjs-namespace@1.0.0::ts",

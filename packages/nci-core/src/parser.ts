@@ -173,7 +173,13 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
         });
         if (statement.body && ts.isModuleBlock(statement.body)) {
           for (const sub of statement.body.statements) {
-            const subExports = extractDirectExport(sub, sourceFile, false);
+            const subExports = extractDirectExport(
+              sub,
+              sourceFile,
+              false,
+              undefined,
+              "global",
+            );
             for (const subExp of subExports) {
               subExp.isGlobalAugmentation = true;
               exports.push(subExp);
@@ -203,6 +209,8 @@ export function parseFileFromSource(sourceFile: ts.SourceFile): {
               sub,
               sourceFile,
               isSubExported,
+              undefined,
+              statement.name.text,
             );
             for (const subExp of subExports) {
               exports.push(subExp);
@@ -313,12 +321,30 @@ export function getFileSource(filePath: string): ts.SourceFile {
   return getOrCreateSourceFile(filePath);
 }
 
+/** Stamp symbols lexically inside `declare module` / `declare global` / nested module blocks. */
+function applyAmbientModuleEnclosure(
+  rows: ParsedExport[],
+  ambientModuleContainerName: string | undefined,
+): void {
+  if (ambientModuleContainerName === undefined) return;
+  for (const row of rows) {
+    if (
+      row.kind === ts.SyntaxKind.ModuleDeclaration &&
+      row.name === ambientModuleContainerName
+    ) {
+      continue;
+    }
+    row.enclosingModuleDeclarationName = ambientModuleContainerName;
+  }
+}
+
 /** Extract architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.). */
 function extractDirectExport(
   statement: ts.Statement,
   sourceFile: ts.SourceFile,
   isExplicitExport: boolean,
   parentName?: string,
+  ambientModuleContainerName?: string,
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
@@ -356,15 +382,25 @@ function extractDirectExport(
               new Set(),
               "type",
               undefined,
+              ambientModuleContainerName,
             ),
           );
         }
       }
     }
+    applyAmbientModuleEnclosure(exports, ambientModuleContainerName);
     return exports;
   }
 
   if (isNamedDeclaration(statement)) {
+    const declarationScopeAmbient =
+      ts.isModuleDeclaration(statement) &&
+      statement.body &&
+      ts.isModuleBlock(statement.body) &&
+      (ts.isStringLiteral(statement.name) || ts.isIdentifier(statement.name))
+        ? statement.name.text
+        : ambientModuleContainerName;
+
     let rawName: string;
     if (
       ts.isModuleDeclaration(statement) &&
@@ -397,6 +433,14 @@ function extractDirectExport(
     const deps = extractTypeReferences(statement);
     const jsdoc = extractJSDocInfo(statement);
 
+    const nestedLexicalEnclosing =
+      ambientModuleContainerName !== undefined &&
+      ts.isModuleDeclaration(statement) &&
+      (ts.isStringLiteral(statement.name) || ts.isIdentifier(statement.name)) &&
+      statement.name.text !== ambientModuleContainerName
+        ? ambientModuleContainerName
+        : undefined;
+
     exports.push({
       name,
       kind: statement.kind,
@@ -413,6 +457,9 @@ function extractDirectExport(
         ts.isClassDeclaration(statement) || ts.isInterfaceDeclaration(statement)
           ? extractHeritage(statement, sourceFile)
           : undefined,
+      ...(nestedLexicalEnclosing !== undefined
+        ? { enclosingModuleDeclarationName: nestedLexicalEnclosing }
+        : {}),
     });
 
     if (
@@ -423,7 +470,13 @@ function extractDirectExport(
       for (const subStatement of statement.body.statements) {
         const isSubExported = isExportedDeclaration(subStatement);
         exports.push(
-          ...extractDirectExport(subStatement, sourceFile, isSubExported, name),
+          ...extractDirectExport(
+            subStatement,
+            sourceFile,
+            isSubExported,
+            name,
+            declarationScopeAmbient,
+          ),
         );
       }
     }
@@ -436,6 +489,7 @@ function extractDirectExport(
           name,
           isExplicitExport,
           jsdoc,
+          declarationScopeAmbient,
         ),
       );
     }
@@ -452,6 +506,7 @@ function extractDirectExport(
           new Set(),
           "type",
           undefined,
+          declarationScopeAmbient,
         ),
       );
     }
@@ -468,11 +523,16 @@ function extractDirectExport(
           new Set(),
           "type",
           undefined,
+          declarationScopeAmbient,
         ),
       );
     }
+
+    applyAmbientModuleEnclosure(exports, declarationScopeAmbient);
+    return exports;
   }
 
+  applyAmbientModuleEnclosure(exports, ambientModuleContainerName);
   return exports;
 }
 
@@ -483,6 +543,7 @@ function extractClassMembers(
   parentName: string,
   isExplicitExport: boolean,
   parentJsDoc: JSDocInfo,
+  ambientModuleContainerName?: string,
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
 
@@ -530,6 +591,7 @@ function extractClassMembers(
     });
   }
 
+  applyAmbientModuleEnclosure(exports, ambientModuleContainerName);
   return exports;
 }
 
@@ -544,6 +606,7 @@ function extractComplexTypeMembers(
   visitedNames: Set<string>,
   memberSymbolSpace: SymbolSpace,
   definitionSitePath?: string,
+  ambientModuleContainerName?: string,
 ): ParsedExport[] {
   const exports: ParsedExport[] = [];
   const declSite = definitionSitePath
@@ -565,6 +628,7 @@ function extractComplexTypeMembers(
       visitedNames,
       memberSymbolSpace,
       definitionSitePath,
+      ambientModuleContainerName,
     );
   }
 
@@ -633,6 +697,7 @@ function extractComplexTypeMembers(
               visitedNames,
               "type",
               definitionSitePath,
+              ambientModuleContainerName,
             ),
           );
         }
@@ -652,6 +717,7 @@ function extractComplexTypeMembers(
           visitedNames,
           memberSymbolSpace,
           definitionSitePath,
+          ambientModuleContainerName,
         ),
       );
     }
@@ -721,12 +787,14 @@ function extractComplexTypeMembers(
             newVisited,
             nextSpace,
             definitionSitePath,
+            ambientModuleContainerName,
           ),
         );
       }
     }
   }
 
+  applyAmbientModuleEnclosure(exports, ambientModuleContainerName);
   return exports;
 }
 

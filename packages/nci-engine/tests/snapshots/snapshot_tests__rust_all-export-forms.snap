@@ -118,6 +118,7 @@ expression: "& rust_graph"
     {
       "id": "all-export-forms@1.0.0::PluginOptions",
       "name": "PluginOptions",
+      "enclosingModuleDeclarationId": "all-export-forms@1.0.0::index.d.ts::my-plugin",
       "kind": 265,
       "kindName": "InterfaceDeclaration",
       "package": "all-export-forms",
@@ -135,6 +136,7 @@ expression: "& rust_graph"
       "id": "all-export-forms@1.0.0::PluginOptions.name",
       "name": "PluginOptions.name",
       "parentSymbolId": "all-export-forms@1.0.0::PluginOptions",
+      "enclosingModuleDeclarationId": "all-export-forms@1.0.0::index.d.ts::my-plugin",
       "kind": 172,
       "kindName": "PropertySignature",
       "package": "all-export-forms",

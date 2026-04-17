@@ -246,7 +246,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS"
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::CaliperNS"
     },
     {
       "id": "member-property-extraction@1.0.0::CaliperNS.BenchOpts.label",
@@ -260,7 +261,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts"
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::CaliperNS"
     },
     {
       "id": "member-property-extraction@1.0.0::CaliperNS.BenchOpts.refresh",
@@ -274,7 +276,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts"
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS.BenchOpts",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::CaliperNS"
     },
     {
       "id": "member-property-extraction@1.0.0::CaliperNS.snapshot",
@@ -291,7 +294,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS"
+      "parentSymbolId": "member-property-extraction@1.0.0::CaliperNS",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::CaliperNS"
     },
     {
       "id": "member-property-extraction@1.0.0::OuterNS",
@@ -327,7 +331,8 @@
         "export",
         "declare"
       ],
-      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS"
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::OuterNS"
     },
     {
       "id": "member-property-extraction@1.0.0::OuterNS.InnerWidget.prototype.slot",
@@ -341,7 +346,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget"
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::OuterNS"
     },
     {
       "id": "member-property-extraction@1.0.0::OuterNS.InnerWidget.prototype.mount",
@@ -355,7 +361,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget"
+      "parentSymbolId": "member-property-extraction@1.0.0::OuterNS.InnerWidget",
+      "enclosingModuleDeclarationId": "member-property-extraction@1.0.0::OuterNS"
     },
     {
       "id": "member-property-extraction@1.0.0::base.d.ts::AST_NODE_TYPES",

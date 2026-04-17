@@ -284,6 +284,10 @@ pub struct ParsedExport {
 
     /// Structured modifiers (readonly, abstract, static, etc.).
     pub modifiers: SharedVec<SharedString>,
+
+    /// Lexical `declare module` / `declare global` / `declare namespace` container name (same as
+    /// the `ModuleDeclaration` row `name`). Resolved to `enclosing_module_declaration_id` on the graph.
+    pub enclosing_module_declaration_name: Option<SharedString>,
 }
 
 impl ParsedExport {
@@ -310,6 +314,7 @@ impl ParsedExport {
             decorators: Arc::from([]),
             heritage: Arc::from([]),
             modifiers: Arc::from([]),
+            enclosing_module_declaration_name: None,
         }
     }
 }
@@ -423,6 +428,9 @@ pub struct ResolvedSymbol {
 
     /// Structured modifiers.
     pub modifiers: SharedVec<SharedString>,
+
+    /// Pre-resolution container name; cleared after graph assigns `enclosing_module_declaration_id`.
+    pub enclosing_module_declaration_name: Option<SharedString>,
 }
 
 impl ResolvedSymbol {
@@ -447,6 +455,7 @@ impl ResolvedSymbol {
             is_inherited: false,
             inherited_from_sources: SharedVec::from(Vec::new()),
             modifiers: export.modifiers.clone(),
+            enclosing_module_declaration_name: export.enclosing_module_declaration_name.clone(),
         }
     }
 }
@@ -468,6 +477,14 @@ pub struct SymbolNode {
     /// (inheritance flattening). Agents should prefer this field over parsing `name` when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_symbol_id: Option<SharedString>,
+
+    /// Graph id of the enclosing `ModuleDeclaration` row (string module, `global`, or namespace).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enclosing_module_declaration_id: Option<SharedString>,
+
+    /// Pre-resolution container name; removed after graph assigns `enclosing_module_declaration_id`.
+    #[serde(skip)]
+    pub enclosing_module_declaration_name: Option<SharedString>,
 
     /// AST node kind identifier.
     pub kind: SymbolKind,

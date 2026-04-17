@@ -429,7 +429,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "name-collision@1.0.0::MergedBox"
+      "parentSymbolId": "name-collision@1.0.0::MergedBox",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::MergedBox"
     },
     {
       "id": "name-collision@1.0.0::MergedBox#2",
@@ -493,7 +494,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge"
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsCrossFileMerge"
     },
     {
       "id": "name-collision@1.0.0::NsCrossFileMerge#2",
@@ -527,7 +529,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge#2"
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge#2",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsCrossFileMerge#2"
     },
     {
       "id": "name-collision@1.0.0::NsCrossFileMerge.FromB.b",
@@ -541,7 +544,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge.FromB"
+      "parentSymbolId": "name-collision@1.0.0::NsCrossFileMerge.FromB",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsCrossFileMerge#2"
     },
     {
       "id": "name-collision@1.0.0::NsSameFileMerge",
@@ -575,7 +579,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge"
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsSameFileMerge"
     },
     {
       "id": "name-collision@1.0.0::NsSameFileMerge.Inner",
@@ -592,7 +597,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge"
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsSameFileMerge"
     },
     {
       "id": "name-collision@1.0.0::NsSameFileMerge.Inner.n",
@@ -606,7 +612,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge.Inner"
+      "parentSymbolId": "name-collision@1.0.0::NsSameFileMerge.Inner",
+      "enclosingModuleDeclarationId": "name-collision@1.0.0::NsSameFileMerge"
     },
     {
       "id": "name-collision@1.0.0::StreamConfig",

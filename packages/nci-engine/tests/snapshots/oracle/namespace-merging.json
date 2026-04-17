@@ -34,7 +34,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "namespace-merging@1.0.0::MergedNS"
+      "parentSymbolId": "namespace-merging@1.0.0::MergedNS",
+      "enclosingModuleDeclarationId": "namespace-merging@1.0.0::MergedNS"
     },
     {
       "id": "namespace-merging@1.0.0::MergedNS#2",

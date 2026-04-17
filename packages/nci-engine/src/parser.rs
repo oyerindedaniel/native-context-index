@@ -229,6 +229,7 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                     &local_decls,
                     false,
                     None,
+                    None,
                 );
             }
 
@@ -239,6 +240,7 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                     current_file,
                     &mut exports,
                     &local_decls,
+                    None,
                     None,
                 );
             }
@@ -281,6 +283,7 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
                     is_script,
                     current_file,
                     &local_decls,
+                    None,
                     None,
                 ) {
                     exports.extend(direct_exports);
@@ -585,6 +588,7 @@ fn extract_export_named<'a>(
             true,
             export_named.span,
             local_decls,
+            None,
         );
         exports.extend(decl_exports);
     }
@@ -857,6 +861,22 @@ fn merge_nested_dependencies_into_namespace(
     ns.dependencies = merged.into();
 }
 
+/// Stamps `enclosing_module_declaration_name` for rows lexically inside an ambient module block.
+/// Skips the `ModuleDeclaration` row whose `name` equals the innermost ambient name (no self-edge).
+fn apply_ambient_module_enclosure(exports: &mut [ParsedExport], ambient: Option<&SharedString>) {
+    let Some(ambient_name) = ambient else {
+        return;
+    };
+    for export_row in exports.iter_mut() {
+        if export_row.kind == SymbolKind::Namespace
+            && export_row.name.as_ref() == ambient_name.as_ref()
+        {
+            continue;
+        }
+        export_row.enclosing_module_declaration_name = Some(ambient_name.clone());
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn extract_module_declaration<'a>(
     module_decl: &TSModuleDeclaration<'a>,
@@ -872,6 +892,8 @@ fn extract_module_declaration<'a>(
     // None → top-level `global` (members unprefixed); Some("") → under `declare module "…"`
     // (inner names become `global.*`); Some("Ns") → under `namespace Ns` (`Ns.global.*`).
     global_enclosing_qualifier: Option<&str>,
+    // When nested in another ambient module: outer module row `name` (resolved to graph id later).
+    lexical_parent_module: Option<SharedString>,
 ) {
     let module_name = match &module_decl.id {
         TSModuleDeclarationName::Identifier(ident) => SharedString::from(ident.name.as_str()),
@@ -901,7 +923,7 @@ fn extract_module_declaration<'a>(
     // flag it the same way, the crawler drops the namespace row as a duplicate “global” shell.
     let global_wrap_is_augmentation = is_global && global_enclosing_qualifier.is_none();
 
-    exports.push(ParsedExport {
+    let mut module_row = ParsedExport {
         name: module_name.clone(),
         kind: SymbolKind::Namespace,
         is_explicit_export: namespace_is_explicit_export && !is_global && !is_string_module,
@@ -913,7 +935,14 @@ fn extract_module_declaration<'a>(
         since: jsdoc.since,
         modifiers: SharedVec::from(modifiers),
         ..Default::default()
-    });
+    };
+    if let Some(ref parent_mod) = lexical_parent_module
+        && parent_mod.as_ref() != module_name.as_ref()
+    {
+        module_row.enclosing_module_declaration_name = Some(parent_mod.clone());
+    }
+    exports.push(module_row);
+    let module_row_idx = exports.len() - 1;
 
     // Recurse into module body to extract nested exports.
     // Ambient string modules (`declare module "m"`) use an empty `parent_name` for children so
@@ -926,7 +955,14 @@ fn extract_module_declaration<'a>(
             Some(ns) => Cow::Owned(format!("{ns}.global")),
         }
     } else if is_string_module {
-        Cow::Borrowed("")
+        // Top-level `declare module "m"` keeps children unqualified (`Foo`, not `"m".Foo`).
+        // Nested `declare module "Inner"` (inside another module) matches TS: qualify as
+        // `Inner.member` (see ambient-module-block-nesting fixture).
+        if lexical_parent_module.is_some() {
+            Cow::Borrowed(module_name.as_ref())
+        } else {
+            Cow::Borrowed("")
+        }
     } else {
         Cow::Borrowed(module_name.as_ref())
     };
@@ -941,11 +977,20 @@ fn extract_module_declaration<'a>(
             child_parent_name.as_ref(),
             is_script,
             local_decls,
+            Some(module_name.clone()),
         );
     }
 
     if exports.len() > before_len {
-        merge_nested_dependencies_into_namespace(exports, before_len - 1, before_len);
+        merge_nested_dependencies_into_namespace(exports, module_row_idx, before_len);
+    }
+
+    // Tag every row in this declaration slice with this namespace's simple name (for enclosing id
+    // resolution). Outer `extract_module_declaration` calls run after inner ones, so nested chains
+    // end up stamped with the outermost namespace. String `declare module "…"` blocks omit this:
+    // a single sweep on the parent slice would wipe more specific enclosing names on nested modules.
+    if !is_string_module {
+        apply_ambient_module_enclosure(&mut exports[module_row_idx..], Some(&module_name));
     }
 
     // Propagate the augmentation flag only for true file-top `global` wrappers (see above).
@@ -964,6 +1009,8 @@ fn extract_global_declaration<'a>(
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
     // Same semantics as `extract_module_declaration`'s `global_enclosing_qualifier`.
     global_enclosing_qualifier: Option<&str>,
+    // When `declare global` sits inside `declare module "…"`, stamp the synthetic `global` row.
+    ambient_enclosing_for_global_row: Option<SharedString>,
 ) {
     let signature_text = get_span_text(source_text, global_decl.span);
     let signature = SharedString::from(
@@ -982,7 +1029,7 @@ fn extract_global_declaration<'a>(
     // block is lexical scoping, not the file-top augment pattern, so skip augmentation metadata.
     let global_decl_is_augmentation = !matches!(global_enclosing_qualifier, Some(""));
 
-    exports.push(ParsedExport {
+    let mut global_row = ParsedExport {
         name: SharedString::from("global"),
         kind: SymbolKind::Namespace,
         is_explicit_export: false,
@@ -993,7 +1040,11 @@ fn extract_global_declaration<'a>(
         visibility: jsdoc.visibility,
         since: jsdoc.since,
         ..Default::default()
-    });
+    };
+    if let Some(ref outer) = ambient_enclosing_for_global_row {
+        global_row.enclosing_module_declaration_name = Some(outer.clone());
+    }
+    exports.push(global_row);
 
     let member_prefix: Cow<'_, str> = match global_enclosing_qualifier {
         None => Cow::Borrowed(""),
@@ -1001,8 +1052,34 @@ fn extract_global_declaration<'a>(
         Some(ns) => Cow::Owned(format!("{ns}.global")),
     };
 
+    // `export interface Foo {}` inside `declare global` is `ExportNamedDeclaration`, not a bare
+    // `TSInterfaceDeclaration`. Mirror `extract_module_body`: unwrap declaration first.
     for statement in &global_decl.body.body {
         let is_exported = statement_has_export_keyword(statement);
+        if let Statement::ExportNamedDeclaration(export_named) = statement
+            && let Some(declaration) = &export_named.declaration
+        {
+            let mut decl_exports = extract_declaration(
+                declaration,
+                source_text,
+                current_file,
+                true,
+                export_named.span,
+                local_decls,
+                Some(SharedString::from("global")),
+            );
+            for export_item in &mut decl_exports {
+                export_item.is_explicit_export = true;
+                export_item.is_global_augmentation = global_decl_is_augmentation;
+                if needs_namespace_qualifier(export_item.name.as_ref(), member_prefix.as_ref()) {
+                    export_item.name = SharedString::from(
+                        format!("{}.{}", member_prefix.as_ref(), export_item.name).as_ref(),
+                    );
+                }
+            }
+            exports.extend(decl_exports);
+            continue;
+        }
         if let Some(mut decl_exports) = extract_direct_statement(
             statement,
             source_text,
@@ -1010,6 +1087,7 @@ fn extract_global_declaration<'a>(
             current_file,
             local_decls,
             None,
+            Some(SharedString::from("global")),
         ) {
             for export_item in &mut decl_exports {
                 export_item.is_explicit_export = is_exported;
@@ -1042,6 +1120,7 @@ fn needs_namespace_qualifier(name: &str, parent: &str) -> bool {
 }
 
 /// Recursively extracts exports from module/namespace bodies.
+#[allow(clippy::too_many_arguments)]
 fn extract_module_body<'a>(
     body: &TSModuleDeclarationBody<'a>,
     source_text: &str,
@@ -1050,6 +1129,8 @@ fn extract_module_body<'a>(
     parent_name: &str,
     is_script: bool,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+    // Innermost ambient module `name` for symbols in this block (resolved to graph ids later).
+    ambient_innermost: Option<SharedString>,
 ) {
     match body {
         TSModuleDeclarationBody::TSModuleBlock(block) => {
@@ -1067,6 +1148,7 @@ fn extract_module_body<'a>(
                         true,
                         export_named.span,
                         local_decls,
+                        ambient_innermost.clone(),
                     );
                     for export_item in &mut decl_exports {
                         if needs_namespace_qualifier(export_item.name.as_ref(), parent_name) {
@@ -1087,6 +1169,7 @@ fn extract_module_body<'a>(
                     current_file,
                     local_decls,
                     Some(parent_name),
+                    ambient_innermost.clone(),
                 ) {
                     for export_item in &mut decl_exports {
                         export_item.is_explicit_export = is_exported;
@@ -1112,6 +1195,7 @@ fn extract_module_body<'a>(
                 local_decls,
                 false,
                 Some(parent_name),
+                ambient_innermost.clone(),
             );
         }
     }
@@ -1125,6 +1209,7 @@ fn extract_declaration<'a>(
     is_explicit_export: bool,
     outer_span: oxc_span::Span,
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
+    ambient_apply: Option<SharedString>,
 ) -> Vec<ParsedExport> {
     let mut results: Vec<ParsedExport> = Vec::new();
 
@@ -1425,12 +1510,15 @@ fn extract_declaration<'a>(
                 local_decls,
                 is_explicit_export,
                 None,
+                ambient_apply.clone(),
             );
+            return results;
         }
 
         _ => {}
     }
 
+    apply_ambient_module_enclosure(&mut results, ambient_apply.as_ref());
     results
 }
 
@@ -1446,10 +1534,32 @@ fn extract_direct_statement<'a>(
     local_decls: &HashMap<SharedString, LocalDecl<'a>>,
     // In a namespace or module body, `Some(prefix)` is the qualifier applied before member names.
     global_enclosing_qualifier: Option<&str>,
+    // Innermost ambient module name for symbols from this statement (`declare global` body uses "global").
+    ambient_apply: Option<SharedString>,
 ) -> Option<Vec<ParsedExport>> {
     let is_exported = statement_has_export_keyword(statement);
 
     match statement {
+        // `export interface` / `export type` / `export declare function` in ambient bodies are often
+        // `ExportNamedDeclaration` wrapping a declaration, not a bare declaration statement.
+        Statement::ExportNamedDeclaration(export_named) => {
+            let declaration = export_named.declaration.as_ref()?;
+            let mut results = extract_declaration(
+                declaration,
+                source_text,
+                current_file,
+                true,
+                export_named.span,
+                local_decls,
+                ambient_apply.clone(),
+            );
+            if !is_exported && is_script {
+                for export_item in &mut results {
+                    export_item.is_global_augmentation = true;
+                }
+            }
+            Some(results)
+        }
         Statement::VariableDeclaration(var_decl) => {
             let mut results = Vec::new();
             for declarator in &var_decl.declarations {
@@ -1516,6 +1626,7 @@ fn extract_direct_statement<'a>(
                     }
                 }
             }
+            apply_ambient_module_enclosure(&mut results, ambient_apply.as_ref());
             if results.is_empty() {
                 None
             } else {
@@ -1538,6 +1649,7 @@ fn extract_direct_statement<'a>(
                 is_exported,
                 statement.span(),
                 local_decls,
+                ambient_apply.clone(),
             );
             if !is_exported && is_script {
                 for export_item in &mut results {
@@ -1559,6 +1671,7 @@ fn extract_direct_statement<'a>(
                 local_decls,
                 is_exported,
                 global_enclosing_qualifier,
+                ambient_apply.clone(),
             );
             Some(results)
         }
@@ -1571,6 +1684,7 @@ fn extract_direct_statement<'a>(
                 &mut results,
                 local_decls,
                 global_enclosing_qualifier,
+                ambient_apply.clone(),
             );
             Some(results)
         }
@@ -3417,6 +3531,32 @@ export declare const ROOT: string;
         assert!(
             !global_ns.is_global_augmentation,
             "nested global under string module must not set is_global_augmentation on the wrapper"
+        );
+    }
+
+    /// `export interface X { m: T }` inside `declare global` is an `ExportNamedDeclaration` in the
+    /// AST; we must extract interface members (same as ambient module bodies).
+    #[test]
+    fn declare_global_export_interface_extracts_property_signatures() {
+        let source = r#"
+declare global {
+  export interface AugRow {
+    readonly fromBlock: true;
+  }
+}
+"#;
+        let result = parse_file_from_source("test.d.ts", source);
+        assert!(
+            result.exports.iter().any(|export_item| {
+                export_item.name.as_ref() == "AugRow.fromBlock"
+                    && export_item.kind == SymbolKind::PropertySignature
+            }),
+            "expected AugRow.fromBlock property row, got {:?}",
+            result
+                .exports
+                .iter()
+                .map(|export_item| export_item.name.as_ref())
+                .collect::<Vec<_>>()
         );
     }
 }

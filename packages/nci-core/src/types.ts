@@ -113,6 +113,12 @@ export interface ParsedExport {
   heritage?: string[];
   /** Structured modifiers (readonly, abstract, static, etc.) */
   modifiers?: string[];
+  /**
+   * Lexical `declare module` / `declare global` / `declare namespace` container **name** (same as
+   * the `ModuleDeclaration` row’s `name`, e.g. `./foo.js` or `global`). Resolved to
+   * `enclosingModuleDeclarationId` on `SymbolNode` after graph id assignment.
+   */
+  enclosingModuleDeclarationName?: string;
 }
 
 /** Documentation for an import in a file */
@@ -205,6 +211,11 @@ export interface ResolvedSymbol {
   modifiers?: string[];
   /** Temporary storage for raw dependencies during graph building (not in final report) */
   rawDependencies?: TypeReference[];
+  /**
+   * Same as {@link ParsedExport.enclosingModuleDeclarationName}; carried through crawl/re-export
+   * to graph merge, then cleared after resolving to {@link SymbolNode.enclosingModuleDeclarationId}.
+   */
+  enclosingModuleDeclarationName?: string;
 }
 
 // ─── Graph Output ──────────────────────────────────────────────
@@ -222,9 +233,21 @@ export interface SymbolNode {
   /**
    * Lexical container when `name` is dotted (e.g. `Foo.bar` → container for `Foo`). Kind-aware when
    * several symbols share the same short name in one file (namespace vs interface vs class). Not
-   * `dependencies` or `inheritedFromSources`.
+   * `dependencies` or `inheritedFromSources`. For symbols inside `declare module "…"` /
+   * `declare global` / `declare namespace` blocks, use {@link enclosingModuleDeclarationId} instead.
    */
   parentSymbolId?: string;
+  /**
+   * Graph id of the enclosing `ModuleDeclaration` row (`declare module`, `declare global` as
+   * `global`, or identifier `declare namespace`). Set after merge/id assignment from crawl-time
+   * `enclosingModuleDeclarationName`. Omitted when not inside such a block.
+   */
+  enclosingModuleDeclarationId?: string;
+  /**
+   * Pre-resolution container name (see {@link ParsedExport.enclosingModuleDeclarationName}). Removed
+   * from the graph after `enclosingModuleDeclarationId` is assigned; not part of the stable report.
+   */
+  enclosingModuleDeclarationName?: string;
   /** AST node kind */
   kind: ts.SyntaxKind;
   /** Human-readable kind name */

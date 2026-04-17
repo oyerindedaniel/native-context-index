@@ -17,7 +17,10 @@ import { npmPackageRoot } from "./npm-package-root.js";
 import { crawl, type CrawlOptions } from "./crawler.js";
 import { clearParserCache } from "./parser.js";
 import { normalizeSignature } from "./dedupe.js";
-import { assignParentSymbolIds } from "./parent-symbol.js";
+import {
+  assignEnclosingModuleDeclarationIds,
+  assignParentSymbolIds,
+} from "./parent-symbol.js";
 import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
 
 function specifierMatchesDependencyStubRoots(
@@ -341,6 +344,13 @@ export function buildPackageGraph(
     if (resolved.modifiers && !existing.modifiers)
       existing.modifiers = resolved.modifiers;
     if (resolved.isGlobalAugmentation) existing.isGlobalAugmentation = true;
+    if (
+      resolved.enclosingModuleDeclarationName &&
+      !existing.enclosingModuleDeclarationName
+    ) {
+      existing.enclosingModuleDeclarationName =
+        resolved.enclosingModuleDeclarationName;
+    }
   }
 
   for (const resolved of allSymbols) {
@@ -414,6 +424,7 @@ export function buildPackageGraph(
         rawDependencies: resolved.dependencies,
         isInternal: resolved.isInternal,
         isGlobalAugmentation: resolved.isGlobalAugmentation,
+        enclosingModuleDeclarationName: resolved.enclosingModuleDeclarationName,
         reExportedFrom:
           reExportSource !== symbolFilePath ? reExportSource : undefined,
         deprecated: resolved.deprecated,
@@ -980,6 +991,7 @@ export function buildPackageGraph(
     ids.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
   }
   assignParentSymbolIds(symbols, fileLocalToIds, nameToId, idToKind);
+  assignEnclosingModuleDeclarationIds(symbols, fileLocalToIds, idToKind);
 
   const afterFlatten = performance.now();
   clearParserCache();

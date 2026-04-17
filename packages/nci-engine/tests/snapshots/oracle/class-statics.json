@@ -125,7 +125,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "class-statics@1.0.0::Cache#2"
+      "parentSymbolId": "class-statics@1.0.0::Cache#2",
+      "enclosingModuleDeclarationId": "class-statics@1.0.0::Cache#2"
     },
     {
       "id": "class-statics@1.0.0::Cache.Options.ttl",
@@ -139,7 +140,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "parentSymbolId": "class-statics@1.0.0::Cache.Options"
+      "parentSymbolId": "class-statics@1.0.0::Cache.Options",
+      "enclosingModuleDeclarationId": "class-statics@1.0.0::Cache#2"
     }
   ],
   "totalSymbols": 8,

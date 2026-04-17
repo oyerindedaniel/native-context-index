@@ -305,6 +305,19 @@ fn compare_structural_properties(
             rust_sym.name, rust_sym.id
         );
 
+        let rust_enclosing = rust_sym
+            .enclosing_module_declaration_id
+            .as_ref()
+            .map(|enclosing_id| enclosing_id.as_ref());
+        let ts_enclosing = ts_sym
+            .get("enclosingModuleDeclarationId")
+            .and_then(|enclosing_field| enclosing_field.as_str());
+        assert_eq!(
+            rust_enclosing, ts_enclosing,
+            "[{fixture_name}] enclosingModuleDeclarationId mismatch for '{}' ({})",
+            rust_sym.name, rust_sym.id
+        );
+
         if let Some(ts_deps) = ts_sym
             .get("dependencies")
             .and_then(|deps_field| deps_field.as_array())
@@ -469,6 +482,14 @@ snapshot_test!(
 snapshot_test!(
     snapshot_heritage_generic_multi_extends,
     "heritage-generic-multi-extends"
+);
+snapshot_test!(
+    snapshot_ambient_module_block_nesting,
+    "ambient-module-block-nesting"
+);
+snapshot_test!(
+    snapshot_relative_string_module_collision,
+    "relative-string-module-collision"
 );
 
 #[test]

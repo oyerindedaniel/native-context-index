@@ -329,6 +329,17 @@ fn merge_resolved_into_node(
     if resolved.is_global_augmentation {
         existing.is_global_augmentation = true;
     }
+
+    match (
+        &existing.enclosing_module_declaration_name,
+        &resolved.enclosing_module_declaration_name,
+    ) {
+        (Some(existing_enc), Some(incoming_enc)) if existing_enc != incoming_enc => {}
+        (None, Some(incoming_enc)) => {
+            existing.enclosing_module_declaration_name = Some(incoming_enc.clone());
+        }
+        _ => {}
+    }
 }
 
 fn triple_slash_reachable(
@@ -914,6 +925,10 @@ pub fn build_package_graph(
                 id: "".into(),
                 name: resolved.name.clone(),
                 parent_symbol_id: None,
+                enclosing_module_declaration_id: None,
+                enclosing_module_declaration_name: resolved
+                    .enclosing_module_declaration_name
+                    .clone(),
                 kind: resolved.kind,
                 kind_name: SharedString::from(resolved.kind.as_str()),
                 package: package_info.name.clone(),
@@ -1209,6 +1224,7 @@ pub fn build_package_graph(
         ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
     }
     assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id, &id_to_kind);
+    assign_enclosing_module_declaration_ids(&mut symbols, &file_local_to_ids, &id_to_kind);
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -1368,6 +1384,54 @@ fn pick_preferred_parent_id(
 ///
 /// `file_local_to_ids` values **must** be sorted by id string (see call site); dependency resolution
 /// runs before that sort and only needs multisets, not order.
+fn assign_enclosing_module_declaration_ids(
+    symbols: &mut [SymbolNode],
+    file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    id_to_kind: &HashMap<SharedString, SymbolKind>,
+) {
+    for node in symbols.iter_mut() {
+        let Some(enclosing_name) = node.enclosing_module_declaration_name.clone() else {
+            continue;
+        };
+        if matches!(node.kind, SymbolKind::Namespace)
+            && node.name.as_ref() == enclosing_name.as_ref()
+        {
+            node.enclosing_module_declaration_name = None;
+            continue;
+        }
+        let file_key: SharedString =
+            format!("{}::{}", node.file_path.as_ref(), enclosing_name.as_ref()).into();
+        let Some(candidate_ids) = file_local_to_ids.get(&file_key) else {
+            node.enclosing_module_declaration_name = None;
+            continue;
+        };
+        let module_declaration_ids: Vec<SharedString> = candidate_ids
+            .iter()
+            .filter(|symbol_id| {
+                id_to_kind
+                    .get(*symbol_id)
+                    .copied()
+                    .unwrap_or(SymbolKind::Unknown)
+                    == SymbolKind::Namespace
+            })
+            .cloned()
+            .collect();
+        if module_declaration_ids.is_empty() {
+            node.enclosing_module_declaration_name = None;
+            continue;
+        }
+        let chosen = if module_declaration_ids.len() == 1 {
+            module_declaration_ids[0].clone()
+        } else {
+            let mut ranked = module_declaration_ids;
+            ranked.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
+            ranked[0].clone()
+        };
+        node.enclosing_module_declaration_id = Some(chosen);
+        node.enclosing_module_declaration_name = None;
+    }
+}
+
 fn assign_parent_symbol_ids(
     symbols: &mut [SymbolNode],
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,

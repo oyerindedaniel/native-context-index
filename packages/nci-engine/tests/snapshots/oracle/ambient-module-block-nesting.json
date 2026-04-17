@@ -1,0 +1,243 @@
+{
+  "package": "ambient-module-block-nesting",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "ambient-module-block-nesting@1.0.0::OuterSpec",
+      "name": "OuterSpec",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "declare module \"OuterSpec\" {\n  export interface BetweenInnerAndOuter {\n    readonly slotBetweenLayers: true;\n  }\n\n  declare module \"InnerSpec\" {\n    export interface InnerOnlySymbol {\n      readonly innerScopeMarker: true;\n    }\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::BetweenInnerAndOuter",
+      "name": "BetweenInnerAndOuter",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export interface BetweenInnerAndOuter {\n    readonly slotBetweenLayers: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::OuterSpec"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::BetweenInnerAndOuter.slotBetweenLayers",
+      "name": "BetweenInnerAndOuter.slotBetweenLayers",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "readonly slotBetweenLayers: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::BetweenInnerAndOuter",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::OuterSpec"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::InnerSpec",
+      "name": "InnerSpec",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "declare module \"InnerSpec\" {\n    export interface InnerOnlySymbol {\n      readonly innerScopeMarker: true;\n    }\n  }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ],
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::OuterSpec"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol",
+      "name": "InnerSpec.InnerOnlySymbol",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export interface InnerOnlySymbol {\n      readonly innerScopeMarker: true;\n    }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::InnerSpec",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::InnerSpec"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol.innerScopeMarker",
+      "name": "InnerSpec.InnerOnlySymbol.innerScopeMarker",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "readonly innerScopeMarker: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::InnerSpec"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::GlobalAugmentedRow",
+      "name": "GlobalAugmentedRow",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export interface GlobalAugmentedRow {\n    readonly fromGlobalBlock: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::GlobalAugmentedRow.fromGlobalBlock",
+      "name": "GlobalAugmentedRow.fromGlobalBlock",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "readonly fromGlobalBlock: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "isGlobalAugmentation": true,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::GlobalAugmentedRow"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::ContainerNs",
+      "name": "ContainerNs",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace ContainerNs {\n  export interface ContainerMember {\n    readonly underIdentifierNamespace: true;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember",
+      "name": "ContainerNs.ContainerMember",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export interface ContainerMember {\n    readonly underIdentifierNamespace: true;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::ContainerNs",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::ContainerNs"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember.underIdentifierNamespace",
+      "name": "ContainerNs.ContainerMember.underIdentifierNamespace",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "readonly underIdentifierNamespace: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ],
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::ContainerNs"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::./WrappedAmbient.js",
+      "name": "./WrappedAmbient.js",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "declare module \"./WrappedAmbient.js\" {\n  export interface HostInterface {\n    memberKey: string;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::HostInterface",
+      "name": "HostInterface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "export interface HostInterface {\n    memberKey: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ],
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::./WrappedAmbient.js"
+    },
+    {
+      "id": "ambient-module-block-nesting@1.0.0::HostInterface.memberKey",
+      "name": "HostInterface.memberKey",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "ambient-module-block-nesting",
+      "filePath": "index.d.ts",
+      "signature": "memberKey: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "ambient-module-block-nesting@1.0.0::HostInterface",
+      "enclosingModuleDeclarationId": "ambient-module-block-nesting@1.0.0::./WrappedAmbient.js"
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

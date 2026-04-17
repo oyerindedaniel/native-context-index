@@ -131,7 +131,8 @@
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer"
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer",
+      "enclosingModuleDeclarationId": "inline-import-type@1.0.0::chain.d.ts::Outer"
     },
     {
       "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf",
@@ -145,7 +146,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner"
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner",
+      "enclosingModuleDeclarationId": "inline-import-type@1.0.0::chain.d.ts::Outer"
     },
     {
       "id": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf.flag",
@@ -159,7 +161,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf"
+      "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf",
+      "enclosingModuleDeclarationId": "inline-import-type@1.0.0::chain.d.ts::Outer"
     },
     {
       "id": "inline-import-type@1.0.0::inline-import-type-remote-target.d.ts::RemoteInner",

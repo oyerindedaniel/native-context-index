@@ -33,7 +33,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "nested-locals@1.0.0::A"
+      "parentSymbolId": "nested-locals@1.0.0::A",
+      "enclosingModuleDeclarationId": "nested-locals@1.0.0::A"
     },
     {
       "id": "nested-locals@1.0.0::B",
@@ -66,7 +67,8 @@
       "modifiers": [
         "export"
       ],
-      "parentSymbolId": "nested-locals@1.0.0::B"
+      "parentSymbolId": "nested-locals@1.0.0::B",
+      "enclosingModuleDeclarationId": "nested-locals@1.0.0::A"
     },
     {
       "id": "nested-locals@1.0.0::index.d.ts::B",

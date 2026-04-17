@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     is_global_augmentation INTEGER NOT NULL DEFAULT 0,
     is_inherited INTEGER NOT NULL DEFAULT 0,
     parent_symbol_id TEXT,
+    enclosing_module_declaration_id TEXT,
     UNIQUE(package_id, id)
 );
 

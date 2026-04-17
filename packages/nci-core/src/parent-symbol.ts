@@ -84,6 +84,46 @@ function pickPreferredParentId(
 }
 
 /**
+ * Resolves {@link SymbolNode.enclosingModuleDeclarationName} to
+ * {@link SymbolNode.enclosingModuleDeclarationId} using `filePath::moduleName` keys and
+ * `ModuleDeclaration` kinds only, then deletes the name field.
+ */
+export function assignEnclosingModuleDeclarationIds(
+  symbols: SymbolNode[],
+  fileLocalToIds: Map<string, string[]>,
+  idToKind: Map<string, ts.SyntaxKind>,
+): void {
+  for (const node of symbols) {
+    const enclosingName = node.enclosingModuleDeclarationName;
+    if (enclosingName === undefined) continue;
+    if (
+      node.kind === ts.SyntaxKind.ModuleDeclaration &&
+      node.name === enclosingName
+    ) {
+      delete node.enclosingModuleDeclarationName;
+      continue;
+    }
+    const fileKey = `${node.filePath}::${enclosingName}`;
+    const candidateIds = fileLocalToIds.get(fileKey) ?? [];
+    const moduleDeclarationIds = candidateIds.filter(
+      (symbolId) => idToKind.get(symbolId) === ts.SyntaxKind.ModuleDeclaration,
+    );
+    if (moduleDeclarationIds.length === 0) {
+      delete node.enclosingModuleDeclarationName;
+      continue;
+    }
+    const chosen =
+      moduleDeclarationIds.length === 1
+        ? moduleDeclarationIds[0]!
+        : [...moduleDeclarationIds].sort((left, right) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          )[0]!;
+    node.enclosingModuleDeclarationId = chosen;
+    delete node.enclosingModuleDeclarationName;
+  }
+}
+
+/**
  * Sets `parentSymbolId` using the same `filePath::name` → ids and `name → id` maps from id assignment
  * (extended after heritage flatten for synthetic rows). Bucket arrays must be sorted by id string;
  * call after deps resolve so order changes do not affect resolution.

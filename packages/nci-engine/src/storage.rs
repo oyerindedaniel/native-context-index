@@ -411,7 +411,8 @@ impl NciDatabase {
                         js_doc, is_type_only, symbol_space, re_exported_from,
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
-                        is_internal, is_global_augmentation, is_inherited, parent_symbol_id
+                        is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
+                        enclosing_module_declaration_id
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -441,6 +442,7 @@ impl NciDatabase {
                     symbol_row.get::<_, i64>(19)?,
                     symbol_row.get::<_, i64>(20)?,
                     symbol_row.get::<_, Option<String>>(21)?,
+                    symbol_row.get::<_, Option<String>>(22)?,
                 ))
             })
             .ok()?;
@@ -473,6 +475,7 @@ impl NciDatabase {
                 is_global_augmentation_int,
                 is_inherited_int,
                 parent_symbol_id_opt,
+                enclosing_module_declaration_id_opt,
             ) = row_result;
 
             let dependencies = SharedVec::from(
@@ -520,6 +523,9 @@ impl NciDatabase {
                 id: SharedString::from(id_text),
                 name: SharedString::from(name_text),
                 parent_symbol_id: parent_symbol_id_opt.map(SharedString::from),
+                enclosing_module_declaration_id: enclosing_module_declaration_id_opt
+                    .map(SharedString::from),
+                enclosing_module_declaration_name: None,
                 kind: SymbolKind::from_numeric_kind(kind_int as u32),
                 kind_name: SharedString::from(kind_name_text),
                 package: package_info.name.clone(),
@@ -603,8 +609,9 @@ impl NciDatabase {
                 js_doc, is_type_only, symbol_space, re_exported_from,
                 deprecated_flag, deprecated_message, visibility,
                 since_tag, since_major, since_minor, since_patch,
-                is_internal, is_global_augmentation, is_inherited, parent_symbol_id
-                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
+                enclosing_module_declaration_id
+                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             )?;
 
             let mut insert_inherited = transaction.prepare(
@@ -668,6 +675,10 @@ impl NciDatabase {
                     if symbol_node.is_inherited { 1i64 } else { 0i64 },
                     symbol_node
                         .parent_symbol_id
+                        .as_ref()
+                        .map(|value| value.as_ref()),
+                    symbol_node
+                        .enclosing_module_declaration_id
                         .as_ref()
                         .map(|value| value.as_ref()),
                 ])?;
@@ -791,7 +802,8 @@ impl NciDatabase {
                         js_doc, is_type_only, symbol_space, re_exported_from,
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
-                        is_internal, is_global_augmentation, is_inherited, parent_symbol_id
+                        is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
+                        enclosing_module_declaration_id
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -818,6 +830,7 @@ impl NciDatabase {
                         symbol_row.get::<_, i64>(19)?,
                         symbol_row.get::<_, i64>(20)?,
                         symbol_row.get::<_, Option<String>>(21)?,
+                        symbol_row.get::<_, Option<String>>(22)?,
                     ))
                 },
             )
@@ -846,6 +859,7 @@ impl NciDatabase {
             is_global_augmentation_int,
             is_inherited_int,
             parent_symbol_id_opt,
+            enclosing_module_declaration_id_opt,
         )) = row_opt
         else {
             return Ok(None);
@@ -978,6 +992,9 @@ impl NciDatabase {
             id: SharedString::from(id_text),
             name: SharedString::from(name_text),
             parent_symbol_id: parent_symbol_id_opt.map(SharedString::from),
+            enclosing_module_declaration_id: enclosing_module_declaration_id_opt
+                .map(SharedString::from),
+            enclosing_module_declaration_name: None,
             kind: SymbolKind::from_numeric_kind(kind_int as u32),
             kind_name: SharedString::from(kind_name_text),
             package: package_info.name.clone(),
@@ -1400,6 +1417,8 @@ mod tests {
             id: SharedString::from(id_str),
             name: SharedString::from(name_str),
             parent_symbol_id: None,
+            enclosing_module_declaration_id: None,
+            enclosing_module_declaration_name: None,
             kind: SymbolKind::Function,
             kind_name: SharedString::from("FunctionDeclaration"),
             package: SharedString::from("demo-pkg"),

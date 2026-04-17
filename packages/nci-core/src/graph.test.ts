@@ -741,6 +741,182 @@ describe("buildPackageGraph", () => {
         (symbolNode) => symbolNode.filePath === "context-b.d.ts",
       ),
     ).toBe(true);
+
+    const moduleRowInFile = (
+      filePath: string,
+      moduleSpecifier: string,
+    ): string | undefined =>
+      graphResult.symbols.find(
+        (symbolNode) =>
+          symbolNode.filePath === filePath &&
+          symbolNode.name === moduleSpecifier &&
+          symbolNode.kindName === "ModuleDeclaration",
+      )?.id;
+
+    const effectModuleEffectA = moduleRowInFile("effect-a.d.ts", "./Effect.js");
+    const effectModuleEffectB = moduleRowInFile("effect-b.d.ts", "./Effect.js");
+    const contextModuleContextA = moduleRowInFile(
+      "context-a.d.ts",
+      "./Context.js",
+    );
+    const contextModuleContextB = moduleRowInFile(
+      "context-b.d.ts",
+      "./Context.js",
+    );
+
+    expect(effectModuleEffectA).toBeDefined();
+    expect(effectModuleEffectB).toBeDefined();
+    expect(contextModuleContextA).toBeDefined();
+    expect(contextModuleContextB).toBeDefined();
+
+    const effectFromA = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "effect-a.d.ts" &&
+        symbolNode.name === "EffectFromA",
+    );
+    const effectFromB = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "effect-b.d.ts" &&
+        symbolNode.name === "EffectFromB",
+    );
+    expect(effectFromA?.enclosingModuleDeclarationId).toBe(effectModuleEffectA);
+    expect(effectFromB?.enclosingModuleDeclarationId).toBe(effectModuleEffectB);
+
+    const tagFromA = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "context-a.d.ts" &&
+        symbolNode.name === "TagFromA",
+    );
+    const tagFromB = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "context-b.d.ts" &&
+        symbolNode.name === "TagFromB",
+    );
+    expect(tagFromA?.enclosingModuleDeclarationId).toBe(contextModuleContextA);
+    expect(tagFromB?.enclosingModuleDeclarationId).toBe(contextModuleContextB);
+
+    const propertyFromA = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "context-a.d.ts" &&
+        symbolNode.name === "TagFromA.tagA",
+    );
+    const propertyFromB = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.filePath === "context-b.d.ts" &&
+        symbolNode.name === "TagFromB.tagB",
+    );
+    expect(propertyFromA?.parentSymbolId).toBe(tagFromA?.id);
+    expect(propertyFromB?.parentSymbolId).toBe(tagFromB?.id);
+    expect(propertyFromA?.enclosingModuleDeclarationId).toBe(
+      contextModuleContextA,
+    );
+    expect(propertyFromB?.enclosingModuleDeclarationId).toBe(
+      contextModuleContextB,
+    );
+  });
+
+  it("resolves enclosing module declaration ids for nested ambient blocks", () => {
+    const graphResult = buildPackageGraph(
+      makePackageInfo("ambient-module-block-nesting"),
+    );
+
+    const rowId = (
+      kindName: string,
+      symbolName: string,
+      filePath: string,
+    ): string | undefined =>
+      graphResult.symbols.find(
+        (symbolNode) =>
+          symbolNode.kindName === kindName &&
+          symbolNode.name === symbolName &&
+          symbolNode.filePath === filePath,
+      )?.id;
+
+    const outerModuleId = rowId("ModuleDeclaration", "OuterSpec", "index.d.ts");
+    const innerModuleId = rowId("ModuleDeclaration", "InnerSpec", "index.d.ts");
+    const containerNsId = rowId(
+      "ModuleDeclaration",
+      "ContainerNs",
+      "index.d.ts",
+    );
+    const wrappedModuleId = rowId(
+      "ModuleDeclaration",
+      "./WrappedAmbient.js",
+      "index.d.ts",
+    );
+
+    expect(outerModuleId).toBeDefined();
+    expect(innerModuleId).toBeDefined();
+    expect(containerNsId).toBeDefined();
+    expect(wrappedModuleId).toBeDefined();
+
+    expect(
+      graphResult.symbols.find((symbolNode) => symbolNode.name === "OuterSpec")
+        ?.enclosingModuleDeclarationId,
+    ).toBeUndefined();
+    expect(
+      graphResult.symbols.find((symbolNode) => symbolNode.name === "InnerSpec")
+        ?.enclosingModuleDeclarationId,
+    ).toBe(outerModuleId);
+    expect(
+      graphResult.symbols.find(
+        (symbolNode) => symbolNode.name === "./WrappedAmbient.js",
+      )?.enclosingModuleDeclarationId,
+    ).toBeUndefined();
+
+    const betweenInner = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "BetweenInnerAndOuter",
+    );
+    const innerOnly = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "InnerSpec.InnerOnlySymbol",
+    );
+    expect(betweenInner?.enclosingModuleDeclarationId).toBe(outerModuleId);
+    expect(innerOnly?.enclosingModuleDeclarationId).toBe(innerModuleId);
+
+    const globalRow = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "GlobalAugmentedRow" &&
+        symbolNode.kindName === "InterfaceDeclaration",
+    );
+    expect(globalRow?.enclosingModuleDeclarationId).toBeUndefined();
+
+    const globalAugmentationProperty = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "GlobalAugmentedRow.fromGlobalBlock",
+    );
+    expect(globalAugmentationProperty).toBeDefined();
+    expect(globalAugmentationProperty?.parentSymbolId).toBe(globalRow?.id);
+
+    const innerInterfaceProperty = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "InnerSpec.InnerOnlySymbol.innerScopeMarker",
+    );
+    expect(innerInterfaceProperty).toBeDefined();
+    expect(innerInterfaceProperty?.parentSymbolId).toBe(innerOnly?.id);
+    expect(innerInterfaceProperty?.enclosingModuleDeclarationId).toBe(
+      innerModuleId,
+    );
+
+    const containerMember = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "ContainerNs.ContainerMember",
+    );
+    expect(containerMember?.enclosingModuleDeclarationId).toBe(containerNsId);
+
+    const hostInterface = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "HostInterface",
+    );
+    const hostMember = graphResult.symbols.find(
+      (symbolNode) => symbolNode.name === "HostInterface.memberKey",
+    );
+    expect(hostInterface?.enclosingModuleDeclarationId).toBe(wrappedModuleId);
+    expect(hostMember?.parentSymbolId).toBe(hostInterface?.id);
+    expect(hostMember?.enclosingModuleDeclarationId).toBe(wrappedModuleId);
+
+    const slotMember = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "BetweenInnerAndOuter.slotBetweenLayers",
+    );
+    expect(slotMember?.parentSymbolId).toBe(betweenInner?.id);
+    expect(slotMember?.enclosingModuleDeclarationId).toBe(outerModuleId);
   });
 
   it("handles duplicate symbol names from the SAME file (e.g. overloads) and assigns unique IDs", () => {

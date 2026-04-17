@@ -182,7 +182,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::context-a.d.ts::./Context.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA.tagA",
@@ -196,7 +197,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA"
+      "parentSymbolId": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA",
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::context-a.d.ts::./Context.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::context-b.d.ts::./Context.js",
@@ -222,7 +224,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::context-b.d.ts::./Context.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB.tagB",
@@ -236,7 +239,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB"
+      "parentSymbolId": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB",
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::context-b.d.ts::./Context.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::./Effect.js",
@@ -262,7 +266,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::effect-a.d.ts::./Effect.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA.fromA",
@@ -276,7 +281,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA"
+      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA",
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::effect-a.d.ts::./Effect.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::./Effect.js",
@@ -302,7 +308,8 @@
       "isTypeOnly": true,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::effect-b.d.ts::./Effect.js"
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB.fromB",
@@ -316,7 +323,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB"
+      "parentSymbolId": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB",
+      "enclosingModuleDeclarationId": "relative-string-module-collision@1.0.0::effect-b.d.ts::./Effect.js"
     }
   ],
   "totalSymbols": 20,
