@@ -1132,20 +1132,11 @@ fn needs_namespace_qualifier(name: &str, parent: &str) -> bool {
     }
 }
 
-/// Two-pass namespace qualification for a batch of [`ParsedExport`] rows from one declaration.
-///
-/// **Pass 1:** For each export whose name still needs a namespace prefix (see
-/// [`needs_namespace_qualifier`]), rewrite `name` to `"{parent_name}.{name}"`. Records
-/// interface/class/type-alias/enum roots whose name changed, because their nested symbols were
-/// emitted with the **unqualified** declaration id as a prefix.
-///
-/// **Pass 2:** For each recorded `(old_root, new_root)` pair, rewrite any other row whose name
-/// starts with `"{old_root}."` but not yet with `"{new_root}."` so members track the qualified root
-/// (`Container.member` → `Ns.Container.member`). **Why:** nested members are built with the local
-/// declaration name only; after pass 1, `needs_namespace_qualifier` can skip them when the
-/// namespace segment equals that local name (they look already qualified). Pass 2 fixes the
-/// same-name namespace + declaration case (e.g. `namespace N { interface N { … } }`) so member
-/// paths stay consistent with the doubled container name on the root row.
+/// Prefixes declaration names with `parent_name` when [`needs_namespace_qualifier`] says so, then
+/// rewrites nested rows still using the old root prefix (`Root.child` → `parent.Root.child`).
+/// Needed when the namespace and an inner declaration share the same simple name: members are
+/// emitted under the local root only, so pass 1 alone would leave them out of sync with the
+/// newly qualified root.
 fn apply_namespace_qualifier_to_exports(parent_name: &str, exports: &mut [ParsedExport]) {
     let mut qualified_roots: Vec<(SharedString, SharedString)> = Vec::new();
     for export_item in exports.iter_mut() {
