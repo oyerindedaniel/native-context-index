@@ -116,6 +116,9 @@ expression: "& rust_graph"
       "kindName": "MethodDeclaration",
       "package": "typeof-import-type-query",
       "filePath": "dep.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "ping(): void;",
       "isTypeOnly": false,
       "symbolSpace": "value",

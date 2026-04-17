@@ -121,7 +121,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "member-property-extraction@1.0.0::BRIDGE_METHODS.SELECT",
@@ -135,7 +138,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "member-property-extraction@1.0.0::base.d.ts::BaseNode",

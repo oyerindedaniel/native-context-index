@@ -27,6 +27,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "namespace-export-method-overloads",
       "filePath": "api.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface Service {\n  use(value: string): void;\n  use(value: number): void;\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -45,6 +48,9 @@ expression: "& rust_graph"
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",
       "filePath": "api.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "use(value: string): void;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -60,6 +66,9 @@ expression: "& rust_graph"
       "kindName": "MethodSignature",
       "package": "namespace-export-method-overloads",
       "filePath": "api.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "use(value: number): void;",
       "isTypeOnly": false,
       "symbolSpace": "type",

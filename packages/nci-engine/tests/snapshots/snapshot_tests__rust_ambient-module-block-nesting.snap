@@ -52,7 +52,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "ambient-module-block-nesting@1.0.0::ContainerNs",
@@ -101,7 +104,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "ambient-module-block-nesting@1.0.0::GlobalAugmentedRow",
@@ -133,7 +139,10 @@ expression: "& rust_graph"
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": false,
-      "isGlobalAugmentation": true
+      "isGlobalAugmentation": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "ambient-module-block-nesting@1.0.0::HostInterface",
@@ -215,7 +224,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "ambient-module-block-nesting@1.0.0::OuterSpec",

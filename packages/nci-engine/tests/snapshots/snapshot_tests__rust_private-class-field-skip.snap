@@ -33,6 +33,7 @@ expression: "& rust_graph"
       "package": "private-class-field-skip",
       "filePath": "index.d.ts",
       "signature": "visible: number;",
+      "jsDoc": "Parity: TS crawler skips `#` fields; Rust must not emit prototype.[#…] symbols.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

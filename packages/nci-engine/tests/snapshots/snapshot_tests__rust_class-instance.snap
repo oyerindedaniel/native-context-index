@@ -88,7 +88,10 @@ expression: "& rust_graph"
       "symbolSpace": "value",
       "dependencies": [],
       "since": "1.1.0",
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     }
   ],
   "totalSymbols": 5,

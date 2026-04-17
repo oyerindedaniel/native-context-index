@@ -52,7 +52,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "qualified-namespace-deps@1.0.0::LocalResult",
@@ -112,7 +115,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOpts",
@@ -143,7 +149,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "qualified-namespace-deps@1.0.0::node_modules/@peer/core/peerCore.d.ts::PeerOut",
@@ -173,7 +182,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "qualified-namespace-deps@1.0.0::localNs",

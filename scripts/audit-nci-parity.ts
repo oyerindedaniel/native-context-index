@@ -2,31 +2,33 @@
 /**
  * TypeScript vs Rust NCI report comparison (same inputs as both demos).
  *
- * Modes:
- *   workspace (default) — Per-package totals (totalSymbols, totalFiles) for every package.
- *   first-package      — Deep dive on `packages[0]` only: symbol-id diff + `basename(filePath)::name` multiset.
- *   package <name>     — Same multiset + id diff for one package (e.g. `ai`, `@oyerinde/caliper`).
+ * Default: per-package totals (symbols + files) for the whole workspace.
+ * With `--package <name>`: deep dive (ids, multiset keys, samples) for that package.
+ *
+ * Shared flags (see `scripts/nci-report-cli.ts`): `--ts-report`, `--rust-report`,
+ * `--package`, `--all-packages` (ignored here; default is already workspace-wide),
+ * `--limit`, `--min-delta-symbols`.
  *
  * Usage (repo root):
  *   npx tsx scripts/audit-nci-parity.ts
- *   npx tsx scripts/audit-nci-parity.ts workspace --min-delta-symbols 10
- *   npx tsx scripts/audit-nci-parity.ts first-package --limit 40
- *   npx tsx scripts/audit-nci-parity.ts package ai --limit 80
+ *   npx tsx scripts/audit-nci-parity.ts --min-delta-symbols 10
+ *   npx tsx scripts/audit-nci-parity.ts --package ai --limit 80
  *
  * Prerequisite: generate both JSON reports (full workspace scans).
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  parseParityCli,
+  printMissingBothReportsHelp,
+  warnUnknownParityArgs,
+} from "./nci-report-cli.ts";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "..");
+const cli = parseParityCli(process.argv.slice(2));
+warnUnknownParityArgs(cli.unknownArgs);
 
-const TS_REPORT = path.join(REPO_ROOT, "packages/nci-core/nci-report.json");
-const RUST_REPORT = path.join(
-  REPO_ROOT,
-  "packages/nci-engine/nci-report-rust.json",
-);
+const tsReportPath = cli.tsReportPath;
+const rustReportPath = cli.rustReportPath;
 
 interface SymbolEntry {
   id: string;
@@ -62,39 +64,39 @@ function symbolKey(symbol: SymbolEntry): string {
 function multiset<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   const multisetMap = new Map<string, T[]>();
   for (const item of items) {
-    const key = keyFn(item);
-    const arr = multisetMap.get(key) ?? [];
-    arr.push(item);
-    multisetMap.set(key, arr);
+    const multisetKey = keyFn(item);
+    const bucket = multisetMap.get(multisetKey) ?? [];
+    bucket.push(item);
+    multisetMap.set(multisetKey, bucket);
   }
   return multisetMap;
 }
 
 function ensureReports(): void {
-  if (!fs.existsSync(TS_REPORT) || !fs.existsSync(RUST_REPORT)) {
-    console.error("Missing reports:\n  " + TS_REPORT + "\n  " + RUST_REPORT);
-    console.error(
-      "Run:\n  npx tsx packages/nci-core/scripts/demo.ts --output packages/nci-core/nci-report.json",
-    );
-    console.error(
-      "  cargo run --release --manifest-path packages/nci-engine/Cargo.toml --example demo -- --output packages/nci-engine/nci-report-rust.json",
-    );
+  if (!fs.existsSync(tsReportPath) || !fs.existsSync(rustReportPath)) {
+    printMissingBothReportsHelp(tsReportPath, rustReportPath);
     process.exit(1);
   }
 }
 
 function runWorkspace(minDelta: number): void {
   ensureReports();
-  const ts = loadReport(TS_REPORT);
-  const rust = loadReport(RUST_REPORT);
+  const tsReport = loadReport(tsReportPath);
+  const rustReport = loadReport(rustReportPath);
 
-  const key = (packageRow: PkgRow) =>
+  const packageVersionKey = (packageRow: PkgRow) =>
     `${packageRow.package}@${packageRow.version}`;
   const tsMap = new Map(
-    ts.packages.map((packageRow) => [key(packageRow), packageRow]),
+    tsReport.packages.map((packageRow) => [
+      packageVersionKey(packageRow),
+      packageRow,
+    ]),
   );
   const rustMap = new Map(
-    rust.packages.map((packageRow) => [key(packageRow), packageRow]),
+    rustReport.packages.map((packageRow) => [
+      packageVersionKey(packageRow),
+      packageRow,
+    ]),
   );
 
   type DiffRow = {
@@ -116,17 +118,17 @@ function runWorkspace(minDelta: number): void {
       console.warn("Package only in one report:", pkgKey);
       continue;
     }
-    const dSym = tsPkg.totalSymbols - rustPkg.totalSymbols;
-    const dFiles = tsPkg.totalFiles - rustPkg.totalFiles;
-    if (Math.abs(dSym) >= minDelta || Math.abs(dFiles) >= 1) {
+    const symbolDelta = tsPkg.totalSymbols - rustPkg.totalSymbols;
+    const fileDelta = tsPkg.totalFiles - rustPkg.totalFiles;
+    if (Math.abs(symbolDelta) >= minDelta || Math.abs(fileDelta) >= 1) {
       rows.push({
         package: tsPkg.package,
         tsSym: tsPkg.totalSymbols,
         rustSym: rustPkg.totalSymbols,
-        dSym,
+        dSym: symbolDelta,
         tsFiles: tsPkg.totalFiles,
         rustFiles: rustPkg.totalFiles,
-        dFiles,
+        dFiles: fileDelta,
       });
     }
   }
@@ -139,10 +141,10 @@ function runWorkspace(minDelta: number): void {
 
   console.log("\nWorkspace TS vs Rust (per package)\n");
   console.log(
-    `TS totals:   ${ts.totalSymbols?.toLocaleString() ?? "?"} symbols, ${ts.totalFiles?.toLocaleString() ?? "?"} files (${ts.packages.length} pkgs)`,
+    `TS totals:   ${tsReport.totalSymbols?.toLocaleString() ?? "?"} symbols, ${tsReport.totalFiles?.toLocaleString() ?? "?"} files (${tsReport.packages.length} pkgs)`,
   );
   console.log(
-    `Rust totals: ${rust.totalSymbols?.toLocaleString() ?? "?"} symbols, ${rust.totalFiles?.toLocaleString() ?? "?"} files (${rust.packages.length} pkgs)\n`,
+    `Rust totals: ${rustReport.totalSymbols?.toLocaleString() ?? "?"} symbols, ${rustReport.totalFiles?.toLocaleString() ?? "?"} files (${rustReport.packages.length} pkgs)\n`,
   );
 
   console.log(
@@ -169,15 +171,23 @@ function runWorkspace(minDelta: number): void {
   }
 }
 
-function runFirstPackage(listLimit: number): void {
+function runPackageDeepDive(packageName: string, listLimit: number): void {
   ensureReports();
-  const ts = loadReport(TS_REPORT);
-  const rust = loadReport(RUST_REPORT);
+  const tsReport = loadReport(tsReportPath);
+  const rustReport = loadReport(rustReportPath);
 
-  const tsPkg = ts.packages[0]!;
-  const rustPkg = rust.packages[0]!;
+  const tsPkg = tsReport.packages.find((row) => row.package === packageName);
+  const rustPkg = rustReport.packages.find(
+    (row) => row.package === packageName,
+  );
+  if (!tsPkg || !rustPkg) {
+    console.error(
+      `Package "${packageName}" missing: TS ${tsPkg ? "ok" : "missing"}, Rust ${rustPkg ? "ok" : "missing"}`,
+    );
+    process.exit(1);
+  }
+
   const pkg = `${rustPkg.package}@${rustPkg.version}`;
-
   const tsSyms = tsPkg.symbols;
   const rustSyms = rustPkg.symbols;
 
@@ -192,7 +202,7 @@ function runFirstPackage(listLimit: number): void {
     (filePath) => !tsFiles.has(filePath),
   );
 
-  console.log(`\n🔍 first-package deep dive: ${pkg}\n`);
+  console.log(`\n🔍 package deep dive: ${pkg}\n`);
   console.log(
     `Row counts: TS ${tsSyms.length.toLocaleString()} | Rust ${rustSyms.length.toLocaleString()}`,
   );
@@ -228,21 +238,44 @@ function runFirstPackage(listLimit: number): void {
     `Duplicate keys → extra rows vs unique: Rust +${extraRustRows} | TS +${extraTsRows}`,
   );
 
+  const byBasename = new Map<string, number>();
+  for (const multisetKey of onlyTsKeys) {
+    const fileBasename = multisetKey.split("::")[0] ?? multisetKey;
+    byBasename.set(fileBasename, (byBasename.get(fileBasename) ?? 0) + 1);
+  }
+  const topBasenames = [...byBasename.entries()]
+    .sort((leftEntry, rightEntry) => rightEntry[1] - leftEntry[1])
+    .slice(0, 20);
+  if (topBasenames.length > 0) {
+    console.log(`\nTS-only keys by file (top ${topBasenames.length}):`);
+    for (const [fileBasename, occurrenceCount] of topBasenames) {
+      console.log(
+        `  ${occurrenceCount.toString().padStart(5)}  ${fileBasename}`,
+      );
+    }
+  }
+
   if (onlyRustKeys.length > 0 && listLimit > 0) {
     console.log(`\nSample Rust-only keys (up to ${listLimit}):`);
-    onlyRustKeys.slice(0, listLimit).forEach((key) => console.log(`  ${key}`));
+    onlyRustKeys
+      .slice(0, listLimit)
+      .forEach((multisetKey) => console.log(`  ${multisetKey}`));
   }
   if (onlyTsKeys.length > 0 && listLimit > 0) {
     console.log(`\nSample TS-only keys (up to ${listLimit}):`);
-    onlyTsKeys.slice(0, listLimit).forEach((key) => console.log(`  ${key}`));
+    onlyTsKeys
+      .slice(0, listLimit)
+      .forEach((multisetKey) => console.log(`  ${multisetKey}`));
   }
 
   if (rustDupKeys.length > 0 && listLimit > 0) {
     console.log(
       `\nRust duplicate keys (top ${Math.min(listLimit, rustDupKeys.length)}):`,
     );
-    for (const [key, rows] of rustDupKeys.slice(0, listLimit)) {
-      console.log(`  ${rows.length}× [${rows[0]!.kindName}] ${key}`);
+    for (const [symbolKey, symbolsForKey] of rustDupKeys.slice(0, listLimit)) {
+      console.log(
+        `  ${symbolsForKey.length}× [${symbolsForKey[0]!.kindName}] ${symbolKey}`,
+      );
     }
   }
 
@@ -250,30 +283,35 @@ function runFirstPackage(listLimit: number): void {
     console.log(
       `\n❌ Symbols in TS missing same id in Rust: ${onlyInTs.length}`,
     );
-    onlyInTs
-      .slice(0, Math.min(listLimit, onlyInTs.length))
-      .forEach((symbol) => {
-        console.log(
-          `   ${symbol.id} (${symbol.kindName}) [${symbol.filePath}]`,
-        );
-      });
-    if (onlyInTs.length > listLimit)
-      console.log(`   … +${onlyInTs.length - listLimit} more`);
+    if (listLimit > 0) {
+      onlyInTs
+        .slice(0, Math.min(listLimit, onlyInTs.length))
+        .forEach((symbol) => {
+          console.log(
+            `   ${symbol.id} (${symbol.kindName}) [${path.basename(symbol.filePath)}] :: ${symbol.name}`,
+          );
+        });
+      if (onlyInTs.length > listLimit)
+        console.log(`   … +${onlyInTs.length - listLimit} more`);
+    }
   }
   if (onlyInRust.length > 0) {
     console.log(
       `\n➕ Symbols in Rust missing same id in TS: ${onlyInRust.length}`,
     );
-    onlyInRust
-      .slice(0, Math.min(listLimit, onlyInRust.length))
-      .forEach((symbol) => {
-        console.log(
-          `   ${symbol.id} (${symbol.kindName}) [${symbol.filePath}]`,
-        );
-      });
-    if (onlyInRust.length > listLimit)
-      console.log(`   … +${onlyInRust.length - listLimit} more`);
+    if (listLimit > 0) {
+      onlyInRust
+        .slice(0, Math.min(listLimit, onlyInRust.length))
+        .forEach((symbol) => {
+          console.log(
+            `   ${symbol.id} (${symbol.kindName}) [${path.basename(symbol.filePath)}] :: ${symbol.name}`,
+          );
+        });
+      if (onlyInRust.length > listLimit)
+        console.log(`   … +${onlyInRust.length - listLimit} more`);
+    }
   }
+
   if (filesOnlyInRust.length > 0) {
     console.log(
       `\n📄 Files seen only in Rust (by symbol paths): ${filesOnlyInRust.length}`,
@@ -284,10 +322,13 @@ function runFirstPackage(listLimit: number): void {
       counts.set(directory, (counts.get(directory) ?? 0) + 1);
     }
     [...counts.entries()]
-      .sort((first, second) => second[1] - first[1])
+      .sort(
+        (leftDirectoryCount, rightDirectoryCount) =>
+          rightDirectoryCount[1] - leftDirectoryCount[1],
+      )
       .slice(0, 15)
-      .forEach(([directory, count]) =>
-        console.log(`   ${directory}: ${count}`),
+      .forEach(([directoryPath, pathHitCount]) =>
+        console.log(`   ${directoryPath}: ${pathHitCount}`),
       );
   }
 
@@ -301,7 +342,7 @@ function runFirstPackage(listLimit: number): void {
     tsSyms.length === rustSyms.length;
   if (idMatch && multisetBalanced) {
     console.log(
-      "\n✅ first-package: identical ids, files, and key counts vs rows.\n",
+      "\n✅ package deep dive: identical ids, files, and key counts vs rows.\n",
     );
   } else {
     console.log(
@@ -310,132 +351,8 @@ function runFirstPackage(listLimit: number): void {
   }
 }
 
-function runNamedPackage(packageName: string, listLimit: number): void {
-  ensureReports();
-  const ts = loadReport(TS_REPORT);
-  const rust = loadReport(RUST_REPORT);
-
-  const tsPkg = ts.packages.find((row) => row.package === packageName);
-  const rustPkg = rust.packages.find((row) => row.package === packageName);
-  if (!tsPkg || !rustPkg) {
-    console.error(
-      `Package "${packageName}" missing: TS ${tsPkg ? "ok" : "missing"}, Rust ${rustPkg ? "ok" : "missing"}`,
-    );
-    process.exit(1);
-  }
-
-  const pkg = `${rustPkg.package}@${rustPkg.version}`;
-  const tsSyms = tsPkg.symbols;
-  const rustSyms = rustPkg.symbols;
-
-  console.log(`\n🔍 package deep dive: ${pkg}\n`);
-  console.log(
-    `Row counts: TS ${tsSyms.length.toLocaleString()} | Rust ${rustSyms.length.toLocaleString()}`,
-  );
-
-  const tsSymbolIds = new Set(tsSyms.map((symbol) => symbol.id));
-  const rustSymbolIds = new Set(rustSyms.map((symbol) => symbol.id));
-  const onlyInTs = tsSyms.filter((symbol) => !rustSymbolIds.has(symbol.id));
-  const onlyInRust = rustSyms.filter((symbol) => !tsSymbolIds.has(symbol.id));
-
-  const rustByKey = multiset(rustSyms, symbolKey);
-  const tsByKey = multiset(tsSyms, symbolKey);
-  const rustKeys = new Set(rustByKey.keys());
-  const tsKeys = new Set(tsByKey.keys());
-  const onlyRustKeys = [...rustKeys].filter((key) => !tsKeys.has(key)).sort();
-  const onlyTsKeys = [...tsKeys].filter((key) => !rustKeys.has(key)).sort();
-
-  console.log(
-    `\nUnique keys (basename(filePath)::name): TS ${tsKeys.size} | Rust ${rustKeys.size}`,
-  );
-  console.log(
-    `Keys only in Rust: ${onlyRustKeys.length} | only in TS: ${onlyTsKeys.length}`,
-  );
-
-  const byBasename = new Map<string, number>();
-  for (const key of onlyTsKeys) {
-    const basename = key.split("::")[0] ?? key;
-    byBasename.set(basename, (byBasename.get(basename) ?? 0) + 1);
-  }
-  const topBasenames = [...byBasename.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20);
-  if (topBasenames.length > 0) {
-    console.log(`\nTS-only keys by file (top ${topBasenames.length}):`);
-    for (const [file, count] of topBasenames) {
-      console.log(`  ${count.toString().padStart(5)}  ${file}`);
-    }
-  }
-
-  if (onlyRustKeys.length > 0 && listLimit > 0) {
-    console.log(`\nSample Rust-only keys (up to ${listLimit}):`);
-    onlyRustKeys.slice(0, listLimit).forEach((key) => console.log(`  ${key}`));
-  }
-  if (onlyTsKeys.length > 0 && listLimit > 0) {
-    console.log(`\nSample TS-only keys (up to ${listLimit}):`);
-    onlyTsKeys.slice(0, listLimit).forEach((key) => console.log(`  ${key}`));
-  }
-
-  if (onlyInTs.length > 0 && listLimit > 0) {
-    console.log(
-      `\nSymbols in TS missing same id in Rust: ${onlyInTs.length} (sample)`,
-    );
-    onlyInTs
-      .slice(0, Math.min(listLimit, onlyInTs.length))
-      .forEach((symbol) => {
-        console.log(
-          `   ${symbol.id} (${symbol.kindName}) [${path.basename(symbol.filePath)}] :: ${symbol.name}`,
-        );
-      });
-  }
-  if (onlyInRust.length > 0 && listLimit > 0) {
-    console.log(
-      `\nSymbols in Rust missing same id in TS: ${onlyInRust.length} (sample)`,
-    );
-    onlyInRust
-      .slice(0, Math.min(listLimit, onlyInRust.length))
-      .forEach((symbol) => {
-        console.log(
-          `   ${symbol.id} (${symbol.kindName}) [${path.basename(symbol.filePath)}] :: ${symbol.name}`,
-        );
-      });
-  }
-
-  console.log("");
-}
-
-// --- CLI ---
-const rawArgs = process.argv.slice(2);
-let mode: "workspace" | "first-package" | "package" = "workspace";
-let listLimit = 30;
-let minDelta = 1;
-let namedPackage: string | undefined;
-
-for (let index = 0; index < rawArgs.length; index++) {
-  const arg = rawArgs[index]!;
-  if (arg === "workspace" || arg === "--workspace") mode = "workspace";
-  else if (arg === "first-package" || arg === "--first-package")
-    mode = "first-package";
-  else if (arg === "package" && rawArgs[index + 1]) {
-    mode = "package";
-    namedPackage = rawArgs[++index];
-  } else if (arg === "--limit" && rawArgs[index + 1]) {
-    listLimit = Math.max(1, parseInt(rawArgs[++index]!, 10) || 30);
-  } else if (arg === "--min-delta-symbols" && rawArgs[index + 1]) {
-    minDelta = Math.max(0, parseInt(rawArgs[++index]!, 10) || 0);
-  }
-}
-
-if (mode === "workspace") {
-  runWorkspace(minDelta);
-} else if (mode === "package") {
-  if (!namedPackage) {
-    console.error(
-      "Usage: npx tsx scripts/audit-nci-parity.ts package <name> [--limit N]",
-    );
-    process.exit(1);
-  }
-  runNamedPackage(namedPackage, listLimit);
+if (cli.packageName) {
+  runPackageDeepDive(cli.packageName, cli.limit);
 } else {
-  runFirstPackage(listLimit);
+  runWorkspace(cli.minDeltaSymbols);
 }

@@ -17,7 +17,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "default"
+      ]
     }
   ],
   "totalSymbols": 1,

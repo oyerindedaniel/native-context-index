@@ -13,13 +13,16 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "internal-overload-ref",
       "filePath": "ambient-ref.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "declare const AMBIENT_PICK: \"ambient\"",
       "jsDoc": "Script-style declarations only: no top-level import/export so names are ambient globals.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": false,
-      "isGlobalAugmentation": true,
       "modifiers": [
         "declare"
       ]
@@ -65,6 +68,10 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "internal-overload-ref",
       "filePath": "ref.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "declare const GLOBAL_FROM_REF: \"global-via-module-ref\"",
       "jsDoc": "Module file augments global scope; entries see this without importing ref.d.ts.",
       "isTypeOnly": false,

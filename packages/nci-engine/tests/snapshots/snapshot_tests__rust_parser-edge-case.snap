@@ -61,7 +61,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "default"
+      ]
     },
     {
       "id": "parser-edge-case@1.0.0::default.prototype.key",
@@ -75,7 +78,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "parser-edge-case@1.0.0::localRef",
@@ -101,7 +107,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "default"
+      ]
     },
     {
       "id": "parser-edge-case@1.0.0::namespacedImport",

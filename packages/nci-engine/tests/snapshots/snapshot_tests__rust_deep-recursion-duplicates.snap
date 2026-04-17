@@ -35,7 +35,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema",
@@ -68,7 +71,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.Type",
@@ -82,7 +88,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations",
@@ -98,7 +107,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Annotations"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::Schema.annotations.title",
@@ -112,7 +124,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult",
@@ -147,7 +162,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Schema"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure",
@@ -163,7 +181,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Schema"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.AST",
@@ -177,7 +198,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.Type",
@@ -191,7 +215,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure._tag",
@@ -221,7 +248,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Annotations"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].failure.annotations.title",
@@ -235,7 +265,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success",
@@ -251,7 +284,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Schema"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.AST",
@@ -265,7 +301,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.Type",
@@ -279,7 +318,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success._tag",
@@ -309,7 +351,10 @@ expression: "& rust_graph"
       "dependencies": [
         "deep-recursion-duplicates@1.0.0::Annotations"
       ],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::WithResult.[symbolWithResult].success.annotations.title",
@@ -323,7 +368,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "deep-recursion-duplicates@1.0.0::symbolWithResult",

@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "TypeAliasDeclaration",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export type Callback = () => void;",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -29,6 +32,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface Config {\n  host: string;\n  port: number;\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -46,6 +52,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "host: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -60,6 +69,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "port: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",

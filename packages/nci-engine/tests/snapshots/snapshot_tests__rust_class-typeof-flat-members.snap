@@ -98,7 +98,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "accessor"
+      ]
     },
     {
       "id": "class-typeof-flat-members@1.0.0::index.d.ts::InnerForBox",
@@ -126,6 +129,7 @@ expression: "& rust_graph"
       "package": "class-typeof-flat-members",
       "filePath": "index.d.ts",
       "signature": "static parse(input: string): InnerForBox;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [
@@ -145,6 +149,7 @@ expression: "& rust_graph"
       "package": "class-typeof-flat-members",
       "filePath": "index.d.ts",
       "signature": "check(): boolean;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
@@ -159,6 +164,7 @@ expression: "& rust_graph"
       "package": "class-typeof-flat-members",
       "filePath": "index.d.ts",
       "signature": "get id(): string;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
@@ -173,6 +179,7 @@ expression: "& rust_graph"
       "package": "class-typeof-flat-members",
       "filePath": "index.d.ts",
       "signature": "set id(v: string);",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
@@ -187,10 +194,14 @@ expression: "& rust_graph"
       "package": "class-typeof-flat-members",
       "filePath": "index.d.ts",
       "signature": "accessor tag: number;",
+      "jsDoc": "Declared only so `Box` can use `typeof InnerForBox`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "accessor"
+      ]
     }
   ],
   "totalSymbols": 12,

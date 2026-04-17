@@ -47,6 +47,10 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "interface MyGlobalType {\n    id: string;\n    value: number;\n  }",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -62,6 +66,10 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "id: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -77,6 +85,10 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "value: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -91,6 +103,10 @@ expression: "& rust_graph"
       "kindName": "ModuleDeclaration",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "namespace MyNamespace {\n    const VERSION: string;\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -106,6 +122,10 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "declare const VERSION: string",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -120,6 +140,10 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "entryVisibility": [
+        "extra-entry.d.ts",
+        "index.d.ts"
+      ],
       "signature": "declare const PICK_TYPE: \"pick\"",
       "jsDoc": "Global pick marker visible via triple-slash from module files.",
       "isTypeOnly": false,

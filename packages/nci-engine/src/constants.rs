@@ -55,6 +55,24 @@ pub static VISIBILITY_TAGS: phf::Set<&'static str> = phf_set! {
     "public", "internal", "alpha", "beta",
 };
 
+/// Signature-leading modifier tokens accepted by parser fallback extraction.
+///
+/// This is used only when an extraction path does not carry direct AST modifier fields
+/// (for example, some flattened/synthesized member rows) and we need stable structured
+/// modifiers from signature text.
+pub const SIGNATURE_MODIFIER_PREFIX_TOKENS: &[&str] = &[
+    "public",
+    "protected",
+    "private",
+    "readonly",
+    "static",
+    "abstract",
+    "override",
+    "declare",
+    "async",
+    "accessor",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +137,14 @@ mod tests {
         assert!(!VISIBILITY_TAGS.contains("private"));
         assert!(!VISIBILITY_TAGS.contains("protected"));
         assert!(!VISIBILITY_TAGS.contains("experimental"));
+    }
+
+    #[test]
+    fn signature_modifier_prefix_tokens_contains_expected_entries() {
+        assert!(SIGNATURE_MODIFIER_PREFIX_TOKENS.contains(&"readonly"));
+        assert!(SIGNATURE_MODIFIER_PREFIX_TOKENS.contains(&"static"));
+        assert!(SIGNATURE_MODIFIER_PREFIX_TOKENS.contains(&"override"));
+        assert!(SIGNATURE_MODIFIER_PREFIX_TOKENS.contains(&"accessor"));
     }
 
     #[test]

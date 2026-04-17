@@ -77,6 +77,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "relative-string-module-collision",
       "filePath": "context-a.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface ContextABase {\n  readonly source: \"context-a\";\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -94,11 +97,17 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "relative-string-module-collision",
       "filePath": "context-a.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "readonly source: \"context-a\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::ContextBBase",
@@ -107,6 +116,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "relative-string-module-collision",
       "filePath": "context-b.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface ContextBBase {\n  readonly source: \"context-b\";\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -124,11 +136,17 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "relative-string-module-collision",
       "filePath": "context-b.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "readonly source: \"context-b\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::EffectABase",
@@ -137,6 +155,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "relative-string-module-collision",
       "filePath": "effect-a.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface EffectABase {\n  readonly source: \"effect-a\";\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -154,11 +175,17 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "relative-string-module-collision",
       "filePath": "effect-a.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "readonly source: \"effect-a\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::EffectBBase",
@@ -167,6 +194,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "relative-string-module-collision",
       "filePath": "effect-b.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface EffectBBase {\n  readonly source: \"effect-b\";\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -184,11 +214,17 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "relative-string-module-collision",
       "filePath": "effect-b.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "readonly source: \"effect-b\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": false
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-a.d.ts::EffectFromA",
@@ -217,7 +253,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::effect-b.d.ts::EffectFromB",
@@ -246,7 +285,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::context-a.d.ts::TagFromA",
@@ -275,7 +317,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     },
     {
       "id": "relative-string-module-collision@1.0.0::context-b.d.ts::TagFromB",
@@ -304,7 +349,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "type",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
     }
   ],
   "totalSymbols": 20,

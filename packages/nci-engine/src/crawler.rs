@@ -79,7 +79,8 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
 
     let mut resolved_symbols: Vec<ResolvedSymbol> = Vec::new();
     let mut public_symbols: HashSet<SharedString> = HashSet::new();
-    let mut all_seen_keys: HashSet<SharedString> = HashSet::new();
+    let mut seen_per_entry_keys: HashSet<SharedString> = HashSet::new();
+    let mut internal_seen_keys: HashSet<SharedString> = HashSet::new();
 
     // Deduplicate entry paths (e.g., exports + typesVersions resolving to the same file)
     let mut seen_entries: HashSet<SharedString> = HashSet::new();
@@ -93,9 +94,10 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
 
     let resolve_exports_start = Instant::now();
     for entry_path in &unique_entries {
+        let entry_norm = session.norm_path(Path::new(entry_path.as_ref()));
         let resolved = session.resolve_file(entry_path, 0, "");
         for mut resolved_symbol in resolved.iter().cloned() {
-            let dedup_key = SharedString::from(
+            let definition_key = SharedString::from(
                 symbol_dedupe_key(
                     resolved_symbol.defined_in.as_ref(),
                     resolved_symbol.name.as_ref(),
@@ -104,13 +106,16 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
                 )
                 .as_str(),
             );
-            if all_seen_keys.contains(&dedup_key) {
+            let per_entry_key: SharedString =
+                format!("{}::{}", entry_norm.as_ref(), definition_key.as_ref()).into();
+            if seen_per_entry_keys.contains(&per_entry_key) {
                 continue;
             }
             resolved_symbol.is_internal = false;
+            resolved_symbol.resolved_from_package_entry = Some(entry_norm.clone());
             resolved_symbols.push(resolved_symbol);
-            all_seen_keys.insert(dedup_key.clone());
-            public_symbols.insert(dedup_key);
+            seen_per_entry_keys.insert(per_entry_key);
+            public_symbols.insert(definition_key);
         }
     }
     profile::profile_log(
@@ -156,14 +161,14 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
                 continue;
             }
 
-            if all_seen_keys.contains(&definition_key) {
+            if internal_seen_keys.contains(&definition_key) {
                 continue;
             }
 
             let mut internal_sym = ResolvedSymbol::from_export(export_entry, file.clone());
             internal_sym.is_internal = true;
             resolved_symbols.push(internal_sym);
-            all_seen_keys.insert(definition_key.clone());
+            internal_seen_keys.insert(definition_key.clone());
             public_symbols.insert(definition_key);
         }
     }

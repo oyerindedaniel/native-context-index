@@ -116,6 +116,7 @@ expression: "& rust_graph"
       "package": "namespace-cases",
       "filePath": "index.d.ts",
       "signature": "export as namespace MyLib;",
+      "jsDoc": "UMD namespace declaration",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

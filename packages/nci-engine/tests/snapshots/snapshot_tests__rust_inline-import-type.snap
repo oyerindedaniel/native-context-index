@@ -36,6 +36,9 @@ expression: "& rust_graph"
       "additionalFiles": [
         "index.d.ts"
       ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "n: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",

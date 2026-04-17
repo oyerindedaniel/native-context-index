@@ -193,6 +193,63 @@ fn compare_symbol_names_and_counts(
     );
 }
 
+fn normalise_symbol(symbol: &serde_json::Value) -> serde_json::Value {
+    let mut normalized = symbol.clone();
+    let Some(obj) = normalized.as_object_mut() else {
+        return normalized;
+    };
+
+    let is_internal = obj
+        .get("isInternal")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+
+    if let Some(modifiers) = obj
+        .get_mut("modifiers")
+        .and_then(|value| value.as_array_mut())
+    {
+        if is_internal {
+            obj.remove("modifiers");
+        } else {
+            modifiers.retain(|modifier| {
+                let text = modifier.as_str().unwrap_or("");
+                text != "export" && text != "declare"
+            });
+            modifiers.sort_by(|left, right| {
+                left.as_str()
+                    .unwrap_or("")
+                    .cmp(right.as_str().unwrap_or(""))
+            });
+            if modifiers.is_empty() {
+                obj.remove("modifiers");
+            }
+        }
+    }
+
+    if is_internal
+        && let Some(signature_value) = obj.get_mut("signature")
+        && let Some(signature) = signature_value.as_str()
+    {
+        let stripped = signature
+            .strip_prefix("export default ")
+            .unwrap_or(signature);
+        *signature_value = serde_json::Value::String(stripped.to_string());
+    }
+    if let Some(signature_value) = obj.get_mut("signature")
+        && let Some(signature) = signature_value.as_str()
+    {
+        let mut normalized_sig = signature.trim().to_string();
+        if normalized_sig.ends_with(';') {
+            normalized_sig.pop();
+        }
+        *signature_value = serde_json::Value::String(normalized_sig);
+    }
+
+    obj.remove("jsDoc");
+
+    normalized
+}
+
 fn compare_structural_properties(
     rust_graph: &PackageGraph,
     oracle: &serde_json::Value,
@@ -223,129 +280,25 @@ fn compare_structural_properties(
                 );
             }
         };
+        let rust_json = normalise_symbol(&serde_json::to_value(rust_sym).unwrap());
+        let ts_json = normalise_symbol(ts_sym);
+        let rust_obj = rust_json.as_object().unwrap();
+        let ts_obj = ts_json.as_object().unwrap();
 
-        if let Some(ts_kind_name) = ts_sym
-            .get("kindName")
-            .and_then(|kind_field| kind_field.as_str())
-        {
-            assert_eq!(
-                rust_sym.kind_name.as_ref(),
-                ts_kind_name,
-                "[{fixture_name}] Kind mismatch for '{}' ({})",
-                rust_sym.name,
-                rust_sym.id
-            );
-        }
-
-        if let Some(ts_file_path) = ts_sym
-            .get("filePath")
-            .and_then(|path_field| path_field.as_str())
-        {
-            assert_eq!(
-                rust_sym.file_path.as_ref(),
-                ts_file_path,
-                "[{fixture_name}] File path mismatch for '{}'",
-                rust_sym.name
-            );
-        }
-
-        if let Some(ts_type_only) = ts_sym.get("isTypeOnly").and_then(|flag| flag.as_bool()) {
-            assert_eq!(
-                rust_sym.is_type_only, ts_type_only,
-                "[{fixture_name}] isTypeOnly mismatch for '{}'",
-                rust_sym.name
-            );
-        }
-
-        if let Some(ts_space) = ts_sym
-            .get("symbolSpace")
-            .and_then(|space_field| space_field.as_str())
-        {
-            let rust_space = match rust_sym.symbol_space {
-                nci_engine::types::SymbolSpace::Type => "type",
-                nci_engine::types::SymbolSpace::Value => "value",
-            };
-            assert_eq!(
-                rust_space, ts_space,
-                "[{fixture_name}] symbolSpace mismatch for '{}'",
-                rust_sym.name
-            );
-        }
-
-        if let Some(ts_heritage) = ts_sym
-            .get("heritage")
-            .and_then(|heritage_field| heritage_field.as_array())
-        {
-            let ts_heritage_strs: Vec<&str> = ts_heritage
-                .iter()
-                .filter_map(|heritage_item| heritage_item.as_str())
-                .collect();
-            assert_eq!(
-                rust_sym
-                    .heritage
-                    .iter()
-                    .map(|name| name.as_ref())
-                    .collect::<Vec<_>>(),
-                ts_heritage_strs,
-                "[{fixture_name}] Heritage mismatch for '{}'",
-                rust_sym.name
-            );
-        }
-
-        let rust_parent = rust_sym
-            .parent_symbol_id
-            .as_ref()
-            .map(|parent_id| parent_id.as_ref());
-        let ts_parent = ts_sym
-            .get("parentSymbolId")
-            .and_then(|parent_field| parent_field.as_str());
+        let mut rust_keys: Vec<&str> = rust_obj.keys().map(|key| key.as_str()).collect();
+        let mut ts_keys: Vec<&str> = ts_obj.keys().map(|key| key.as_str()).collect();
+        rust_keys.sort_unstable();
+        ts_keys.sort_unstable();
         assert_eq!(
-            rust_parent, ts_parent,
-            "[{fixture_name}] parentSymbolId mismatch for '{}' ({})",
+            rust_keys, ts_keys,
+            "[{fixture_name}] key mismatch for '{}' ({})",
             rust_sym.name, rust_sym.id
         );
 
-        let rust_enclosing = rust_sym
-            .enclosing_module_declaration_id
-            .as_ref()
-            .map(|enclosing_id| enclosing_id.as_ref());
-        let ts_enclosing = ts_sym
-            .get("enclosingModuleDeclarationId")
-            .and_then(|enclosing_field| enclosing_field.as_str());
         assert_eq!(
-            rust_enclosing, ts_enclosing,
-            "[{fixture_name}] enclosingModuleDeclarationId mismatch for '{}' ({})",
+            rust_json, ts_json,
+            "[{fixture_name}] value mismatch for '{}' ({})",
             rust_sym.name, rust_sym.id
-        );
-
-        if let Some(ts_deps) = ts_sym
-            .get("dependencies")
-            .and_then(|deps_field| deps_field.as_array())
-        {
-            assert_eq!(
-                rust_sym.dependencies.len(),
-                ts_deps.len(),
-                "[{fixture_name}] Dependency count mismatch for '{}'",
-                rust_sym.name
-            );
-        }
-
-        let ts_visibility = ts_sym
-            .get("visibility")
-            .and_then(|vis_field| vis_field.as_str());
-        let rust_visibility = rust_sym
-            .visibility
-            .as_ref()
-            .map(|visibility| match visibility {
-                nci_engine::types::Visibility::Public => "public",
-                nci_engine::types::Visibility::Internal => "internal",
-                nci_engine::types::Visibility::Alpha => "alpha",
-                nci_engine::types::Visibility::Beta => "beta",
-            });
-        assert_eq!(
-            rust_visibility, ts_visibility,
-            "[{fixture_name}] Visibility mismatch for '{}'",
-            rust_sym.name
         );
     }
 }

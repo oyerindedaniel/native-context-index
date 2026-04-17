@@ -249,10 +249,37 @@ fn fuse_merged_signatures(existing: &mut Option<SharedString>, incoming: Option<
     }
 }
 
+fn entry_visibility_contributions(
+    resolved: &ResolvedSymbol,
+    symbol_file_path: &SharedString,
+    entry_files: &HashSet<SharedString>,
+    abs_to_rel: &HashMap<SharedString, SharedString>,
+    package_dir_str: &str,
+    normalized_pkg_dir: &str,
+) -> Vec<SharedString> {
+    let mut visibility: Vec<SharedString> = Vec::new();
+    if entry_files.contains(symbol_file_path) {
+        visibility.push(symbol_file_path.clone());
+    }
+    if let Some(entry_abs_path) = resolved.resolved_from_package_entry.as_ref() {
+        let rel = abs_to_rel.get(entry_abs_path).cloned().unwrap_or_else(|| {
+            SharedString::from(
+                make_relative_to_package(entry_abs_path, package_dir_str, normalized_pkg_dir)
+                    .as_str(),
+            )
+        });
+        if entry_files.contains(&rel) && !visibility.iter().any(|current| current == &rel) {
+            visibility.push(rel);
+        }
+    }
+    visibility
+}
+
 fn merge_resolved_into_node(
     existing: &mut SymbolNode,
     resolved: &ResolvedSymbol,
     symbol_file_path: &SharedString,
+    entry_visibility_paths: &[SharedString],
     merged_index: usize,
     additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
 ) {
@@ -284,6 +311,37 @@ fn merge_resolved_into_node(
     }
 
     fuse_merged_signatures(&mut existing.signature, resolved.signature.as_ref());
+
+    if !entry_visibility_paths.is_empty() {
+        match &mut existing.entry_visibility {
+            Some(paths) => {
+                let mut merged_paths: Vec<SharedString> = paths.iter().cloned().collect();
+                let mut changed = false;
+                for vis_path in entry_visibility_paths {
+                    if !merged_paths
+                        .iter()
+                        .any(|existing_path| existing_path == vis_path)
+                    {
+                        merged_paths.push(vis_path.clone());
+                        changed = true;
+                    }
+                }
+                if changed {
+                    existing.entry_visibility = Some(SharedVec::from(merged_paths));
+                }
+            }
+            None => {
+                existing.entry_visibility = Some(SharedVec::from(entry_visibility_paths.to_vec()));
+            }
+        }
+    }
+
+    if let Some(paths) = existing.entry_visibility.as_ref()
+        && paths.len() == 1
+        && paths[0] == existing.file_path
+    {
+        existing.entry_visibility = None;
+    }
 
     if !resolved.dependencies.is_empty() {
         let set = existing.dep_dedupe_keys.get_or_insert_with(|| {
@@ -781,7 +839,6 @@ pub fn build_package_graph(
     );
 
     let graph_assembly_phase_start = Instant::now();
-
     let all_symbols = crawl_result.exports;
     let all_imports_per_file = crawl_result.imports;
     let import_maps_per_file = index_imports_by_local_name(&all_imports_per_file);
@@ -789,6 +846,20 @@ pub fn build_package_graph(
     let file_is_external = crawl_result.file_is_external_module;
     let package_dir_str = package_info.dir.as_ref();
     let normalized_pkg_dir = package_dir_str.replace('\\', "/");
+    let entry_files: HashSet<SharedString> = entry
+        .types_entries
+        .iter()
+        .map(|entry_file_path| {
+            SharedString::from(
+                make_relative_to_package(
+                    entry_file_path,
+                    package_dir_str,
+                    normalized_pkg_dir.as_str(),
+                )
+                .as_str(),
+            )
+        })
+        .collect();
     let abs_to_rel_fallback;
     let abs_to_rel: &HashMap<SharedString, SharedString> =
         if !crawl_result.absolute_to_package_relative.is_empty() {
@@ -836,6 +907,14 @@ pub fn build_package_graph(
             .get(resolved.defined_in.as_ref())
             .copied()
             .unwrap_or(true);
+        let entry_visibility_paths = entry_visibility_contributions(
+            resolved,
+            &symbol_file_path,
+            &entry_files,
+            abs_to_rel,
+            package_dir_str,
+            normalized_pkg_dir.as_str(),
+        );
         let norm_sig = normalize_signature(resolved.signature.as_deref());
         let merge_key: SharedString = if is_interface_or_type_alias_merge_scoped(resolved.kind) {
             let scope_key = merge_scope_by_rel
@@ -896,6 +975,7 @@ pub fn build_package_graph(
                     &mut merged[fold_idx].1,
                     resolved,
                     &symbol_file_path,
+                    &entry_visibility_paths,
                     fold_idx,
                     &mut additional_files_seen,
                 );
@@ -908,6 +988,7 @@ pub fn build_package_graph(
                 &mut merged[index].1,
                 resolved,
                 &symbol_file_path,
+                &entry_visibility_paths,
                 index,
                 &mut additional_files_seen,
             );
@@ -934,6 +1015,11 @@ pub fn build_package_graph(
                 package: package_info.name.clone(),
                 file_path: symbol_file_path,
                 additional_files: None,
+                entry_visibility: if entry_visibility_paths.is_empty() {
+                    None
+                } else {
+                    Some(SharedVec::from(entry_visibility_paths))
+                },
                 signature: resolved.signature.clone(),
                 js_doc: resolved.js_doc.clone(),
                 is_type_only: resolved.is_type_only,
@@ -976,12 +1062,22 @@ pub fn build_package_graph(
 
     // Insertion order = first occurrence of each merge key in crawl order (stable `#n` / name_to_id).
     let mut symbols: Vec<SymbolNode> = merged.into_iter().map(|(_unused_key, node)| node).collect();
+    for symbol_node in &mut symbols {
+        if let Some(paths) = symbol_node.entry_visibility.as_ref()
+            && paths.len() == 1
+            && paths[0] == symbol_node.file_path
+        {
+            symbol_node.entry_visibility = None;
+        }
+    }
 
     let ids_maps_phase_start = Instant::now();
     let sym_cap = symbols.len().min(65536);
     let mut name_to_id: HashMap<SharedString, SharedString> = HashMap::with_capacity(sym_cap);
     let mut name_to_ids: HashMap<SharedString, Vec<SharedString>> = HashMap::with_capacity(sym_cap);
     let mut file_local_to_ids: HashMap<SharedString, Vec<SharedString>> =
+        HashMap::with_capacity(sym_cap);
+    let mut file_local_namespace_ids: HashMap<SharedString, Vec<SharedString>> =
         HashMap::with_capacity(sym_cap);
     let mut name_count: HashMap<SharedString, usize> = HashMap::with_capacity(sym_cap);
     let mut internal_file_name_count: HashMap<SharedString, usize> =
@@ -1036,9 +1132,15 @@ pub fn build_package_graph(
         let short_key: SharedString =
             format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
         file_local_to_ids
-            .entry(short_key)
+            .entry(short_key.clone())
             .or_default()
             .push(symbol_node.id.clone());
+        if matches!(symbol_node.kind, SymbolKind::Namespace) {
+            file_local_namespace_ids
+                .entry(short_key)
+                .or_default()
+                .push(symbol_node.id.clone());
+        }
 
         name_to_ids
             .entry(symbol_node.name.clone())
@@ -1189,9 +1291,15 @@ pub fn build_package_graph(
         let short_key: SharedString =
             format!("{}::{}", symbol_node.file_path, symbol_node.name).into();
         file_local_to_ids
-            .entry(short_key)
+            .entry(short_key.clone())
             .or_default()
             .push(symbol_node.id.clone());
+        if matches!(symbol_node.kind, SymbolKind::Namespace) {
+            file_local_namespace_ids
+                .entry(short_key)
+                .or_default()
+                .push(symbol_node.id.clone());
+        }
     }
     for symbol_node in &symbols[pre_flatten_len..] {
         if matches!(
@@ -1223,8 +1331,11 @@ pub fn build_package_graph(
     for ids in file_local_to_ids.values_mut() {
         ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
     }
+    for ids in file_local_namespace_ids.values_mut() {
+        ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
+    }
     assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id, &id_to_kind);
-    assign_enclosing_module_declaration_ids(&mut symbols, &file_local_to_ids, &id_to_kind);
+    assign_enclosing_module_declaration_ids(&mut symbols, &file_local_namespace_ids);
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -1379,15 +1490,14 @@ fn pick_preferred_parent_id(
     ranked.first().cloned()
 }
 
-/// Sets [`SymbolNode::parent_symbol_id`] for dotted names using the same `file_local_to_ids` /
-/// `name_to_id` maps built during id assignment (extended after heritage flatten for synthetic rows).
+/// Sets [`SymbolNode::enclosing_module_declaration_id`] from [`SymbolNode::enclosing_module_declaration_name`]
+/// using `filePath::moduleName` keys. Only namespace symbol ids are stored in `file_local_namespace_ids`
+/// (precomputed while building `file_local_to_ids`).
 ///
-/// `file_local_to_ids` values **must** be sorted by id string (see call site); dependency resolution
-/// runs before that sort and only needs multisets, not order.
+/// `file_local_namespace_ids` values **must** be sorted by id string (see call site).
 fn assign_enclosing_module_declaration_ids(
     symbols: &mut [SymbolNode],
-    file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
-    id_to_kind: &HashMap<SharedString, SymbolKind>,
+    file_local_namespace_ids: &HashMap<SharedString, Vec<SharedString>>,
 ) {
     for node in symbols.iter_mut() {
         let Some(enclosing_name) = node.enclosing_module_declaration_name.clone() else {
@@ -1401,33 +1511,16 @@ fn assign_enclosing_module_declaration_ids(
         }
         let file_key: SharedString =
             format!("{}::{}", node.file_path.as_ref(), enclosing_name.as_ref()).into();
-        let Some(candidate_ids) = file_local_to_ids.get(&file_key) else {
+        let Some(module_declaration_ids) = file_local_namespace_ids.get(&file_key) else {
             node.enclosing_module_declaration_name = None;
             continue;
         };
-        let module_declaration_ids: Vec<SharedString> = candidate_ids
-            .iter()
-            .filter(|symbol_id| {
-                id_to_kind
-                    .get(*symbol_id)
-                    .copied()
-                    .unwrap_or(SymbolKind::Unknown)
-                    == SymbolKind::Namespace
-            })
-            .cloned()
-            .collect();
         if module_declaration_ids.is_empty() {
             node.enclosing_module_declaration_name = None;
             continue;
         }
-        let chosen = if module_declaration_ids.len() == 1 {
-            module_declaration_ids[0].clone()
-        } else {
-            let mut ranked = module_declaration_ids;
-            ranked.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
-            ranked[0].clone()
-        };
-        node.enclosing_module_declaration_id = Some(chosen);
+        // `file_local_namespace_ids` values are sorted by id string (same as `file_local_to_ids`).
+        node.enclosing_module_declaration_id = Some(module_declaration_ids[0].clone());
         node.enclosing_module_declaration_name = None;
     }
 }

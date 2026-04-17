@@ -30,6 +30,9 @@ expression: "& rust_graph"
       "kindName": "TypeAliasDeclaration",
       "package": "deep-chain",
       "filePath": "core/handler.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export type Handler = (req: Request, res: Response) => void;",
       "isTypeOnly": true,
       "symbolSpace": "type",

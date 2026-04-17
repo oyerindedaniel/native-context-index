@@ -57,6 +57,9 @@ expression: "& rust_graph"
       "kindName": "TypeAliasDeclaration",
       "package": "all-export-forms",
       "filePath": "handlers.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export type Handler = (req: any, res: any) => void;",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -154,6 +157,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "all-export-forms",
       "filePath": "options.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export interface RequestOptions {\n  timeout?: number;\n  retries?: number;\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -199,6 +205,9 @@ expression: "& rust_graph"
       "kindName": "ClassDeclaration",
       "package": "all-export-forms",
       "filePath": "internal.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export declare class InternalRouter {\n  add(path: string, handler: any): void;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -240,7 +249,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
-      "isInternal": true
+      "isInternal": true,
+      "modifiers": [
+        "default"
+      ]
     },
     {
       "id": "all-export-forms@1.0.0::Server.prototype.close",
@@ -344,6 +356,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",
       "filePath": "utils.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export declare function formatDate(date: Date): string;",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -375,6 +390,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",
       "filePath": "helpers.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export declare function decode(data: string): string;",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -394,6 +412,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",
       "filePath": "helpers.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export declare function encode(data: string): string;",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -448,6 +469,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "all-export-forms",
       "filePath": "utils.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export declare function parseDate(str: string): Date;",
       "isTypeOnly": false,
       "symbolSpace": "value",

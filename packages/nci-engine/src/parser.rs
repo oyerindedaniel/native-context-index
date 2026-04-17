@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::*;
@@ -16,7 +16,9 @@ static TRIPLE_SLASH_PATH_RE: LazyLock<Regex> =
 static TRIPLE_SLASH_TYPES_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"///\s*<reference\s+types\s*=\s*"([^"]+)"\s*/>"#).unwrap());
 
-use crate::constants::{BUILTIN_TYPES, MAX_RECURSION_DEPTH, VISIBILITY_TAGS};
+use crate::constants::{
+    BUILTIN_TYPES, MAX_RECURSION_DEPTH, SIGNATURE_MODIFIER_PREFIX_TOKENS, VISIBILITY_TAGS,
+};
 use crate::resolver::{normalize_path, resolve_module_specifier};
 use crate::types::{
     Deprecation, ParsedExport, ParsedImport, SharedString, SharedVec, SymbolKind, SymbolSpace,
@@ -266,12 +268,17 @@ pub fn parse_file_from_source(_file_path: &str, source_text: &str) -> ParseResul
             Statement::TSNamespaceExportDeclaration(ns_export) => {
                 let name = ns_export.id.name.to_string();
                 let signature = get_span_text(source_text, ns_export.span);
+                let jsdoc = extract_jsdoc_from_leading_comments(source_text, ns_export.span);
                 exports.push(ParsedExport {
                     name: name.into(),
                     kind: SymbolKind::NamespaceExportDeclaration,
                     is_namespace_export: true,
                     is_explicit_export: true,
                     signature: Some(signature),
+                    js_doc: jsdoc.js_doc,
+                    deprecated: jsdoc.deprecated,
+                    visibility: jsdoc.visibility,
+                    since: jsdoc.since,
                     ..Default::default()
                 });
             }
@@ -651,6 +658,7 @@ fn extract_export_default<'a>(
         },
         is_explicit_export: true,
         signature: Some(signature),
+        modifiers: SharedVec::from([SharedString::from("default")]),
         ..Default::default()
     });
 
@@ -873,6 +881,13 @@ fn apply_ambient_module_enclosure(exports: &mut [ParsedExport], ambient: Option<
         {
             continue;
         }
+        if export_row
+            .enclosing_module_declaration_name
+            .as_ref()
+            .is_some_and(|existing| Arc::ptr_eq(existing, ambient_name))
+        {
+            continue;
+        }
         export_row.enclosing_module_declaration_name = Some(ambient_name.clone());
     }
 }
@@ -985,12 +1000,18 @@ fn extract_module_declaration<'a>(
         merge_nested_dependencies_into_namespace(exports, module_row_idx, before_len);
     }
 
-    // Tag every row in this declaration slice with this namespace's simple name (for enclosing id
-    // resolution). Outer `extract_module_declaration` calls run after inner ones, so nested chains
-    // end up stamped with the outermost namespace. String `declare module "…"` blocks omit this:
-    // a single sweep on the parent slice would wipe more specific enclosing names on nested modules.
+    // Tag rows with the effective enclosing namespace simple name. Nested identifier namespaces
+    // use the outermost name (`lexical_parent_module` when set, else this declaration's name).
+    // `declare global { }` keeps stamping with `global`. String `declare module "…"` omits this.
     if !is_string_module {
-        apply_ambient_module_enclosure(&mut exports[module_row_idx..], Some(&module_name));
+        let stamp = if is_global {
+            module_name.clone()
+        } else {
+            lexical_parent_module
+                .clone()
+                .unwrap_or_else(|| module_name.clone())
+        };
+        apply_ambient_module_enclosure(&mut exports[module_row_idx..], Some(&stamp));
     }
 
     // Propagate the augmentation flag only for true file-top `global` wrappers (see above).
@@ -1544,7 +1565,7 @@ fn extract_direct_statement<'a>(
         // `ExportNamedDeclaration` wrapping a declaration, not a bare declaration statement.
         Statement::ExportNamedDeclaration(export_named) => {
             let declaration = export_named.declaration.as_ref()?;
-            let mut results = extract_declaration(
+            let results = extract_declaration(
                 declaration,
                 source_text,
                 current_file,
@@ -1553,11 +1574,6 @@ fn extract_direct_statement<'a>(
                 local_decls,
                 ambient_apply.clone(),
             );
-            if !is_exported && is_script {
-                for export_item in &mut results {
-                    export_item.is_global_augmentation = true;
-                }
-            }
             Some(results)
         }
         Statement::VariableDeclaration(var_decl) => {
@@ -1596,7 +1612,7 @@ fn extract_direct_statement<'a>(
                         name: name.clone(),
                         kind: SymbolKind::Variable,
                         is_explicit_export: is_exported,
-                        is_global_augmentation: !is_exported && is_script,
+                        is_global_augmentation: false,
                         signature: Some(signature.into()),
                         js_doc: jsdoc.js_doc.clone(),
                         dependencies: dependencies.into(),
@@ -1642,7 +1658,7 @@ fn extract_direct_statement<'a>(
         | Statement::TSEnumDeclaration(_) => {
             // Convert statement to declaration for reuse
             let declaration = statement_to_declaration(statement)?;
-            let mut results = extract_declaration(
+            let results = extract_declaration(
                 declaration,
                 source_text,
                 current_file,
@@ -1651,11 +1667,6 @@ fn extract_direct_statement<'a>(
                 local_decls,
                 ambient_apply.clone(),
             );
-            if !is_exported && is_script {
-                for export_item in &mut results {
-                    export_item.is_global_augmentation = true;
-                }
-            }
             Some(results)
         }
 
@@ -1806,24 +1817,21 @@ fn extract_class_members<'a>(
         }
         let dependencies: Vec<TypeReference> = deps_map.into_values().collect();
 
+        let member_modifiers = extract_signature_modifiers(signature.as_ref());
         results.push(ParsedExport {
             name: qualified_name,
             kind: member_kind,
             symbol_space: SymbolSpace::Value,
             is_explicit_export,
             signature: Some(signature),
-            js_doc: member_jsdoc.js_doc,
+            js_doc: member_jsdoc.js_doc.or_else(|| parent_jsdoc.js_doc.clone()),
             dependencies: dependencies.into(),
             deprecated: member_jsdoc
                 .deprecated
                 .or_else(|| parent_jsdoc.deprecated.clone()),
             visibility,
             since: member_jsdoc.since.or_else(|| parent_jsdoc.since.clone()),
-            modifiers: if is_static {
-                SharedVec::from([SharedString::from("static")])
-            } else {
-                SharedVec::from([])
-            },
+            modifiers: member_modifiers,
             ..Default::default()
         });
     }
@@ -1849,7 +1857,7 @@ fn extract_class_body_as_type_members<'a>(
     definition_site: Option<SharedString>,
 ) {
     for member in &class_decl.body.body {
-        let (member_name_opt, member_span, member_kind, is_static) = match member {
+        let (member_name_opt, member_span, member_kind, _is_static) = match member {
             ClassElement::PropertyDefinition(prop_def) => {
                 let name = property_key_to_string(&prop_def.key, source_text);
                 (
@@ -1893,6 +1901,7 @@ fn extract_class_body_as_type_members<'a>(
         let qualified_name =
             SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
         let signature = get_span_text(source_text, member_span);
+        let member_modifiers = extract_signature_modifiers(signature.as_ref());
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
 
         let visibility = member_jsdoc.visibility.clone().or_else(|| {
@@ -1929,12 +1938,6 @@ fn extract_class_body_as_type_members<'a>(
         }
         let dependencies: Vec<TypeReference> = deps_map.into_values().collect();
 
-        let modifiers = if is_static {
-            SharedVec::from([SharedString::from("static")])
-        } else {
-            SharedVec::from([])
-        };
-
         results.push(ParsedExport {
             name: qualified_name.clone(),
             kind: member_kind,
@@ -1952,7 +1955,7 @@ fn extract_class_body_as_type_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
-            modifiers,
+            modifiers: member_modifiers,
             declared_in_file: definition_site.clone(),
             ..Default::default()
         });
@@ -2018,6 +2021,7 @@ fn extract_interface_members<'a>(
         let qualified_name =
             SharedString::from(format!("{}.{}", parent_name, member_name).as_ref());
         let signature = get_span_text(source_text, member_span);
+        let member_modifiers = extract_signature_modifiers(signature.as_ref());
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
 
         let mut deps_map = HashMap::new();
@@ -2063,6 +2067,7 @@ fn extract_interface_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
+            modifiers: member_modifiers,
             ..Default::default()
         });
 
@@ -2462,6 +2467,7 @@ fn extract_type_literal_members<'a>(
 
         let qualified_name = SharedString::from(format!("{}.{}", parent_name, member_name));
         let signature = get_span_text(source_text, member_span);
+        let member_modifiers = extract_signature_modifiers(signature.as_ref());
         let member_jsdoc = extract_jsdoc_from_leading_comments(source_text, member_span);
 
         let mut deps_map = HashMap::new();
@@ -2505,6 +2511,7 @@ fn extract_type_literal_members<'a>(
                 .since
                 .clone()
                 .or_else(|| parent_jsdoc.since.clone()),
+            modifiers: member_modifiers,
             declared_in_file: definition_site.clone(),
             ..Default::default()
         });
@@ -3191,6 +3198,18 @@ fn extract_declaration_modifiers(declaration: &Declaration<'_>) -> Vec<SharedStr
     }
 
     modifiers
+}
+
+fn extract_signature_modifiers(signature: &str) -> SharedVec<SharedString> {
+    let mut parsed: Vec<SharedString> = Vec::new();
+    for token in signature.split_whitespace() {
+        if SIGNATURE_MODIFIER_PREFIX_TOKENS.contains(&token) {
+            parsed.push(SharedString::from(token));
+            continue;
+        }
+        break;
+    }
+    SharedVec::from(parsed)
 }
 
 fn statement_has_export_keyword(statement: &Statement<'_>) -> bool {

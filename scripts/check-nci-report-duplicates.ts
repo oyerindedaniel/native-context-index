@@ -17,11 +17,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { defaultRustReportPath } from "./nci-report-cli.ts";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "..");
-const DEFAULT_REPORT = path.join(REPO_ROOT, "nci-report-rust.json");
+const DEFAULT_REPORT = defaultRustReportPath();
 
 interface ReportSymbol {
   id?: string;
@@ -46,8 +44,8 @@ function distinctDuplicates(values: string[]): string[] {
     counts.set(value, (counts.get(value) ?? 0) + 1);
   }
   return Array.from(counts.entries())
-    .filter(([, count]) => count > 1)
-    .map(([value]) => value)
+    .filter(([, occurrenceCount]) => occurrenceCount > 1)
+    .map(([stringValue]) => stringValue)
     .sort();
 }
 
@@ -103,7 +101,7 @@ function validateReport(report: ReportRoot): string[] {
     );
 
     for (const duplicateId of distinctDuplicates(
-      symbolIds.filter((id) => id.length > 0),
+      symbolIds.filter((symbolId) => symbolId.length > 0),
     )) {
       violations.push(
         `${packageName}: duplicate symbol id ${JSON.stringify(duplicateId)} ` +

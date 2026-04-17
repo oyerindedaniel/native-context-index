@@ -27,6 +27,9 @@ expression: "& rust_graph"
       "kindName": "ExportDeclaration",
       "package": "nested-prefix",
       "filePath": "mid.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export * as Inner from './inner.js'",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -42,6 +45,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "nested-prefix",
       "filePath": "inner.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "declare const val: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",

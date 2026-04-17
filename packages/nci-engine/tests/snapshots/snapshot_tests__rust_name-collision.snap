@@ -110,6 +110,10 @@ expression: "& rust_graph"
       "additionalFiles": [
         "dist/dup-enum-identical-b.d.ts"
       ],
+      "entryVisibility": [
+        "dist/dup-enum-identical-a.d.ts",
+        "dist/dup-enum-identical-b.d.ts"
+      ],
       "signature": "export enum DupEnumIdentical {\n  X = 0,\n}",
       "jsDoc": "Identical enum body — second half in dup-enum-identical-b.d.ts",
       "isTypeOnly": false,
@@ -129,6 +133,9 @@ expression: "& rust_graph"
       "filePath": "dist/dup-identical-a.d.ts",
       "additionalFiles": [
         "dist/dup-identical-b.d.ts"
+      ],
+      "entryVisibility": [
+        "dist/index.d.ts"
       ],
       "signature": "export interface DupIdentical {\n  x: number;\n}",
       "jsDoc": "Identical interface half A — should fold with dup-identical-b.",
@@ -150,6 +157,9 @@ expression: "& rust_graph"
       "filePath": "dist/dup-identical-a.d.ts",
       "additionalFiles": [
         "dist/dup-identical-b.d.ts"
+      ],
+      "entryVisibility": [
+        "dist/index.d.ts"
       ],
       "signature": "x: number;",
       "isTypeOnly": false,

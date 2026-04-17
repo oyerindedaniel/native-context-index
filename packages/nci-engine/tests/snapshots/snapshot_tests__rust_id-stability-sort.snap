@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "id-stability-sort",
       "filePath": "z-file.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "declare const identity: (x: number) => number",
       "jsDoc": "This identity should get the BASE ID if it was discovered first.",
       "isTypeOnly": false,
@@ -31,6 +34,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "id-stability-sort",
       "filePath": "a-file.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "declare const identity: (x: string) => string",
       "jsDoc": "This identity should get the Suffix #2 if it was discovered after z-file.",
       "isTypeOnly": false,

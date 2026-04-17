@@ -43,6 +43,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "namespace-reexport",
       "filePath": "lib.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "declare const VERSION: \"1.0.0\"",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -61,6 +64,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "namespace-reexport",
       "filePath": "lib.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
       "signature": "export function internal(): void;",
       "isTypeOnly": false,
       "symbolSpace": "value",

@@ -393,6 +393,9 @@ pub struct ResolvedSymbol {
     /// File where this symbol is actually defined.
     pub defined_in: SharedString,
 
+    /// Package types entry (absolute path) through which this symbol was discovered in pass 1.
+    pub resolved_from_package_entry: Option<SharedString>,
+
     /// If re-exported, the chain of files it passed through.
     pub re_export_chain: Vec<SharedString>,
 
@@ -443,6 +446,7 @@ impl ResolvedSymbol {
             signature: export.signature.clone(),
             js_doc: export.js_doc.clone(),
             defined_in: defined_in.into(),
+            resolved_from_package_entry: None,
             re_export_chain: Vec::new(),
             dependencies: export.dependencies.clone(),
             deprecated: export.deprecated.clone(),
@@ -501,6 +505,10 @@ pub struct SymbolNode {
     /// Additional files that contribute to this symbol.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_files: Option<SharedVec<SharedString>>,
+
+    /// Entry files that make this symbol reachable on the public package surface.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry_visibility: Option<SharedVec<SharedString>>,
 
     /// Full type signature.
     #[serde(skip_serializing_if = "Option::is_none")]

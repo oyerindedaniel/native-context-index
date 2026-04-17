@@ -1,5 +1,16 @@
 //! Optional stderr phase profiling. Build with `phase-profile`; logs when `NCI_PROFILE=1`.
 //! Without the feature the public API is stubbed out. With it, `NCI_PROFILE` is read once per process (`OnceLock`).
+//!
+//! **Pipeline baseline (where to look first):** `build_package_graph` emits labels such as
+//! `graph.resolve_entry`, `graph.crawl_total` (parse + crawl of `.d.ts` files), `graph.merge`,
+//! `graph.ids_maps`, `graph.resolve_deps`, `graph.flatten_heritage`, and `graph.assembly_total`.
+//! Compare those durations before optimizing a single subsystem; crawl often includes lexer/parser work
+//! for every visited file. For deeper call stacks, use `cargo flamegraph` (or your OS profiler) on
+//! the `index` / `nci` binary under realistic workloads.
+//!
+//! **Larger parser memory layouts** (arena-backed `ParsedExport` lists, two-pass enclosing fill):
+//! only worth pursuing if profiling shows the parser or merge phase as a dominant cost; the default
+//! `Vec` extraction path is simpler and already parity-tested.
 
 #[cfg(feature = "phase-profile")]
 use std::io::Write;
