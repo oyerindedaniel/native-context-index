@@ -255,8 +255,7 @@ export function buildPackageGraph(
     kind === ts.SyntaxKind.CallSignature ||
     kind === ts.SyntaxKind.IndexSignature;
 
-  // At most three labels; mutate the row's `kinds` array in place after the first merge (no Set
-  // or full-array copy per contribution).
+
   function upsertMergeProvenance(
     existing: SymbolNode,
     contributionPath: ContributionMergePath,
