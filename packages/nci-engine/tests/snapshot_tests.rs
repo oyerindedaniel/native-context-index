@@ -368,6 +368,10 @@ snapshot_test!(
     snapshot_merge_signature_whitespace_dedupe,
     "merge-signature-whitespace-dedupe"
 );
+snapshot_test!(
+    snapshot_merge_provenance_overload_dup,
+    "merge-provenance-overload-dup"
+);
 snapshot_test!(snapshot_name_collision, "name-collision");
 snapshot_test!(snapshot_deps_pkg, "deps-pkg");
 snapshot_test!(

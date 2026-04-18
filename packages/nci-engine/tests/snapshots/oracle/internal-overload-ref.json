@@ -74,7 +74,12 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "internal-overload-ref@1.0.0::AMBIENT_PICK",
@@ -95,7 +100,12 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "internal-overload-ref@1.0.0::ImportedShape",

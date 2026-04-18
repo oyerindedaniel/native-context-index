@@ -137,6 +137,11 @@
         "dist/dup-enum-identical-a.d.ts",
         "dist/dup-enum-identical-b.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold"
+        ]
+      },
       "additionalFiles": [
         "dist/dup-enum-identical-b.d.ts"
       ]
@@ -156,7 +161,12 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "name-collision@1.0.0::DupIfaceSameFileTwice.alpha",
@@ -373,6 +383,11 @@
       "entryVisibility": [
         "dist/index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold"
+        ]
+      },
       "additionalFiles": [
         "dist/dup-identical-b.d.ts"
       ]
@@ -392,6 +407,12 @@
       "entryVisibility": [
         "dist/index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "additionalFiles": [
         "dist/dup-identical-b.d.ts"
       ],
@@ -562,7 +583,12 @@
       "isInternal": false,
       "modifiers": [
         "export"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "name-collision@1.0.0::NsSameFileMerge.k",

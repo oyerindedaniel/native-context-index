@@ -39,6 +39,12 @@ expression: "& rust_graph"
       "entryVisibility": [
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "n: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",

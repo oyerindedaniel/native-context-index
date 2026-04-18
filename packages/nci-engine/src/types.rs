@@ -466,6 +466,22 @@ impl ResolvedSymbol {
 
 // ─── Graph Output ──────────────────────────────────────────────
 
+/// Which merge mechanisms contributed to a merged graph row (see `graph-merge.md`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeProvenance {
+    pub kinds: Vec<MergeProvenanceKind>,
+}
+
+/// Stable JSON labels for [`MergeProvenance`]; variant order matches lexicographic sort of snake_case names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MergeProvenanceKind {
+    IdenticalFold,
+    MergeScope,
+    OverloadKey,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SymbolNode {
@@ -509,6 +525,10 @@ pub struct SymbolNode {
     /// Entry files that make this symbol reachable on the public package surface.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entry_visibility: Option<SharedVec<SharedString>>,
+
+    /// Set when this row absorbed more than one declaration via graph merge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_provenance: Option<MergeProvenance>,
 
     /// Full type signature.
     #[serde(skip_serializing_if = "Option::is_none")]

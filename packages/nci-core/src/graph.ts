@@ -6,7 +6,10 @@ import type {
   SymbolNode,
   PackageInfo,
   ResolvedSymbol,
+  MergeProvenanceKind,
+  ContributionMergePath,
 } from "./types.js";
+import { CONTRIBUTION_MERGE_PATH, MERGE_PROVENANCE_KIND } from "./types.js";
 import { NODE_BUILTINS } from "./constants.js";
 import {
   resolveTypesEntry,
@@ -252,6 +255,23 @@ export function buildPackageGraph(
     kind === ts.SyntaxKind.CallSignature ||
     kind === ts.SyntaxKind.IndexSignature;
 
+  function upsertMergeProvenance(
+    existing: SymbolNode,
+    contributionPath: ContributionMergePath,
+    resolved: ResolvedSymbol,
+  ): void {
+    const kinds = new Set<MergeProvenanceKind>(
+      existing.mergeProvenance?.kinds ?? [],
+    );
+    kinds.add(contributionPath);
+    if (isOverloadMergeable(resolved.kind)) {
+      kinds.add(MERGE_PROVENANCE_KIND.overloadKey);
+    }
+    existing.mergeProvenance = {
+      kinds: Array.from(kinds).sort() as MergeProvenanceKind[],
+    };
+  }
+
   const entryVisibilityContributions = (
     resolved: ResolvedSymbol,
     symbolFilePath: string,
@@ -285,7 +305,10 @@ export function buildPackageGraph(
     resolved: ResolvedSymbol,
     symbolFilePath: string,
     isEntryFile: boolean,
+    contributionPath: ContributionMergePath,
   ): void {
+    upsertMergeProvenance(existing, contributionPath, resolved);
+
     if (symbolFilePath !== existing.filePath) {
       existing.additionalFiles = existing.additionalFiles || [];
       if (!existing.additionalFiles.includes(symbolFilePath)) {
@@ -410,6 +433,7 @@ export function buildPackageGraph(
             resolved,
             symbolFilePath,
             isEntryFile,
+            CONTRIBUTION_MERGE_PATH.identicalFold,
           );
           continue;
         }
@@ -424,6 +448,7 @@ export function buildPackageGraph(
         resolved,
         symbolFilePath,
         isEntryFile,
+        CONTRIBUTION_MERGE_PATH.mergeScope,
       );
     } else {
       const reExportSource = resolved.reExportChain?.[0]

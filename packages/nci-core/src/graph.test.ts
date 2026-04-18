@@ -3,6 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { buildPackageGraph } from "./graph.js";
 import type { PackageInfo } from "./types.js";
+import { MERGE_PROVENANCE_KIND } from "./types.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 
@@ -1299,6 +1300,30 @@ describe("buildPackageGraph", () => {
           relPath.includes("vendor-copy-distinct.d.ts"),
         ),
       ).toBe(true);
+
+      const provenanceKinds = new Set(
+        mergedInterface.mergeProvenance?.kinds ?? [],
+      );
+      expect(provenanceKinds.has(MERGE_PROVENANCE_KIND.identicalFold)).toBe(
+        true,
+      );
+    });
+
+    it("records overload_key and merge_scope when duplicate member signatures merge across files", () => {
+      const graph = buildPackageGraph(
+        makePackageInfo("merge-provenance-overload-dup"),
+      );
+      const mergedMembers = graph.symbols.filter(
+        (symbolNode) =>
+          symbolNode.name === "OverloadDupProbe.sharedMethod" &&
+          symbolNode.kind === ts.SyntaxKind.MethodSignature,
+      );
+      expect(mergedMembers).toHaveLength(1);
+      const member = mergedMembers[0]!;
+      expect(member.additionalFiles?.length).toBeGreaterThanOrEqual(1);
+      const kinds = new Set(member.mergeProvenance?.kinds ?? []);
+      expect(kinds.has(MERGE_PROVENANCE_KIND.mergeScope)).toBe(true);
+      expect(kinds.has(MERGE_PROVENANCE_KIND.overloadKey)).toBe(true);
     });
   });
 });

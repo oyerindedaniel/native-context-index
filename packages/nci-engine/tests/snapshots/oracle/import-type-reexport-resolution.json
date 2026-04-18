@@ -80,6 +80,12 @@
       "entryVisibility": [
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "additionalFiles": [
         "index.d.ts"
       ],

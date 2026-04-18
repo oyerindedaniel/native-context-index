@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     is_inherited INTEGER NOT NULL DEFAULT 0,
     parent_symbol_id TEXT,
     enclosing_module_declaration_id TEXT,
+    merge_provenance_json TEXT,
     UNIQUE(package_id, id)
 );
 

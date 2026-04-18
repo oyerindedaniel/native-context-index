@@ -55,7 +55,12 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::MyGlobalType",
@@ -73,7 +78,12 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::MyGlobalType.id",
@@ -92,6 +102,12 @@
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType"
     },
     {
@@ -111,6 +127,12 @@
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyGlobalType"
     },
     {
@@ -129,7 +151,12 @@
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "module-global-augmentation-ref@1.0.0::MyNamespace.VERSION",
@@ -148,6 +175,11 @@
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "parentSymbolId": "module-global-augmentation-ref@1.0.0::MyNamespace"
     },
     {

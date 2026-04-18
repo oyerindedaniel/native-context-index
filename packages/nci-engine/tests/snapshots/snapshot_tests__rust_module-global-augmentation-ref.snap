@@ -51,6 +51,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "interface MyGlobalType {\n    id: string;\n    value: number;\n  }",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -70,6 +75,12 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "id: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -89,6 +100,12 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "value: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -107,6 +124,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "namespace MyNamespace {\n    const VERSION: string;\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -126,6 +148,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "declare const VERSION: string",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -144,6 +171,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "declare const PICK_TYPE: \"pick\"",
       "jsDoc": "Global pick marker visible via triple-slash from module files.",
       "isTypeOnly": false,

@@ -32,6 +32,12 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold",
+          "merge_scope"
+        ]
+      },
       "additionalFiles": [
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"
@@ -49,6 +55,12 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "additionalFiles": [
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"

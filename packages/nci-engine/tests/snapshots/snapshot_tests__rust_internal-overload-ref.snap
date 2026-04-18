@@ -17,6 +17,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "declare const AMBIENT_PICK: \"ambient\"",
       "jsDoc": "Script-style declarations only: no top-level import/export so names are ambient globals.",
       "isTypeOnly": false,
@@ -72,6 +77,11 @@ expression: "& rust_graph"
         "extra-entry.d.ts",
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "declare const GLOBAL_FROM_REF: \"global-via-module-ref\"",
       "jsDoc": "Module file augments global scope; entries see this without importing ref.d.ts.",
       "isTypeOnly": false,

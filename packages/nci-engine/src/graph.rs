@@ -19,8 +19,8 @@ use crate::resolver::{
     resolve_types_entry, specifier_is_dependency_stub,
 };
 use crate::types::{
-    PackageEntry, PackageGraph, PackageInfo, ParsedImport, ResolvedSymbol, SharedString, SharedVec,
-    SymbolKind, SymbolNode, SymbolSpace, Visibility,
+    MergeProvenance, MergeProvenanceKind, PackageEntry, PackageGraph, PackageInfo, ParsedImport,
+    ResolvedSymbol, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
 };
 
 /// Parent directory of a package-relative path (already forward-slash normalized by [`make_relative_to_package`]).
@@ -230,6 +230,36 @@ fn is_member_overload_mergeable(kind: SymbolKind) -> bool {
     )
 }
 
+#[derive(Clone, Copy)]
+enum ContributionMergePath {
+    MergeScope,
+    IdenticalFold,
+}
+
+fn upsert_merge_provenance(
+    existing: &mut SymbolNode,
+    contribution_path: ContributionMergePath,
+    resolved: &ResolvedSymbol,
+) {
+    use MergeProvenanceKind::{IdenticalFold, MergeScope, OverloadKey};
+    let path_kind = match contribution_path {
+        ContributionMergePath::MergeScope => MergeScope,
+        ContributionMergePath::IdenticalFold => IdenticalFold,
+    };
+    let provenance = existing
+        .merge_provenance
+        .get_or_insert_with(|| MergeProvenance {
+            kinds: Vec::with_capacity(3),
+        });
+    if !provenance.kinds.contains(&path_kind) {
+        provenance.kinds.push(path_kind);
+    }
+    if is_member_overload_mergeable(resolved.kind) && !provenance.kinds.contains(&OverloadKey) {
+        provenance.kinds.push(OverloadKey);
+    }
+    provenance.kinds.sort();
+}
+
 fn fuse_merged_signatures(existing: &mut Option<SharedString>, incoming: Option<&SharedString>) {
     match (existing.as_ref(), incoming) {
         (_, None) => {}
@@ -275,6 +305,8 @@ fn entry_visibility_contributions(
     visibility
 }
 
+// Merge bookkeeping: per-row signature sets, additional-file dedupe, and contribution path.
+#[allow(clippy::too_many_arguments)]
 fn merge_resolved_into_node(
     existing: &mut SymbolNode,
     resolved: &ResolvedSymbol,
@@ -283,7 +315,10 @@ fn merge_resolved_into_node(
     merged_index: usize,
     additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
     signature_norm_seen: &mut [HashSet<String>],
+    contribution_path: ContributionMergePath,
 ) {
+    upsert_merge_provenance(existing, contribution_path, resolved);
+
     if symbol_file_path != &existing.file_path {
         let seen = additional_files_seen
             .entry(merged_index)
@@ -1011,6 +1046,7 @@ pub fn build_package_graph(
                     fold_idx,
                     &mut additional_files_seen,
                     &mut signature_norm_seen,
+                    ContributionMergePath::IdenticalFold,
                 );
                 continue;
             }
@@ -1025,6 +1061,7 @@ pub fn build_package_graph(
                 index,
                 &mut additional_files_seen,
                 &mut signature_norm_seen,
+                ContributionMergePath::MergeScope,
             );
         } else {
             let re_export_source = resolved.re_export_chain.first().map(|chain_start| {
@@ -1054,6 +1091,7 @@ pub fn build_package_graph(
                 } else {
                     Some(SharedVec::from(entry_visibility_paths))
                 },
+                merge_provenance: None,
                 signature: resolved.signature.clone(),
                 js_doc: resolved.js_doc.clone(),
                 is_type_only: resolved.is_type_only,
@@ -1747,6 +1785,7 @@ fn flatten_inherited_members(
                         synth_node.inherited_from_sources =
                             SharedVec::from(vec![parent_member.id.clone()]);
                         synth_node.additional_files = None;
+                        synth_node.merge_provenance = None;
                         vacant.insert(synth_node);
                     }
                 }

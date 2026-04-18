@@ -1,0 +1,78 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "merge-provenance-overload-dup",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "merge-provenance-overload-dup@1.0.0::one.d.ts::OverloadDupProbe",
+      "name": "OverloadDupProbe",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merge-provenance-overload-dup",
+      "filePath": "one.d.ts",
+      "additionalFiles": [
+        "two.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold"
+        ]
+      },
+      "signature": "export interface OverloadDupProbe {\n  sharedMethod(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merge-provenance-overload-dup@1.0.0::one.d.ts::OverloadDupProbe.sharedMethod",
+      "name": "OverloadDupProbe.sharedMethod",
+      "parentSymbolId": "merge-provenance-overload-dup@1.0.0::one.d.ts::OverloadDupProbe",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "merge-provenance-overload-dup",
+      "filePath": "one.d.ts",
+      "additionalFiles": [
+        "two.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
+      "signature": "sharedMethod(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "merge-provenance-overload-dup@1.0.0::mergeProvenanceOverloadDupRoot",
+      "name": "mergeProvenanceOverloadDupRoot",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "merge-provenance-overload-dup",
+      "filePath": "index.d.ts",
+      "signature": "declare const mergeProvenanceOverloadDupRoot: 1",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

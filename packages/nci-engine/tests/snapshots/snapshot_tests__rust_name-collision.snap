@@ -114,6 +114,11 @@ expression: "& rust_graph"
         "dist/dup-enum-identical-a.d.ts",
         "dist/dup-enum-identical-b.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold"
+        ]
+      },
       "signature": "export enum DupEnumIdentical {\n  X = 0,\n}",
       "jsDoc": "Identical enum body — second half in dup-enum-identical-b.d.ts",
       "isTypeOnly": false,
@@ -137,6 +142,11 @@ expression: "& rust_graph"
       "entryVisibility": [
         "dist/index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold"
+        ]
+      },
       "signature": "export interface DupIdentical {\n  x: number;\n}",
       "jsDoc": "Identical interface half A — should fold with dup-identical-b.",
       "isTypeOnly": true,
@@ -161,6 +171,12 @@ expression: "& rust_graph"
       "entryVisibility": [
         "dist/index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "x: number;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -174,6 +190,11 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "name-collision",
       "filePath": "dist/dup-iface-same-file-twice.d.ts",
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "export interface DupIfaceSameFileTwice {\n  alpha: number;\n}\nexport interface DupIfaceSameFileTwice {\n  beta: string;\n}",
       "jsDoc": "Two `interface` blocks, same name, one file — TS merges.",
       "isTypeOnly": true,
@@ -551,6 +572,11 @@ expression: "& rust_graph"
       "kindName": "ModuleDeclaration",
       "package": "name-collision",
       "filePath": "dist/ns-same-file-merge.d.ts",
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
       "signature": "export namespace NsSameFileMerge {\n  export const k: 1;\n}\nexport namespace NsSameFileMerge {\n  export interface Inner {\n    n: number;\n  }\n}",
       "jsDoc": "Two `namespace` blocks, same name, one file — TS merges into one namespace.",
       "isTypeOnly": false,

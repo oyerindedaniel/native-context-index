@@ -125,6 +125,12 @@ expression: "& rust_graph"
       "entryVisibility": [
         "index.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "readonly inline: boolean;",
       "isTypeOnly": false,
       "symbolSpace": "type",

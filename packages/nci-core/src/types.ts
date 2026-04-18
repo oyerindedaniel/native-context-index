@@ -1,9 +1,3 @@
-/**
- * NCI Core — Shared Types
- *
- * All types used across the pipeline modules.
- * Uses ts.SyntaxKind from the TypeScript compiler API.
- */
 import type ts from "typescript";
 
 /** API visibility level from JSDoc tags: @public, @internal, @alpha, @beta */
@@ -220,6 +214,32 @@ export interface ResolvedSymbol {
 
 // ─── Graph Output ──────────────────────────────────────────────
 
+/** Labels for how a merged graph row was formed (see `graph-merge.md`). */
+export type MergeProvenanceKind =
+  | "merge_scope"
+  | "identical_fold"
+  | "overload_key";
+
+export const MERGE_PROVENANCE_KIND = {
+  mergeScope: "merge_scope",
+  identicalFold: "identical_fold",
+  overloadKey: "overload_key",
+} as const;
+
+/** Labels passed from merge-key vs identical-fold branches into `mergeContribution` (subset of keys). */
+export const CONTRIBUTION_MERGE_PATH = {
+  mergeScope: MERGE_PROVENANCE_KIND.mergeScope,
+  identicalFold: MERGE_PROVENANCE_KIND.identicalFold,
+} as const;
+
+export type ContributionMergePath =
+  (typeof CONTRIBUTION_MERGE_PATH)[keyof typeof CONTRIBUTION_MERGE_PATH];
+
+/** Which merge mechanisms contributed to this symbol row (sorted, unique). */
+export interface MergeProvenance {
+  kinds: MergeProvenanceKind[];
+}
+
 /** A node in the symbol graph */
 export interface SymbolNode {
   /**
@@ -294,6 +314,8 @@ export interface SymbolNode {
   rawDependencies?: TypeReference[];
   /** Entry files in which this symbol is visible (relative paths) */
   entryVisibility?: string[];
+  /** Present when this row absorbed more than one declaration via graph merge */
+  mergeProvenance?: MergeProvenance;
 }
 
 /** The complete graph for a single package */

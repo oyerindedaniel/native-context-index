@@ -18,6 +18,8 @@ export {
   profileStat,
 } from "./nci-log-flags.js";
 
+export { MERGE_PROVENANCE_KIND, CONTRIBUTION_MERGE_PATH } from "./types.js";
+
 export type {
   PackageInfo,
   PackageEntry,
@@ -27,4 +29,7 @@ export type {
   SymbolNode,
   PackageGraph,
   SymbolSpace,
+  MergeProvenance,
+  MergeProvenanceKind,
+  ContributionMergePath,
 } from "./types.js";

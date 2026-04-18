@@ -17,7 +17,12 @@
       "visibility": "public",
       "modifiers": [
         "export"
-      ]
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      }
     },
     {
       "id": "visibility-merge@1.0.0::Merged.a",

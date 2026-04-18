@@ -11,8 +11,8 @@ use tracing::{info, trace, warn};
 
 use crate::storage_migrations::{META_SCHEMA_KEY, MIGRATIONS, read_schema_version};
 use crate::types::{
-    DecoratorMetadata, Deprecation, PackageGraph, PackageIndexMetadata, PackageInfo, SharedString,
-    SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
+    DecoratorMetadata, Deprecation, MergeProvenance, PackageGraph, PackageIndexMetadata,
+    PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
 };
 
 /// Result of streaming a user SQL query via [`NciDatabase::for_each_readonly_sql_row`].
@@ -412,7 +412,7 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id
+                        enclosing_module_declaration_id, merge_provenance_json
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -443,6 +443,7 @@ impl NciDatabase {
                     symbol_row.get::<_, i64>(20)?,
                     symbol_row.get::<_, Option<String>>(21)?,
                     symbol_row.get::<_, Option<String>>(22)?,
+                    symbol_row.get::<_, Option<String>>(23)?,
                 ))
             })
             .ok()?;
@@ -476,7 +477,10 @@ impl NciDatabase {
                 is_inherited_int,
                 parent_symbol_id_opt,
                 enclosing_module_declaration_id_opt,
+                merge_provenance_json_opt,
             ) = row_result;
+
+            let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
 
             let dependencies = SharedVec::from(
                 deps_map
@@ -532,6 +536,7 @@ impl NciDatabase {
                 file_path: SharedString::from(file_path_text),
                 additional_files,
                 entry_visibility: None,
+                merge_provenance,
                 signature: signature_opt.map(SharedString::from),
                 js_doc: js_doc_opt.map(SharedString::from),
                 is_type_only: is_type_only_int != 0,
@@ -611,8 +616,8 @@ impl NciDatabase {
                 deprecated_flag, deprecated_message, visibility,
                 since_tag, since_major, since_minor, since_patch,
                 is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                enclosing_module_declaration_id
-                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                enclosing_module_declaration_id, merge_provenance_json
+                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             )?;
 
             let mut insert_inherited = transaction.prepare(
@@ -644,6 +649,11 @@ impl NciDatabase {
                 let (since_major, since_minor, since_patch) = since_tag
                     .map(parse_since_semver_triple)
                     .unwrap_or((None, None, None));
+
+                let merge_provenance_json = symbol_node
+                    .merge_provenance
+                    .as_ref()
+                    .and_then(|provenance| serde_json::to_string(provenance).ok());
 
                 insert_symbol.execute(rusqlite::params![
                     package_id,
@@ -682,6 +692,7 @@ impl NciDatabase {
                         .enclosing_module_declaration_id
                         .as_ref()
                         .map(|value| value.as_ref()),
+                    merge_provenance_json,
                 ])?;
 
                 let symbol_row_id = transaction.last_insert_rowid();
@@ -804,7 +815,7 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id
+                        enclosing_module_declaration_id, merge_provenance_json
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -832,6 +843,7 @@ impl NciDatabase {
                         symbol_row.get::<_, i64>(20)?,
                         symbol_row.get::<_, Option<String>>(21)?,
                         symbol_row.get::<_, Option<String>>(22)?,
+                        symbol_row.get::<_, Option<String>>(23)?,
                     ))
                 },
             )
@@ -861,6 +873,7 @@ impl NciDatabase {
             is_inherited_int,
             parent_symbol_id_opt,
             enclosing_module_declaration_id_opt,
+            merge_provenance_json_opt,
         )) = row_opt
         else {
             return Ok(None);
@@ -989,6 +1002,8 @@ impl NciDatabase {
         let symbol_space =
             parse_symbol_space_from_db(&symbol_space_text).unwrap_or(SymbolSpace::Value);
 
+        let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
+
         Ok(Some(SymbolNode {
             id: SharedString::from(id_text),
             name: SharedString::from(name_text),
@@ -1002,6 +1017,7 @@ impl NciDatabase {
             file_path: SharedString::from(file_path_text),
             additional_files,
             entry_visibility: None,
+            merge_provenance,
             signature: signature_opt.map(SharedString::from),
             js_doc: js_doc_opt.map(SharedString::from),
             is_type_only: is_type_only_int != 0,
@@ -1248,6 +1264,10 @@ fn row_to_json_object(
     Ok(map)
 }
 
+fn merge_provenance_from_db(json_text: Option<String>) -> Option<MergeProvenance> {
+    json_text.and_then(|text| serde_json::from_str(&text).ok())
+}
+
 fn deprecation_to_columns(deprecation: Option<&Deprecation>) -> (i64, Option<String>) {
     match deprecation {
         None | Some(Deprecation::Flag(false)) => (0, None),
@@ -1348,7 +1368,7 @@ fn decorator_arguments_json(arguments: &[SharedString]) -> String {
 mod tests {
     use super::*;
     use crate::cache::index_engine_cache_key;
-    use crate::types::PackageGraph;
+    use crate::types::{MergeProvenance, MergeProvenanceKind, PackageGraph};
     use std::sync::{Arc, Mutex};
     use std::thread;
     use std::time::Instant;
@@ -1414,6 +1434,48 @@ mod tests {
         );
     }
 
+    #[test]
+    fn merge_provenance_roundtrips_through_sqlite() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("merge_prov.sqlite");
+        let mut database = NciDatabase::open(&path).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("demo-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/x"),
+            is_scoped: false,
+        };
+        let mut sym = minimal_symbol("sym-mp", "fnMp");
+        sym.merge_provenance = Some(MergeProvenance {
+            kinds: vec![
+                MergeProvenanceKind::IdenticalFold,
+                MergeProvenanceKind::MergeScope,
+            ],
+        });
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+        let loaded = database.load_package(&package_info).expect("load");
+        assert_eq!(
+            loaded.symbols[0].merge_provenance,
+            Some(MergeProvenance {
+                kinds: vec![
+                    MergeProvenanceKind::IdenticalFold,
+                    MergeProvenanceKind::MergeScope,
+                ],
+            })
+        );
+    }
+
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {
         SymbolNode {
             id: SharedString::from(id_str),
@@ -1427,6 +1489,7 @@ mod tests {
             file_path: SharedString::from("index.d.ts"),
             additional_files: None,
             entry_visibility: None,
+            merge_provenance: None,
             signature: Some(SharedString::from("declare function demo(): void")),
             js_doc: Some(SharedString::from("Hello world token")),
             is_type_only: false,

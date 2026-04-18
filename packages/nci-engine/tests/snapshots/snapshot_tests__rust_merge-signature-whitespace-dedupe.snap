@@ -17,6 +17,12 @@ expression: "& rust_graph"
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "identical_fold",
+          "merge_scope"
+        ]
+      },
       "signature": "export interface MergeSignatureWhitespaceProbe {\n    readonly sharedField: string;\n}\nexport interface MergeSignatureWhitespaceProbe {\n    readonly sharedField: string;\n    readonly extraMember: boolean;\n}",
       "jsDoc": "Shared probe; vendor A uses 4-space body indent.",
       "isTypeOnly": true,
@@ -56,6 +62,12 @@ expression: "& rust_graph"
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"
       ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
       "signature": "readonly sharedField: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",
