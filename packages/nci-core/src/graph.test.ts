@@ -1205,4 +1205,64 @@ describe("buildPackageGraph", () => {
       expect(uniqueIds.size).toBe(ids.length);
     });
   });
+
+  describe("import() type references and barrel re-exports", () => {
+    it("resolves import(pkg).Type to the definition file when the package entry only re-exports", () => {
+      const graph = buildPackageGraph(
+        makePackageInfo("import-type-reexport-resolution"),
+      );
+      const consumerSymbol = graph.symbols.find(
+        (symbolNode) => symbolNode.name === "useThing",
+      );
+      expect(consumerSymbol).toBeDefined();
+      const dependencyList = consumerSymbol!.dependencies ?? [];
+      const hasNpmStub = dependencyList.some((dependencyId) =>
+        dependencyId.startsWith("npm::import-type-reexport-dep::"),
+      );
+      expect(hasNpmStub).toBe(false);
+      const linksToInnerDefinition = dependencyList.some((dependencyId) =>
+        dependencyId.includes("inner.d.ts::OptionsFromInner"),
+      );
+      expect(linksToInnerDefinition).toBe(true);
+    });
+
+    it("resolves the same logical type via top-level import map to the definition file", () => {
+      const graph = buildPackageGraph(
+        makePackageInfo("import-type-reexport-resolution"),
+      );
+      const controlSymbol = graph.symbols.find(
+        (symbolNode) => symbolNode.name === "controlSameType",
+      );
+      expect(controlSymbol).toBeDefined();
+      const dependencyList = controlSymbol!.dependencies ?? [];
+      expect(
+        dependencyList.some((dependencyId) =>
+          dependencyId.includes("inner.d.ts::OptionsFromInner"),
+        ),
+      ).toBe(true);
+    });
+
+    it("resolves import(pkg).Type to the entry file when the type is declared on the barrel", () => {
+      const graph = buildPackageGraph(
+        makePackageInfo("import-type-reexport-resolution"),
+      );
+      const inlineSymbol = graph.symbols.find(
+        (symbolNode) => symbolNode.name === "inlineEntry",
+      );
+      expect(inlineSymbol).toBeDefined();
+      const dependencyList = inlineSymbol!.dependencies ?? [];
+      expect(
+        dependencyList.some((dependencyId) =>
+          dependencyId.includes(
+            "import-type-reexport-dep/index.d.ts::DeclaredOnEntry",
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        dependencyList.some((dependencyId) =>
+          dependencyId.startsWith("npm::import-type-reexport-dep::"),
+        ),
+      ).toBe(false);
+    });
+  });
 });

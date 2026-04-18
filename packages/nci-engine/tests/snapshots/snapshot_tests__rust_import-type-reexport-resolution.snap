@@ -1,0 +1,162 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "import-type-reexport-resolution",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/index.d.ts::DeclaredOnEntry",
+      "name": "DeclaredOnEntry",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "import-type-reexport-resolution",
+      "filePath": "node_modules/import-type-reexport-dep/index.d.ts",
+      "signature": "export interface DeclaredOnEntry {\n  readonly inline: boolean;\n}",
+      "jsDoc": "Declared on the package entry (not only re-exported from inner).",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/index.d.ts::DeclaredOnEntry.inline",
+      "name": "DeclaredOnEntry.inline",
+      "parentSymbolId": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/index.d.ts::DeclaredOnEntry",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "import-type-reexport-resolution",
+      "filePath": "node_modules/import-type-reexport-dep/index.d.ts",
+      "signature": "readonly inline: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/inner.d.ts::OptionsFromInner",
+      "name": "OptionsFromInner",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "import-type-reexport-resolution",
+      "filePath": "node_modules/import-type-reexport-dep/inner.d.ts",
+      "signature": "export type OptionsFromInner<T = object> = { optionToken: T };",
+      "jsDoc": "Definition file: type is not declared on the package entry barrel.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/inner.d.ts::OptionsFromInner.optionToken",
+      "name": "OptionsFromInner.optionToken",
+      "parentSymbolId": "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/inner.d.ts::OptionsFromInner",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "import-type-reexport-resolution",
+      "filePath": "node_modules/import-type-reexport-dep/inner.d.ts",
+      "signature": "optionToken: T",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::controlSameType",
+      "name": "controlSameType",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "import-type-reexport-resolution",
+      "filePath": "index.d.ts",
+      "signature": "export declare function controlSameType(\n  value: OptionsFromInner<object>,\n): void;",
+      "jsDoc": "Control: bare identifier resolves via import map to the same definition file.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/inner.d.ts::OptionsFromInner"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::inlineEntry",
+      "name": "inlineEntry",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "import-type-reexport-resolution",
+      "filePath": "index.d.ts",
+      "signature": "declare const inlineEntry: import(\"import-type-reexport-dep\").DeclaredOnEntry",
+      "jsDoc": "Inline-on-entry: import() should resolve against dep index.d.ts.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/index.d.ts::DeclaredOnEntry"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::inlineEntry.inline",
+      "name": "inlineEntry.inline",
+      "parentSymbolId": "import-type-reexport-resolution@1.0.0::inlineEntry",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "import-type-reexport-resolution",
+      "filePath": "node_modules/import-type-reexport-dep/index.d.ts",
+      "additionalFiles": [
+        "index.d.ts"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "signature": "readonly inline: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "import-type-reexport-resolution@1.0.0::useThing",
+      "name": "useThing",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "import-type-reexport-resolution",
+      "filePath": "index.d.ts",
+      "signature": "declare const useThing: (\n  options?: import(\"import-type-reexport-dep\").OptionsFromInner<object>,\n) => void",
+      "jsDoc": "Target: import()-type should resolve to inner.d.ts, not npm:: stub.",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "import-type-reexport-resolution@1.0.0::node_modules/import-type-reexport-dep/inner.d.ts::OptionsFromInner"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 8,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

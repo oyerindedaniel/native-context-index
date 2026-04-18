@@ -513,6 +513,7 @@ fn resolve_dependency_ids_for_symbol(
         HashSet::with_capacity(dep_count.saturating_mul(2));
     let mut target_ids: Vec<SharedString> = Vec::with_capacity(8);
     let mut namespace_fallback_roots: Vec<SharedString> = Vec::with_capacity(4);
+    let mut import_path_dedup: HashSet<SharedString> = HashSet::with_capacity(8);
 
     for raw_dep in symbol_node.raw_dependencies.iter() {
         let namespace_qual = raw_dep
@@ -564,16 +565,31 @@ fn resolve_dependency_ids_for_symbol(
             }
         }
 
+        // import()-style deps: merge file_local_to_ids across all resolved paths,
+        // then fall back to name_to_ids when the entry file has no local row
+        // (typical barrel re-export to a definition file).
         if let Some(import_path) = &raw_dep.import_path {
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
             let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
-            if !abs_paths.is_empty() {
-                let rel_path =
-                    make_relative_to_package(&abs_paths[0], package_dir_str, normalized_pkg_dir);
+            import_path_dedup.clear();
+            for abs_path in abs_paths.iter() {
+                let rel_path = make_relative_to_package(
+                    abs_path.as_ref(),
+                    package_dir_str,
+                    normalized_pkg_dir,
+                );
                 let key: SharedString = format!("{}::{}", rel_path, raw_dep.name.as_ref()).into();
                 if let Some(ids) = file_local_to_ids.get(&key) {
-                    target_ids.extend(ids.iter().cloned());
+                    for symbol_id in ids {
+                        import_path_dedup.insert(symbol_id.clone());
+                    }
                 }
+            }
+            target_ids.extend(import_path_dedup.drain());
+            if target_ids.is_empty()
+                && let Some(ids) = name_to_ids.get(&raw_dep.name)
+            {
+                target_ids.extend(ids.iter().cloned());
             }
         } else {
             let mut namespace_target_files_resolved = false;

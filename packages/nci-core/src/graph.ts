@@ -662,6 +662,8 @@ export function buildPackageGraph(
     if (symbolNode.rawDependencies && symbolNode.rawDependencies.length > 0) {
       const resolvedIds = new Set<string>();
       const symAbsPath = getCachedAbsPath(symbolNode.filePath);
+      const importPathIdDedup = new Set<string>();
+      const importPathTargetScratch: string[] = [];
 
       for (const rawDep of symbolNode.rawDependencies) {
         const namespaceQual = !rawDep.importPath
@@ -736,17 +738,31 @@ export function buildPackageGraph(
           }
         }
 
+        // import()-style deps: try every resolved path for the specifier, then
+        // fall back to package-wide name→id lookup when the entry module has no
+        // local row (typical barrel re-export to a definition file).
         if (rawDep.importPath) {
           const absPaths = getCachedModuleSpecifier(
             rawDep.importPath,
             symbolNode.filePath,
           );
-          if (absPaths.length > 0) {
-            const relPath = makePackageRelativePath(
-              absPaths[0]!,
-              packageInfo.dir,
-            );
-            targetIds = fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
+          importPathIdDedup.clear();
+          for (const absPath of absPaths) {
+            const relPath = makePackageRelativePath(absPath, packageInfo.dir);
+            for (const symbolId of fileLocalToIds.get(
+              `${relPath}::${rawDep.name}`,
+            ) || []) {
+              importPathIdDedup.add(symbolId);
+            }
+          }
+          if (importPathIdDedup.size > 0) {
+            importPathTargetScratch.length = 0;
+            for (const symbolId of importPathIdDedup) {
+              importPathTargetScratch.push(symbolId);
+            }
+            targetIds = importPathTargetScratch;
+          } else {
+            targetIds = nameToIds.get(rawDep.name) || [];
           }
         } else {
           let namespaceTargetFilesResolved = false;

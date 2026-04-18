@@ -10,10 +10,13 @@
 //! Flags: `--package NAME` (repeatable), `--output PATH`, `--sequential` (serialize package indexing),
 //! `--skip-write` (skip huge JSON export — for timing index work only), `--profile`,
 //! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling),
-//! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing).
+//! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing),
+//! `--max-hops N` (crawl depth from package entries; `-1` = unlimited, see `MAX_HOPS_UNLIMITED` in
+//! `nci_engine::constants`; default 10 when omitted).
 //!
 //! Env: `NCI_INDEX_NO_CACHE=1` is the same as `--no-package-cache` (handy when you cannot pass flags).
 //! `NCI_PARALLEL_RESOLVE_DEPS=0` is the same as `--no-parallel-resolve-deps`.
+//! `NCI_MAX_HOPS` sets the same value as `--max-hops` when the flag is not passed (integer or `-1`).
 //!
 //! # Diagnostics
 //!
@@ -31,6 +34,7 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
 
+use nci_engine::constants::{MAX_HOPS_UNLIMITED, max_hops_from_user_value};
 use nci_engine::pipeline::{
     GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
@@ -40,7 +44,7 @@ use nci_engine::scanner::scan_packages;
 /// Package roots for dependency stubbing (`npm::…` edges). Edit this slice; leave empty for default
 /// in-graph resolution. Not wired to CLI flags in this example.
 const DEMO_DEPENDENCY_STUB_PACKAGES: &[&str] = &[
-    // "zod",
+    "zod",
     // "@types/node",
 ];
 struct IndexedSummary<'a> {
@@ -151,12 +155,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut profile_phases = false;
     let mut no_package_cache = false;
     let mut no_parallel_resolve_deps = false;
+    let mut max_hops_cli: Option<i64> = None;
+    let mut max_hops_from_flag = false;
 
     let mut current_index = 1;
     while current_index < args.len() {
         match args[current_index].as_str() {
             "--package" if current_index + 1 < args.len() => {
                 target_packages_args.push(args[current_index + 1].clone());
+                current_index += 1;
+            }
+            "--max-hops" if current_index + 1 < args.len() => {
+                let raw = args[current_index + 1].as_str();
+                max_hops_cli = Some(match raw.parse::<i64>() {
+                    Ok(value) => value,
+                    Err(_) => {
+                        eprintln!(
+                            "--max-hops expects an integer (use {} for unlimited), got {raw:?}",
+                            MAX_HOPS_UNLIMITED
+                        );
+                        std::process::exit(2);
+                    }
+                });
+                max_hops_from_flag = true;
                 current_index += 1;
             }
             "--output" if current_index + 1 < args.len() => {
@@ -198,6 +219,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             no_parallel_resolve_deps = true;
         }
     }
+    if !max_hops_from_flag && let Ok(raw) = env::var("NCI_MAX_HOPS") {
+        max_hops_cli = Some(match raw.parse::<i64>() {
+            Ok(value) => value,
+            Err(_) => {
+                eprintln!(
+                    "NCI_MAX_HOPS must be an integer (use {} for unlimited), got {raw:?}",
+                    MAX_HOPS_UNLIMITED
+                );
+                std::process::exit(2);
+            }
+        });
+    }
+
+    let max_hops = match max_hops_from_user_value(max_hops_cli) {
+        Ok(value) => value,
+        Err(message) => {
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
+    };
 
     if profile_phases {
         // SAFETY: set once on the main thread before `index_packages` spawns work that reads `NCI_PROFILE`
@@ -256,7 +297,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         normalize_dependency_stub_list(DEMO_DEPENDENCY_STUB_PACKAGES.iter().copied());
 
     let index_options = Some(IndexOptions {
-        max_hops: 10,
+        max_hops,
         parallel: !use_sequential,
         project_root: Some(repo_root.clone()),
         enable_package_cache: !no_package_cache,
@@ -385,6 +426,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     );
     println!(
+        "   Max hops:        {}",
+        if max_hops == usize::MAX {
+            format!("unlimited ({MAX_HOPS_UNLIMITED})")
+        } else {
+            max_hops.to_string()
+        }
+    );
+    println!(
         "   Total packages:  {} ({} cached, {} crawled)",
         indexed_results.len(),
         cached_count,
@@ -450,10 +499,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .filter_map(|result| result.graph.as_ref())
             .collect();
+        let max_hops_json: serde_json::Value = if max_hops == usize::MAX {
+            MAX_HOPS_UNLIMITED.into()
+        } else {
+            serde_json::Number::from(max_hops).into()
+        };
         let report_data = serde_json::json!({
             "generatedAt": "now",
             "indexMode": mode_label,
             "parallelResolveDeps": !no_parallel_resolve_deps,
+            "maxHops": max_hops_json,
             "timingsMs": {
                 "scanDedupe": (scan_dedupe_duration.as_secs_f64() * 1000.0).round() as u64,
                 "indexPackagesWall": (index_wall_ms).round() as u64,

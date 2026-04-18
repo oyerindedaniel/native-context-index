@@ -325,6 +325,10 @@ snapshot_test!(snapshot_simple_export, "simple-export");
 snapshot_test!(snapshot_re_export_chain, "re-export-chain");
 snapshot_test!(snapshot_namespace_cases, "namespace-cases");
 snapshot_test!(
+    snapshot_import_type_reexport_resolution,
+    "import-type-reexport-resolution"
+);
+snapshot_test!(
     snapshot_namespace_interface_same_name,
     "namespace-interface-same-name"
 );
