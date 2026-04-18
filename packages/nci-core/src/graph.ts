@@ -255,21 +255,27 @@ export function buildPackageGraph(
     kind === ts.SyntaxKind.CallSignature ||
     kind === ts.SyntaxKind.IndexSignature;
 
+  // At most three labels; mutate the row's `kinds` array in place after the first merge (no Set
+  // or full-array copy per contribution).
   function upsertMergeProvenance(
     existing: SymbolNode,
     contributionPath: ContributionMergePath,
     resolved: ResolvedSymbol,
   ): void {
-    const kinds = new Set<MergeProvenanceKind>(
-      existing.mergeProvenance?.kinds ?? [],
-    );
-    kinds.add(contributionPath);
-    if (isOverloadMergeable(resolved.kind)) {
-      kinds.add(MERGE_PROVENANCE_KIND.overloadKey);
+    if (!existing.mergeProvenance) {
+      existing.mergeProvenance = { kinds: [] };
     }
-    existing.mergeProvenance = {
-      kinds: Array.from(kinds).sort() as MergeProvenanceKind[],
-    };
+    const { kinds } = existing.mergeProvenance;
+    if (!kinds.includes(contributionPath)) {
+      kinds.push(contributionPath);
+    }
+    if (
+      isOverloadMergeable(resolved.kind) &&
+      !kinds.includes(MERGE_PROVENANCE_KIND.overloadKey)
+    ) {
+      kinds.push(MERGE_PROVENANCE_KIND.overloadKey);
+    }
+    kinds.sort();
   }
 
   const entryVisibilityContributions = (
