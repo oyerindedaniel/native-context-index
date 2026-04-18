@@ -282,6 +282,7 @@ fn merge_resolved_into_node(
     entry_visibility_paths: &[SharedString],
     merged_index: usize,
     additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
+    signature_norm_seen: &mut [HashSet<String>],
 ) {
     if symbol_file_path != &existing.file_path {
         let seen = additional_files_seen
@@ -310,7 +311,21 @@ fn merge_resolved_into_node(
         }
     }
 
-    fuse_merged_signatures(&mut existing.signature, resolved.signature.as_ref());
+    let normalized_incoming_signature = normalize_signature(resolved.signature.as_deref());
+    let should_skip_redundant_signature_fusion = if normalized_incoming_signature.is_empty() {
+        false
+    } else {
+        let normalized_signatures_for_row = &mut signature_norm_seen[merged_index];
+        if normalized_signatures_for_row.contains(&normalized_incoming_signature) {
+            true
+        } else {
+            normalized_signatures_for_row.insert(normalized_incoming_signature);
+            false
+        }
+    };
+    if !should_skip_redundant_signature_fusion {
+        fuse_merged_signatures(&mut existing.signature, resolved.signature.as_ref());
+    }
 
     if !entry_visibility_paths.is_empty() {
         match &mut existing.entry_visibility {
@@ -900,6 +915,7 @@ pub fn build_package_graph(
     let mut merge_index: HashMap<SharedString, usize> =
         HashMap::with_capacity(all_symbols.len().min(65536));
     let mut additional_files_seen: HashMap<usize, HashSet<SharedString>> = HashMap::new();
+    let mut signature_norm_seen: Vec<HashSet<String>> = Vec::new();
     // External-module Interface / TypeAlias: fold files when kind + name + normalized signature match.
     let mut module_identical_fold: HashMap<(SharedString, u32, String), usize> =
         HashMap::with_capacity(all_symbols.len().min(4096));
@@ -994,6 +1010,7 @@ pub fn build_package_graph(
                     &entry_visibility_paths,
                     fold_idx,
                     &mut additional_files_seen,
+                    &mut signature_norm_seen,
                 );
                 continue;
             }
@@ -1007,6 +1024,7 @@ pub fn build_package_graph(
                 &entry_visibility_paths,
                 index,
                 &mut additional_files_seen,
+                &mut signature_norm_seen,
             );
         } else {
             let re_export_source = resolved.re_export_chain.first().map(|chain_start| {
@@ -1068,6 +1086,12 @@ pub fn build_package_graph(
                     index,
                 );
             }
+            let mut initial_normalized_signatures_for_row = HashSet::with_capacity(4);
+            let normalized_signature_initial = normalize_signature(resolved.signature.as_deref());
+            if !normalized_signature_initial.is_empty() {
+                initial_normalized_signatures_for_row.insert(normalized_signature_initial);
+            }
+            signature_norm_seen.push(initial_normalized_signatures_for_row);
             merged.push((SharedString::from(""), node));
         }
     }

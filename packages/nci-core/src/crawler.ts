@@ -400,9 +400,13 @@ export function crawl(
     // When folding `/// <reference path="..." />` results into the entry resolution,
     // overloads must be kept distinct. De-dupe using kind+signature, not just name.
     const knownExportKeys = new Set(
-      rawExports.map(
-        (entry) =>
-          `${entry.name}::${entry.kind}::${normalizeSignature(entry.signature)}`,
+      rawExports.map((entry) =>
+        tripleSlashExportCollapseKey(
+          normalizedPath,
+          entry.name,
+          entry.kind,
+          entry.signature,
+        ),
       ),
     );
 
@@ -427,7 +431,12 @@ export function crawl(
             refIsModule ? symbolNode.isGlobalAugmentation === true : true,
         );
         for (const symbolNode of nestedSymbols) {
-          const exportKey = `${symbolNode.name}::${symbolNode.kind}::${normalizeSignature(symbolNode.signature)}`;
+          const exportKey = tripleSlashExportCollapseKey(
+            refNormalized,
+            symbolNode.name,
+            symbolNode.kind,
+            symbolNode.signature,
+          );
           if (!knownExportKeys.has(exportKey)) {
             knownExportKeys.add(exportKey);
             actualExports.push({
@@ -774,6 +783,29 @@ export function crawl(
     fileIsExternalModule: fileIsExternalModuleRecord,
     absoluteToPackageRelative,
   };
+}
+
+/**
+ * When folding `/// <reference path="..." />`, overloads dedupe on name+kind+normalized signature only.
+ * Interface / type / namespace / enum use the declaring file in the key so each physical site reaches
+ * graph merge (declaration merging + normalized signature fusion dedupe).
+ */
+function tripleSlashExportCollapseKey(
+  declaredFileAbs: string,
+  exportName: string,
+  syntaxKind: ts.SyntaxKind,
+  signatureText: string | undefined,
+): string {
+  const normalizedSignature = normalizeSignature(signatureText);
+  if (
+    syntaxKind === ts.SyntaxKind.InterfaceDeclaration ||
+    syntaxKind === ts.SyntaxKind.TypeAliasDeclaration ||
+    syntaxKind === ts.SyntaxKind.ModuleDeclaration ||
+    syntaxKind === ts.SyntaxKind.EnumDeclaration
+  ) {
+    return `${declaredFileAbs}::${exportName}::${syntaxKind}::${normalizedSignature}`;
+  }
+  return `${exportName}::${syntaxKind}::${normalizedSignature}`;
 }
 
 /** Resolve a triple-slash reference path relative to the current file. */

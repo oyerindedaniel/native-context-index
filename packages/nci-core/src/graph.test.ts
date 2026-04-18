@@ -1265,4 +1265,40 @@ describe("buildPackageGraph", () => {
       ).toBe(false);
     });
   });
+
+  describe("merged declaration signatures", () => {
+    it("does not duplicate fused text when another file contributes the same interface after normalize", () => {
+      const graph = buildPackageGraph(
+        makePackageInfo("merge-signature-whitespace-dedupe"),
+      );
+      const mergedInterfaceDeclarations = graph.symbols.filter(
+        (symbolNode) =>
+          symbolNode.name === "MergeSignatureWhitespaceProbe" &&
+          symbolNode.kind === ts.SyntaxKind.InterfaceDeclaration,
+      );
+      expect(mergedInterfaceDeclarations).toHaveLength(1);
+      const mergedInterface = mergedInterfaceDeclarations[0]!;
+      const signatureText = mergedInterface.signature ?? "";
+      const interfaceDeclarationMatches = signatureText.match(
+        /export interface MergeSignatureWhitespaceProbe/g,
+      );
+      expect(interfaceDeclarationMatches?.length).toBe(2);
+
+      const contributingRelativePaths = new Set<string>([
+        mergedInterface.filePath,
+        ...(mergedInterface.additionalFiles ?? []),
+      ]);
+      expect(contributingRelativePaths.size).toBeGreaterThanOrEqual(3);
+      expect(
+        [...contributingRelativePaths].some((relPath) =>
+          relPath.includes("vendor-copy-b.d.ts"),
+        ),
+      ).toBe(true);
+      expect(
+        [...contributingRelativePaths].some((relPath) =>
+          relPath.includes("vendor-copy-distinct.d.ts"),
+        ),
+      ).toBe(true);
+    });
+  });
 });

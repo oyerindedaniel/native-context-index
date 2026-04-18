@@ -226,6 +226,8 @@ export function buildPackageGraph(
   );
 
   const merged = new Map<string, SymbolNode>();
+  /** Per merged row (`mergeKey`): normalized signatures already represented in `signature` (avoids fusing whitespace-only duplicates). */
+  const signatureNormsByMergeRow = new Map<string, Set<string>>();
 
   const [mergeScopeByRel, absToRel] = computeMergeScopeIds(
     crawlResult.visitedFiles,
@@ -278,6 +280,7 @@ export function buildPackageGraph(
   };
 
   function mergeContribution(
+    mergeRowKey: string,
     existing: SymbolNode,
     resolved: ResolvedSymbol,
     symbolFilePath: string,
@@ -305,10 +308,22 @@ export function buildPackageGraph(
       }
     }
 
-    existing.signature = fuseMergedSignatures(
-      existing.signature,
-      resolved.signature,
-    );
+    const normalizedIncomingSignature = normalizeSignature(resolved.signature);
+    const normalizedSignaturesSeen = signatureNormsByMergeRow.get(mergeRowKey);
+    let shouldSkipRedundantSignatureFusion = false;
+    if (normalizedIncomingSignature && normalizedSignaturesSeen) {
+      if (normalizedSignaturesSeen.has(normalizedIncomingSignature)) {
+        shouldSkipRedundantSignatureFusion = true;
+      } else {
+        normalizedSignaturesSeen.add(normalizedIncomingSignature);
+      }
+    }
+    if (!shouldSkipRedundantSignatureFusion) {
+      existing.signature = fuseMergedSignatures(
+        existing.signature,
+        resolved.signature,
+      );
+    }
 
     for (const visPath of entryVisibilityContributions(
       resolved,
@@ -390,6 +405,7 @@ export function buildPackageGraph(
           foldExisting.filePath !== symbolFilePath
         ) {
           mergeContribution(
+            canonKey,
             foldExisting,
             resolved,
             symbolFilePath,
@@ -402,12 +418,27 @@ export function buildPackageGraph(
 
     const existing = merged.get(mergeKey);
     if (existing) {
-      mergeContribution(existing, resolved, symbolFilePath, isEntryFile);
+      mergeContribution(
+        mergeKey,
+        existing,
+        resolved,
+        symbolFilePath,
+        isEntryFile,
+      );
     } else {
       const reExportSource = resolved.reExportChain?.[0]
         ? makePackageRelativePath(resolved.reExportChain[0], packageInfo.dir)
         : undefined;
       const visContrib = entryVisibilityContributions(resolved, symbolFilePath);
+
+      const normalizedSignatureForNewRow = normalizeSignature(
+        resolved.signature,
+      );
+      const initialNormalizedSignatures = new Set<string>();
+      if (normalizedSignatureForNewRow) {
+        initialNormalizedSignatures.add(normalizedSignatureForNewRow);
+      }
+      signatureNormsByMergeRow.set(mergeKey, initialNormalizedSignatures);
 
       merged.set(mergeKey, {
         id: "", // Assigned in next step

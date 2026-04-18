@@ -1,0 +1,90 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "merge-signature-whitespace-dedupe",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "merge-signature-whitespace-dedupe@1.0.0::vendor-copy-a.d.ts::MergeSignatureWhitespaceProbe",
+      "name": "MergeSignatureWhitespaceProbe",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merge-signature-whitespace-dedupe",
+      "filePath": "vendor-copy-a.d.ts",
+      "additionalFiles": [
+        "vendor-copy-b.d.ts",
+        "vendor-copy-distinct.d.ts"
+      ],
+      "signature": "export interface MergeSignatureWhitespaceProbe {\n    readonly sharedField: string;\n}\nexport interface MergeSignatureWhitespaceProbe {\n    readonly sharedField: string;\n    readonly extraMember: boolean;\n}",
+      "jsDoc": "Shared probe; vendor A uses 4-space body indent.",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merge-signature-whitespace-dedupe@1.0.0::vendor-copy-distinct.d.ts::MergeSignatureWhitespaceProbe.extraMember",
+      "name": "MergeSignatureWhitespaceProbe.extraMember",
+      "parentSymbolId": "merge-signature-whitespace-dedupe@1.0.0::vendor-copy-a.d.ts::MergeSignatureWhitespaceProbe",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merge-signature-whitespace-dedupe",
+      "filePath": "vendor-copy-distinct.d.ts",
+      "signature": "readonly extraMember: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "merge-signature-whitespace-dedupe@1.0.0::vendor-copy-a.d.ts::MergeSignatureWhitespaceProbe.sharedField",
+      "name": "MergeSignatureWhitespaceProbe.sharedField",
+      "parentSymbolId": "merge-signature-whitespace-dedupe@1.0.0::vendor-copy-a.d.ts::MergeSignatureWhitespaceProbe",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merge-signature-whitespace-dedupe",
+      "filePath": "vendor-copy-a.d.ts",
+      "additionalFiles": [
+        "vendor-copy-b.d.ts",
+        "vendor-copy-distinct.d.ts"
+      ],
+      "signature": "readonly sharedField: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "readonly"
+      ]
+    },
+    {
+      "id": "merge-signature-whitespace-dedupe@1.0.0::mergeSignatureWhitespaceDedupeRoot",
+      "name": "mergeSignatureWhitespaceDedupeRoot",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "merge-signature-whitespace-dedupe",
+      "filePath": "index.d.ts",
+      "signature": "declare const mergeSignatureWhitespaceDedupeRoot: 1",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 4,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

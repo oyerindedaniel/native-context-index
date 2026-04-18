@@ -364,6 +364,10 @@ snapshot_test!(snapshot_local_export, "local-export");
 snapshot_test!(snapshot_nested_prefix, "nested-prefix");
 snapshot_test!(snapshot_import_cases, "import-cases");
 snapshot_test!(snapshot_merged_symbols, "merged-symbols");
+snapshot_test!(
+    snapshot_merge_signature_whitespace_dedupe,
+    "merge-signature-whitespace-dedupe"
+);
 snapshot_test!(snapshot_name_collision, "name-collision");
 snapshot_test!(snapshot_deps_pkg, "deps-pkg");
 snapshot_test!(

@@ -208,7 +208,7 @@
       "kindName": "ModuleDeclaration",
       "package": "triple-slash-scope-cases",
       "filePath": "script-entry.d.ts",
-      "signature": "declare namespace ScriptPair {\n  const alpha: \"a\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}",
+      "signature": "declare namespace ScriptPair {\n  const alpha: \"a\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],

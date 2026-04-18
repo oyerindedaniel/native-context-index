@@ -529,6 +529,37 @@ impl CrawlSession {
         (triple_edges, targets)
     }
 
+    /// Triple-slash fold: overloads dedupe on name+kind+norm; declaration-merge kinds include file so
+    /// graph merge sees each physical site.
+    #[inline]
+    fn triple_slash_export_collapse_key(
+        declared_file: &str,
+        export_name: &str,
+        kind: SymbolKind,
+        signature: Option<&str>,
+    ) -> SharedString {
+        let normalized_sig = normalize_signature(signature);
+        if matches!(
+            kind,
+            SymbolKind::Interface
+                | SymbolKind::TypeAlias
+                | SymbolKind::Enum
+                | SymbolKind::Namespace
+        ) {
+            SharedString::from(
+                format!(
+                    "{declared_file}::{export_name}::{}::{normalized_sig}",
+                    kind.numeric_kind()
+                )
+                .as_str(),
+            )
+        } else {
+            SharedString::from(
+                format!("{export_name}::{}::{normalized_sig}", kind.numeric_kind()).as_str(),
+            )
+        }
+    }
+
     /// Resolves all public symbols from a file by following its export chain.
     fn resolve_file(
         &mut self,
@@ -560,14 +591,11 @@ impl CrawlSession {
         let mut known_export_keys: HashSet<SharedString> =
             HashSet::with_capacity(actual_exports.len());
         known_export_keys.extend(actual_exports.iter().map(|entry| {
-            SharedString::from(
-                format!(
-                    "{}::{}::{}",
-                    entry.name.as_ref(),
-                    entry.kind.numeric_kind(),
-                    normalize_signature(entry.signature.as_deref())
-                )
-                .as_ref(),
+            Self::triple_slash_export_collapse_key(
+                normalized_path.as_ref(),
+                entry.name.as_ref(),
+                entry.kind,
+                entry.signature.as_deref(),
             )
         }));
 
@@ -600,14 +628,11 @@ impl CrawlSession {
                     .cloned()
                     .collect();
                 for symbol_node in nested_symbols {
-                    let export_key = SharedString::from(
-                        format!(
-                            "{}::{}::{}",
-                            symbol_node.name.as_ref(),
-                            symbol_node.kind.numeric_kind(),
-                            normalize_signature(symbol_node.signature.as_deref())
-                        )
-                        .as_ref(),
+                    let export_key = Self::triple_slash_export_collapse_key(
+                        symbol_node.defined_in.as_ref(),
+                        symbol_node.name.as_ref(),
+                        symbol_node.kind,
+                        symbol_node.signature.as_deref(),
                     );
                     if !known_export_keys.contains(&export_key) {
                         known_export_keys.insert(export_key);
