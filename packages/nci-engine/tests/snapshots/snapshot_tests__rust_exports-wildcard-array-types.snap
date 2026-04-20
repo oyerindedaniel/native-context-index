@@ -1,0 +1,74 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "exports-wildcard-array-types",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "exports-wildcard-array-types@1.0.0::AlphaFeature",
+      "name": "AlphaFeature",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "exports-wildcard-array-types",
+      "filePath": "dist/alpha.d.ts",
+      "signature": "export interface AlphaFeature {\n  alpha: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "exports-wildcard-array-types@1.0.0::AlphaFeature.alpha",
+      "name": "AlphaFeature.alpha",
+      "parentSymbolId": "exports-wildcard-array-types@1.0.0::AlphaFeature",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "exports-wildcard-array-types",
+      "filePath": "dist/alpha.d.ts",
+      "signature": "alpha: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "exports-wildcard-array-types@1.0.0::BetaFeature",
+      "name": "BetaFeature",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "exports-wildcard-array-types",
+      "filePath": "dist/beta.d.ts",
+      "signature": "export interface BetaFeature {\n  beta: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "exports-wildcard-array-types@1.0.0::BetaFeature.beta",
+      "name": "BetaFeature.beta",
+      "parentSymbolId": "exports-wildcard-array-types@1.0.0::BetaFeature",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "exports-wildcard-array-types",
+      "filePath": "dist/beta.d.ts",
+      "signature": "beta: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

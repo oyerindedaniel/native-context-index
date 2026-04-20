@@ -1,0 +1,11 @@
+{
+  "name": "exports-plus-types-root",
+  "version": "1.0.0",
+  "types": "./index.d.ts",
+  "exports": {
+    "./utils": {
+      "types": "./utils.d.ts",
+      "default": "./utils.js"
+    }
+  }
+}

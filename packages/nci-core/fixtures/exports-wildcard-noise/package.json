@@ -1,0 +1,9 @@
+{
+  "name": "exports-wildcard-noise",
+  "version": "1.0.0",
+  "exports": {
+    "./lib/*": {
+      "types": "./typings/*.d.ts"
+    }
+  }
+}

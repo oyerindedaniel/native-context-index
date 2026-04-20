@@ -1,0 +1,5 @@
+{
+  "name": "local-export-alias-duplicate",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

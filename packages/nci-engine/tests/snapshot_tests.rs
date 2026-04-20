@@ -460,6 +460,24 @@ snapshot_test!(
     snapshot_relative_string_module_collision,
     "relative-string-module-collision"
 );
+snapshot_test!(snapshot_exports_plus_types_root, "exports-plus-types-root");
+snapshot_test!(
+    snapshot_types_versions_multi_candidate,
+    "types-versions-multi-candidate"
+);
+snapshot_test!(
+    snapshot_exports_wildcard_array_types,
+    "exports-wildcard-array-types"
+);
+snapshot_test!(
+    snapshot_dt_express_function_namespace_export_equals,
+    "dt-express-function-namespace-export-equals"
+);
+snapshot_test!(snapshot_bare_to_types_fallback, "bare-to-types-fallback");
+snapshot_test!(
+    snapshot_bare_to_types_fallback_prefer_direct,
+    "bare-to-types-fallback-prefer-direct"
+);
 
 #[test]
 fn all_oracles_have_tests() {

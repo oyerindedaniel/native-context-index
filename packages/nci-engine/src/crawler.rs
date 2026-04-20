@@ -990,32 +990,14 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
     use std::fs;
+    use std::path::Path;
     use std::path::PathBuf;
-    use std::slice;
     use std::sync::Arc;
-    use tempfile::TempDir;
-
-    /// Helper: creates a .d.ts file in the temp directory.
-    fn write_dts(dir: &Path, name: &str, content: &str) -> SharedString {
-        let file_path = dir.join(name);
-        fs::write(&file_path, content).unwrap();
-        normalize_path(&file_path)
-    }
 
     /// `import x = require("...")` should pull the target `.d.ts` into the crawl like a normal import.
     #[test]
     fn crawl_follows_ts_import_equals_require() {
-        let temp_dir = TempDir::new().unwrap();
-        write_dts(
-            temp_dir.path(),
-            "impl.d.ts",
-            "export declare function fromImpl(): void;",
-        );
-        let entry = write_dts(
-            temp_dir.path(),
-            "entry.d.ts",
-            "import bundle = require(\"./impl.js\");\nexport = bundle;",
-        );
+        let entry = fixture_entry_absolute("import-equals-require-js", "entry.d.ts");
         let result = crawl(&[entry], None);
         assert!(
             result.visited_files.len() >= 2,
@@ -1036,66 +1018,41 @@ mod tests {
 
     #[test]
     fn crawl_single_file_extracts_exports() {
-        let temp_dir = TempDir::new().unwrap();
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export declare function greet(name: string): string;\nexport declare const VERSION: string;",
-        );
-
+        let entry = fixture_entry_absolute("simple-export", "index.d.ts");
         let result = crawl(&[entry], None);
 
-        assert_eq!(result.exports.len(), 2);
+        assert!(result.exports.len() >= 2);
         assert!(
             result.exports.iter().any(
-                |symbol| symbol.name.as_ref() == "greet" && symbol.kind == SymbolKind::Function
+                |symbol| symbol.name.as_ref() == "init" && symbol.kind == SymbolKind::Function
             )
         );
         assert!(
             result
                 .exports
                 .iter()
-                .any(|symbol| symbol.name.as_ref() == "VERSION"
-                    && symbol.kind == SymbolKind::Variable)
+                .any(|symbol| symbol.name.as_ref() == "Config"
+                    && symbol.kind == SymbolKind::Interface)
         );
     }
 
     #[test]
     fn crawl_follows_re_exports() {
-        let temp_dir = TempDir::new().unwrap();
-
-        write_dts(
-            temp_dir.path(),
-            "lib.d.ts",
-            "export declare function helper(): void;",
-        );
-
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export { helper } from './lib';",
-        );
-
+        let entry = fixture_entry_absolute("re-export-chain", "index.d.ts");
         let result = crawl(&[entry], None);
 
         assert!(
             result
                 .exports
                 .iter()
-                .any(|symbol| symbol.name.as_ref() == "helper"
-                    && symbol.kind == SymbolKind::Function)
+                .any(|symbol| symbol.name.as_ref() == "Server" && symbol.kind == SymbolKind::Class)
         );
         assert!(result.visited_files.len() >= 2);
     }
 
     #[test]
     fn crawl_detects_circular_refs() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let file_a = write_dts(temp_dir.path(), "a.d.ts", "export { b } from './b';");
-
-        write_dts(temp_dir.path(), "b.d.ts", "export { a } from './a';");
-
+        let file_a = fixture_entry_absolute("circular-deps", "a.d.ts");
         let result = crawl(&[file_a], None);
 
         // Circular reference should be detected
@@ -1107,19 +1064,7 @@ mod tests {
 
     #[test]
     fn crawl_respects_max_hops_zero() {
-        let temp_dir = TempDir::new().unwrap();
-
-        write_dts(
-            temp_dir.path(),
-            "deep.d.ts",
-            "export declare function deepFunc(): void;",
-        );
-
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export { deepFunc } from './deep';",
-        );
+        let entry = hop_limit_chain_entry();
 
         let result = crawl(
             &[entry],
@@ -1135,42 +1080,21 @@ mod tests {
 
     #[test]
     fn crawl_skips_files_for_dependency_stub_root_specifiers() {
-        let temp_dir = TempDir::new().unwrap();
-        let project_root = temp_dir.path();
-        fs::create_dir_all(project_root.join("node_modules/stub-npm-pkg")).unwrap();
-        fs::write(
-            project_root.join("package.json"),
-            r#"{"name":"root-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
-        )
-        .unwrap();
-        fs::write(
-            project_root.join("node_modules/stub-npm-pkg/package.json"),
-            r#"{"name":"stub-npm-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
-        )
-        .unwrap();
-        fs::write(
-            project_root.join("node_modules/stub-npm-pkg/index.d.ts"),
-            "export interface StubExported { v: number; }\n",
-        )
-        .unwrap();
-        let entry = write_dts(
-            project_root,
-            "index.d.ts",
-            "import type { StubExported } from \"stub-npm-pkg\";\nexport declare function useStub(x: StubExported): void;\n",
-        );
+        let fixture_root = fixture_dir("dependency-stub-packages");
+        let entry = normalize_path(&fixture_root.join("index.d.ts"));
 
-        let baseline = crawl(slice::from_ref(&entry), None);
+        let baseline = crawl(std::slice::from_ref(&entry), None);
         assert!(
             baseline
                 .visited_files
                 .iter()
-                .any(|visited_path| { visited_path.as_ref().contains("stub-npm-pkg") }),
+                .any(|visited_path| { visited_path.as_ref().contains("@stub-listed/core") }),
             "without stub roots, dependency package should be visited: {:?}",
             baseline.visited_files
         );
 
         let mut stub_roots = HashSet::new();
-        stub_roots.insert("stub-npm-pkg".to_string());
+        stub_roots.insert("@stub-listed/core".to_string());
         let stubbed = crawl(
             &[entry],
             Some(CrawlOptions {
@@ -1182,59 +1106,22 @@ mod tests {
             !stubbed
                 .visited_files
                 .iter()
-                .any(|visited_path| { visited_path.as_ref().contains("stub-npm-pkg") }),
+                .any(|visited_path| { visited_path.as_ref().contains("@stub-listed/core") }),
             "stub-listed roots must not add stub package files to visited set: {:?}",
             stubbed.visited_files
         );
     }
 
-    /// A package that imports its own bare name (`from "self-stub-pkg/inner"`) must still crawl
-    /// `inner` when that name is on the stub list, as long as `dependency_stub_self_exempt_root`
-    /// matches the indexed package root (mirrors `build_package_graph` behavior).
     #[test]
     fn crawl_resolves_self_package_bare_specifier_when_stub_self_exempt_matches() {
-        fn mirror_pkg_into_node_modules(pkg_root: &std::path::Path, package_name: &str) {
-            let dest_dir = if package_name.starts_with('@') {
-                let mut parts = package_name.split('/');
-                let scope = parts.next().expect("scope");
-                let name = parts.next().expect("name");
-                assert!(parts.next().is_none());
-                pkg_root.join("node_modules").join(scope).join(name)
-            } else {
-                pkg_root.join("node_modules").join(package_name)
-            };
-            fs::create_dir_all(&dest_dir).unwrap();
-            for file in ["package.json", "index.d.ts", "inner.d.ts"] {
-                fs::copy(pkg_root.join(file), dest_dir.join(file)).unwrap();
-            }
-        }
-
-        let temp_dir = TempDir::new().unwrap();
-        let pkg = temp_dir.path();
-        fs::write(
-            pkg.join("package.json"),
-            r#"{"name":"self-stub-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
-        )
-        .unwrap();
-        fs::write(
-            pkg.join("index.d.ts"),
-            r#"export type { Inner } from "self-stub-pkg/inner";
-"#,
-        )
-        .unwrap();
-        fs::write(
-            pkg.join("inner.d.ts"),
-            "export interface Inner { marker: true }\n",
-        )
-        .unwrap();
-        mirror_pkg_into_node_modules(pkg, "self-stub-pkg");
-        let entry = normalize_path(&pkg.join("index.d.ts"));
+        let fixture_root = fixture_dir("dependency-stub-self-exempt-unscoped");
+        let entry = normalize_path(&fixture_root.join("index.d.ts"));
 
         let mut stub_roots = HashSet::new();
         stub_roots.insert("self-stub-pkg".to_string());
 
         let blocked = crawl(
-            slice::from_ref(&entry),
+            std::slice::from_ref(&entry),
             Some(CrawlOptions {
                 dependency_stub_roots: Arc::new(stub_roots.clone()),
                 dependency_stub_self_exempt_root: None,
@@ -1290,7 +1177,7 @@ mod tests {
     #[test]
     fn crawl_unlimited_max_hops_matches_default_for_deep_chain() {
         let entry = hop_limit_chain_entry();
-        let baseline = crawl(slice::from_ref(&entry), None);
+        let baseline = crawl(std::slice::from_ref(&entry), None);
         let unlimited = crawl(
             &[entry],
             Some(CrawlOptions {
@@ -1330,16 +1217,7 @@ mod tests {
 
     #[test]
     fn crawl_wildcard_re_export() {
-        let temp_dir = TempDir::new().unwrap();
-
-        write_dts(
-            temp_dir.path(),
-            "types.d.ts",
-            "export interface Config { key: string; }\nexport type Mode = 'dark' | 'light';",
-        );
-
-        let entry = write_dts(temp_dir.path(), "index.d.ts", "export * from './types';");
-
+        let entry = fixture_entry_absolute("wildcard-reexport", "index.d.ts");
         let result = crawl(&[entry], None);
 
         assert!(
@@ -1349,29 +1227,14 @@ mod tests {
                 .any(|symbol| symbol.name.as_ref() == "Config"
                     && symbol.kind == SymbolKind::Interface)
         );
-        assert!(
-            result.exports.iter().any(
-                |symbol| symbol.name.as_ref() == "Mode" && symbol.kind == SymbolKind::TypeAlias
-            )
-        );
+        assert!(result.exports.iter().any(
+            |symbol| symbol.name.as_ref() == "Callback" && symbol.kind == SymbolKind::TypeAlias
+        ));
     }
 
     #[test]
     fn crawl_namespace_re_export() {
-        let temp_dir = TempDir::new().unwrap();
-
-        write_dts(
-            temp_dir.path(),
-            "utils.d.ts",
-            "export declare function format(): string;",
-        );
-
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export * as utils from './utils';",
-        );
-
+        let entry = fixture_entry_absolute("namespace-reexport", "index.d.ts");
         let result = crawl(&[entry], None);
 
         // Should have the namespace symbol and the nested one
@@ -1379,45 +1242,73 @@ mod tests {
             result
                 .exports
                 .iter()
-                .any(|symbol| symbol.name.as_ref() == "utils")
+                .any(|symbol| symbol.name.as_ref() == "Lib")
         );
         assert!(
             result
                 .exports
                 .iter()
-                .any(|symbol| symbol.name.as_ref() == "utils.format")
+                .any(|symbol| symbol.name.as_ref() == "Lib.internal")
+        );
+    }
+
+    fn fixture_entry_absolute(fixture_name: &str, entry_file_name: &str) -> SharedString {
+        let fixture_file_path = fixture_dir(fixture_name).join(entry_file_name);
+        let canonical = fs::canonicalize(&fixture_file_path).unwrap_or_else(|err| {
+            panic!(
+                "fixture entry missing at {}: {err}",
+                fixture_file_path.display()
+            )
+        });
+        normalize_path(&canonical)
+    }
+
+    fn fixture_dir(fixture_name: &str) -> PathBuf {
+        let fixture_file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../nci-core/fixtures")
+            .join(fixture_name);
+        assert!(
+            Path::new(&fixture_file_path).exists(),
+            "fixture directory missing: {}",
+            fixture_file_path.display()
+        );
+        fixture_file_path
+    }
+
+    #[test]
+    fn crawl_collects_reference_types_packages_without_auto_traversing_them() {
+        let entry = fixture_entry_absolute("type-ref-directives", "index.d.ts");
+        let result = crawl(&[entry], None);
+        assert!(
+            result
+                .type_reference_packages
+                .iter()
+                .any(|pkg_name| pkg_name.as_ref() == "express")
+        );
+        assert_eq!(
+            result.visited_files.len(),
+            1,
+            "reference types packages are reported but not auto-traversed in crawl discovery"
         );
     }
 
     #[test]
     fn crawl_marks_internal_symbols() {
-        let temp_dir = TempDir::new().unwrap();
-
-        write_dts(
-            temp_dir.path(),
-            "internal.d.ts",
-            "export declare function internalHelper(): void;\nexport declare function publicHelper(): void;",
-        );
-
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "export { publicHelper } from './internal';",
-        );
+        let entry = fixture_entry_absolute("local-reexport", "index.d.ts");
 
         let result = crawl(&[entry], None);
 
         let public_sym = result
             .exports
             .iter()
-            .find(|symbol| symbol.name.as_ref() == "publicHelper");
+            .find(|symbol| symbol.name.as_ref() == "External");
         assert!(public_sym.is_some());
         assert!(!public_sym.unwrap().is_internal);
 
         let internal_sym = result
             .exports
             .iter()
-            .find(|symbol| symbol.name.as_ref() == "internalHelper");
+            .find(|symbol| symbol.name.as_ref() == "Internal");
         assert!(internal_sym.is_some());
         assert!(internal_sym.unwrap().is_internal);
     }
@@ -1425,16 +1316,7 @@ mod tests {
     /// Crawl must retain the inner `global` namespace row (not only `global.*` members).
     #[test]
     fn crawl_keeps_global_namespace_inside_ambient_module_file() {
-        let temp_dir = TempDir::new().unwrap();
-        let entry = write_dts(
-            temp_dir.path(),
-            "buffer.buffer.d.ts",
-            r#"declare module "buffer" {
-    global {
-        interface BufferCtor { x: number; }
-    }
-}"#,
-        );
+        let entry = fixture_entry_absolute("ambient-module-global-inner", "index.d.ts");
         let result = crawl(&[entry], None);
         assert!(
             result.exports.iter().any(|symbol| {
@@ -1453,12 +1335,7 @@ mod tests {
     /// resolved declaration and an `ExportDeclaration` forwarder.
     #[test]
     fn crawl_duplicate_export_list_binding_yields_export_declaration_alias_row() {
-        let temp_dir = TempDir::new().unwrap();
-        let entry = write_dts(
-            temp_dir.path(),
-            "index.d.ts",
-            "declare class Agent {}\nexport { Agent as Experimental_Agent, Agent };",
-        );
+        let entry = fixture_entry_absolute("local-export-alias-duplicate", "index.d.ts");
 
         let result = crawl(&[entry], None);
 

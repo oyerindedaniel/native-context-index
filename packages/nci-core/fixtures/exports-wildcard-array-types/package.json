@@ -1,0 +1,13 @@
+{
+  "name": "exports-wildcard-array-types",
+  "version": "1.0.0",
+  "exports": {
+    "./feature/*": [
+      {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.js"
+      },
+      "./dist/*.js"
+    ]
+  }
+}

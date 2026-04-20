@@ -1,0 +1,44 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "types-versions-multi-candidate",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "types-versions-multi-candidate@1.0.0::MultiCandidateResolved",
+      "name": "MultiCandidateResolved",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-versions-multi-candidate",
+      "filePath": "types/index.d.ts",
+      "signature": "export interface MultiCandidateResolved {\n  resolvedBySecondCandidate: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "types-versions-multi-candidate@1.0.0::MultiCandidateResolved.resolvedBySecondCandidate",
+      "name": "MultiCandidateResolved.resolvedBySecondCandidate",
+      "parentSymbolId": "types-versions-multi-candidate@1.0.0::MultiCandidateResolved",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-versions-multi-candidate",
+      "filePath": "types/index.d.ts",
+      "signature": "resolvedBySecondCandidate: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

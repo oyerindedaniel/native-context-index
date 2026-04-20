@@ -1813,6 +1813,15 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
+    fn fixture_dir(fixture_name: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join(fixture_name)
+    }
+
     #[test]
     fn namespace_enum_cross_file_mergeable_matches_expectation() {
         assert!(is_namespace_or_enum_cross_file_mergeable(
@@ -1894,25 +1903,17 @@ mod tests {
 
     #[test]
     fn build_empty_package_graph() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let pkg_dir = temp_dir.path().to_path_buf();
-
-        std::fs::write(
-            pkg_dir.join("package.json"),
-            r#"{"name": "empty-pkg", "version": "1.0.0"}"#,
-        )
-        .unwrap();
-
+        let pkg_dir = fixture_dir("no-types-pkg");
         let info = PackageInfo {
-            name: "empty-pkg".to_string().into(),
+            name: "no-types-pkg".to_string().into(),
             version: "1.0.0".to_string().into(),
-            dir: normalize_path(&pkg_dir),
+            dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
         };
 
         let graph = build_package_graph(&info, None);
 
-        assert_eq!(graph.package, "empty-pkg".into());
+        assert_eq!(graph.package, "no-types-pkg".into());
         assert_eq!(graph.version, "1.0.0".into());
         assert_eq!(graph.total_symbols, 0);
         assert_eq!(graph.total_files, 0);
@@ -1920,42 +1921,28 @@ mod tests {
 
     #[test]
     fn build_graph_with_simple_exports() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let pkg_dir = temp_dir.path().to_path_buf();
-
-        std::fs::write(
-            pkg_dir.join("package.json"),
-            r#"{"name": "test-pkg", "version": "2.0.0", "types": "./index.d.ts"}"#,
-        )
-        .unwrap();
-
-        std::fs::write(
-            pkg_dir.join("index.d.ts"),
-            "export declare function greet(name: string): string;\nexport interface Config { key: string; }",
-        )
-        .unwrap();
-
+        let pkg_dir = fixture_dir("simple-export");
         let info = PackageInfo {
-            name: "test-pkg".to_string().into(),
-            version: "2.0.0".to_string().into(),
-            dir: normalize_path(&pkg_dir),
+            name: "simple-export".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
         };
 
         let graph = build_package_graph(&info, None);
 
-        assert_eq!(graph.package, "test-pkg".into());
-        assert_eq!(graph.version, "2.0.0".into());
+        assert_eq!(graph.package, "simple-export".into());
+        assert_eq!(graph.version, "1.0.0".into());
         assert!(graph.total_symbols >= 2);
 
-        let greet = graph
+        let init = graph
             .symbols
             .iter()
-            .find(|symbol| symbol.name == "greet".into());
-        assert!(greet.is_some());
-        let greet = greet.unwrap();
-        assert_eq!(greet.kind, SymbolKind::Function);
-        assert!(greet.id.starts_with("test-pkg@2.0.0::"));
+            .find(|symbol| symbol.name == "init".into());
+        assert!(init.is_some());
+        let init = init.unwrap();
+        assert_eq!(init.kind, SymbolKind::Function);
+        assert!(init.id.starts_with("simple-export@1.0.0::"));
 
         let config = graph
             .symbols
@@ -2038,48 +2025,13 @@ mod tests {
         }
     }
 
-    fn mirror_pkg_into_node_modules(pkg_root: &Path, package_name: &str) {
-        use std::fs;
-        let dest_dir = if package_name.starts_with('@') {
-            let mut parts = package_name.split('/');
-            let scope = parts.next().expect("scope");
-            let name = parts.next().expect("name");
-            assert!(parts.next().is_none());
-            pkg_root.join("node_modules").join(scope).join(name)
-        } else {
-            pkg_root.join("node_modules").join(package_name)
-        };
-        fs::create_dir_all(&dest_dir).unwrap();
-        for file in ["package.json", "index.d.ts", "inner.d.ts"] {
-            fs::copy(pkg_root.join(file), dest_dir.join(file)).unwrap();
-        }
-    }
-
     #[test]
     fn dependency_stub_self_exempt_allows_own_package_subpath_imports() {
-        use std::fs;
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let pkg = temp_dir.path();
-        fs::write(
-            pkg.join("package.json"),
-            r#"{"name":"self-stub-pkg","version":"1.0.0","types":"./index.d.ts"}"#,
-        )
-        .unwrap();
-        fs::write(
-            pkg.join("index.d.ts"),
-            "export type { Inner } from \"self-stub-pkg/inner\";\n",
-        )
-        .unwrap();
-        fs::write(
-            pkg.join("inner.d.ts"),
-            "export interface Inner { marker: true }\n",
-        )
-        .unwrap();
-        mirror_pkg_into_node_modules(pkg, "self-stub-pkg");
+        let pkg = fixture_dir("dependency-stub-self-exempt-unscoped");
         let info = PackageInfo {
             name: "self-stub-pkg".into(),
             version: "1.0.0".into(),
-            dir: normalize_path(pkg),
+            dir: normalize_path(pkg.as_path()),
             is_scoped: false,
         };
         let mut stub_roots = HashSet::new();
@@ -2279,40 +2231,11 @@ mod tests {
 
     #[test]
     fn merged_declarations_produce_unique_synthetic_ids() {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let pkg_dir = temp_dir.path().to_path_buf();
-
-        std::fs::write(
-            pkg_dir.join("package.json"),
-            r#"{"name": "merge-pkg", "version": "1.0.0", "types": "./index.d.ts"}"#,
-        )
-        .unwrap();
-
-        std::fs::write(
-            pkg_dir.join("index.d.ts"),
-            concat!(
-                "export declare class Base {\n",
-                "  shared(): void;\n",
-                "  baseOnly(): void;\n",
-                "}\n",
-                "export declare interface Trait {\n",
-                "  shared(): void;\n",
-                "  traitOnly(): void;\n",
-                "}\n",
-                "export declare interface Composite extends Trait {\n",
-                "  compositeFunc(): void;\n",
-                "}\n",
-                "export declare class Composite extends Base {\n",
-                "  ownProp: number;\n",
-                "}\n",
-            ),
-        )
-        .unwrap();
-
+        let pkg_dir = fixture_dir("multi-declaration-heritage");
         let info = PackageInfo {
-            name: "merge-pkg".to_string().into(),
+            name: "multi-declaration-heritage".to_string().into(),
             version: "1.0.0".to_string().into(),
-            dir: normalize_path(&pkg_dir),
+            dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
         };
 

@@ -1,0 +1,9 @@
+{
+  "name": "types-versions-multi-candidate",
+  "version": "1.0.0",
+  "typesVersions": {
+    ">=5.0": {
+      ".": ["./missing.d.ts", "./types/index.d.ts"]
+    }
+  }
+}

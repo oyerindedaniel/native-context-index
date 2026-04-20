@@ -206,28 +206,45 @@ pub fn package_entry_from_parsed_pkg(
         types_entries.extend(resolved);
     }
 
-    if types_entries.is_empty()
+    let should_resolve_root_fallbacks = types_entries.is_empty() || !subpaths.contains_key(".");
+
+    if should_resolve_root_fallbacks
         && let Some(types_versions) = parsed_pkg.get("typesVersions")
         && let Some(resolved) = resolve_types_versions(package_dir, types_versions)
     {
-        subpaths.insert(".".into(), resolved.clone());
-        types_entries.push(resolved);
+        if !types_entries
+            .iter()
+            .any(|entry_path| entry_path == &resolved)
+        {
+            types_entries.push(resolved.clone());
+        }
+        subpaths.insert(".".into(), resolved);
     }
 
-    if types_entries.is_empty()
+    if (types_entries.is_empty() || !subpaths.contains_key("."))
         && let Some(types_value) = parsed_pkg["types"].as_str()
         && let Some(resolved) = resolve_file(package_dir, types_value)
     {
-        subpaths.insert(".".into(), resolved.clone());
-        types_entries.push(resolved);
+        if !types_entries
+            .iter()
+            .any(|entry_path| entry_path == &resolved)
+        {
+            types_entries.push(resolved.clone());
+        }
+        subpaths.insert(".".into(), resolved);
     }
 
-    if types_entries.is_empty()
+    if (types_entries.is_empty() || !subpaths.contains_key("."))
         && let Some(typings_value) = parsed_pkg["typings"].as_str()
         && let Some(resolved) = resolve_file(package_dir, typings_value)
     {
-        subpaths.insert(".".into(), resolved.clone());
-        types_entries.push(resolved);
+        if !types_entries
+            .iter()
+            .any(|entry_path| entry_path == &resolved)
+        {
+            types_entries.push(resolved.clone());
+        }
+        subpaths.insert(".".into(), resolved);
     }
 
     if types_entries.is_empty() {
@@ -400,24 +417,43 @@ fn resolve_types_versions(
             None => continue,
         };
 
-        // Try wildcard paths first
-        if let Some(wildcard_paths) = path_map.get("*")
-            && let Some(first_pattern) = wildcard_paths.as_array().and_then(|arr| arr.first())
-            && let Some(pattern_str) = first_pattern.as_str()
+        if let Some(dot_paths) = path_map.get(".")
+            && let Some(dot_candidates) = dot_paths.as_array()
         {
-            let redirect_path = pattern_str.replace('*', "index.d.ts");
-            if let Some(resolved) = resolve_file(package_dir, &redirect_path) {
-                return Some(resolved);
+            for dot_candidate in dot_candidates {
+                if let Some(path_str) = dot_candidate.as_str()
+                    && let Some(resolved) = resolve_file(package_dir, path_str)
+                {
+                    return Some(resolved);
+                }
             }
         }
 
-        // Try dot paths
-        if let Some(dot_paths) = path_map.get(".")
-            && let Some(first_path) = dot_paths.as_array().and_then(|arr| arr.first())
-            && let Some(path_str) = first_path.as_str()
-            && let Some(resolved) = resolve_file(package_dir, path_str)
+        if let Some(wildcard_paths) = path_map.get("*")
+            && let Some(wildcard_candidates) = wildcard_paths.as_array()
         {
-            return Some(resolved);
+            for wildcard_candidate in wildcard_candidates {
+                if let Some(pattern_str) = wildcard_candidate.as_str() {
+                    let redirect_path = pattern_str.replace('*', "index");
+                    if let Some(resolved) = resolve_file(package_dir, &redirect_path) {
+                        return Some(resolved);
+                    }
+                    if !is_declaration_file(&redirect_path) {
+                        let with_dts = format!("{redirect_path}.d.ts");
+                        if let Some(resolved) = resolve_file(package_dir, &with_dts) {
+                            return Some(resolved);
+                        }
+                        let with_dmts = format!("{redirect_path}.d.mts");
+                        if let Some(resolved) = resolve_file(package_dir, &with_dmts) {
+                            return Some(resolved);
+                        }
+                        let with_dcts = format!("{redirect_path}.d.cts");
+                        if let Some(resolved) = resolve_file(package_dir, &with_dcts) {
+                            return Some(resolved);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -538,6 +574,7 @@ fn collect_wildcard_declaration_files(
 fn extract_wildcard_pattern(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::String(string_value) => Some(string_value.clone()),
+        serde_json::Value::Array(items) => items.iter().find_map(extract_wildcard_pattern),
 
         serde_json::Value::Object(condition_map) => {
             let priority_keys = ["types", "import", "require", "default"];
@@ -647,7 +684,12 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
         .parent()
         .unwrap_or_else(|| Path::new("."));
 
-    let pkg_dir = match find_package_dir(&package_name, current_dir) {
+    let mut pkg_dir = find_package_dir(&package_name, current_dir);
+    if pkg_dir.is_none() && !package_name.starts_with('@') {
+        let types_fallback_name = format!("@types/{package_name}");
+        pkg_dir = find_package_dir(&types_fallback_name, current_dir);
+    }
+    let pkg_dir = match pkg_dir {
         Some(dir) => dir,
         None => return vec![],
     };
@@ -938,25 +980,21 @@ pub(crate) fn make_relative_to_package(
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use std::fs;
     use std::path::Path;
+
+    fn fixture_dir(fixture_name: &str) -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("nci-engine lives under packages/")
+            .join("nci-core")
+            .join("fixtures")
+            .join(fixture_name)
+    }
 
     #[test]
     fn resolve_bare_package_subpath_from_nested_project() {
-        let temp = tempfile::tempdir().unwrap();
-        let ws = temp.path().join("ws");
+        let ws = fixture_dir("resolver-nested-node-modules").join("ws");
         let from_file = ws.join("pkg/dist/consumer.d.ts");
-        fs::create_dir_all(from_file.parent().unwrap()).unwrap();
-        fs::write(&from_file, "export {}\n").unwrap();
-
-        let ts_pkg = ws.join("node_modules/typescript");
-        fs::create_dir_all(ts_pkg.join("lib")).unwrap();
-        fs::write(
-            ts_pkg.join("package.json"),
-            r#"{"name":"typescript","version":"0.0.0"}"#,
-        )
-        .unwrap();
-        fs::write(ts_pkg.join("lib/tsserverlibrary.d.ts"), "export {}\n").unwrap();
 
         let paths = resolve_module_specifier(
             "typescript/lib/tsserverlibrary",
@@ -1020,37 +1058,30 @@ mod tests {
 
     #[test]
     fn resolve_export_condition_string_dts() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let dts_file = temp_dir.path().join("index.d.ts");
-        fs::write(&dts_file, "export {};").unwrap();
-
+        let fixture_path = fixture_dir("simple-export");
         let value = serde_json::json!("./index.d.ts");
-        let result = resolve_export_condition(temp_dir.path(), &value);
+        let result = resolve_export_condition(&fixture_path, &value);
         assert!(result.is_some());
     }
 
     #[test]
     fn resolve_export_condition_rejects_js() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let fixture_path = fixture_dir("simple-export");
         let value = serde_json::json!("./index.js");
-        let result = resolve_export_condition(temp_dir.path(), &value);
+        let result = resolve_export_condition(&fixture_path, &value);
         assert!(result.is_none());
     }
 
     #[test]
     fn resolve_export_condition_nested_types() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let dts_file = temp_dir.path().join("dist").join("index.d.ts");
-        fs::create_dir_all(dts_file.parent().unwrap()).unwrap();
-        fs::write(&dts_file, "export {};").unwrap();
-
+        let fixture_path = fixture_dir("export-condition-nested-types");
         let value = serde_json::json!({
             "types": "./dist/index.d.ts",
             "import": "./dist/index.mjs",
             "default": "./dist/index.js"
         });
 
-        let result = resolve_export_condition(temp_dir.path(), &value);
+        let result = resolve_export_condition(&fixture_path, &value);
         assert!(result.is_some());
         assert!(result.unwrap().contains("index.d.ts"));
     }
@@ -1059,65 +1090,88 @@ mod tests {
 
     #[test]
     fn resolve_types_entry_from_types_field() {
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        fs::write(
-            temp_dir.path().join("package.json"),
-            serde_json::to_string(&serde_json::json!({
-                "name": "test-pkg",
-                "version": "1.0.0",
-                "types": "./index.d.ts"
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-
-        fs::write(temp_dir.path().join("index.d.ts"), "export {};").unwrap();
-
-        let entry = resolve_types_entry(temp_dir.path()).unwrap();
-        assert_eq!(entry.name, "test-pkg".into());
+        let fixture_path = fixture_dir("simple-export");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(entry.name, "simple-export".into());
         assert_eq!(entry.types_entries.len(), 1);
         assert!(entry.types_entries[0].contains("index.d.ts"));
     }
 
     #[test]
     fn resolve_types_entry_fallback_to_index_dts() {
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        fs::write(
-            temp_dir.path().join("package.json"),
-            serde_json::to_string(&serde_json::json!({
-                "name": "bare-pkg",
-                "version": "1.0.0"
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-
-        fs::write(temp_dir.path().join("index.d.ts"), "export {};").unwrap();
-
-        let entry = resolve_types_entry(temp_dir.path()).unwrap();
+        let fixture_path = fixture_dir("fallback-index-types");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
         assert_eq!(entry.types_entries.len(), 1);
         assert!(entry.types_entries[0].contains("index.d.ts"));
     }
 
     #[test]
     fn resolve_types_entry_works_without_pkg_json() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let result = resolve_types_entry(temp_dir.path());
+        let fixture_path = fixture_dir("no-package-json-dir");
+        let result = resolve_types_entry(&fixture_path);
         assert!(result.is_ok());
         let entry = result.unwrap();
         assert_eq!(
             entry.name,
-            SharedString::from(
-                temp_dir
-                    .path()
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .as_ref()
-            )
+            SharedString::from(fixture_path.file_name().unwrap().to_string_lossy().as_ref())
         );
+    }
+
+    #[test]
+    fn resolve_types_entry_includes_root_types_when_exports_only_lists_subpath() {
+        let fixture_path = fixture_dir("exports-plus-types-root");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(
+            entry.types_entries.len(),
+            2,
+            "expected both root types and exports subpath entries"
+        );
+        assert!(entry.types_entries.iter().any(|entry_path| {
+            entry_path
+                .as_ref()
+                .replace('\\', "/")
+                .ends_with("index.d.ts")
+        }));
+        assert!(entry.types_entries.iter().any(|entry_path| {
+            entry_path
+                .as_ref()
+                .replace('\\', "/")
+                .ends_with("utils.d.ts")
+        }));
+    }
+
+    #[test]
+    fn resolve_types_entry_types_versions_tries_later_dot_candidates() {
+        let fixture_path = fixture_dir("types-versions-multi-candidate");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(entry.types_entries.len(), 1);
+        assert!(
+            entry.types_entries[0].contains("types/index.d.ts"),
+            "expected resolver to continue to second typesVersions candidate"
+        );
+    }
+
+    #[test]
+    fn resolve_types_entry_supports_wildcard_exports_in_array_conditions() {
+        let fixture_path = fixture_dir("exports-wildcard-array-types");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(
+            entry.types_entries.len(),
+            2,
+            "expected wildcard export array branch to collect all declaration files"
+        );
+        assert!(entry.types_entries.iter().any(|entry_path| {
+            entry_path
+                .as_ref()
+                .replace('\\', "/")
+                .ends_with("dist/alpha.d.ts")
+        }));
+        assert!(entry.types_entries.iter().any(|entry_path| {
+            entry_path
+                .as_ref()
+                .replace('\\', "/")
+                .ends_with("dist/beta.d.ts")
+        }));
     }
 
     // ─── npm_package_root tests ───────────────────────────────
@@ -1295,23 +1349,8 @@ mod tests {
 
     #[test]
     fn exports_wildcard_subpath_collects_only_matching_declaration_files() {
-        let temp = tempfile::tempdir().unwrap();
-        let pkg = temp.path();
-        fs::write(
-            pkg.join("package.json"),
-            r#"{"name":"w","version":"1.0.0","exports":{"./lib/*":{"types":"./typings/*.d.ts"}}}"#,
-        )
-        .unwrap();
-        let typings = pkg.join("typings");
-        fs::create_dir_all(&typings).unwrap();
-        fs::write(typings.join("a.d.ts"), "export const a = 1;").unwrap();
-        fs::write(typings.join("b.d.ts"), "export const b = 1;").unwrap();
-        fs::write(typings.join("skipped.ts"), "").unwrap();
-        for noise_file_index in 0..15u8 {
-            fs::write(typings.join(format!("extra{noise_file_index}.js")), "").unwrap();
-        }
-
-        let entry = resolve_types_entry(pkg).unwrap();
+        let fixture_path = fixture_dir("exports-wildcard-noise");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
         let mut paths: Vec<&str> = entry
             .types_entries
             .iter()
@@ -1320,5 +1359,48 @@ mod tests {
         paths.sort();
         assert_eq!(paths.len(), 2, "expected two .d.ts matches, got {paths:?}");
         assert!(paths.iter().all(|entry_path| entry_path.ends_with(".d.ts")));
+    }
+
+    #[test]
+    fn resolve_module_specifier_falls_back_to_types_package_for_unscoped_bare_import() {
+        let fixture_path = fixture_dir("bare-to-types-fallback");
+        let from_file = fixture_path.join("index.d.ts");
+        let resolved_paths =
+            resolve_module_specifier("routing-core-types", from_file.to_str().unwrap());
+
+        assert!(
+            resolved_paths.iter().any(|resolved_path| {
+                resolved_path
+                    .as_ref()
+                    .replace('\\', "/")
+                    .contains("node_modules/@types/routing-core-types/index.d.ts")
+            }),
+            "expected @types fallback resolution, got {resolved_paths:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_module_specifier_prefers_direct_package_over_types_fallback() {
+        let fixture_path = fixture_dir("bare-to-types-fallback-prefer-direct");
+        let from_file = fixture_path.join("index.d.ts");
+        let resolved_paths =
+            resolve_module_specifier("routing-core-types", from_file.to_str().unwrap());
+
+        assert!(
+            resolved_paths.iter().any(|resolved_path| {
+                resolved_path
+                    .as_ref()
+                    .replace('\\', "/")
+                    .contains("node_modules/routing-core-types/index.d.ts")
+            }),
+            "expected direct package resolution, got {resolved_paths:?}"
+        );
+        assert!(
+            resolved_paths.iter().all(|resolved_path| !resolved_path
+                .as_ref()
+                .replace('\\', "/")
+                .contains("node_modules/@types/routing-core-types/index.d.ts")),
+            "direct package should win over @types fallback, got {resolved_paths:?}"
+        );
     }
 }

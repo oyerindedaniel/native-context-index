@@ -433,6 +433,32 @@ describe("buildPackageGraph", () => {
     expect(names).not.toContain("LegacyConfig");
   });
 
+  it("keeps root types entry when exports only declares subpath types", () => {
+    const graph = buildPackageGraph(makePackageInfo("exports-plus-types-root"));
+    const names = graph.symbols.map((symbolNode) => symbolNode.name);
+    expect(names).toContain("RootSurface");
+    expect(names).toContain("UtilitySurface");
+    expect(graph.totalFiles).toBe(2);
+  });
+
+  it("resolves later dot candidates in typesVersions arrays", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("types-versions-multi-candidate"),
+    );
+    const names = graph.symbols.map((symbolNode) => symbolNode.name);
+    expect(names).toContain("MultiCandidateResolved");
+  });
+
+  it("collects wildcard declaration files from array export branches", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("exports-wildcard-array-types"),
+    );
+    const names = graph.symbols.map((symbolNode) => symbolNode.name);
+    expect(names).toContain("AlphaFeature");
+    expect(names).toContain("BetaFeature");
+    expect(graph.totalFiles).toBe(2);
+  });
+
   it("merges symbols from all subpath exports without duplicates", () => {
     const graph = buildPackageGraph(makePackageInfo("subpath-exports"));
 
@@ -504,6 +530,71 @@ describe("buildPackageGraph", () => {
 
     const tsNode = graph.symbols.find((symbol) => symbol.name === "ts.Node");
     expect(tsNode?.signature).toContain("interface Node");
+  });
+
+  it("handles function plus namespace with export equals patterns", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("dt-express-function-namespace-export-equals"),
+    );
+    const appFunction = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "app" &&
+        symbolNode.kindName === "FunctionDeclaration",
+    );
+    const appNamespace = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "app" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+    const appExportAssignment = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.kindName === "ExportAssignment" && symbolNode.name === "app",
+    );
+    const appInstance = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "app.AppInstance",
+    );
+    const appGet = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "app.AppInstance.get",
+    );
+    expect(appFunction).toBeDefined();
+    expect(appNamespace).toBeDefined();
+    expect(appExportAssignment).toBeDefined();
+    expect(appInstance?.parentSymbolId).toBe(appNamespace?.id);
+    expect(appGet?.parentSymbolId).toBe(appInstance?.id);
+  });
+
+  it("falls back from bare import to @types package when direct package is missing", () => {
+    const graph = buildPackageGraph(makePackageInfo("bare-to-types-fallback"));
+    const names = graph.symbols.map((symbolNode) => symbolNode.name);
+    expect(names).toContain("CoreRequest");
+    expect(graph.totalFiles).toBe(2);
+    expect(
+      graph.symbols.some((symbolNode) =>
+        symbolNode.filePath.includes(
+          "node_modules/@types/routing-core-types/index.d.ts",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("prefers direct package over @types fallback for bare imports", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("bare-to-types-fallback-prefer-direct"),
+    );
+    expect(
+      graph.symbols.some((symbolNode) =>
+        symbolNode.filePath.includes(
+          "node_modules/routing-core-types/index.d.ts",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      graph.symbols.some((symbolNode) =>
+        symbolNode.filePath.includes(
+          "node_modules/@types/routing-core-types/index.d.ts",
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("resolves local re-exports to their definitions", () => {

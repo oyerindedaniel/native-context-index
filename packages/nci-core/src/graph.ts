@@ -255,7 +255,6 @@ export function buildPackageGraph(
     kind === ts.SyntaxKind.CallSignature ||
     kind === ts.SyntaxKind.IndexSignature;
 
-
   function upsertMergeProvenance(
     existing: SymbolNode,
     contributionPath: ContributionMergePath,

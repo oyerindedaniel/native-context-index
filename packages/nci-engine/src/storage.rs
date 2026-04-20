@@ -1425,7 +1425,7 @@ mod tests {
             Some("v4.5.6")
         );
         match loaded.symbols[0].deprecated.as_ref() {
-            Some(Deprecation::Message(m)) => assert_eq!(m.as_ref(), "use other"),
+            Some(Deprecation::Message(message)) => assert_eq!(message.as_ref(), "use other"),
             other => panic!("expected deprecated message, got {other:?}"),
         }
         assert_eq!(

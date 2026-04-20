@@ -6,9 +6,7 @@ import { NODE_BUILTINS } from "./constants.js";
 
 /**
  * Resolves the types entry point(s) for a package given its directory.
- *
- * @param packageDir - Absolute path to the package directory
- * @returns PackageEntry with all resolved .d.ts paths
+
  */
 export function resolveTypesEntry(packageDir: string): PackageEntry {
   const pkgJsonPath = path.join(packageDir, "package.json");
@@ -26,29 +24,41 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     typesEntries.push(...resolved);
   }
 
+  const shouldResolveRootFallbacks =
+    typesEntries.length === 0 || subpaths["."] === undefined;
+
   // 2. typesVersions (TypeScript version-specific mappings)
-  if (typesEntries.length === 0 && pkg.typesVersions) {
+  if (shouldResolveRootFallbacks && pkg.typesVersions) {
     const resolved = resolveTypesVersions(packageDir, pkg.typesVersions);
     if (resolved) {
-      typesEntries.push(resolved);
+      if (!typesEntries.includes(resolved)) {
+        typesEntries.push(resolved);
+      }
       subpaths["."] = resolved;
     }
   }
 
   // 3. types field (Standard TS field)
-  if (typesEntries.length === 0 && pkg.types) {
+  if ((typesEntries.length === 0 || subpaths["."] === undefined) && pkg.types) {
     const resolved = resolveFile(packageDir, pkg.types);
     if (resolved) {
-      typesEntries.push(resolved);
+      if (!typesEntries.includes(resolved)) {
+        typesEntries.push(resolved);
+      }
       subpaths["."] = resolved;
     }
   }
 
   // 4. typings field (Legacy TS field)
-  if (typesEntries.length === 0 && pkg.typings) {
+  if (
+    (typesEntries.length === 0 || subpaths["."] === undefined) &&
+    pkg.typings
+  ) {
     const resolved = resolveFile(packageDir, pkg.typings);
     if (resolved) {
-      typesEntries.push(resolved);
+      if (!typesEntries.includes(resolved)) {
+        typesEntries.push(resolved);
+      }
       subpaths["."] = resolved;
     }
   }
@@ -238,18 +248,33 @@ function resolveTypesVersions(
 
   for (const [versionRange, pathMap] of Object.entries(typesVersions)) {
     if (matchesVersionRange(currentVersion, versionRange)) {
-      const wildcardPaths = pathMap["*"];
-      if (wildcardPaths && wildcardPaths.length > 0) {
-        const redirectPattern = wildcardPaths[0]!;
-        const redirectPath = redirectPattern.replace("*", "index.d.ts");
-        const resolved = resolveFile(packageDir, redirectPath);
-        if (resolved) return resolved;
-      }
-
       const dotPaths = pathMap["."];
       if (dotPaths && dotPaths.length > 0) {
-        const resolved = resolveFile(packageDir, dotPaths[0]!);
-        if (resolved) return resolved;
+        for (const dotPath of dotPaths) {
+          const resolved = resolveFile(packageDir, dotPath);
+          if (resolved) return resolved;
+        }
+      }
+
+      const wildcardPaths = pathMap["*"];
+      if (wildcardPaths && wildcardPaths.length > 0) {
+        for (const wildcardPath of wildcardPaths) {
+          const redirectPath = wildcardPath.replace("*", "index");
+          const resolved = resolveFile(packageDir, redirectPath);
+          if (resolved) return resolved;
+          const hasDeclarationExt =
+            redirectPath.endsWith(".d.ts") ||
+            redirectPath.endsWith(".d.mts") ||
+            redirectPath.endsWith(".d.cts");
+          if (!hasDeclarationExt) {
+            const withDts = resolveFile(packageDir, `${redirectPath}.d.ts`);
+            if (withDts) return withDts;
+            const withDmts = resolveFile(packageDir, `${redirectPath}.d.mts`);
+            if (withDmts) return withDmts;
+            const withDcts = resolveFile(packageDir, `${redirectPath}.d.cts`);
+            if (withDcts) return withDcts;
+          }
+        }
       }
     }
   }
@@ -392,6 +417,13 @@ function scanDirectoryRecursive(dir: string): string[] {
  */
 function extractWildcardPattern(value: unknown): string | null {
   if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractWildcardPattern(item);
+      if (found) return found;
+    }
+    return null;
+  }
   if (typeof value !== "object" || value === null) return null;
 
   const obj = value as Record<string, unknown>;
@@ -473,7 +505,10 @@ function resolvePackageEntry(specifier: string, currentFile: string): string[] {
     subpath = parts.length > 1 ? `./${parts.slice(1).join("/")}` : ".";
   }
 
-  const pkgDir = findPackageDir(packageName, path.dirname(currentFile));
+  let pkgDir = findPackageDir(packageName, path.dirname(currentFile));
+  if (!pkgDir && !packageName.startsWith("@")) {
+    pkgDir = findPackageDir(`@types/${packageName}`, path.dirname(currentFile));
+  }
   if (!pkgDir) return [];
 
   const pkgJsonPath = path.join(pkgDir, "package.json");
