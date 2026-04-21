@@ -3290,7 +3290,7 @@ mod tests {
             .map(|type_ref| type_ref.name.as_ref())
             .collect();
         assert!(
-            dep_names.iter().any(|name| *name == "boundAlias.RemoteBase"),
+            dep_names.contains(&"boundAlias.RemoteBase"),
             "qualified extends must appear as a single dotted name in raw type refs: {:?}",
             dep_names
         );

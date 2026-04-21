@@ -714,24 +714,21 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
     };
 
     // Unscoped install: if `package.json` exposes no declaration entry points, try the matching DefinitelyTyped package.
-    if !package_name.starts_with('@') && pkg_entry.types_entries.is_empty() {
-        if let Some(types_pkg_dir) = find_package_dir(&format!("@types/{package_name}"), current_dir)
+    if !package_name.starts_with('@')
+        && pkg_entry.types_entries.is_empty()
+        && let Some(types_pkg_dir) =
+            find_package_dir(&format!("@types/{package_name}"), current_dir)
+    {
+        let alt_json = types_pkg_dir.join("package.json");
+        if alt_json.exists()
+            && let Ok(raw_alt) = fs::read_to_string(&alt_json)
+            && let Ok(parsed_alt) = serde_json::from_str::<serde_json::Value>(&raw_alt)
+            && let Ok(entry_alt) = package_entry_from_parsed_pkg(&types_pkg_dir, &parsed_alt)
+            && !entry_alt.types_entries.is_empty()
         {
-            let alt_json = types_pkg_dir.join("package.json");
-            if alt_json.exists() {
-                if let Ok(raw_alt) = fs::read_to_string(&alt_json) {
-                    if let Ok(parsed_alt) = serde_json::from_str::<serde_json::Value>(&raw_alt) {
-                        if let Ok(entry_alt) =
-                            package_entry_from_parsed_pkg(&types_pkg_dir, &parsed_alt)
-                            && !entry_alt.types_entries.is_empty()
-                        {
-                            pkg_dir = types_pkg_dir;
-                            parsed_pkg = parsed_alt;
-                            pkg_entry = entry_alt;
-                        }
-                    }
-                }
-            }
+            pkg_dir = types_pkg_dir;
+            parsed_pkg = parsed_alt;
+            pkg_entry = entry_alt;
         }
     }
 
@@ -1434,7 +1431,8 @@ mod tests {
             ("runtime-no-types-alpha", "@types/runtime-no-types-alpha"),
             ("runtime-no-types-beta", "@types/runtime-no-types-beta"),
         ] {
-            let resolved_paths = resolve_module_specifier(import_specifier, from_file.to_str().unwrap());
+            let resolved_paths =
+                resolve_module_specifier(import_specifier, from_file.to_str().unwrap());
             assert!(
                 !resolved_paths.is_empty(),
                 "{import_specifier}: expected at least one declaration path"
@@ -1449,5 +1447,4 @@ mod tests {
             );
         }
     }
-
 }

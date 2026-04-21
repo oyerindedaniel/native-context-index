@@ -12,8 +12,8 @@ use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
 use crate::resolver::{
-    make_relative_to_package, normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
-    specifier_is_dependency_stub,
+    make_relative_to_package, normalize_path, normalize_path_with_dashmap,
+    resolve_module_specifier, specifier_is_dependency_stub,
 };
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,

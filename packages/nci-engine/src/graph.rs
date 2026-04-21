@@ -1295,7 +1295,7 @@ pub fn build_package_graph(
                     protocol_regex,
                     dependency_stub_roots_ref,
                     stub_self_exempt_for_resolve,
-                    &rel_to_abs,
+                    rel_to_abs,
                 );
                 (symbol_index, deps)
             })
@@ -1325,7 +1325,7 @@ pub fn build_package_graph(
                 protocol_regex,
                 dependency_stub_roots_ref,
                 stub_self_exempt_for_resolve,
-                &rel_to_abs,
+                rel_to_abs,
             );
             symbol_node.dependencies = SharedVec::from(deps);
             symbol_node.raw_dependencies.clear();
@@ -2513,14 +2513,12 @@ mod tests {
         );
         let targets_container = root_contract.dependencies.iter().any(|edge| {
             let edge_str = edge.as_ref();
-            edge_str.contains("shared-contracts")
-                && edge_str.ends_with("::ContainerContract")
+            edge_str.contains("shared-contracts") && edge_str.ends_with("::ContainerContract")
         });
         assert!(
             targets_container,
             "expected dependency to shared-contracts ContainerContract; heritage={:?} deps={:?}",
-            root_contract.heritage,
-            root_contract.dependencies
+            root_contract.heritage, root_contract.dependencies
         );
     }
 
