@@ -499,6 +499,10 @@ snapshot_test!(
     snapshot_bare_to_types_fallback_multi_imports,
     "bare-to-types-fallback-multi-imports"
 );
+snapshot_test!(
+    snapshot_types_fallback_export_equals_namespace,
+    "types-fallback-export-equals-namespace"
+);
 
 #[test]
 fn all_oracles_have_tests() {

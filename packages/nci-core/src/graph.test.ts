@@ -597,6 +597,41 @@ describe("buildPackageGraph", () => {
     ).toBe(false);
   });
 
+  it("resolves import-type members from fallback packages that use export-equals namespace", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("types-fallback-export-equals-namespace"),
+    );
+    const queryWrapper = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "QueryWrapper",
+    );
+    const sendWrapper = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "SendWrapper",
+    );
+
+    expect(queryWrapper).toBeDefined();
+    expect(sendWrapper).toBeDefined();
+    expect(
+      queryWrapper!.dependencies.some((dependencyId) =>
+        dependencyId.startsWith("npm::"),
+      ),
+    ).toBe(false);
+    expect(
+      sendWrapper!.dependencies.some((dependencyId) =>
+        dependencyId.startsWith("npm::"),
+      ),
+    ).toBe(false);
+    expect(
+      queryWrapper!.dependencies.some((dependencyId) =>
+        dependencyId.includes("ParseShape"),
+      ),
+    ).toBe(true);
+    expect(
+      sendWrapper!.dependencies.some((dependencyId) =>
+        dependencyId.includes("TransferOptions"),
+      ),
+    ).toBe(true);
+  });
+
   it("resolves local re-exports to their definitions", () => {
     const graph = buildPackageGraph(makePackageInfo("local-reexport"));
 

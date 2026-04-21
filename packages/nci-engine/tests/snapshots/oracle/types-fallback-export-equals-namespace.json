@@ -1,0 +1,191 @@
+{
+  "package": "types-fallback-export-equals-namespace",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::QueryWrapper",
+      "name": "QueryWrapper",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "index.d.ts",
+      "signature": "export interface QueryWrapper {\n  query: ParseShape;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::QueryWrapper.query",
+      "name": "QueryWrapper.query",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "index.d.ts",
+      "signature": "query: ParseShape;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::QueryWrapper"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::SendWrapper",
+      "name": "SendWrapper",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "index.d.ts",
+      "signature": "export interface SendWrapper extends TransferOptions {\n  headers?: Record<string, unknown>;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "TransferOptions"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::SendWrapper.headers",
+      "name": "SendWrapper.headers",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "index.d.ts",
+      "signature": "headers?: Record<string, unknown>;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::SendWrapper"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace",
+      "name": "AlphaNamespace",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "export = AlphaNamespace;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2",
+      "name": "AlphaNamespace",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "declare namespace AlphaNamespace {\n  interface ParseShape {\n    mode: \"parsed\";\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape",
+      "name": "AlphaNamespace.ParseShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "interface ParseShape {\n    mode: \"parsed\";\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape.mode",
+      "name": "AlphaNamespace.ParseShape.mode",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "mode: \"parsed\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace",
+      "name": "BetaNamespace",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "export = BetaNamespace;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2",
+      "name": "BetaNamespace",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "declare namespace BetaNamespace {\n  interface TransferOptions {\n    strategy: \"stream\";\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions",
+      "name": "BetaNamespace.TransferOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "interface TransferOptions {\n    strategy: \"stream\";\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions.strategy",
+      "name": "BetaNamespace.TransferOptions.strategy",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "strategy: \"stream\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2"
+    }
+  ],
+  "totalSymbols": 12,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

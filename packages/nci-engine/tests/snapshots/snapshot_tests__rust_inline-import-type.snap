@@ -161,7 +161,9 @@ expression: "& rust_graph"
       "jsDoc": "Qualified `import()` chains (nested namespaces / interface).",
       "isTypeOnly": true,
       "symbolSpace": "type",
-      "dependencies": [],
+      "dependencies": [
+        "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

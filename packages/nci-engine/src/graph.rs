@@ -531,6 +531,7 @@ fn resolve_dependency_ids_for_symbol(
     module_specifier_cache: &DashMap<(SharedString, SharedString), Vec<SharedString>>,
     closure_cache: &DashMap<SharedString, Vec<SharedString>>,
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    file_local_member_tail_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     name_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     id_to_file_path: &HashMap<SharedString, SharedString>,
     import_maps_per_file: &HashMap<SharedString, HashMap<SharedString, ParsedImport>>,
@@ -626,6 +627,14 @@ fn resolve_dependency_ids_for_symbol(
                     for symbol_id in ids {
                         import_path_dedup.insert(symbol_id.clone());
                     }
+                } else {
+                    let member_tail_key: SharedString =
+                        format!("{}::.{}", rel_path, raw_dep.name.as_ref()).into();
+                    if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                        for symbol_id in ids {
+                            import_path_dedup.insert(symbol_id.clone());
+                        }
+                    }
                 }
             }
             target_ids.extend(import_path_dedup.drain());
@@ -671,6 +680,12 @@ fn resolve_dependency_ids_for_symbol(
                         format!("{}::{}", rel_source_path, original_name).into();
                     if let Some(ids) = file_local_to_ids.get(&import_key) {
                         target_ids.extend(ids.iter().cloned());
+                    } else {
+                        let member_tail_key: SharedString =
+                            format!("{}::.{}", rel_source_path, original_name).into();
+                        if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                            target_ids.extend(ids.iter().cloned());
+                        }
                     }
                 }
             }
@@ -1138,6 +1153,8 @@ pub fn build_package_graph(
     let mut name_to_ids: HashMap<SharedString, Vec<SharedString>> = HashMap::with_capacity(sym_cap);
     let mut file_local_to_ids: HashMap<SharedString, Vec<SharedString>> =
         HashMap::with_capacity(sym_cap);
+    let mut file_local_member_tail_to_ids: HashMap<SharedString, Vec<SharedString>> =
+        HashMap::with_capacity(sym_cap);
     let mut file_local_namespace_ids: HashMap<SharedString, Vec<SharedString>> =
         HashMap::with_capacity(sym_cap);
     let mut name_count: HashMap<SharedString, usize> = HashMap::with_capacity(sym_cap);
@@ -1196,6 +1213,14 @@ pub fn build_package_graph(
             .entry(short_key.clone())
             .or_default()
             .push(symbol_node.id.clone());
+        if let Some((_, tail)) = symbol_node.name.rsplit_once('.') {
+            let member_tail_key: SharedString =
+                format!("{}::.{}", symbol_node.file_path, tail).into();
+            file_local_member_tail_to_ids
+                .entry(member_tail_key)
+                .or_default()
+                .push(symbol_node.id.clone());
+        }
         if matches!(symbol_node.kind, SymbolKind::Namespace) {
             file_local_namespace_ids
                 .entry(short_key)
@@ -1287,6 +1312,7 @@ pub fn build_package_graph(
                     &module_specifier_cache,
                     &closure_cache,
                     &file_local_to_ids,
+                    &file_local_member_tail_to_ids,
                     &name_to_ids,
                     &id_to_file_path,
                     &import_maps_per_file,
@@ -1317,6 +1343,7 @@ pub fn build_package_graph(
                 &module_specifier_cache,
                 &closure_cache,
                 &file_local_to_ids,
+                &file_local_member_tail_to_ids,
                 &name_to_ids,
                 &id_to_file_path,
                 &import_maps_per_file,
@@ -1935,6 +1962,57 @@ mod tests {
             .find(|symbol| symbol.name == "Config".into());
         assert!(config.is_some());
         assert_eq!(config.unwrap().kind, SymbolKind::Interface);
+    }
+
+    #[test]
+    fn resolves_import_type_members_from_fallback_packages_with_export_equals_namespace() {
+        let pkg_dir = fixture_dir("types-fallback-export-equals-namespace");
+        let info = PackageInfo {
+            name: "types-fallback-export-equals-namespace".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let query_wrapper = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "QueryWrapper")
+            .expect("QueryWrapper symbol");
+        let send_wrapper = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "SendWrapper")
+            .expect("SendWrapper symbol");
+
+        assert!(
+            query_wrapper
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().starts_with("npm::")),
+            "QueryWrapper should resolve ParseShape in-graph: {:?}",
+            query_wrapper.dependencies
+        );
+        assert!(
+            send_wrapper
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().starts_with("npm::")),
+            "SendWrapper should resolve TransferOptions in-graph: {:?}",
+            send_wrapper.dependencies
+        );
+        assert!(
+            query_wrapper
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().contains("ParseShape"))
+        );
+        assert!(
+            send_wrapper
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().contains("TransferOptions"))
+        );
     }
 
     #[test]

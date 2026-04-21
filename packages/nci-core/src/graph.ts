@@ -527,6 +527,8 @@ export function buildPackageGraph(
   const nameToIds = new Map<string, string[]>();
   /** `filePath::name` → ids (all overloads in that file-local scope). */
   const fileLocalToIds = new Map<string, string[]>();
+  /** `filePath::.<memberTail>` → ids (e.g. `ns.Member` maps under `.<memberTail>`). */
+  const fileLocalMemberTailToIds = new Map<string, string[]>();
   const nameCount = new Map<string, number>();
   const internalFileNameCount = new Map<string, number>();
 
@@ -553,6 +555,15 @@ export function buildPackageGraph(
     const existingShort = fileLocalToIds.get(shortKey) || [];
     existingShort.push(symbolNode.id);
     fileLocalToIds.set(shortKey, existingShort);
+    const tailSeparator = symbolNode.name.lastIndexOf(".");
+    if (tailSeparator > 0 && tailSeparator < symbolNode.name.length - 1) {
+      const memberTail = symbolNode.name.slice(tailSeparator + 1);
+      const memberTailKey = `${symbolNode.filePath}::.${memberTail}`;
+      const existingMemberTail =
+        fileLocalMemberTailToIds.get(memberTailKey) || [];
+      existingMemberTail.push(symbolNode.id);
+      fileLocalMemberTailToIds.set(memberTailKey, existingMemberTail);
+    }
 
     const existingByName = nameToIds.get(symbolNode.name) || [];
     existingByName.push(symbolNode.id);
@@ -819,9 +830,11 @@ export function buildPackageGraph(
           importPathIdDedup.clear();
           for (const absPath of absPaths) {
             const relPath = makePackageRelativePath(absPath, packageInfo.dir);
-            for (const symbolId of fileLocalToIds.get(
-              `${relPath}::${rawDep.name}`,
-            ) || []) {
+            const exactIds =
+              fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
+            const memberTailIds =
+              fileLocalMemberTailToIds.get(`${relPath}::.${rawDep.name}`) || [];
+            for (const symbolId of [...exactIds, ...memberTailIds]) {
               importPathIdDedup.add(symbolId);
             }
           }
@@ -855,7 +868,11 @@ export function buildPackageGraph(
                 );
                 const originalName = matchingImport.originalName || rawDep.name;
                 targetIds =
-                  fileLocalToIds.get(`${relSourcePath}::${originalName}`) || [];
+                  fileLocalToIds.get(`${relSourcePath}::${originalName}`) ||
+                  fileLocalMemberTailToIds.get(
+                    `${relSourcePath}::.${originalName}`,
+                  ) ||
+                  [];
               }
             }
           }
