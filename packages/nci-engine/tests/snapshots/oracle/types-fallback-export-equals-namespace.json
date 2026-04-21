@@ -74,19 +74,6 @@
     {
       "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace",
       "name": "AlphaNamespace",
-      "kind": 278,
-      "kindName": "ExportAssignment",
-      "package": "types-fallback-export-equals-namespace",
-      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
-      "signature": "export = AlphaNamespace;",
-      "isTypeOnly": false,
-      "symbolSpace": "value",
-      "dependencies": [],
-      "isInternal": true
-    },
-    {
-      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2",
-      "name": "AlphaNamespace",
       "kind": 268,
       "kindName": "ModuleDeclaration",
       "package": "types-fallback-export-equals-namespace",
@@ -109,8 +96,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2",
-      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2"
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace"
     },
     {
       "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape.mode",
@@ -125,23 +112,23 @@
       "dependencies": [],
       "isInternal": true,
       "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape",
-      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2"
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace"
     },
     {
-      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace",
-      "name": "BetaNamespace",
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace#2",
+      "name": "AlphaNamespace",
       "kind": 278,
       "kindName": "ExportAssignment",
       "package": "types-fallback-export-equals-namespace",
-      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
-      "signature": "export = BetaNamespace;",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "export = AlphaNamespace;",
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
       "isInternal": true
     },
     {
-      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2",
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace",
       "name": "BetaNamespace",
       "kind": 268,
       "kindName": "ModuleDeclaration",
@@ -165,8 +152,8 @@
       "symbolSpace": "type",
       "dependencies": [],
       "isInternal": true,
-      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2",
-      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2"
+      "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace",
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace"
     },
     {
       "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions.strategy",
@@ -181,7 +168,20 @@
       "dependencies": [],
       "isInternal": true,
       "parentSymbolId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions",
-      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2"
+      "enclosingModuleDeclarationId": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace"
+    },
+    {
+      "id": "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace#2",
+      "name": "BetaNamespace",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "types-fallback-export-equals-namespace",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "export = BetaNamespace;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
     }
   ],
   "totalSymbols": 12,
