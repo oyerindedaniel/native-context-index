@@ -1,0 +1,86 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "namespace-import-qualified-extends",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-import-qualified-extends@1.0.0::AppSurface",
+      "name": "AppSurface",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-import-qualified-extends",
+      "filePath": "index.d.ts",
+      "signature": "export declare namespace AppSurface {\n  export interface RootContract extends sharedContracts.ContainerContract {}\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-import-qualified-extends@1.0.0::AppSurface.RootContract",
+      "name": "AppSurface.RootContract",
+      "parentSymbolId": "namespace-import-qualified-extends@1.0.0::AppSurface",
+      "enclosingModuleDeclarationId": "namespace-import-qualified-extends@1.0.0::AppSurface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-import-qualified-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface RootContract extends sharedContracts.ContainerContract {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "sharedContracts.ContainerContract"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract",
+      "name": "ContainerContract",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-import-qualified-extends",
+      "filePath": "shared-contracts.d.ts",
+      "signature": "export interface ContainerContract {\n  initialize(): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract.initialize",
+      "name": "ContainerContract.initialize",
+      "parentSymbolId": "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "namespace-import-qualified-extends",
+      "filePath": "shared-contracts.d.ts",
+      "signature": "initialize(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

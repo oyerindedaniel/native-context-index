@@ -1,0 +1,90 @@
+{
+  "package": "cross-package-interface-extends",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "cross-package-interface-extends@1.0.0::ExtendedOptions",
+      "name": "ExtendedOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "cross-package-interface-extends",
+      "filePath": "index.d.ts",
+      "signature": "export interface ExtendedOptions extends BaseOptions {\n  timeoutMs?: number;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "cross-package-interface-extends@1.0.0::node_modules/external-options-shim/index.d.ts::BaseOptions"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "BaseOptions"
+      ],
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "cross-package-interface-extends@1.0.0::ExtendedOptions.timeoutMs",
+      "name": "ExtendedOptions.timeoutMs",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "cross-package-interface-extends",
+      "filePath": "index.d.ts",
+      "signature": "timeoutMs?: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "cross-package-interface-extends@1.0.0::ExtendedOptions"
+    },
+    {
+      "id": "cross-package-interface-extends@1.0.0::node_modules/external-options-shim/index.d.ts::BaseOptions",
+      "name": "BaseOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "cross-package-interface-extends",
+      "filePath": "node_modules/external-options-shim/index.d.ts",
+      "signature": "export interface BaseOptions {\n  root?: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "cross-package-interface-extends@1.0.0::node_modules/external-options-shim/index.d.ts::BaseOptions.root",
+      "name": "BaseOptions.root",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "cross-package-interface-extends",
+      "filePath": "node_modules/external-options-shim/index.d.ts",
+      "signature": "root?: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "cross-package-interface-extends@1.0.0::node_modules/external-options-shim/index.d.ts::BaseOptions"
+    },
+    {
+      "id": "cross-package-interface-extends@1.0.0::ExtendedOptions.root",
+      "name": "ExtendedOptions.root",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "cross-package-interface-extends",
+      "filePath": "node_modules/external-options-shim/index.d.ts",
+      "signature": "root?: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "cross-package-interface-extends@1.0.0::node_modules/external-options-shim/index.d.ts::BaseOptions.root"
+      ],
+      "parentSymbolId": "cross-package-interface-extends@1.0.0::ExtendedOptions"
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

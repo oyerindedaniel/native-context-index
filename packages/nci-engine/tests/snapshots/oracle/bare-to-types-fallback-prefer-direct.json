@@ -1,0 +1,71 @@
+{
+  "package": "bare-to-types-fallback-prefer-direct",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "bare-to-types-fallback-prefer-direct@1.0.0::UsesCore",
+      "name": "UsesCore",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback-prefer-direct",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesCore {\n  req: CoreRequest;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback-prefer-direct@1.0.0::node_modules/routing-core-types/index.d.ts::CoreRequest"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "bare-to-types-fallback-prefer-direct@1.0.0::UsesCore.req",
+      "name": "UsesCore.req",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-prefer-direct",
+      "filePath": "index.d.ts",
+      "signature": "req: CoreRequest;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback-prefer-direct@1.0.0::node_modules/routing-core-types/index.d.ts::CoreRequest"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "bare-to-types-fallback-prefer-direct@1.0.0::UsesCore"
+    },
+    {
+      "id": "bare-to-types-fallback-prefer-direct@1.0.0::node_modules/routing-core-types/index.d.ts::CoreRequest",
+      "name": "CoreRequest",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback-prefer-direct",
+      "filePath": "node_modules/routing-core-types/index.d.ts",
+      "signature": "export interface CoreRequest {\n  source: \"direct-package\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "bare-to-types-fallback-prefer-direct@1.0.0::node_modules/routing-core-types/index.d.ts::CoreRequest.source",
+      "name": "CoreRequest.source",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-prefer-direct",
+      "filePath": "node_modules/routing-core-types/index.d.ts",
+      "signature": "source: \"direct-package\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "bare-to-types-fallback-prefer-direct@1.0.0::node_modules/routing-core-types/index.d.ts::CoreRequest"
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

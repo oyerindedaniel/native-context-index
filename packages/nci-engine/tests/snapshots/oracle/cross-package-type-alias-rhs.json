@@ -1,0 +1,55 @@
+{
+  "package": "cross-package-type-alias-rhs",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "cross-package-type-alias-rhs@1.0.0::ReExportedAlias",
+      "name": "ReExportedAlias",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "cross-package-type-alias-rhs",
+      "filePath": "index.d.ts",
+      "signature": "export type ReExportedAlias = ExternalTypeShape;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "cross-package-type-alias-rhs@1.0.0::node_modules/external-type-shim/index.d.ts::ExternalTypeShape"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "cross-package-type-alias-rhs@1.0.0::node_modules/external-type-shim/index.d.ts::ExternalTypeShape",
+      "name": "ExternalTypeShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "cross-package-type-alias-rhs",
+      "filePath": "node_modules/external-type-shim/index.d.ts",
+      "signature": "export interface ExternalTypeShape {\n  marker: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "cross-package-type-alias-rhs@1.0.0::node_modules/external-type-shim/index.d.ts::ExternalTypeShape.marker",
+      "name": "ExternalTypeShape.marker",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "cross-package-type-alias-rhs",
+      "filePath": "node_modules/external-type-shim/index.d.ts",
+      "signature": "marker: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "cross-package-type-alias-rhs@1.0.0::node_modules/external-type-shim/index.d.ts::ExternalTypeShape"
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

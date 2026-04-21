@@ -1,0 +1,102 @@
+{
+  "package": "@types/express-like",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "@types/express-like@1.0.0::app",
+      "name": "app",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "declare function app(): app.AppInstance;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "@types/express-like@1.0.0::app.AppInstance"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "@types/express-like@1.0.0::app#2",
+      "name": "app",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace app {\n  interface AppInstance {\n    get(path: string): void;\n  }\n\n  const json: () => string;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "@types/express-like@1.0.0::app.AppInstance",
+      "name": "app.AppInstance",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "interface AppInstance {\n    get(path: string): void;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "@types/express-like@1.0.0::app#2",
+      "enclosingModuleDeclarationId": "@types/express-like@1.0.0::app#2"
+    },
+    {
+      "id": "@types/express-like@1.0.0::app.AppInstance.get",
+      "name": "app.AppInstance.get",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "get(path: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "@types/express-like@1.0.0::app.AppInstance",
+      "enclosingModuleDeclarationId": "@types/express-like@1.0.0::app#2"
+    },
+    {
+      "id": "@types/express-like@1.0.0::app.json",
+      "name": "app.json",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "declare const json: () => string",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "@types/express-like@1.0.0::app#2",
+      "enclosingModuleDeclarationId": "@types/express-like@1.0.0::app#2"
+    },
+    {
+      "id": "@types/express-like@1.0.0::index.d.ts::app",
+      "name": "app",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "@types/express-like",
+      "filePath": "index.d.ts",
+      "signature": "export = app;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

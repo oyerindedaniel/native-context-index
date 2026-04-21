@@ -1,0 +1,71 @@
+{
+  "package": "bare-to-types-fallback",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "bare-to-types-fallback@1.0.0::UsesCore",
+      "name": "UsesCore",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesCore {\n  req: CoreRequest;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback@1.0.0::node_modules/@types/routing-core-types/index.d.ts::CoreRequest"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "bare-to-types-fallback@1.0.0::UsesCore.req",
+      "name": "UsesCore.req",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback",
+      "filePath": "index.d.ts",
+      "signature": "req: CoreRequest;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback@1.0.0::node_modules/@types/routing-core-types/index.d.ts::CoreRequest"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "bare-to-types-fallback@1.0.0::UsesCore"
+    },
+    {
+      "id": "bare-to-types-fallback@1.0.0::node_modules/@types/routing-core-types/index.d.ts::CoreRequest",
+      "name": "CoreRequest",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback",
+      "filePath": "node_modules/@types/routing-core-types/index.d.ts",
+      "signature": "export interface CoreRequest {\n  method: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "bare-to-types-fallback@1.0.0::node_modules/@types/routing-core-types/index.d.ts::CoreRequest.method",
+      "name": "CoreRequest.method",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback",
+      "filePath": "node_modules/@types/routing-core-types/index.d.ts",
+      "signature": "method: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "bare-to-types-fallback@1.0.0::node_modules/@types/routing-core-types/index.d.ts::CoreRequest"
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

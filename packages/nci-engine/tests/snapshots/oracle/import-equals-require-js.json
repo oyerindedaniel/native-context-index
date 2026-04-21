@@ -1,0 +1,36 @@
+{
+  "package": "import-equals-require-js",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "import-equals-require-js@1.0.0::entry.d.ts::bundle",
+      "name": "bundle",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "import-equals-require-js",
+      "filePath": "entry.d.ts",
+      "signature": "export = bundle;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "import-equals-require-js@1.0.0::impl.d.ts::fromImpl",
+      "name": "fromImpl",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "import-equals-require-js",
+      "filePath": "impl.d.ts",
+      "signature": "export declare function fromImpl(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

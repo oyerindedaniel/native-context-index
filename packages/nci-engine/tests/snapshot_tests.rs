@@ -9,7 +9,8 @@
 ///    `cd packages/nci-core && npx tsx scripts/generate-snapshots.ts`
 /// 2. Run these tests:
 ///    `cargo test --test snapshot_tests`
-/// 3. If insta reports new `*.snap.new` files under `tests/snapshots/`, accept them with
+/// 3. When adding a fixture, add a matching `snapshot_test!` row so Rust insta + TS oracle parity run.
+///    If insta reports new `*.snap.new` files under `tests/snapshots/`, accept them with
 ///    `cargo insta accept --manifest-path packages/nci-engine/Cargo.toml --include-ignored`
 ///    (that directory is gitignored, so insta needs `--include-ignored`).
 ///
@@ -378,6 +379,22 @@ snapshot_test!(
     snapshot_qualified_namespace_deps,
     "qualified-namespace-deps"
 );
+snapshot_test!(
+    snapshot_cross_package_type_alias_rhs,
+    "cross-package-type-alias-rhs"
+);
+snapshot_test!(
+    snapshot_cross_package_interface_extends,
+    "cross-package-interface-extends"
+);
+snapshot_test!(
+    snapshot_namespace_import_qualified_extends,
+    "namespace-import-qualified-extends"
+);
+snapshot_test!(
+    snapshot_declare_namespace_variable_and_type,
+    "declare-namespace-variable-and-type"
+);
 snapshot_test!(snapshot_inline_import_type, "inline-import-type");
 snapshot_test!(snapshot_class_statics, "class-statics");
 snapshot_test!(snapshot_global_augmentation, "global-augmentation");
@@ -477,6 +494,10 @@ snapshot_test!(snapshot_bare_to_types_fallback, "bare-to-types-fallback");
 snapshot_test!(
     snapshot_bare_to_types_fallback_prefer_direct,
     "bare-to-types-fallback-prefer-direct"
+);
+snapshot_test!(
+    snapshot_bare_to_types_fallback_multi_imports,
+    "bare-to-types-fallback-multi-imports"
 );
 
 #[test]

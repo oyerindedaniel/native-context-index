@@ -511,12 +511,30 @@ function resolvePackageEntry(specifier: string, currentFile: string): string[] {
   }
   if (!pkgDir) return [];
 
-  const pkgJsonPath = path.join(pkgDir, "package.json");
-  if (!fs.existsSync(pkgJsonPath)) {
+  const pkgJsonPathInitial = path.join(pkgDir, "package.json");
+  if (!fs.existsSync(pkgJsonPathInitial)) {
     return [];
   }
 
-  const pkgEntry = resolveTypesEntry(pkgDir);
+  let pkgEntry = resolveTypesEntry(pkgDir);
+  if (!packageName.startsWith("@") && pkgEntry.typesEntries.length === 0) {
+    const typesPkgDir = findPackageDir(
+      `@types/${packageName}`,
+      path.dirname(currentFile),
+    );
+    if (typesPkgDir && typesPkgDir !== pkgDir) {
+      const typesPackageJsonPath = path.join(typesPkgDir, "package.json");
+      if (fs.existsSync(typesPackageJsonPath)) {
+        const typesPackageEntry = resolveTypesEntry(typesPkgDir);
+        if (typesPackageEntry.typesEntries.length > 0) {
+          pkgDir = typesPkgDir;
+          pkgEntry = typesPackageEntry;
+        }
+      }
+    }
+  }
+
+  const pkgJsonPath = path.join(pkgDir, "package.json");
 
   if (subpath === ".") {
     return pkgEntry.typesEntries;

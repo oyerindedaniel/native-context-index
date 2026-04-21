@@ -1,0 +1,40 @@
+{
+  "package": "no-package-json-dir",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "no-package-json-dir@1.0.0::NoPkgJson",
+      "name": "NoPkgJson",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "no-package-json-dir",
+      "filePath": "index.d.ts",
+      "signature": "export interface NoPkgJson {\n  ok: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "no-package-json-dir@1.0.0::NoPkgJson.ok",
+      "name": "NoPkgJson.ok",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "no-package-json-dir",
+      "filePath": "index.d.ts",
+      "signature": "ok: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "no-package-json-dir@1.0.0::NoPkgJson"
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

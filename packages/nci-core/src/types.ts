@@ -157,6 +157,8 @@ export interface CrawlResult {
    * Omitted or empty when crawl was run without a package root (e.g. standalone tests).
    */
   absoluteToPackageRelative?: Record<string, string>;
+  /** Stored package-relative path → absolute path for visited files. */
+  relToAbs?: Record<string, string>;
 }
 
 /** A fully resolved symbol (after following all re-exports) */

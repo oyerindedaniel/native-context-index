@@ -73,7 +73,7 @@ function computeMergeScopeIds(
   tripleSlash: Record<string, string[]>,
   fileIsExternalModule: Record<string, boolean>,
   packageDir: string,
-  absoluteToPackageRelativeFromCrawl?: Record<string, string>,
+  absoluteToPackageRelativeFromCrawl: Record<string, string>,
 ): [Map<string, string>, Map<string, string>] {
   const absToRel = new Map<string, string>();
   const scriptAbs: string[] = [];
@@ -82,7 +82,7 @@ function computeMergeScopeIds(
   const moduleIndex = new Map<string, number>();
   for (const abs of visitedFiles) {
     const rel =
-      absoluteToPackageRelativeFromCrawl?.[abs] ??
+      absoluteToPackageRelativeFromCrawl[abs] ??
       makePackageRelativePath(abs, packageDir);
     absToRel.set(abs, rel);
     const isExternalModule = fileIsExternalModule[abs] ?? true;
@@ -232,14 +232,24 @@ export function buildPackageGraph(
   /** Per merged row (`mergeKey`): normalized signatures already represented in `signature` (avoids fusing whitespace-only duplicates). */
   const signatureNormsByMergeRow = new Map<string, Set<string>>();
 
+  const absoluteToPackageRelative = crawlResult.absoluteToPackageRelative ?? {};
   const [mergeScopeByRel, absToRel] = computeMergeScopeIds(
     crawlResult.visitedFiles,
     crawlResult.tripleSlashReferenceTargets,
     crawlResult.fileIsExternalModule,
     packageInfo.dir,
-    crawlResult.absoluteToPackageRelative,
+    absoluteToPackageRelative,
   );
+  const relToAbsRecord = crawlResult.relToAbs ?? {};
   const moduleIdenticalFold = new Map<string, string>();
+
+  function storedFilePathToCrawlAbs(relFilePath: string): string {
+    const absolutePath = relToAbsRecord[relFilePath];
+    if (absolutePath !== undefined) {
+      return normalizePath(absolutePath);
+    }
+    return normalizePath(path.resolve(packageInfo.dir, relFilePath));
+  }
 
   const isInterfaceOrTypeAliasMergeScoped = (kind: ts.SyntaxKind): boolean =>
     kind === ts.SyntaxKind.InterfaceDeclaration ||
@@ -601,7 +611,7 @@ export function buildPackageGraph(
   function getCachedNormalizedAbs(relFilePath: string): string {
     let cached = normalizedAbsCache.get(relFilePath);
     if (cached === undefined) {
-      cached = normalizePath(path.join(packageInfo.dir, relFilePath));
+      cached = storedFilePathToCrawlAbs(relFilePath);
       normalizedAbsCache.set(relFilePath, cached);
     }
     return cached;
@@ -630,7 +640,7 @@ export function buildPackageGraph(
   function getCachedAbsPath(relFilePath: string): string {
     let cached = absPathCache.get(relFilePath);
     if (cached === undefined) {
-      cached = normalizePath(path.resolve(packageInfo.dir, relFilePath));
+      cached = storedFilePathToCrawlAbs(relFilePath);
       absPathCache.set(relFilePath, cached);
     }
     return cached;
@@ -645,7 +655,7 @@ export function buildPackageGraph(
     if (cached === undefined) {
       cached = resolveModuleSpecifier(
         specifier,
-        path.join(packageInfo.dir, fromRelFile),
+        storedFilePathToCrawlAbs(fromRelFile),
       );
       moduleSpecifierCache.set(cacheKey, cached);
     }

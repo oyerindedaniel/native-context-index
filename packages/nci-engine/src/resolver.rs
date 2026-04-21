@@ -689,7 +689,7 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
         let types_fallback_name = format!("@types/{package_name}");
         pkg_dir = find_package_dir(&types_fallback_name, current_dir);
     }
-    let pkg_dir = match pkg_dir {
+    let mut pkg_dir = match pkg_dir {
         Some(dir) => dir,
         None => return vec![],
     };
@@ -703,15 +703,37 @@ fn resolve_package_entry(specifier: &str, current_file: &str) -> Vec<SharedStrin
         Ok(contents) => contents,
         Err(_) => return vec![],
     };
-    let parsed_pkg: serde_json::Value = match serde_json::from_str(&raw_contents) {
+    let mut parsed_pkg: serde_json::Value = match serde_json::from_str(&raw_contents) {
         Ok(parsed) => parsed,
         Err(_) => return vec![],
     };
 
-    let pkg_entry = match package_entry_from_parsed_pkg(&pkg_dir, &parsed_pkg) {
+    let mut pkg_entry = match package_entry_from_parsed_pkg(&pkg_dir, &parsed_pkg) {
         Ok(entry) => entry,
         Err(_) => return vec![],
     };
+
+    // Unscoped install: if `package.json` exposes no declaration entry points, try the matching DefinitelyTyped package.
+    if !package_name.starts_with('@') && pkg_entry.types_entries.is_empty() {
+        if let Some(types_pkg_dir) = find_package_dir(&format!("@types/{package_name}"), current_dir)
+        {
+            let alt_json = types_pkg_dir.join("package.json");
+            if alt_json.exists() {
+                if let Ok(raw_alt) = fs::read_to_string(&alt_json) {
+                    if let Ok(parsed_alt) = serde_json::from_str::<serde_json::Value>(&raw_alt) {
+                        if let Ok(entry_alt) =
+                            package_entry_from_parsed_pkg(&types_pkg_dir, &parsed_alt)
+                            && !entry_alt.types_entries.is_empty()
+                        {
+                            pkg_dir = types_pkg_dir;
+                            parsed_pkg = parsed_alt;
+                            pkg_entry = entry_alt;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if subpath == "." {
         return pkg_entry.types_entries;
@@ -1403,4 +1425,29 @@ mod tests {
             "direct package should win over @types fallback, got {resolved_paths:?}"
         );
     }
+
+    #[test]
+    fn resolve_module_specifier_falls_back_for_multiple_unscoped_runtime_packages_without_types() {
+        let fixture_path = fixture_dir("bare-to-types-fallback-multi-imports");
+        let from_file = fixture_path.join("index.d.ts");
+        for (import_specifier, expected_path_segment) in [
+            ("runtime-no-types-alpha", "@types/runtime-no-types-alpha"),
+            ("runtime-no-types-beta", "@types/runtime-no-types-beta"),
+        ] {
+            let resolved_paths = resolve_module_specifier(import_specifier, from_file.to_str().unwrap());
+            assert!(
+                !resolved_paths.is_empty(),
+                "{import_specifier}: expected at least one declaration path"
+            );
+            assert!(
+                resolved_paths.iter().all(|resolved_path| {
+                    let normalized_path = resolved_path.as_ref().replace('\\', "/");
+                    normalized_path.contains(expected_path_segment)
+                        && normalized_path.ends_with(".d.ts")
+                }),
+                "{import_specifier}: expected @types fallback under {expected_path_segment}, got {resolved_paths:?}"
+            );
+        }
+    }
+
 }

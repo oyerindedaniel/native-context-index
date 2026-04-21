@@ -1,0 +1,70 @@
+{
+  "package": "exports-plus-types-root",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "exports-plus-types-root@1.0.0::RootSurface",
+      "name": "RootSurface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "exports-plus-types-root",
+      "filePath": "index.d.ts",
+      "signature": "export interface RootSurface {\n  rootFlag: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "exports-plus-types-root@1.0.0::RootSurface.rootFlag",
+      "name": "RootSurface.rootFlag",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "exports-plus-types-root",
+      "filePath": "index.d.ts",
+      "signature": "rootFlag: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "exports-plus-types-root@1.0.0::RootSurface"
+    },
+    {
+      "id": "exports-plus-types-root@1.0.0::UtilitySurface",
+      "name": "UtilitySurface",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "exports-plus-types-root",
+      "filePath": "utils.d.ts",
+      "signature": "export interface UtilitySurface {\n  utilityFlag: true;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "exports-plus-types-root@1.0.0::UtilitySurface.utilityFlag",
+      "name": "UtilitySurface.utilityFlag",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "exports-plus-types-root",
+      "filePath": "utils.d.ts",
+      "signature": "utilityFlag: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "exports-plus-types-root@1.0.0::UtilitySurface"
+    }
+  ],
+  "totalSymbols": 4,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

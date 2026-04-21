@@ -41,14 +41,12 @@ export interface CrawlOptions {
 function normalizeMaxHops(raw?: number): number {
   const resolved = raw ?? DEFAULT_MAX_HOPS;
   if (resolved === MAX_HOPS_UNLIMITED) return Number.POSITIVE_INFINITY;
-  if (!Number.isFinite(resolved) || !Number.isInteger(resolved))
-    throw new Error(
-      `maxHops must be a finite integer, ${MAX_HOPS_UNLIMITED} (unlimited), or >= 0`,
-    );
-  if (resolved < 0)
-    throw new Error(
-      `maxHops must be ${MAX_HOPS_UNLIMITED} (unlimited) or >= 0, got ${resolved}`,
-    );
+  if (!Number.isFinite(resolved) || !Number.isInteger(resolved)) {
+    return DEFAULT_MAX_HOPS;
+  }
+  if (resolved < 0) {
+    return DEFAULT_MAX_HOPS;
+  }
   return resolved;
 }
 
@@ -760,13 +758,19 @@ export function crawl(
     a < b ? -1 : a > b ? 1 : 0,
   );
   let absoluteToPackageRelative: Record<string, string> | undefined;
+  let relToAbs: Record<string, string> | undefined;
   if (packageRootForRelativePaths) {
     absoluteToPackageRelative = {};
+    relToAbs = {};
     for (const visitedAbs of visitedFiles) {
-      absoluteToPackageRelative[visitedAbs] = makePackageRelativePath(
+      const storedRelativePath = makePackageRelativePath(
         visitedAbs,
         packageRootForRelativePaths,
       );
+      absoluteToPackageRelative[visitedAbs] = storedRelativePath;
+      if (relToAbs[storedRelativePath] === undefined) {
+        relToAbs[storedRelativePath] = visitedAbs;
+      }
     }
   }
 
@@ -782,6 +786,7 @@ export function crawl(
     tripleSlashReferenceTargets,
     fileIsExternalModule: fileIsExternalModuleRecord,
     absoluteToPackageRelative,
+    relToAbs,
   };
 }
 

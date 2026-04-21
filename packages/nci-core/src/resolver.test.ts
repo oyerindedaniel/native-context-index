@@ -401,5 +401,32 @@ describe("resolveTypesEntry", () => {
         "node_modules/@sibling/core/dist/internal.d.ts",
       );
     });
+
+    it("falls back to declaration packages for multiple unscoped runtime packages without types", () => {
+      const fixtureDir = path.resolve(
+        __dirname,
+        "../fixtures/bare-to-types-fallback-multi-imports",
+      );
+      const fromFile = path.join(fixtureDir, "index.d.ts");
+
+      const importExpectations: Array<[string, string]> = [
+        ["runtime-no-types-alpha", "@types/runtime-no-types-alpha"],
+        ["runtime-no-types-beta", "@types/runtime-no-types-beta"],
+      ];
+
+      for (const [importSpecifier, expectedPathSegment] of importExpectations) {
+        const resolvedPaths = resolveModuleSpecifier(importSpecifier, fromFile);
+        expect(resolvedPaths.length).toBeGreaterThan(0);
+        expect(
+          resolvedPaths.every((resolvedPath) => {
+            const normalizedPath = normalizePath(resolvedPath);
+            return (
+              normalizedPath.includes(expectedPathSegment) &&
+              normalizedPath.endsWith(".d.ts")
+            );
+          }),
+        ).toBe(true);
+      }
+    });
   });
 });

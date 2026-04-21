@@ -1,0 +1,42 @@
+{
+  "package": "exports-wildcard-noise",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "exports-wildcard-noise@1.0.0::a",
+      "name": "a",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "exports-wildcard-noise",
+      "filePath": "typings/a.d.ts",
+      "signature": "declare const a: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "exports-wildcard-noise@1.0.0::b",
+      "name": "b",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "exports-wildcard-noise",
+      "filePath": "typings/b.d.ts",
+      "signature": "declare const b: number",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 2,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

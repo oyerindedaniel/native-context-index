@@ -6,7 +6,7 @@ This directory contains test fixtures for the `nci-core` package.
 
 ### Static Fixtures (committed)
 
-Stable, reusable test scenarios live as committed directories (e.g., `simple-export/`, `re-export-chain/`). Each directory represents a minimal package structure with a `package.json` and `.d.ts` files.
+Stable, reusable test scenarios live as committed directories (e.g., `simple-export/`, `re-export-chain/`). Each directory represents a minimal package structure with a `package.json` and `.d.ts` files. Names describe the **technical scenario** (e.g., `cross-package-type-alias-rhs`, `namespace-import-qualified-extends`, `declare-namespace-variable-and-type`), not a ticket or product label.
 
 Use static fixtures when the test data is:
 

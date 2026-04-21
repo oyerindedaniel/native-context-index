@@ -193,19 +193,6 @@ fn compute_merge_scope_ids(
     merge_scope_by_rel
 }
 
-fn build_abs_to_rel_map_for_visited(
-    visited_files: &[SharedString],
-    package_dir_str: &str,
-    normalized_pkg_dir: &str,
-) -> HashMap<SharedString, SharedString> {
-    let mut absolute_to_relative = HashMap::with_capacity(visited_files.len());
-    for abs in visited_files {
-        let rel = make_relative_to_package(abs.as_ref(), package_dir_str, normalized_pkg_dir);
-        absolute_to_relative.insert(abs.clone(), SharedString::from(rel.as_str()));
-    }
-    absolute_to_relative
-}
-
 #[inline]
 fn is_interface_or_type_alias_merge_scoped(kind: SymbolKind) -> bool {
     matches!(kind, SymbolKind::Interface | SymbolKind::TypeAlias)
@@ -495,11 +482,15 @@ fn dash_norm_abs(
     cache: &DashMap<SharedString, SharedString>,
     file_path: &SharedString,
     package_dir_str: &str,
+    rel_to_abs: &HashMap<SharedString, SharedString>,
 ) -> SharedString {
     if let Some(entry) = cache.get(file_path) {
         return entry.value().clone();
     }
-    let normalized_abs = normalize_path(&Path::new(package_dir_str).join(file_path.as_ref()));
+    let normalized_abs = rel_to_abs
+        .get(file_path)
+        .map(|abs| normalize_path(Path::new(abs.as_ref())))
+        .unwrap_or_else(|| normalize_path(&Path::new(package_dir_str).join(file_path.as_ref())));
     cache.insert(file_path.clone(), normalized_abs.clone());
     normalized_abs
 }
@@ -548,11 +539,13 @@ fn resolve_dependency_ids_for_symbol(
     protocol_regex: &Regex,
     dependency_stub_roots: Option<&HashSet<String>>,
     stub_self_exempt_root: Option<&str>,
+    rel_to_abs: &HashMap<SharedString, SharedString>,
 ) -> Vec<SharedString> {
     let abs_lookup = dash_norm_abs(
         normalized_abs_cache,
         &symbol_node.file_path,
         package_dir_str,
+        rel_to_abs,
     );
     let abs_lookup_str: &str = abs_lookup.as_ref();
 
@@ -926,18 +919,8 @@ pub fn build_package_graph(
             )
         })
         .collect();
-    let abs_to_rel_fallback;
-    let abs_to_rel: &HashMap<SharedString, SharedString> =
-        if !crawl_result.absolute_to_package_relative.is_empty() {
-            &crawl_result.absolute_to_package_relative
-        } else {
-            abs_to_rel_fallback = build_abs_to_rel_map_for_visited(
-                &crawl_result.visited_files,
-                package_dir_str,
-                normalized_pkg_dir.as_str(),
-            );
-            &abs_to_rel_fallback
-        };
+    let abs_to_rel = &crawl_result.absolute_to_package_relative;
+    let rel_to_abs = &crawl_result.rel_to_abs;
     let merge_scope_by_rel = compute_merge_scope_ids(
         &crawl_result.visited_files,
         &triple_slash_edges,
@@ -1312,6 +1295,7 @@ pub fn build_package_graph(
                     protocol_regex,
                     dependency_stub_roots_ref,
                     stub_self_exempt_for_resolve,
+                    &rel_to_abs,
                 );
                 (symbol_index, deps)
             })
@@ -1341,6 +1325,7 @@ pub fn build_package_graph(
                 protocol_regex,
                 dependency_stub_roots_ref,
                 stub_self_exempt_for_resolve,
+                &rel_to_abs,
             );
             symbol_node.dependencies = SharedVec::from(deps);
             symbol_node.raw_dependencies.clear();
@@ -2419,6 +2404,163 @@ mod tests {
         );
         assert!(bridge.parent_symbol_id.is_none());
     }
+
+    /// Cross-package type alias RHS must produce at least one navigable edge (in-graph id or `npm::` stub).
+    fn assert_dependency_targets_shimmed_type(
+        symbol: &SymbolNode,
+        node_modules_segment: &str,
+        exported_type_name: &str,
+        bare_specifier: &str,
+    ) {
+        assert!(
+            !symbol.dependencies.is_empty(),
+            "{}: dependencies must not be empty for a cross-package type reference",
+            symbol.name
+        );
+        let stub_edge = format!("npm::{bare_specifier}::{exported_type_name}");
+        let found = symbol.dependencies.iter().any(|edge| {
+            let edge_str = edge.as_ref();
+            edge_str == stub_edge.as_str()
+                || (edge_str.contains(node_modules_segment)
+                    && edge_str.ends_with(format!("::{exported_type_name}").as_str()))
+        });
+        assert!(
+            found,
+            "{}: expected edge to {} from `{}` (stub `{}` or in-graph path containing `{}`); got {:?}",
+            symbol.name,
+            exported_type_name,
+            bare_specifier,
+            stub_edge,
+            node_modules_segment,
+            symbol.dependencies
+        );
+    }
+
+    #[test]
+    fn cross_package_type_alias_rhs_resolves_dependency_edge() {
+        let pkg_dir = fixture_dir("cross-package-type-alias-rhs");
+        let info = PackageInfo {
+            name: "cross-package-type-alias-rhs".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let alias_symbol = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| {
+                symbol_node.name.as_ref() == "ReExportedAlias"
+                    && symbol_node.kind == SymbolKind::TypeAlias
+            })
+            .expect("ReExportedAlias type alias");
+        assert_dependency_targets_shimmed_type(
+            alias_symbol,
+            "external-type-shim",
+            "ExternalTypeShape",
+            "external-type-shim",
+        );
+    }
+
+    #[test]
+    fn cross_package_interface_extends_resolves_base_type_edge() {
+        let pkg_dir = fixture_dir("cross-package-interface-extends");
+        let info = PackageInfo {
+            name: "cross-package-interface-extends".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let extended = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| {
+                symbol_node.name.as_ref() == "ExtendedOptions"
+                    && symbol_node.kind == SymbolKind::Interface
+            })
+            .expect("ExtendedOptions interface");
+        assert_dependency_targets_shimmed_type(
+            extended,
+            "external-options-shim",
+            "BaseOptions",
+            "external-options-shim",
+        );
+    }
+
+    #[test]
+    fn namespace_import_qualified_extends_resolves_base_interface() {
+        let pkg_dir = fixture_dir("namespace-import-qualified-extends");
+        let info = PackageInfo {
+            name: "namespace-import-qualified-extends".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let root_contract = graph
+            .symbols
+            .iter()
+            .find(|symbol_node| {
+                symbol_node.name.as_ref() == "AppSurface.RootContract"
+                    && symbol_node.kind == SymbolKind::Interface
+            })
+            .expect("AppSurface.RootContract interface");
+        assert!(
+            !root_contract.dependencies.is_empty(),
+            "qualified extends must emit raw_dependencies resolved to ContainerContract; got {:?}",
+            root_contract.dependencies
+        );
+        let targets_container = root_contract.dependencies.iter().any(|edge| {
+            let edge_str = edge.as_ref();
+            edge_str.contains("shared-contracts")
+                && edge_str.ends_with("::ContainerContract")
+        });
+        assert!(
+            targets_container,
+            "expected dependency to shared-contracts ContainerContract; heritage={:?} deps={:?}",
+            root_contract.heritage,
+            root_contract.dependencies
+        );
+    }
+
+    #[test]
+    fn declare_namespace_emits_distinct_variable_and_interface_symbols() {
+        let pkg_dir = fixture_dir("declare-namespace-variable-and-type");
+        let info = PackageInfo {
+            name: "declare-namespace-variable-and-type".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let variable_row = graph.symbols.iter().find(|symbol_node| {
+            symbol_node.name.as_ref() == "AppSurface.primaryHandle"
+                && symbol_node.kind == SymbolKind::Variable
+        });
+        let interface_row = graph.symbols.iter().find(|symbol_node| {
+            symbol_node.name.as_ref() == "AppSurface.ControllerHandle"
+                && symbol_node.kind == SymbolKind::Interface
+        });
+        assert!(
+            variable_row.is_some(),
+            "expected a Variable row for the namespace `var` binding; names: {:?}",
+            graph
+                .symbols
+                .iter()
+                .map(|symbol_node| symbol_node.name.as_ref())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            interface_row.is_some(),
+            "expected an Interface row for the nested interface; names: {:?}",
+            graph
+                .symbols
+                .iter()
+                .map(|symbol_node| symbol_node.name.as_ref())
+                .collect::<Vec<_>>()
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2448,4 +2590,22 @@ fn index_imports_by_local_name_keeps_first_binding_per_name() {
     let maps = index_imports_by_local_name(&all_imports);
     let by_name = maps.get(abs.as_ref()).expect("map for file");
     assert_eq!(by_name.get("Foo").unwrap().source.as_ref(), "./keep");
+}
+
+#[cfg(test)]
+#[test]
+fn dash_norm_abs_prefers_rel_to_abs_over_package_dir_join() {
+    let cache = DashMap::new();
+    let package_dir = "/workspace/pkg";
+    let encoded: SharedString = "__nci_external__/other/types.d.ts".into();
+    let crawl_absolute: SharedString = "/hoisted/other/types.d.ts".into();
+    let mut rel_to_abs = HashMap::new();
+    rel_to_abs.insert(encoded.clone(), crawl_absolute.clone());
+    let normalized = dash_norm_abs(&cache, &encoded, package_dir, &rel_to_abs);
+    assert_eq!(
+        normalized.as_ref(),
+        normalize_path(Path::new(crawl_absolute.as_ref())).as_ref()
+    );
+    let wrong_join = normalize_path(&Path::new(package_dir).join(encoded.as_ref()));
+    assert_ne!(normalized.as_ref(), wrong_join.as_ref());
 }

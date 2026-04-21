@@ -1,0 +1,55 @@
+{
+  "package": "local-export-alias-duplicate",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "local-export-alias-duplicate@1.0.0::Experimental_Agent",
+      "name": "Experimental_Agent",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "local-export-alias-duplicate",
+      "filePath": "index.d.ts",
+      "signature": "declare class Agent {}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "local-export-alias-duplicate@1.0.0::Experimental_Agent#2",
+      "name": "Experimental_Agent",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "local-export-alias-duplicate",
+      "filePath": "index.d.ts",
+      "signature": "export { Agent }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "local-export-alias-duplicate@1.0.0::Agent",
+      "name": "Agent",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "local-export-alias-duplicate",
+      "filePath": "index.d.ts",
+      "signature": "declare class Agent {}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

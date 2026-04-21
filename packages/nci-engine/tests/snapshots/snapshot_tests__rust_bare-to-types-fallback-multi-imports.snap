@@ -1,0 +1,125 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "bare-to-types-fallback-multi-imports",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaType",
+      "name": "AlphaType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "export interface AlphaType {\n  kind: \"alpha\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaType.kind",
+      "name": "AlphaType.kind",
+      "parentSymbolId": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaType",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "node_modules/@types/runtime-no-types-alpha/index.d.ts",
+      "signature": "kind: \"alpha\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaType",
+      "name": "BetaType",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "export interface BetaType {\n  kind: \"beta\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaType.kind",
+      "name": "BetaType.kind",
+      "parentSymbolId": "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaType",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "node_modules/@types/runtime-no-types-beta/index.d.ts",
+      "signature": "kind: \"beta\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::UsesMultipleFallbackPackages",
+      "name": "UsesMultipleFallbackPackages",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesMultipleFallbackPackages {\n  alpha: AlphaType;\n  beta: BetaType;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaType",
+        "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaType"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::UsesMultipleFallbackPackages.alpha",
+      "name": "UsesMultipleFallbackPackages.alpha",
+      "parentSymbolId": "bare-to-types-fallback-multi-imports@1.0.0::UsesMultipleFallbackPackages",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "index.d.ts",
+      "signature": "alpha: AlphaType;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaType"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "bare-to-types-fallback-multi-imports@1.0.0::UsesMultipleFallbackPackages.beta",
+      "name": "UsesMultipleFallbackPackages.beta",
+      "parentSymbolId": "bare-to-types-fallback-multi-imports@1.0.0::UsesMultipleFallbackPackages",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "bare-to-types-fallback-multi-imports",
+      "filePath": "index.d.ts",
+      "signature": "beta: BetaType;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "bare-to-types-fallback-multi-imports@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaType"
+      ],
+      "isInternal": false
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 3,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

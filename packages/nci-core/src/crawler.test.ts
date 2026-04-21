@@ -110,9 +110,21 @@ describe("crawl", () => {
     );
   });
 
-  it("rejects maxHops below -1", () => {
+  it("falls back to default when maxHops is below -1", () => {
     const entry = path.join(FIXTURES_DIR, "hop-limit-chain", "index.d.ts");
-    expect(() => crawl(entry, { maxHops: -2 })).toThrow(/unlimited/);
+    const baseline = crawl(entry);
+    const invalid = crawl(entry, { maxHops: -2 });
+    expect(invalid.visitedFiles.length).toBe(baseline.visitedFiles.length);
+    expect(invalid.exports.length).toBe(baseline.exports.length);
+  });
+
+  it("falls back to default when maxHops is not a finite integer", () => {
+    const entry = path.join(FIXTURES_DIR, "hop-limit-chain", "index.d.ts");
+    const baseline = crawl(entry);
+    const nonInteger = crawl(entry, { maxHops: 2.5 });
+    const nonFinite = crawl(entry, { maxHops: Number.POSITIVE_INFINITY });
+    expect(nonInteger.visitedFiles.length).toBe(baseline.visitedFiles.length);
+    expect(nonFinite.visitedFiles.length).toBe(baseline.visitedFiles.length);
   });
 
   it("tracks all visited files", () => {

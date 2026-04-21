@@ -368,6 +368,9 @@ pub struct CrawlResult {
 
     /// When [`CrawlOptions::package_dir_for_relative_paths`] is set: absolute path → path relative to that root (same rules as graph `make_relative`).
     pub absolute_to_package_relative: HashMap<SharedString, SharedString>,
+
+    /// Stored package-relative path → normalized absolute path (paired with [`Self::absolute_to_package_relative`] when a crawl package root is set).
+    pub rel_to_abs: HashMap<SharedString, SharedString>,
 }
 
 #[derive(Debug, Clone)]
@@ -544,7 +547,10 @@ pub struct SymbolNode {
     /// Type vs value namespace for this declaration.
     pub symbol_space: SymbolSpace,
 
-    /// IDs of symbols this one references.
+    /// Navigable dependency edges after graph resolution: resolved symbol ids from the same crawled
+    /// package graph, and/or `npm::<specifier>::<name>` stubs when the target is not bound to a
+    /// crawled symbol. Distinct from [`Self::heritage`], which keeps verbatim `extends` / `implements`
+    /// clause text for provenance.
     pub dependencies: SharedVec<SharedString>,
 
     /// ID of the original source symbol if re-exported.
@@ -582,7 +588,8 @@ pub struct SymbolNode {
     #[serde(skip_serializing_if = "is_shared_vec_empty")]
     pub inherited_from_sources: SharedVec<SharedString>,
 
-    /// Names of classes or interfaces this symbol extends/implements.
+    /// Verbatim `extends` / `implements` clause fragments from the source (human-readable).
+    /// Prefer [`Self::dependencies`] for machine-navigable edges.
     #[serde(skip_serializing_if = "is_shared_vec_empty")]
     pub heritage: SharedVec<SharedString>,
 

@@ -1,0 +1,5 @@
+{
+  "name": "namespace-import-qualified-extends",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

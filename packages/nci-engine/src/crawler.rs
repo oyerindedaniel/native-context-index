@@ -12,8 +12,8 @@ use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
 use crate::resolver::{
-    make_relative_to_package, normalize_path, normalize_path_with_dashmap,
-    resolve_module_specifier, specifier_is_dependency_stub,
+    make_relative_to_package, normalize_path, normalize_path_with_dashmap, resolve_module_specifier,
+    specifier_is_dependency_stub,
 };
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
@@ -34,8 +34,8 @@ pub struct CrawlOptions {
     /// (the package being crawled can resolve itself).
     pub dependency_stub_self_exempt_root: Option<String>,
 
-    /// When set (e.g. by `build_package_graph`), crawl fills [`CrawlResult::absolute_to_package_relative`]
-    /// so graph merge-scope does not recompute package-relative paths.
+    /// When set (e.g. by `build_package_graph`), the crawl records per-file paths relative to that root and
+    /// the matching lookup from stored relative paths back to absolute paths for graph assembly.
     pub package_dir_for_relative_paths: Option<String>,
 }
 
@@ -193,20 +193,12 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
     let mut type_ref_packages: Vec<SharedString> = session.type_ref_packages.into_iter().collect();
     type_ref_packages.sort();
 
-    let absolute_to_package_relative = if let Some(ref pkg_dir) =
-        crawl_options.package_dir_for_relative_paths
-    {
-        let norm_pkg = pkg_dir.replace('\\', "/");
-        let mut relative_by_absolute = HashMap::with_capacity(visited_files.len());
-        for visited_abs in &visited_files {
-            let rel =
-                make_relative_to_package(visited_abs.as_ref(), pkg_dir.as_ref(), norm_pkg.as_str());
-            relative_by_absolute.insert(visited_abs.clone(), SharedString::from(rel.as_str()));
-        }
-        relative_by_absolute
-    } else {
-        HashMap::new()
-    };
+    let (absolute_to_package_relative, rel_to_abs) =
+        if let Some(ref package_dir) = crawl_options.package_dir_for_relative_paths {
+            build_package_path_maps_for_visited(&visited_files, package_dir.as_ref())
+        } else {
+            (HashMap::new(), HashMap::new())
+        };
 
     CrawlResult {
         file_path: SharedString::from(primary_entry.as_ref()),
@@ -218,7 +210,36 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         triple_slash_reference_targets,
         file_is_external_module: session.file_is_external_module,
         absolute_to_package_relative,
+        rel_to_abs,
     }
+}
+
+/// Builds package path maps for visited files.
+fn build_package_path_maps_for_visited(
+    visited_files: &[SharedString],
+    package_dir: &str,
+) -> (
+    HashMap<SharedString, SharedString>,
+    HashMap<SharedString, SharedString>,
+) {
+    let normalized_package_dir = package_dir.replace('\\', "/");
+    let visited_len = visited_files.len();
+    let mut absolute_to_relative = HashMap::with_capacity(visited_len);
+    let mut relative_to_absolute = HashMap::with_capacity(visited_len);
+
+    for absolute_path in visited_files {
+        let relative = make_relative_to_package(
+            absolute_path.as_ref(),
+            package_dir,
+            normalized_package_dir.as_str(),
+        );
+        let stored_relative = SharedString::from(relative.as_str());
+        absolute_to_relative.insert(absolute_path.clone(), stored_relative.clone());
+        relative_to_absolute
+            .entry(stored_relative)
+            .or_insert_with(|| absolute_path.clone());
+    }
+    (absolute_to_relative, relative_to_absolute)
 }
 
 /// Returns export indices in the same merge order as the previous implementation that preferred

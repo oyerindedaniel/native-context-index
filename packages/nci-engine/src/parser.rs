@@ -2698,17 +2698,16 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
                 collect_type_refs(param, &mut refs);
             }
         }
-        if let Expression::Identifier(ident) = &heritage.expression {
-            let name = SharedString::from(ident.name.as_ref());
-            if !BUILTIN_TYPES.contains(name.as_ref()) {
-                refs.insert(
-                    name.clone(),
-                    TypeReference {
-                        name,
-                        import_path: None,
-                    },
-                );
-            }
+        if let Some(name) = expression_to_string(&heritage.expression)
+            && !BUILTIN_TYPES.contains(name.as_ref())
+        {
+            refs.insert(
+                name.clone(),
+                TypeReference {
+                    name,
+                    import_path: None,
+                },
+            );
         }
     }
 
@@ -3270,6 +3269,30 @@ mod tests {
                 .iter()
                 .any(|export_item| export_item.name == "Config".into()
                     && export_item.kind == SymbolKind::Interface)
+        );
+    }
+
+    #[test]
+    fn parse_interface_qualified_extends_records_dependency_name() {
+        let source = r#"
+            import * as boundAlias from "./remote";
+            export interface Derived extends boundAlias.RemoteBase {}
+        "#;
+        let result = parse_file_from_source("derived.d.ts", source);
+        let derived = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "Derived".into())
+            .expect("Derived interface export");
+        let dep_names: Vec<&str> = derived
+            .dependencies
+            .iter()
+            .map(|type_ref| type_ref.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.iter().any(|name| *name == "boundAlias.RemoteBase"),
+            "qualified extends must appear as a single dotted name in raw type refs: {:?}",
+            dep_names
         );
     }
 
