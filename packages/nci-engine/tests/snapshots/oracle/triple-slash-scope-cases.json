@@ -12,7 +12,9 @@
       "signature": "export namespace ModulePair {\n  export const left: 1;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::ModulePair.left"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -52,7 +54,9 @@
       "signature": "export namespace MixedScope {\n  export const fromModule: \"module\";\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::MixedScope.fromModule"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -92,7 +96,9 @@
       "signature": "export namespace ModulePair {\n  export const right: 2;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::ModulePair.right"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -132,7 +138,10 @@
       "signature": "export namespace ModuleReachPair {\n  export const core: 1;\n}\nexport namespace ModuleReachPair {\n  export const extra: 2;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::ModuleReachPair.core",
+        "triple-slash-scope-cases@1.0.0::module-reach-extra.d.ts::ModuleReachPair.extra"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -180,7 +189,9 @@
       "signature": "declare namespace MixedScope {\n  const fromScript: \"script\";\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::MixedScope.fromScript"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"
@@ -216,7 +227,10 @@
       "signature": "declare namespace ScriptPair {\n  const alpha: \"a\";\n}\ndeclare namespace ScriptPair {\n  const beta: \"b\";\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "triple-slash-scope-cases@1.0.0::ScriptPair.alpha",
+        "triple-slash-scope-cases@1.0.0::ScriptPair.beta"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"

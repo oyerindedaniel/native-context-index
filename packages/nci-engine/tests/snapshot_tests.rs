@@ -503,6 +503,30 @@ snapshot_test!(
     snapshot_types_fallback_export_equals_namespace,
     "types-fallback-export-equals-namespace"
 );
+snapshot_test!(
+    snapshot_qualified_type_query_namespace_member,
+    "qualified-type-query-namespace-member"
+);
+snapshot_test!(
+    snapshot_namespace_qualified_return_type,
+    "namespace-qualified-return-type"
+);
+snapshot_test!(
+    snapshot_generic_default_type_parameter_deps,
+    "generic-default-type-parameter-deps"
+);
+snapshot_test!(
+    snapshot_type_alias_call_signature_deps,
+    "type-alias-call-signature-deps"
+);
+snapshot_test!(
+    snapshot_namespace_member_local_type_deps,
+    "namespace-member-local-type-deps"
+);
+snapshot_test!(
+    snapshot_interface_wrapper_generic_default_deps,
+    "interface-wrapper-generic-default-deps"
+);
 
 #[test]
 fn all_oracles_have_tests() {

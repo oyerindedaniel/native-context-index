@@ -409,6 +409,132 @@ describe("buildPackageGraph", () => {
     expect(typeAlias!.dependencies).not.toContain(typeAlias!.id);
   });
 
+  it("resolves qualified typeof namespace member dependencies", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("qualified-type-query-namespace-member"),
+    );
+    const readConfig = graph.symbols.find(
+      (symbol) => symbol.name === "readConfig",
+    );
+    expect(readConfig).toBeDefined();
+    expect(readConfig!.dependencies).toEqual(
+      expect.arrayContaining([
+        "qualified-type-query-namespace-member@1.0.0::provider.d.ts::readConfig",
+      ]),
+    );
+  });
+
+  it("resolves namespace-qualified return types from export-equals namespaces", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("namespace-qualified-return-type"),
+    );
+    const createRouter = graph.symbols.find(
+      (symbol) => symbol.name === "createRouter",
+    );
+    expect(createRouter).toBeDefined();
+    expect(createRouter!.dependencies).toEqual(
+      expect.arrayContaining([
+        "namespace-qualified-return-type@1.0.0::RouterOptions",
+        "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router",
+      ]),
+    );
+  });
+
+  it("resolves unqualified local type deps inside export-equals namespace members", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("namespace-member-local-type-deps"),
+    );
+    const createRouter = graph.symbols.find(
+      (symbol) => symbol.name === "surface.createRouter",
+    );
+    expect(createRouter).toBeDefined();
+    expect(createRouter!.dependencies).toEqual(
+      expect.arrayContaining([
+        "namespace-member-local-type-deps@1.0.0::surface.RouterOptions",
+        "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router",
+      ]),
+    );
+  });
+
+  it("tracks generic default type parameter dependencies", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("generic-default-type-parameter-deps"),
+    );
+    const handler = graph.symbols.find(
+      (symbol) => symbol.name === "RequestHandler",
+    );
+    expect(handler).toBeDefined();
+    expect(handler!.dependencies).toEqual(
+      expect.arrayContaining([
+        "generic-default-type-parameter-deps@1.0.0::ParamsShape",
+        "generic-default-type-parameter-deps@1.0.0::QueryShape",
+      ]),
+    );
+  });
+
+  it("tracks call-signature dependencies inside type literal aliases", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("type-alias-call-signature-deps"),
+    );
+    const alias = graph.symbols.find(
+      (symbol) => symbol.name === "CallableContainer",
+    );
+    expect(alias).toBeDefined();
+    expect(alias!.dependencies).toEqual(
+      expect.arrayContaining([
+        "type-alias-call-signature-deps@1.0.0::InputShape",
+        "type-alias-call-signature-deps@1.0.0::OutputShape",
+      ]),
+    );
+  });
+
+  it("resolves interface wrapper generic defaults without binding generic placeholders", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("interface-wrapper-generic-default-deps"),
+    );
+    const handler = graph.symbols.find(
+      (symbol) => symbol.name === "wrapper.Handler",
+    );
+    expect(handler).toBeDefined();
+    expect(handler!.dependencies).toEqual(
+      expect.arrayContaining([
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape",
+      ]),
+    );
+    expect(
+      handler!.dependencies.some(
+        (dependencyId) =>
+          dependencyId.endsWith("::wrapper.Locals") ||
+          dependencyId.endsWith("::core.Locals"),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps namespace container edges focused on direct members", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("interface-wrapper-generic-default-deps"),
+    );
+    const wrapper = graph.symbols.find((symbol) => symbol.name === "wrapper");
+    expect(wrapper).toBeDefined();
+    expect(wrapper!.dependencies).toEqual(
+      expect.arrayContaining([
+        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals",
+      ]),
+    );
+    expect(
+      wrapper!.dependencies.some(
+        (dependencyId) =>
+          dependencyId.endsWith("::core.Handler") ||
+          dependencyId.endsWith("::core.Locals") ||
+          dependencyId.endsWith("::core.ParamsShape") ||
+          dependencyId.endsWith("::core.QueryShape"),
+      ),
+    ).toBe(false);
+  });
+
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(makePackageInfo("triple-slash-refs"));
 

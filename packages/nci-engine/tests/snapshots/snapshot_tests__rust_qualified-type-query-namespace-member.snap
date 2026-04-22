@@ -1,0 +1,112 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "qualified-type-query-namespace-member",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider",
+      "name": "provider",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "provider.d.ts",
+      "signature": "declare namespace provider {\n  interface ConfigShape {\n    mode: \"strict\";\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape"
+      ],
+      "isInternal": true,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider#2",
+      "name": "provider",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "provider.d.ts",
+      "signature": "export = provider;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape",
+      "name": "provider.ConfigShape",
+      "parentSymbolId": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider",
+      "enclosingModuleDeclarationId": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "provider.d.ts",
+      "signature": "interface ConfigShape {\n    mode: \"strict\";\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape.mode",
+      "name": "provider.ConfigShape.mode",
+      "parentSymbolId": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape",
+      "enclosingModuleDeclarationId": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "provider.d.ts",
+      "signature": "mode: \"strict\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::readConfig",
+      "name": "readConfig",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "index.d.ts",
+      "signature": "declare const readConfig: typeof provider.readConfig",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-type-query-namespace-member@1.0.0::provider.d.ts::readConfig"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "qualified-type-query-namespace-member@1.0.0::provider.d.ts::readConfig",
+      "name": "readConfig",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "qualified-type-query-namespace-member",
+      "filePath": "provider.d.ts",
+      "signature": "declare function readConfig(): provider.ConfigShape;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape"
+      ],
+      "isInternal": true,
+      "modifiers": [
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

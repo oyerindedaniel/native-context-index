@@ -124,7 +124,9 @@
       "signature": "export namespace Outer {\n  export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "inline-import-type@1.0.0::chain.d.ts::Outer.Inner"
+      ],
       "isInternal": true
     },
     {
@@ -137,7 +139,9 @@
       "signature": "export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf"
+      ],
       "isInternal": true,
       "parentSymbolId": "inline-import-type@1.0.0::chain.d.ts::Outer",
       "enclosingModuleDeclarationId": "inline-import-type@1.0.0::chain.d.ts::Outer"

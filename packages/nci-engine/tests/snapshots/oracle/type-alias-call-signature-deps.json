@@ -1,0 +1,103 @@
+{
+  "package": "type-alias-call-signature-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::InputShape",
+      "name": "InputShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface InputShape {\n  value: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::InputShape.value",
+      "name": "InputShape.value",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "value: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "type-alias-call-signature-deps@1.0.0::InputShape"
+    },
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::OutputShape",
+      "name": "OutputShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface OutputShape {\n  ok: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::OutputShape.ok",
+      "name": "OutputShape.ok",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "ok: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "type-alias-call-signature-deps@1.0.0::OutputShape"
+    },
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::CallableContainer",
+      "name": "CallableContainer",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "export type CallableContainer = {\n  (input: InputShape): OutputShape;\n  label: string;\n};",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "type-alias-call-signature-deps@1.0.0::InputShape",
+        "type-alias-call-signature-deps@1.0.0::OutputShape"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "type-alias-call-signature-deps@1.0.0::CallableContainer.label",
+      "name": "CallableContainer.label",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "type-alias-call-signature-deps",
+      "filePath": "index.d.ts",
+      "signature": "label: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "type-alias-call-signature-deps@1.0.0::CallableContainer"
+    }
+  ],
+  "totalSymbols": 6,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

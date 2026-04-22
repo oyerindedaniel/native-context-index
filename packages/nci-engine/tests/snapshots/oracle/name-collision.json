@@ -429,7 +429,9 @@
       "jsDoc": "Same name: `namespace` + `interface` in one file — TS merges declaration spaces.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "name-collision@1.0.0::MergedBox.make"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -494,7 +496,9 @@
       "jsDoc": "Cross-file namespace merge — part A.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "name-collision@1.0.0::NsCrossFileMerge.fromA"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -529,7 +533,9 @@
       "jsDoc": "Cross-file namespace merge — part B.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "name-collision@1.0.0::NsCrossFileMerge.FromB"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -579,7 +585,10 @@
       "jsDoc": "Two `namespace` blocks, same name, one file — TS merges into one namespace.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "name-collision@1.0.0::NsSameFileMerge.Inner",
+        "name-collision@1.0.0::NsSameFileMerge.k"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

@@ -1,0 +1,5 @@
+{
+  "name": "namespace-member-local-type-deps",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

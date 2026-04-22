@@ -338,6 +338,44 @@ function applyAmbientModuleEnclosure(
   }
 }
 
+function mergeDirectNamespaceMemberDependencies(
+  rows: ParsedExport[],
+  namespaceIndex: number,
+  nestedStartIndex: number,
+): void {
+  if (nestedStartIndex >= rows.length || namespaceIndex >= nestedStartIndex)
+    return;
+  const namespaceRow = rows[namespaceIndex];
+  if (!namespaceRow) return;
+  const namespacePrefix = `${namespaceRow.name}.`;
+  const seen = new Set(
+    (namespaceRow.dependencies ?? []).map(
+      (dependency) =>
+        `${dependency.name}::${dependency.importPath ?? ""}::${dependency.resolutionHint ?? "type"}`,
+    ),
+  );
+  const extra: TypeReference[] = [];
+  for (let index = nestedStartIndex; index < rows.length; index += 1) {
+    const nestedRow = rows[index];
+    if (!nestedRow || !nestedRow.name.startsWith(namespacePrefix)) continue;
+    const tail = nestedRow.name.slice(namespacePrefix.length);
+    if (tail.length === 0 || tail.includes(".")) continue;
+    const directMemberRef: TypeReference = {
+      name: nestedRow.name,
+      resolutionHint:
+        nestedRow.symbolSpace === "value" && nestedRow.isTypeOnly !== true
+          ? "value"
+          : "type",
+    };
+    const dedupeKey = `${directMemberRef.name}::${directMemberRef.importPath ?? ""}::${directMemberRef.resolutionHint ?? "type"}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    extra.push(directMemberRef);
+  }
+  if (extra.length === 0) return;
+  namespaceRow.dependencies = [...(namespaceRow.dependencies ?? []), ...extra];
+}
+
 /** Extract architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.). */
 function extractDirectExport(
   statement: ts.Statement,
@@ -430,7 +468,9 @@ function extractDirectExport(
       parentName && rawName !== "<unnamed>"
         ? `${parentName}.${rawName}`
         : rawName;
-    const deps = extractTypeReferences(statement);
+    const deps = ts.isModuleDeclaration(statement)
+      ? []
+      : extractTypeReferences(statement);
     const jsdoc = extractJSDocInfo(statement);
 
     const nestedLexicalEnclosing =
@@ -467,6 +507,7 @@ function extractDirectExport(
       statement.body &&
       ts.isModuleBlock(statement.body)
     ) {
+      const nestedStartIndex = exports.length;
       for (const subStatement of statement.body.statements) {
         const isSubExported = isExportedDeclaration(subStatement);
         exports.push(
@@ -479,6 +520,7 @@ function extractDirectExport(
           ),
         );
       }
+      mergeDirectNamespaceMemberDependencies(exports, 0, nestedStartIndex);
     }
 
     if (ts.isClassDeclaration(statement)) {
@@ -1148,7 +1190,7 @@ function extractJSDocInfo(node: ts.Node): JSDocInfo {
 /** Traverse a TypeScript AST node to extract all type-level dependencies. */
 export function extractTypeReferences(node: ts.Node): TypeReference[] {
   const refs = new Map<string, TypeReference>();
-  visitTypeNode(node, refs);
+  visitTypeNode(node, refs, new Set<string>());
   return Array.from(refs.values());
 }
 
@@ -1167,12 +1209,58 @@ function entityNameToDotted(name: ts.EntityName): string {
   return `${entityNameToDotted(name.left)}.${name.right.text}`;
 }
 
+function expressionToDotted(expressionNode: ts.Expression): string | null {
+  if (ts.isIdentifier(expressionNode)) return expressionNode.text;
+  if (ts.isPropertyAccessExpression(expressionNode)) {
+    const left = expressionToDotted(expressionNode.expression);
+    if (!left) return null;
+    return `${left}.${expressionNode.name.text}`;
+  }
+  return null;
+}
+
+function getNodeTypeParameterNames(node: ts.Node): string[] {
+  const maybeNode = node as {
+    typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>;
+  };
+  if (!maybeNode.typeParameters || maybeNode.typeParameters.length === 0) {
+    return [];
+  }
+  return maybeNode.typeParameters
+    .map((typeParameter) => typeParameter.name.text)
+    .filter((name) => name.length > 0);
+}
+
+function isShadowedTypeParameter(
+  referenceName: string,
+  scopedTypeParameters: ReadonlySet<string>,
+): boolean {
+  if (scopedTypeParameters.has(referenceName)) return true;
+  const firstDot = referenceName.indexOf(".");
+  const firstSegment =
+    firstDot === -1 ? referenceName : referenceName.slice(0, firstDot);
+  return scopedTypeParameters.has(firstSegment);
+}
+
 /** Internal visitor that recursively populates the dependency map. */
 function visitTypeNode(
   typeAstNode: ts.Node,
   refs: Map<string, TypeReference>,
+  scopedTypeParameters: ReadonlySet<string>,
 ): void {
-  if (ts.isTypeParameterDeclaration(typeAstNode)) return;
+  const localTypeParameters = getNodeTypeParameterNames(typeAstNode);
+  const activeTypeParameters =
+    localTypeParameters.length === 0
+      ? scopedTypeParameters
+      : new Set([...scopedTypeParameters, ...localTypeParameters]);
+
+  if (ts.isTypeParameterDeclaration(typeAstNode)) {
+    if (typeAstNode.constraint)
+      visitTypeNode(typeAstNode.constraint, refs, activeTypeParameters);
+    if (typeAstNode.default)
+      visitTypeNode(typeAstNode.default, refs, activeTypeParameters);
+    return;
+  }
 
   if (ts.isIndexedAccessTypeNode(typeAstNode)) {
     let indexedObjectName = "";
@@ -1205,7 +1293,10 @@ function visitTypeNode(
     else if (ts.isQualifiedName(typeName)) name = entityNameToDotted(typeName);
     else return;
 
-    if (!BUILTIN_TYPES.has(name))
+    if (
+      !BUILTIN_TYPES.has(name) &&
+      !isShadowedTypeParameter(name, activeTypeParameters)
+    )
       addTypeRef(refs, { name, resolutionHint: "type" });
   } else if (ts.isImportTypeNode(typeAstNode) && typeAstNode.qualifier) {
     let name: string;
@@ -1222,38 +1313,45 @@ function visitTypeNode(
     ) {
       importPath = typeAstNode.argument.literal.text;
     }
-    if (!BUILTIN_TYPES.has(name))
+    if (
+      !BUILTIN_TYPES.has(name) &&
+      !isShadowedTypeParameter(name, activeTypeParameters)
+    )
       addTypeRef(refs, { name, importPath, resolutionHint: "type" });
   } else if (ts.isExpressionWithTypeArguments(typeAstNode)) {
-    let name: string;
-    if (ts.isIdentifier(typeAstNode.expression))
-      name = typeAstNode.expression.text;
-    else if (ts.isPropertyAccessExpression(typeAstNode.expression)) {
-      name = typeAstNode.expression.name.text;
-    } else {
+    const name = expressionToDotted(typeAstNode.expression);
+    if (!name) {
       ts.forEachChild(typeAstNode, (descendant) =>
-        visitTypeNode(descendant, refs),
+        visitTypeNode(descendant, refs, activeTypeParameters),
       );
       return;
     }
 
-    if (!BUILTIN_TYPES.has(name))
+    if (
+      !BUILTIN_TYPES.has(name) &&
+      !isShadowedTypeParameter(name, activeTypeParameters)
+    )
       addTypeRef(refs, { name, resolutionHint: "type" });
   } else if (ts.isTypeQueryNode(typeAstNode)) {
     const exprName = typeAstNode.exprName;
     let name: string;
     if (ts.isIdentifier(exprName)) name = exprName.text;
-    else if (ts.isQualifiedName(exprName)) name = exprName.right.text;
+    else if (ts.isQualifiedName(exprName)) name = entityNameToDotted(exprName);
     else {
       ts.forEachChild(typeAstNode, (descendant) =>
-        visitTypeNode(descendant, refs),
+        visitTypeNode(descendant, refs, activeTypeParameters),
       );
       return;
     }
 
-    if (!BUILTIN_TYPES.has(name))
+    if (
+      !BUILTIN_TYPES.has(name) &&
+      !isShadowedTypeParameter(name, activeTypeParameters)
+    )
       addTypeRef(refs, { name, resolutionHint: "value" });
   }
 
-  ts.forEachChild(typeAstNode, (descendant) => visitTypeNode(descendant, refs));
+  ts.forEachChild(typeAstNode, (descendant) =>
+    visitTypeNode(descendant, refs, activeTypeParameters),
+  );
 }

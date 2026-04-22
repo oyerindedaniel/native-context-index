@@ -13,7 +13,7 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [
-        "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract"
+        "namespace-import-qualified-extends@1.0.0::AppSurface.RootContract"
       ],
       "isInternal": false,
       "modifiers": [

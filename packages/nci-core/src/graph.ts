@@ -6,7 +6,6 @@ import type {
   SymbolNode,
   PackageInfo,
   ResolvedSymbol,
-  MergeProvenanceKind,
   ContributionMergePath,
 } from "./types.js";
 import { CONTRIBUTION_MERGE_PATH, MERGE_PROVENANCE_KIND } from "./types.js";
@@ -664,10 +663,7 @@ export function buildPackageGraph(
     const cacheKey = `${fromRelFile}\0${specifier}`;
     let cached = moduleSpecifierCache.get(cacheKey);
     if (cached === undefined) {
-      cached = resolveModuleSpecifier(
-        specifier,
-        storedFilePathToCrawlAbs(fromRelFile),
-      );
+      cached = resolveModuleSpecifier(specifier, getCachedAbsPath(fromRelFile));
       moduleSpecifierCache.set(cacheKey, cached);
     }
     return cached;
@@ -747,6 +743,7 @@ export function buildPackageGraph(
       const importPathTargetScratch: string[] = [];
 
       for (const rawDep of symbolNode.rawDependencies) {
+        const importMap = getImportsByName(symAbsPath);
         const namespaceQual = !rawDep.importPath
           ? splitImportNamespaceMember(rawDep.name)
           : null;
@@ -772,8 +769,7 @@ export function buildPackageGraph(
               }
             }
           } else {
-            const importMapForStub = getImportsByName(symAbsPath);
-            const stubMatchingImport = importMapForStub.get(rawDep.name);
+            const stubMatchingImport = importMap.get(rawDep.name);
             if (stubMatchingImport) {
               if (
                 specifierMatchesDependencyStubRoots(
@@ -795,9 +791,7 @@ export function buildPackageGraph(
               }
             }
             if (namespaceQual) {
-              const stubNsImport = importMapForStub.get(
-                namespaceQual.qualifier,
-              );
+              const stubNsImport = importMap.get(namespaceQual.qualifier);
               if (
                 stubNsImport &&
                 specifierMatchesDependencyStubRoots(
@@ -834,7 +828,10 @@ export function buildPackageGraph(
               fileLocalToIds.get(`${relPath}::${rawDep.name}`) || [];
             const memberTailIds =
               fileLocalMemberTailToIds.get(`${relPath}::.${rawDep.name}`) || [];
-            for (const symbolId of [...exactIds, ...memberTailIds]) {
+            for (const symbolId of exactIds) {
+              importPathIdDedup.add(symbolId);
+            }
+            for (const symbolId of memberTailIds) {
               importPathIdDedup.add(symbolId);
             }
           }
@@ -850,10 +847,13 @@ export function buildPackageGraph(
         } else {
           let namespaceTargetFilesResolved = false;
           targetIds =
-            fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) || [];
+            fileLocalToIds.get(`${symbolNode.filePath}::${rawDep.name}`) ||
+            fileLocalMemberTailToIds.get(
+              `${symbolNode.filePath}::.${rawDep.name}`,
+            ) ||
+            [];
 
           if (targetIds.length === 0) {
-            const importMap = getImportsByName(symAbsPath);
             const matchingImport = importMap.get(rawDep.name);
 
             if (matchingImport) {
@@ -877,7 +877,6 @@ export function buildPackageGraph(
             }
           }
           if (targetIds.length === 0 && namespaceQual) {
-            const importMap = getImportsByName(symAbsPath);
             const nsImport = importMap.get(namespaceQual.qualifier);
             if (nsImport) {
               const absSourcePaths = getCachedModuleSpecifier(
@@ -899,9 +898,18 @@ export function buildPackageGraph(
                   resolvedAbsPath,
                   packageInfo.dir,
                 );
-                for (const symbolId of fileLocalToIds.get(
-                  `${relSourcePath}::${namespaceQual.memberPath}`,
-                ) || []) {
+                const exactIds =
+                  fileLocalToIds.get(
+                    `${relSourcePath}::${namespaceQual.memberPath}`,
+                  ) || [];
+                const memberTailIds =
+                  fileLocalMemberTailToIds.get(
+                    `${relSourcePath}::.${namespaceQual.memberPath}`,
+                  ) || [];
+                for (const symbolId of exactIds) {
+                  targetIds.push(symbolId);
+                }
+                for (const symbolId of memberTailIds) {
                   targetIds.push(symbolId);
                 }
               }
@@ -921,10 +929,23 @@ export function buildPackageGraph(
               ) || []) {
                 fromClosure.add(symbolId);
               }
+              for (const symbolId of fileLocalMemberTailToIds.get(
+                `${rel}::.${rawDep.name}`,
+              ) || []) {
+                fromClosure.add(symbolId);
+              }
               if (namespaceQual) {
-                for (const symbolId of fileLocalToIds.get(
-                  `${rel}::${namespaceQual.memberPath}`,
-                ) || []) {
+                const exactIds =
+                  fileLocalToIds.get(`${rel}::${namespaceQual.memberPath}`) ||
+                  [];
+                const memberTailIds =
+                  fileLocalMemberTailToIds.get(
+                    `${rel}::.${namespaceQual.memberPath}`,
+                  ) || [];
+                for (const symbolId of exactIds) {
+                  fromClosure.add(symbolId);
+                }
+                for (const symbolId of memberTailIds) {
                   fromClosure.add(symbolId);
                 }
               }
@@ -964,20 +985,20 @@ export function buildPackageGraph(
           }
         }
         if (targetIds.length > 0) {
-          targetIds = targetIds.filter(
-            (symbolId) =>
+          const filteredTargetIds: string[] = [];
+          for (const symbolId of targetIds) {
+            if (symbolId === symbolNode.id) continue;
+            if (
               isExternalDependencyStub(symbolId) ||
               kindMatchesResolutionHint(
                 idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
                 rawDep.resolutionHint,
-              ),
-          );
-        }
-
-        if (targetIds.length > 0) {
-          targetIds = targetIds.filter(
-            (symbolId) => symbolId !== symbolNode.id,
-          );
+              )
+            ) {
+              filteredTargetIds.push(symbolId);
+            }
+          }
+          targetIds = filteredTargetIds;
         }
 
         if (targetIds.length > 0) {
@@ -996,7 +1017,6 @@ export function buildPackageGraph(
               if (stub) resolvedIds.add(stub);
             }
           } else {
-            const importMap = getImportsByName(symAbsPath);
             const matchingImport = importMap.get(rawDep.name);
             if (matchingImport) {
               const resolved = resolveProtocol(

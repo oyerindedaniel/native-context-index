@@ -78,7 +78,7 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [
-        "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls"
+        "typeof-import-type-query@1.0.0::index.d.ts::NS.box"
       ],
       "isInternal": true
     },

@@ -12,7 +12,10 @@
       "signature": "export declare namespace AppSurface {\n  var primaryHandle: ControllerHandle;\n\n  interface ControllerHandle {\n    dispose(): void;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "declare-namespace-variable-and-type@1.0.0::index.d.ts::AppSurface.ControllerHandle",
+        "declare-namespace-variable-and-type@1.0.0::index.d.ts::AppSurface.primaryHandle"
+      ],
       "isInternal": false,
       "modifiers": [
         "export",
@@ -29,7 +32,9 @@
       "signature": "declare const primaryHandle: ControllerHandle",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "declare-namespace-variable-and-type@1.0.0::index.d.ts::AppSurface.ControllerHandle"
+      ],
       "isInternal": true,
       "parentSymbolId": "declare-namespace-variable-and-type@1.0.0::AppSurface",
       "enclosingModuleDeclarationId": "declare-namespace-variable-and-type@1.0.0::AppSurface"

@@ -12,7 +12,9 @@
       "signature": "export namespace A {\n  export const x: 1;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "nested-locals@1.0.0::A.x"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -46,7 +48,9 @@
       "signature": "export namespace A {\n  export const x: 1;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "nested-locals@1.0.0::A.x"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

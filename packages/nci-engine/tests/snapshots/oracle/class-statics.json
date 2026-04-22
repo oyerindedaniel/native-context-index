@@ -104,7 +104,9 @@
       "signature": "export namespace Cache {\n  export interface Options {\n    ttl: number;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "class-statics@1.0.0::Cache.Options"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

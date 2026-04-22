@@ -25,7 +25,9 @@
       "signature": "global {\n    interface BufferCtor {\n      x: number;\n    }\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "ambient-module-global-inner@1.0.0::global.BufferCtor"
+      ],
       "isInternal": false,
       "enclosingModuleDeclarationId": "ambient-module-global-inner@1.0.0::buffer"
     },

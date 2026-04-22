@@ -17,7 +17,12 @@ expression: "& rust_graph"
       "jsDoc": "Recursive namespace with nested members",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "namespace-cases@1.0.0::API.Config",
+        "namespace-cases@1.0.0::API.fetch",
+        "namespace-cases@1.0.0::API.secret",
+        "namespace-cases@1.0.0::index.d.ts::API.hidden"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -68,7 +73,9 @@ expression: "& rust_graph"
       "signature": "export function fetch(conf: Config): void;",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "namespace-cases@1.0.0::API.Config"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

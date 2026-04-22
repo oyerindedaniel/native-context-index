@@ -829,17 +829,8 @@ fn extract_export_all(
     let _ = source_text; // Used for consistency; export_all is self-contained
 }
 
-fn type_ref_dedupe_key(d: &TypeReference) -> String {
-    format!(
-        "{}|{}",
-        d.name.as_ref(),
-        d.import_path.as_deref().unwrap_or("")
-    )
-}
-
-/// Rolls up `dependencies` from declarations nested under a namespace/module so the container
-/// row reflects every type edge reachable inside its subtree (not only the headline signature).
-fn merge_nested_dependencies_into_namespace(
+/// Adds direct child declaration refs to namespace/module container dependencies.
+fn merge_direct_member_dependencies_into_namespace(
     exports: &mut [ParsedExport],
     ns_idx: usize,
     nested_start: usize,
@@ -851,14 +842,31 @@ fn merge_nested_dependencies_into_namespace(
     let Some(ns) = head.get_mut(ns_idx) else {
         return;
     };
-    let mut seen: HashSet<String> = ns.dependencies.iter().map(type_ref_dedupe_key).collect();
+    let namespace_prefix = format!("{}.", ns.name.as_ref());
+    let mut seen: HashSet<(SharedString, Option<SharedString>)> = ns
+        .dependencies
+        .iter()
+        .map(|dependency| (dependency.name.clone(), dependency.import_path.clone()))
+        .collect();
     let mut extra: Vec<TypeReference> = Vec::new();
     for nested in nested_slice.iter() {
-        for type_ref in nested.dependencies.iter() {
-            let dedupe_key = type_ref_dedupe_key(type_ref);
-            if seen.insert(dedupe_key) {
-                extra.push(type_ref.clone());
-            }
+        let nested_name = nested.name.as_ref();
+        let Some(member_tail) = nested_name.strip_prefix(&namespace_prefix) else {
+            continue;
+        };
+        if member_tail.is_empty() || member_tail.contains('.') {
+            continue;
+        }
+        let direct_member_ref = TypeReference {
+            name: nested.name.clone(),
+            import_path: None,
+        };
+        let dedupe_key = (
+            direct_member_ref.name.clone(),
+            direct_member_ref.import_path.clone(),
+        );
+        if seen.insert(dedupe_key) {
+            extra.push(direct_member_ref);
         }
     }
     if extra.is_empty() {
@@ -997,7 +1005,7 @@ fn extract_module_declaration<'a>(
     }
 
     if exports.len() > before_len {
-        merge_nested_dependencies_into_namespace(exports, module_row_idx, before_len);
+        merge_direct_member_dependencies_into_namespace(exports, module_row_idx, before_len);
     }
 
     // Tag rows with the effective enclosing namespace simple name. Nested identifier namespaces
@@ -1165,6 +1173,26 @@ fn apply_namespace_qualifier_to_exports(parent_name: &str, exports: &mut [Parsed
             if full_name.starts_with(&old_prefix_dot) && !full_name.starts_with(&new_prefix_dot) {
                 let suffix = &full_name[old_prefix_dot.len()..];
                 export_item.name = format!("{}{}", new_prefix_dot, suffix).into();
+            }
+            let mut rewritten_dependencies = export_item.dependencies.to_vec();
+            let mut dependency_changed = false;
+            for dependency in &mut rewritten_dependencies {
+                let dependency_name = dependency.name.as_ref();
+                if dependency_name == old_prefix.as_ref() {
+                    dependency.name = new_prefix.clone();
+                    dependency_changed = true;
+                    continue;
+                }
+                if dependency_name.starts_with(&old_prefix_dot)
+                    && !dependency_name.starts_with(&new_prefix_dot)
+                {
+                    let suffix = &dependency_name[old_prefix_dot.len()..];
+                    dependency.name = format!("{}{}", new_prefix_dot, suffix).into();
+                    dependency_changed = true;
+                }
+            }
+            if dependency_changed {
+                export_item.dependencies = rewritten_dependencies.into();
             }
         }
     }
@@ -1406,7 +1434,19 @@ fn extract_declaration<'a>(
                     type_alias.span
                 },
             );
-            let dependencies = extract_type_refs_from_ts_type(&type_alias.type_annotation);
+            let mut deps_map: HashMap<SharedString, TypeReference> = HashMap::new();
+            collect_type_refs(&type_alias.type_annotation, &mut deps_map);
+            if let Some(type_parameters) = type_alias.type_parameters.as_ref() {
+                for type_parameter in &type_parameters.params {
+                    if let Some(constraint) = type_parameter.constraint.as_ref() {
+                        collect_type_refs(constraint, &mut deps_map);
+                    }
+                    if let Some(default_type) = type_parameter.default.as_ref() {
+                        collect_type_refs(default_type, &mut deps_map);
+                    }
+                }
+            }
+            let dependencies: Vec<TypeReference> = deps_map.into_values().collect();
             let jsdoc = extract_jsdoc_from_leading_comments(source_text, outer_span);
 
             let mut modifiers = extract_declaration_modifiers(declaration);
@@ -2690,6 +2730,19 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
 /// Extracts type references from an interface declaration (heritage + members).
 fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> Vec<TypeReference> {
     let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut type_parameter_names: HashSet<SharedString> = HashSet::new();
+
+    if let Some(type_parameters) = iface_decl.type_parameters.as_ref() {
+        for type_parameter in &type_parameters.params {
+            type_parameter_names.insert(SharedString::from(type_parameter.name.name.as_ref()));
+            if let Some(constraint) = type_parameter.constraint.as_ref() {
+                collect_type_refs(constraint, &mut refs);
+            }
+            if let Some(default_type) = type_parameter.default.as_ref() {
+                collect_type_refs(default_type, &mut refs);
+            }
+        }
+    }
 
     // Heritage clause refs (extends)
     for heritage in &iface_decl.extends {
@@ -2743,6 +2796,15 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
         }
     }
 
+    refs.retain(|dependency_name, _| {
+        let first_segment = dependency_name
+            .as_ref()
+            .split('.')
+            .next()
+            .unwrap_or(dependency_name.as_ref());
+        !type_parameter_names.contains(first_segment)
+    });
+
     refs.into_values().collect()
 }
 
@@ -2757,6 +2819,11 @@ fn import_type_qualifier_leaf_name<'a>(qualifier: &'a TSImportTypeQualifier<'a>)
         TSImportTypeQualifier::Identifier(ident) => ident.name.as_ref(),
         TSImportTypeQualifier::QualifiedName(qn) => qn.right.name.as_ref(),
     }
+}
+
+fn ts_qualified_name_to_string(qualified_name: &TSQualifiedName<'_>) -> SharedString {
+    let left = ts_type_name_to_string(&qualified_name.left);
+    SharedString::from(format!("{}.{}", left, qualified_name.right.name.as_ref()).as_ref())
 }
 
 /// Recursive visitor that collects type references from any TSType.
@@ -2840,6 +2907,16 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
                             }
                         }
                     }
+                    TSSignature::TSCallSignatureDeclaration(call_sig) => {
+                        if let Some(return_type) = &call_sig.return_type {
+                            collect_type_refs(&return_type.type_annotation, refs);
+                        }
+                        for param in &call_sig.params.items {
+                            if let Some(type_annotation) = &param.type_annotation {
+                                collect_type_refs(&type_annotation.type_annotation, refs);
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -2896,7 +2973,19 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
                     }
                 }
             }
-            TSTypeQueryExprName::QualifiedName(_) | TSTypeQueryExprName::ThisExpression(_) => {}
+            TSTypeQueryExprName::QualifiedName(qualified_name) => {
+                let name = ts_qualified_name_to_string(qualified_name);
+                if !BUILTIN_TYPES.contains(name.as_ref()) {
+                    refs.insert(
+                        name.clone(),
+                        TypeReference {
+                            name,
+                            import_path: None,
+                        },
+                    );
+                }
+            }
+            TSTypeQueryExprName::ThisExpression(_) => {}
         },
 
         TSType::TSImportType(import_type) => {
@@ -3243,6 +3332,25 @@ fn statement_has_export_keyword(statement: &Statement<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn fixtures_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../nci-core")
+            .join("fixtures")
+    }
+
+    fn parse_fixture_file(fixture_name: &str, rel_file: &str) -> ParseResult {
+        let fixture_path = fixtures_dir().join(fixture_name).join(rel_file);
+        let source = fs::read_to_string(&fixture_path).unwrap_or_else(|error| {
+            panic!(
+                "failed to read fixture file {}: {error}",
+                fixture_path.display()
+            )
+        });
+        parse_file_from_source(rel_file, &source)
+    }
 
     #[test]
     fn parse_simple_function_export() {
@@ -3496,11 +3604,10 @@ mod tests {
 
     #[test]
     fn parse_ts_import_equals_require_records_module_specifier() {
-        let source = "import ts = require(\"./typescript.js\");\nexport = ts;\n";
-        let result = parse_file_from_source("shim.d.ts", source);
+        let result = parse_fixture_file("import-equals-require-js", "entry.d.ts");
         assert!(
             result.imports.iter().any(|import_row| {
-                import_row.name.as_ref() == "ts" && import_row.source.as_ref() == "./typescript.js"
+                import_row.name.as_ref() == "bundle" && import_row.source.as_ref() == "./impl.js"
             }),
             "imports: {:?}",
             result.imports
@@ -3526,6 +3633,141 @@ mod tests {
                 .as_ref()
                 .map(|import_path| import_path.as_ref()),
             Some("./dep")
+        );
+    }
+
+    #[test]
+    fn parse_type_query_keeps_qualified_namespace_member_name() {
+        let result = parse_fixture_file("qualified-type-query-namespace-member", "index.d.ts");
+        let read_config = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "readConfig".into())
+            .expect("readConfig export");
+        let dep_names: Vec<&str> = read_config
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"provider.readConfig"),
+            "qualified typeof ref should be preserved: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn parse_generic_default_type_parameters_record_dependencies() {
+        let result = parse_fixture_file("generic-default-type-parameter-deps", "index.d.ts");
+        let handler = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "RequestHandler".into())
+            .expect("RequestHandler export");
+        let dep_names: Vec<&str> = handler
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"ParamsShape"),
+            "missing ParamsShape in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"QueryShape"),
+            "missing QueryShape in deps: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn parse_interface_generic_defaults_record_dependencies_without_generic_placeholders() {
+        let result = parse_fixture_file("interface-wrapper-generic-default-deps", "index.d.ts");
+        let handler = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "wrapper.Handler".into())
+            .expect("Handler export");
+        let dep_names: Vec<&str> = handler
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"core.Handler"),
+            "missing core.Handler in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"core.ParamsShape"),
+            "missing core.ParamsShape in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"core.QueryShape"),
+            "missing core.QueryShape in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"Params"),
+            "generic placeholder Params must not become dependency: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"Query"),
+            "generic placeholder Query must not become dependency: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"LocalsType"),
+            "generic placeholder LocalsType must not become dependency: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn parse_namespace_container_keeps_direct_member_dependencies() {
+        let result = parse_fixture_file("interface-wrapper-generic-default-deps", "index.d.ts");
+        let wrapper = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "wrapper".into())
+            .expect("wrapper export");
+        let dep_names: Vec<&str> = wrapper
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"wrapper.Handler"),
+            "missing wrapper.Handler in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"wrapper.Locals"),
+            "missing wrapper.Locals in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"core.Handler"),
+            "container must not promote member heritage core.Handler: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"core.Locals"),
+            "container must not promote member heritage core.Locals: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"core.ParamsShape"),
+            "container must not promote member default core.ParamsShape: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"core.QueryShape"),
+            "container must not promote member default core.QueryShape: {:?}",
+            dep_names
         );
     }
 

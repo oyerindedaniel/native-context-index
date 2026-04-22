@@ -1,0 +1,118 @@
+{
+  "package": "namespace-qualified-return-type",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-qualified-return-type@1.0.0::RouterOptions",
+      "name": "RouterOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-qualified-return-type",
+      "filePath": "index.d.ts",
+      "signature": "export interface RouterOptions {\n  strict: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::RouterOptions.strict",
+      "name": "RouterOptions.strict",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "namespace-qualified-return-type",
+      "filePath": "index.d.ts",
+      "signature": "strict: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "namespace-qualified-return-type@1.0.0::RouterOptions"
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::createRouter",
+      "name": "createRouter",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-qualified-return-type",
+      "filePath": "index.d.ts",
+      "signature": "export declare function createRouter(options?: RouterOptions): core.Router;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-qualified-return-type@1.0.0::RouterOptions",
+        "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::core.d.ts::core",
+      "name": "core",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-qualified-return-type",
+      "filePath": "core.d.ts",
+      "signature": "declare namespace core {\n  interface Router {\n    handle(path: string): void;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router",
+      "name": "core.Router",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-qualified-return-type",
+      "filePath": "core.d.ts",
+      "signature": "interface Router {\n    handle(path: string): void;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "namespace-qualified-return-type@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "namespace-qualified-return-type@1.0.0::core.d.ts::core"
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router.handle",
+      "name": "core.Router.handle",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "namespace-qualified-return-type",
+      "filePath": "core.d.ts",
+      "signature": "handle(path: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router",
+      "enclosingModuleDeclarationId": "namespace-qualified-return-type@1.0.0::core.d.ts::core"
+    },
+    {
+      "id": "namespace-qualified-return-type@1.0.0::core.d.ts::core#2",
+      "name": "core",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "namespace-qualified-return-type",
+      "filePath": "core.d.ts",
+      "signature": "export = core;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 7,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

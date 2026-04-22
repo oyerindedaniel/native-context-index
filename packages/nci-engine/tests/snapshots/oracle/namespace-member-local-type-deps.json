@@ -1,0 +1,148 @@
+{
+  "package": "namespace-member-local-type-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::surface",
+      "name": "surface",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace surface {\n  interface RouterOptions {\n    strict: boolean;\n  }\n\n  function createRouter(options?: RouterOptions): core.Router;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-member-local-type-deps@1.0.0::surface.RouterOptions",
+        "namespace-member-local-type-deps@1.0.0::surface.createRouter"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::surface.RouterOptions",
+      "name": "surface.RouterOptions",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "index.d.ts",
+      "signature": "interface RouterOptions {\n    strict: boolean;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "namespace-member-local-type-deps@1.0.0::surface",
+      "enclosingModuleDeclarationId": "namespace-member-local-type-deps@1.0.0::surface"
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::surface.RouterOptions.strict",
+      "name": "surface.RouterOptions.strict",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "index.d.ts",
+      "signature": "strict: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "namespace-member-local-type-deps@1.0.0::surface.RouterOptions",
+      "enclosingModuleDeclarationId": "namespace-member-local-type-deps@1.0.0::surface"
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::surface.createRouter",
+      "name": "surface.createRouter",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "index.d.ts",
+      "signature": "function createRouter(options?: RouterOptions): core.Router;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router",
+        "namespace-member-local-type-deps@1.0.0::surface.RouterOptions"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "namespace-member-local-type-deps@1.0.0::surface",
+      "enclosingModuleDeclarationId": "namespace-member-local-type-deps@1.0.0::surface"
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::core.d.ts::core",
+      "name": "core",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "core.d.ts",
+      "signature": "declare namespace core {\n  interface Router {\n    handle(path: string): void;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router",
+      "name": "core.Router",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "core.d.ts",
+      "signature": "interface Router {\n    handle(path: string): void;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "namespace-member-local-type-deps@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "namespace-member-local-type-deps@1.0.0::core.d.ts::core"
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router.handle",
+      "name": "core.Router.handle",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "core.d.ts",
+      "signature": "handle(path: string): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router",
+      "enclosingModuleDeclarationId": "namespace-member-local-type-deps@1.0.0::core.d.ts::core"
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::core.d.ts::core#2",
+      "name": "core",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "core.d.ts",
+      "signature": "export = core;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "namespace-member-local-type-deps@1.0.0::index.d.ts::surface",
+      "name": "surface",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "namespace-member-local-type-deps",
+      "filePath": "index.d.ts",
+      "signature": "export = surface;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 9,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

@@ -414,6 +414,86 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
 
     expect(referenceNames).toHaveLength(0);
   });
+
+  it("keeps qualified names for typeof namespace member queries", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "qualified-type-query-namespace-member",
+        "index.d.ts",
+      ),
+    );
+    const readConfig = parsed.exports.find(
+      (exportItem) => exportItem.name === "readConfig",
+    );
+    expect(readConfig).toBeDefined();
+    const dependencyNames =
+      readConfig?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("provider.readConfig");
+  });
+
+  it("extracts generic default type parameter references", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "generic-default-type-parameter-deps",
+        "index.d.ts",
+      ),
+    );
+    const handler = parsed.exports.find(
+      (exportItem) => exportItem.name === "RequestHandler",
+    );
+    expect(handler).toBeDefined();
+    const dependencyNames =
+      handler?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("ParamsShape");
+    expect(dependencyNames).toContain("QueryShape");
+  });
+
+  it("tracks interface generic defaults and excludes generic placeholders", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "interface-wrapper-generic-default-deps",
+        "index.d.ts",
+      ),
+    );
+    const handler = parsed.exports.find(
+      (exportItem) => exportItem.name === "wrapper.Handler",
+    );
+    expect(handler).toBeDefined();
+    const dependencyNames =
+      handler?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("core.Handler");
+    expect(dependencyNames).toContain("core.ParamsShape");
+    expect(dependencyNames).toContain("core.QueryShape");
+    expect(dependencyNames).not.toContain("Params");
+    expect(dependencyNames).not.toContain("Query");
+    expect(dependencyNames).not.toContain("LocalsType");
+  });
+
+  it("keeps namespace container deps on direct members only", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "interface-wrapper-generic-default-deps",
+        "index.d.ts",
+      ),
+    );
+    const wrapper = parsed.exports.find(
+      (exportItem) => exportItem.name === "wrapper",
+    );
+    expect(wrapper).toBeDefined();
+    const dependencyNames =
+      wrapper?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toEqual(
+      expect.arrayContaining(["wrapper.Handler", "wrapper.Locals"]),
+    );
+    expect(dependencyNames).not.toContain("core.Handler");
+    expect(dependencyNames).not.toContain("core.Locals");
+    expect(dependencyNames).not.toContain("core.ParamsShape");
+    expect(dependencyNames).not.toContain("core.QueryShape");
+  });
 });
 
 describe("parseExports dependencies — Relationship Tracking", () => {
@@ -777,7 +857,7 @@ describe("Structural Stability & Resource Parsing", () => {
       getFileSource(complexityPath),
     ).map((reference) => reference.name);
     expect(typeRefNames).toContain("Type");
-    expect(typeRefNames).toContain("Base");
+    expect(typeRefNames).toContain("External.Base");
   });
 
   it("verifies @since tag propagation across various export syntax forms", () => {

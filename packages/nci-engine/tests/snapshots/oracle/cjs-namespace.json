@@ -45,7 +45,9 @@
       "signature": "export function createNode(): Node;",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "cjs-namespace@1.0.0::ts.Node"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -63,7 +65,9 @@
       "signature": "export namespace server {\n    export interface Project {}\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "cjs-namespace@1.0.0::ts.server.Project"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -99,7 +103,11 @@
       "signature": "declare namespace ts {\n  export interface Node {\n    kind: number;\n  }\n  export function createNode(): Node;\n  export namespace server {\n    export interface Project {}\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "cjs-namespace@1.0.0::ts.Node",
+        "cjs-namespace@1.0.0::ts.createNode",
+        "cjs-namespace@1.0.0::ts.server"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"

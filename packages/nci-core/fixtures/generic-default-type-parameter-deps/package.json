@@ -1,0 +1,5 @@
+{
+  "name": "generic-default-type-parameter-deps",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

@@ -60,7 +60,9 @@
       "signature": "declare module \"InnerSpec\" {\n    export interface InnerOnlySymbol {\n      readonly innerScopeMarker: true;\n    }\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"
@@ -148,7 +150,9 @@
       "signature": "declare namespace ContainerNs {\n  export interface ContainerMember {\n    readonly underIdentifierNamespace: true;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"

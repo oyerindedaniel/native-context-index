@@ -336,7 +336,9 @@
       "signature": "declare namespace RefLib {\n  export interface Dual {\n    pick(): void;\n    pick(n: number): void;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "internal-overload-ref@1.0.0::ref.d.ts::RefLib.Dual"
+      ],
       "isInternal": true
     },
     {

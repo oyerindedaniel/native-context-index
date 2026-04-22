@@ -16,7 +16,9 @@ expression: "& rust_graph"
       "signature": "declare namespace AlphaNamespace {\n  interface ParseShape {\n    mode: \"parsed\";\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape"
+      ],
       "isInternal": true,
       "modifiers": [
         "declare"
@@ -75,7 +77,9 @@ expression: "& rust_graph"
       "signature": "declare namespace BetaNamespace {\n  interface TransferOptions {\n    strategy: \"stream\";\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions"
+      ],
       "isInternal": true,
       "modifiers": [
         "declare"

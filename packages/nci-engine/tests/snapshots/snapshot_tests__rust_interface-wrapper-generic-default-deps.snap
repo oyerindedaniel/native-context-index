@@ -1,0 +1,249 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "interface-wrapper-generic-default-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "name": "core",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "declare namespace core {\n  interface ParamsShape {\n    id: string;\n  }\n\n  interface QueryShape {\n    search: string;\n  }\n\n  interface Locals {\n    tenant: string;\n  }\n\n  interface Handler<\n    Params = ParamsShape,\n    Query = QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > {\n    (params: Params, query: Query): LocalsType;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
+      ],
+      "isInternal": true,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core#2",
+      "name": "core",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "export = core;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+      "name": "core.Handler",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "interface Handler<\n    Params = ParamsShape,\n    Query = QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > {\n    (params: Params, query: Query): LocalsType;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
+      "name": "core.Locals",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "interface Locals {\n    tenant: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals.tenant",
+      "name": "core.Locals.tenant",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "tenant: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+      "name": "core.ParamsShape",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "interface ParamsShape {\n    id: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape.id",
+      "name": "core.ParamsShape.id",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape",
+      "name": "core.QueryShape",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "interface QueryShape {\n    search: string;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape.search",
+      "name": "core.QueryShape.search",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "search: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::wrapper",
+      "name": "wrapper",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace wrapper {\n  interface Locals extends core.Locals {}\n\n  interface Handler<\n    Params = core.ParamsShape,\n    Query = core.QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > extends core.Handler<Params, Query, LocalsType> {}\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "declare"
+      ]
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::index.d.ts::wrapper",
+      "name": "wrapper",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "index.d.ts",
+      "signature": "export = wrapper;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
+      "name": "wrapper.Handler",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::wrapper",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::wrapper",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "index.d.ts",
+      "signature": "interface Handler<\n    Params = core.ParamsShape,\n    Query = core.QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > extends core.Handler<Params, Query, LocalsType> {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "core.Handler<Params, Query, LocalsType>"
+      ]
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals",
+      "name": "wrapper.Locals",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::wrapper",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::wrapper",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "index.d.ts",
+      "signature": "interface Locals extends core.Locals {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals"
+      ],
+      "isInternal": false,
+      "heritage": [
+        "core.Locals"
+      ]
+    },
+    {
+      "id": "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals.tenant",
+      "name": "wrapper.Locals.tenant",
+      "parentSymbolId": "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals",
+      "enclosingModuleDeclarationId": "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "interface-wrapper-generic-default-deps",
+      "filePath": "core.d.ts",
+      "signature": "tenant: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals.tenant"
+      ]
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

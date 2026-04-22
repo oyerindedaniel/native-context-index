@@ -654,6 +654,16 @@ fn resolve_dependency_ids_for_symbol(
             .into();
             if let Some(ids) = file_local_to_ids.get(&key) {
                 target_ids.extend(ids.iter().cloned());
+            } else {
+                let member_tail_key: SharedString = format!(
+                    "{}::.{}",
+                    symbol_node.file_path.as_ref(),
+                    raw_dep.name.as_ref()
+                )
+                .into();
+                if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                    target_ids.extend(ids.iter().cloned());
+                }
             }
 
             if target_ids.is_empty()
@@ -708,18 +718,20 @@ fn resolve_dependency_ids_for_symbol(
                         package_dir_str,
                         normalized_pkg_dir,
                     );
-                    namespace_fallback_roots.push(rel_parent_dir(rel_source_path.as_ref()));
-                }
-                for absolute_source_path in &abs_source_paths {
-                    let rel_source_path = make_relative_to_package(
-                        absolute_source_path.as_ref(),
-                        package_dir_str,
-                        normalized_pkg_dir,
-                    );
+                    let parent_dir = rel_parent_dir(rel_source_path.as_ref());
+                    if !namespace_fallback_roots.contains(&parent_dir) {
+                        namespace_fallback_roots.push(parent_dir);
+                    }
                     let import_key: SharedString =
                         format!("{}::{}", rel_source_path, member_path).into();
                     if let Some(ids) = file_local_to_ids.get(&import_key) {
                         target_ids.extend(ids.iter().cloned());
+                    } else {
+                        let member_tail_key: SharedString =
+                            format!("{}::.{}", rel_source_path, member_path).into();
+                        if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                            target_ids.extend(ids.iter().cloned());
+                        }
                     }
                 }
             }
@@ -747,6 +759,14 @@ fn resolve_dependency_ids_for_symbol(
                         for symbol_id in ids {
                             from_closure.insert(symbol_id.clone());
                         }
+                    } else {
+                        let member_tail_key: SharedString =
+                            format!("{}::.{}", relative_file_path, raw_dep.name.as_ref()).into();
+                        if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                            for symbol_id in ids {
+                                from_closure.insert(symbol_id.clone());
+                            }
+                        }
                     }
                     if let Some((_qualifier, member_path)) = namespace_qual {
                         let member_key: SharedString =
@@ -754,6 +774,14 @@ fn resolve_dependency_ids_for_symbol(
                         if let Some(ids) = file_local_to_ids.get(&member_key) {
                             for symbol_id in ids {
                                 from_closure.insert(symbol_id.clone());
+                            }
+                        } else {
+                            let member_tail_key: SharedString =
+                                format!("{}::.{}", relative_file_path, member_path).into();
+                            if let Some(ids) = file_local_member_tail_to_ids.get(&member_tail_key) {
+                                for symbol_id in ids {
+                                    from_closure.insert(symbol_id.clone());
+                                }
                             }
                         }
                     }
@@ -779,15 +807,14 @@ fn resolve_dependency_ids_for_symbol(
                     if skip_namespace_root_filter {
                         target_ids.extend(ids.iter().cloned());
                     } else {
-                        let distinct_namespace_roots: HashSet<&str> = namespace_fallback_roots
-                            .iter()
-                            .map(|root_path| root_path.as_ref())
-                            .collect();
                         for symbol_id in ids {
                             if let Some(stored_path) = id_to_file_path.get(symbol_id) {
                                 let defining_path = stored_path.as_ref();
-                                if distinct_namespace_roots.iter().any(|&namespace_root| {
-                                    file_path_under_namespace_root(defining_path, namespace_root)
+                                if namespace_fallback_roots.iter().any(|namespace_root| {
+                                    file_path_under_namespace_root(
+                                        defining_path,
+                                        namespace_root.as_ref(),
+                                    )
                                 }) {
                                     target_ids.push(symbol_id.clone());
                                 }

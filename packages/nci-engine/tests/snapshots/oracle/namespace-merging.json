@@ -12,7 +12,9 @@
       "signature": "export namespace MergedNS {\n  export const original: 1;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "namespace-merging@1.0.0::MergedNS.original"
+      ],
       "isInternal": false,
       "since": "1.0.0",
       "modifiers": [
@@ -63,7 +65,9 @@
       "signature": "declare namespace MergedNS {\n  export const extra: 2;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "namespace-merging@1.0.0::MergedNS.extra"
+      ],
       "isInternal": false,
       "since": "2.0.0",
       "modifiers": [

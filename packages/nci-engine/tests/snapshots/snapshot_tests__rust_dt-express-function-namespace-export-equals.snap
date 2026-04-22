@@ -34,7 +34,10 @@ expression: "& rust_graph"
       "signature": "declare namespace app {\n  interface AppInstance {\n    get(path: string): void;\n  }\n\n  const json: () => string;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [],
+      "dependencies": [
+        "@types/express-like@1.0.0::app.AppInstance",
+        "@types/express-like@1.0.0::app.json"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"

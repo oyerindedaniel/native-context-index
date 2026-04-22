@@ -1,0 +1,93 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "generic-default-type-parameter-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "generic-default-type-parameter-deps@1.0.0::ParamsShape",
+      "name": "ParamsShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-default-type-parameter-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface ParamsShape {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-default-type-parameter-deps@1.0.0::ParamsShape.id",
+      "name": "ParamsShape.id",
+      "parentSymbolId": "generic-default-type-parameter-deps@1.0.0::ParamsShape",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-default-type-parameter-deps",
+      "filePath": "index.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "generic-default-type-parameter-deps@1.0.0::QueryShape",
+      "name": "QueryShape",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-default-type-parameter-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface QueryShape {\n  filter: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-default-type-parameter-deps@1.0.0::QueryShape.filter",
+      "name": "QueryShape.filter",
+      "parentSymbolId": "generic-default-type-parameter-deps@1.0.0::QueryShape",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-default-type-parameter-deps",
+      "filePath": "index.d.ts",
+      "signature": "filter: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "generic-default-type-parameter-deps@1.0.0::RequestHandler",
+      "name": "RequestHandler",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "generic-default-type-parameter-deps",
+      "filePath": "index.d.ts",
+      "signature": "export type RequestHandler<\n  Params = ParamsShape,\n  Query = QueryShape,\n> = (params: Params) => Query;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-default-type-parameter-deps@1.0.0::ParamsShape",
+        "generic-default-type-parameter-deps@1.0.0::QueryShape"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 5,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}
