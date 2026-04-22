@@ -3675,7 +3675,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_namespace_container_keeps_direct_member_dependencies() {
+    fn parse_namespace_container_dependencies_stay_semantic_only() {
         let result = parse_fixture_file("interface-wrapper-generic-default-deps", "index.d.ts");
         let wrapper = result
             .exports
@@ -3688,23 +3688,23 @@ mod tests {
             .map(|dependency| dependency.name.as_ref())
             .collect();
         assert!(
-            dep_names.contains(&"wrapper.Handler"),
-            "missing wrapper.Handler in deps: {:?}",
+            dep_names.is_empty(),
+            "namespace container should not carry containment edges as dependencies: {:?}",
             dep_names
         );
         assert!(
-            dep_names.contains(&"wrapper.Locals"),
-            "missing wrapper.Locals in deps: {:?}",
+            !dep_names.contains(&"wrapper.Handler"),
+            "container must not include containment edge wrapper.Handler: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"wrapper.Locals"),
+            "container must not include containment edge wrapper.Locals: {:?}",
             dep_names
         );
         assert!(
             !dep_names.contains(&"core.Handler"),
             "container must not promote member heritage core.Handler: {:?}",
-            dep_names
-        );
-        assert!(
-            !dep_names.contains(&"core.Locals"),
-            "container must not promote member heritage core.Locals: {:?}",
             dep_names
         );
         assert!(
