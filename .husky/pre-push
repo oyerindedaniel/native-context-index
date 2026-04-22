@@ -2,4 +2,5 @@
 
 echo "Running pre-push checks..."
 pnpm run test || exit 1
+pnpm run rust:test:lib || exit 1
 pnpm run rust:test:snapshots || exit 1
