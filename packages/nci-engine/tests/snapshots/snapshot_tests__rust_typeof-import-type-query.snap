@@ -18,6 +18,9 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "typeof-import-type-query@1.0.0::dep.d.ts::RemoteCls"
+      ],
       "isInternal": true,
       "modifiers": [
         "declare"

@@ -13,6 +13,9 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "namespace-import-qualified-extends@1.0.0::shared-contracts.d.ts::ContainerContract"
+      ],
       "isInternal": false,
       "modifiers": [
         "export",

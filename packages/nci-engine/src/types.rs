@@ -553,6 +553,11 @@ pub struct SymbolNode {
     /// clause text for provenance.
     pub dependencies: SharedVec<SharedString>,
 
+    /// For namespace/module containers: semantic dependency rollup from direct members.
+    /// Excludes containment/member ids and keeps [`Self::dependencies`] direct to the symbol row.
+    #[serde(skip_serializing_if = "is_shared_vec_empty")]
+    pub surface_dependencies: SharedVec<SharedString>,
+
     /// ID of the original source symbol if re-exported.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub re_exported_from: Option<SharedString>,

@@ -13,6 +13,12 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"
@@ -71,6 +77,10 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
+      ],
       "isInternal": true
     },
     {

@@ -76,6 +76,10 @@ expression: "& rust_graph"
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router",
+        "namespace-member-local-type-deps@1.0.0::surface.RouterOptions"
+      ],
       "isInternal": false,
       "modifiers": [
         "declare"

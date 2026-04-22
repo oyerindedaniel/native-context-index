@@ -512,6 +512,31 @@ describe("buildPackageGraph", () => {
     ).toBe(false);
   });
 
+  it("rolls namespace surface dependencies from direct member semantics", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("interface-wrapper-generic-default-deps"),
+    );
+    const wrapperNamespace = graph.symbols.find(
+      (symbol) => symbol.name === "wrapper",
+    );
+    expect(wrapperNamespace).toBeDefined();
+    expect(wrapperNamespace!.dependencies).toEqual([]);
+    expect(wrapperNamespace!.surfaceDependencies).toEqual(
+      expect.arrayContaining([
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
+        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape",
+      ]),
+    );
+    expect(wrapperNamespace!.surfaceDependencies).not.toContain(
+      "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
+    );
+    expect(wrapperNamespace!.surfaceDependencies).not.toContain(
+      "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals",
+    );
+  });
+
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(makePackageInfo("triple-slash-refs"));
 
@@ -643,6 +668,9 @@ describe("buildPackageGraph", () => {
     );
     expect(tsNamespace!.dependencies).not.toContain(
       "cjs-namespace@1.0.0::ts.server",
+    );
+    expect(tsNamespace!.surfaceDependencies).toEqual(
+      expect.arrayContaining(["cjs-namespace@1.0.0::ts.Node"]),
     );
   });
 

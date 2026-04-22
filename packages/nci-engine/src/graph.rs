@@ -1122,6 +1122,7 @@ pub fn build_package_graph(
                 is_type_only: resolved.is_type_only,
                 symbol_space: resolved.symbol_space,
                 dependencies: SharedVec::from(Vec::new()), // Built later
+                surface_dependencies: SharedVec::from(Vec::new()),
                 raw_dependencies: resolved.dependencies.to_vec(),
                 re_exported_from: re_exported_from.map(Into::into),
                 deprecated: resolved.deprecated.clone(),
@@ -1453,6 +1454,7 @@ pub fn build_package_graph(
     }
     assign_parent_symbol_ids(&mut symbols, &file_local_to_ids, &name_to_id, &id_to_kind);
     assign_enclosing_module_declaration_ids(&mut symbols, &file_local_namespace_ids);
+    assign_surface_dependencies(&mut symbols);
 
     let graph_assembly_ms = graph_assembly_phase_start.elapsed().as_secs_f64() * 1000.0;
     profile::profile_log(
@@ -1472,6 +1474,51 @@ pub fn build_package_graph(
         total_files,
         crawl_duration_ms,
         build_duration_ms,
+    }
+}
+
+fn assign_surface_dependencies(symbols: &mut [SymbolNode]) {
+    let mut namespace_container_index_by_id: HashMap<SharedString, usize> = HashMap::new();
+    for (symbol_index, symbol_node) in symbols.iter().enumerate() {
+        if matches!(symbol_node.kind, SymbolKind::Namespace) {
+            namespace_container_index_by_id.insert(symbol_node.id.clone(), symbol_index);
+        }
+    }
+    if namespace_container_index_by_id.is_empty() {
+        return;
+    }
+
+    let mut member_indices_by_container_index: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (symbol_index, symbol_node) in symbols.iter().enumerate() {
+        let Some(parent_id) = symbol_node.parent_symbol_id.as_ref() else {
+            continue;
+        };
+        let Some(container_index) = namespace_container_index_by_id.get(parent_id) else {
+            continue;
+        };
+        member_indices_by_container_index
+            .entry(*container_index)
+            .or_default()
+            .push(symbol_index);
+    }
+
+    for (container_index, member_indices) in member_indices_by_container_index {
+        let mut rolled_dependency_ids: HashSet<SharedString> = HashSet::new();
+        for member_index in member_indices {
+            let member_node = &symbols[member_index];
+            for dependency_id in member_node.dependencies.iter() {
+                rolled_dependency_ids.insert(dependency_id.clone());
+            }
+        }
+        let container_node = &mut symbols[container_index];
+        if rolled_dependency_ids.is_empty() {
+            container_node.surface_dependencies = SharedVec::from(Vec::new());
+            continue;
+        }
+        let mut sorted_dependency_ids: Vec<SharedString> =
+            rolled_dependency_ids.into_iter().collect();
+        sorted_dependency_ids.sort_by(|left, right| left.as_ref().cmp(right.as_ref()));
+        container_node.surface_dependencies = SharedVec::from(sorted_dependency_ids);
     }
 }
 
@@ -2039,6 +2086,55 @@ mod tests {
                 .dependencies
                 .iter()
                 .any(|dependency_id| dependency_id.as_ref().contains("TransferOptions"))
+        );
+    }
+
+    #[test]
+    fn namespace_surface_dependencies_roll_up_direct_member_semantics() {
+        let pkg_dir = fixture_dir("interface-wrapper-generic-default-deps");
+        let info = PackageInfo {
+            name: "interface-wrapper-generic-default-deps".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let wrapper_namespace = graph
+            .symbols
+            .iter()
+            .find(|symbol| {
+                symbol.name.as_ref() == "wrapper" && matches!(symbol.kind, SymbolKind::Namespace)
+            })
+            .expect("wrapper namespace symbol");
+
+        assert!(
+            wrapper_namespace.dependencies.is_empty(),
+            "wrapper direct dependencies should stay semantic-only: {:?}",
+            wrapper_namespace.dependencies
+        );
+        assert!(
+            wrapper_namespace
+                .surface_dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().contains("core.Handler")),
+            "wrapper surface dependencies should include core.Handler refs: {:?}",
+            wrapper_namespace.surface_dependencies
+        );
+        assert!(
+            wrapper_namespace
+                .surface_dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().contains("core.ParamsShape")),
+            "wrapper surface dependencies should include core.ParamsShape refs: {:?}",
+            wrapper_namespace.surface_dependencies
+        );
+        assert!(
+            wrapper_namespace
+                .surface_dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().ends_with("::wrapper.Handler")),
+            "wrapper surface dependencies must exclude containment ids: {:?}",
+            wrapper_namespace.surface_dependencies
         );
     }
 

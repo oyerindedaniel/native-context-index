@@ -290,6 +290,11 @@ export interface SymbolNode {
   symbolSpace: SymbolSpace;
   /** IDs of symbols this one references */
   dependencies: string[];
+  /**
+   * For namespace/module containers only: semantic dependency rollup from direct members.
+   * This excludes containment/member ids and keeps `dependencies` as direct symbol-owned refs.
+   */
+  surfaceDependencies?: string[];
   /** ID of the original source symbol if re-exported */
   reExportedFrom?: string;
   /** Deprecation info: true if @deprecated with no message, or the message string */

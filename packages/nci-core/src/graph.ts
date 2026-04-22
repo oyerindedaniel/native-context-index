@@ -490,6 +490,7 @@ export function buildPackageGraph(
         isTypeOnly: resolved.isTypeOnly,
         symbolSpace: resolved.symbolSpace,
         dependencies: [],
+        surfaceDependencies: undefined,
         rawDependencies: resolved.dependencies,
         isInternal: resolved.isInternal,
         isGlobalAugmentation: resolved.isGlobalAugmentation,
@@ -1115,6 +1116,7 @@ export function buildPackageGraph(
   }
   assignParentSymbolIds(symbols, fileLocalToIds, nameToId, idToKind);
   assignEnclosingModuleDeclarationIds(symbols, fileLocalToIds, idToKind);
+  assignSurfaceDependencies(symbols);
 
   const afterFlatten = performance.now();
   clearParserCache();
@@ -1138,6 +1140,51 @@ export function buildPackageGraph(
   };
 
   return result;
+}
+
+function assignSurfaceDependencies(symbols: SymbolNode[]): void {
+  const namespaceContainerIndexById = new Map<string, number>();
+  for (let symbolIndex = 0; symbolIndex < symbols.length; symbolIndex += 1) {
+    const symbolNode = symbols[symbolIndex]!;
+    if (symbolNode.kind === ts.SyntaxKind.ModuleDeclaration) {
+      namespaceContainerIndexById.set(symbolNode.id, symbolIndex);
+    }
+  }
+
+  if (namespaceContainerIndexById.size === 0) return;
+
+  const memberIndicesByContainerIndex = new Map<number, number[]>();
+  for (let symbolIndex = 0; symbolIndex < symbols.length; symbolIndex += 1) {
+    const symbolNode = symbols[symbolIndex]!;
+    const parentId = symbolNode.parentSymbolId;
+    if (!parentId) continue;
+    const containerIndex = namespaceContainerIndexById.get(parentId);
+    if (containerIndex === undefined) continue;
+    let memberIndices = memberIndicesByContainerIndex.get(containerIndex);
+    if (!memberIndices) {
+      memberIndices = [];
+      memberIndicesByContainerIndex.set(containerIndex, memberIndices);
+    }
+    memberIndices.push(symbolIndex);
+  }
+
+  for (const [containerIndex, memberIndices] of memberIndicesByContainerIndex) {
+    const rolledDependencyIds = new Set<string>();
+    for (const memberIndex of memberIndices) {
+      const memberNode = symbols[memberIndex]!;
+      for (const dependencyId of memberNode.dependencies) {
+        rolledDependencyIds.add(dependencyId);
+      }
+    }
+    const containerNode = symbols[containerIndex]!;
+    if (rolledDependencyIds.size === 0) {
+      delete containerNode.surfaceDependencies;
+      continue;
+    }
+    containerNode.surfaceDependencies = Array.from(rolledDependencyIds).sort(
+      (leftId, rightId) => (leftId < rightId ? -1 : leftId > rightId ? 1 : 0),
+    );
+  }
 }
 
 /** Map full heritage clause text to a declared parent name (e.g. `Omit<Foo, 'k'>` → `Omit`). */

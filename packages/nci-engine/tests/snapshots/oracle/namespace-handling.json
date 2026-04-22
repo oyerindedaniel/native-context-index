@@ -13,6 +13,9 @@
       "isTypeOnly": false,
       "symbolSpace": "value",
       "dependencies": [],
+      "surfaceDependencies": [
+        "namespace-handling@1.0.0::API.Config"
+      ],
       "isInternal": false,
       "modifiers": [
         "export"

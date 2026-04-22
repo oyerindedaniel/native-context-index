@@ -371,6 +371,12 @@ impl NciDatabase {
              WHERE symbols.package_id = ?1",
             package_id,
         );
+        let surface_deps_map = self.bulk_load_string_junction(
+            "SELECT from_symbol_id, to_symbol_id_text FROM symbol_surface_dependencies
+             JOIN symbols ON symbols.symbol_id = from_symbol_id
+             WHERE symbols.package_id = ?1",
+            package_id,
+        );
 
         let additional_map = self.bulk_load_string_junction(
             "SELECT symbol_additional_files.symbol_id, file_path FROM symbol_additional_files
@@ -489,6 +495,13 @@ impl NciDatabase {
                     .clone()
                     .into_boxed_slice(),
             );
+            let surface_dependencies = SharedVec::from(
+                surface_deps_map
+                    .get(&symbol_row_id)
+                    .unwrap_or(&empty_string_vec)
+                    .clone()
+                    .into_boxed_slice(),
+            );
 
             let additional_files = additional_map
                 .get(&symbol_row_id)
@@ -542,6 +555,7 @@ impl NciDatabase {
                 is_type_only: is_type_only_int != 0,
                 symbol_space,
                 dependencies,
+                surface_dependencies,
                 re_exported_from: re_exported_from_opt.map(SharedString::from),
                 deprecated,
                 visibility,
@@ -627,6 +641,9 @@ impl NciDatabase {
             let mut insert_dependency = transaction.prepare(
                 "INSERT OR IGNORE INTO symbol_dependencies (from_symbol_id, to_symbol_id_text) VALUES (?1, ?2)",
             )?;
+            let mut insert_surface_dependency = transaction.prepare(
+                "INSERT OR IGNORE INTO symbol_surface_dependencies (from_symbol_id, to_symbol_id_text) VALUES (?1, ?2)",
+            )?;
             let mut insert_additional = transaction.prepare(
                 "INSERT OR IGNORE INTO symbol_additional_files (symbol_id, file_path) VALUES (?1, ?2)",
             )?;
@@ -705,6 +722,12 @@ impl NciDatabase {
                 for dependency_id in symbol_node.dependencies.iter() {
                     insert_dependency
                         .execute(rusqlite::params![symbol_row_id, dependency_id.as_ref()])?;
+                }
+                for surface_dependency_id in symbol_node.surface_dependencies.iter() {
+                    insert_surface_dependency.execute(rusqlite::params![
+                        symbol_row_id,
+                        surface_dependency_id.as_ref()
+                    ])?;
                 }
 
                 if let Some(ref additional) = symbol_node.additional_files {
@@ -905,6 +928,19 @@ impl NciDatabase {
             }
             SharedVec::from(dep_vec.into_boxed_slice())
         };
+        let surface_dependencies: SharedVec<SharedString> = {
+            let mut dep_vec: Vec<SharedString> = Vec::new();
+            let mut dependency_stmt = self.connection.prepare(
+                "SELECT to_symbol_id_text FROM symbol_surface_dependencies WHERE from_symbol_id = ?1",
+            )?;
+            let dep_rows = dependency_stmt.query_map([symbol_row_id], |dependency_row| {
+                dependency_row.get::<_, String>(0)
+            })?;
+            for dependency_text in dep_rows.flatten() {
+                dep_vec.push(SharedString::from(dependency_text));
+            }
+            SharedVec::from(dep_vec.into_boxed_slice())
+        };
 
         let additional_files: Option<SharedVec<SharedString>> = {
             let mut files: Vec<SharedString> = Vec::new();
@@ -1023,6 +1059,7 @@ impl NciDatabase {
             is_type_only: is_type_only_int != 0,
             symbol_space,
             dependencies,
+            surface_dependencies,
             re_exported_from: re_exported_from_opt.map(SharedString::from),
             deprecated,
             visibility,
@@ -1495,6 +1532,7 @@ mod tests {
             is_type_only: false,
             symbol_space: SymbolSpace::Value,
             dependencies: SharedVec::from(Vec::<SharedString>::new().into_boxed_slice()),
+            surface_dependencies: SharedVec::from(Vec::<SharedString>::new().into_boxed_slice()),
             re_exported_from: None,
             deprecated: None,
             visibility: None,
