@@ -67,9 +67,7 @@ expression: "& rust_graph"
       "signature": "declare namespace ContainerNs {\n  export interface ContainerMember {\n    readonly underIdentifierNamespace: true;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare"
@@ -189,9 +187,7 @@ expression: "& rust_graph"
       "signature": "declare module \"InnerSpec\" {\n    export interface InnerOnlySymbol {\n      readonly innerScopeMarker: true;\n    }\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare"

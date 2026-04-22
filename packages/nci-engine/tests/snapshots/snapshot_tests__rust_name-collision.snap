@@ -426,9 +426,7 @@ expression: "& rust_graph"
       "jsDoc": "Same name: `namespace` + `interface` in one file — TS merges declaration spaces.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "name-collision@1.0.0::MergedBox.make"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -493,9 +491,7 @@ expression: "& rust_graph"
       "jsDoc": "Cross-file namespace merge — part A.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "name-collision@1.0.0::NsCrossFileMerge.fromA"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -512,9 +508,7 @@ expression: "& rust_graph"
       "jsDoc": "Cross-file namespace merge — part B.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "name-collision@1.0.0::NsCrossFileMerge.FromB"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"
@@ -587,10 +581,7 @@ expression: "& rust_graph"
       "jsDoc": "Two `namespace` blocks, same name, one file — TS merges into one namespace.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "name-collision@1.0.0::NsSameFileMerge.Inner",
-        "name-collision@1.0.0::NsSameFileMerge.k"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"

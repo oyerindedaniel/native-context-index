@@ -17,9 +17,7 @@ expression: "& rust_graph"
       "jsDoc": "Mirrors eslint `namespace Scope { interface Scope { ... } }` merge naming:\ninterface members must be qualified as `Outer.Outer.member`, not `Outer.member`.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-interface-same-name@1.0.0::Scope.Scope"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"

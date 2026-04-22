@@ -62,9 +62,7 @@
       "signature": "declare namespace core {\n  interface Router {\n    handle(path: string): void;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-qualified-return-type@1.0.0::core.d.ts::core.Router"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {

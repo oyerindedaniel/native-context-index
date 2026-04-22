@@ -93,9 +93,7 @@ expression: "& rust_graph"
       "signature": "export namespace Outer {\n  export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "inline-import-type@1.0.0::chain.d.ts::Outer.Inner"
-      ],
+      "dependencies": [],
       "isInternal": true,
       "modifiers": [
         "export"
@@ -113,9 +111,7 @@ expression: "& rust_graph"
       "signature": "export namespace Inner {\n    export interface Leaf {\n      flag: boolean;\n    }\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "inline-import-type@1.0.0::chain.d.ts::Outer.Inner.Leaf"
-      ],
+      "dependencies": [],
       "isInternal": true,
       "modifiers": [
         "export"

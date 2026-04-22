@@ -46,9 +46,7 @@
       "signature": "declare namespace provider {\n  interface ConfigShape {\n    mode: \"strict\";\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "qualified-type-query-namespace-member@1.0.0::provider.d.ts::provider.ConfigShape"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {

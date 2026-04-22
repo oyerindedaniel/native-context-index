@@ -33,9 +33,7 @@ expression: "& rust_graph"
       "signature": "declare namespace merged {\n  /** An interface in the namespace */\n  export interface Config {\n    debug: boolean;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "merged-symbols@1.0.0::merged.Config"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare"

@@ -16,9 +16,7 @@ expression: "& rust_graph"
       "signature": "export declare namespace AppSurface {\n  export interface RootContract extends sharedContracts.ContainerContract {}\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-import-qualified-extends@1.0.0::AppSurface.RootContract"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare",

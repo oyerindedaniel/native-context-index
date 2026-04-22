@@ -132,9 +132,7 @@ expression: "& rust_graph"
       "signature": "namespace MyNamespace {\n    const VERSION: string;\n  }",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "module-global-augmentation-ref@1.0.0::MyNamespace.VERSION"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "isGlobalAugmentation": true
     },

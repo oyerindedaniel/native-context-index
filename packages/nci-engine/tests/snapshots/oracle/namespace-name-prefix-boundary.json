@@ -13,9 +13,7 @@
       "jsDoc": "Child identifier shares a prefix with the parent namespace name (`Outer` + `OuterChild`).\nQualified export must be `Outer.OuterChild`, not a false skip from string prefix matching.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-name-prefix-boundary@1.0.0::index.d.ts::Outer.OuterChild"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export",

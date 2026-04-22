@@ -512,29 +512,6 @@ describe("buildPackageGraph", () => {
     ).toBe(false);
   });
 
-  it("keeps namespace container edges focused on direct members", () => {
-    const graph = buildPackageGraph(
-      makePackageInfo("interface-wrapper-generic-default-deps"),
-    );
-    const wrapper = graph.symbols.find((symbol) => symbol.name === "wrapper");
-    expect(wrapper).toBeDefined();
-    expect(wrapper!.dependencies).toEqual(
-      expect.arrayContaining([
-        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
-        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals",
-      ]),
-    );
-    expect(
-      wrapper!.dependencies.some(
-        (dependencyId) =>
-          dependencyId.endsWith("::core.Handler") ||
-          dependencyId.endsWith("::core.Locals") ||
-          dependencyId.endsWith("::core.ParamsShape") ||
-          dependencyId.endsWith("::core.QueryShape"),
-      ),
-    ).toBe(false);
-  });
-
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(makePackageInfo("triple-slash-refs"));
 
@@ -655,7 +632,18 @@ describe("buildPackageGraph", () => {
     expect(names).toContain("ts.server.Project");
 
     const tsNode = graph.symbols.find((symbol) => symbol.name === "ts.Node");
+    const tsNamespace = graph.symbols.find((symbol) => symbol.name === "ts");
     expect(tsNode?.signature).toContain("interface Node");
+    expect(tsNamespace).toBeDefined();
+    expect(tsNamespace!.dependencies).not.toContain(
+      "cjs-namespace@1.0.0::ts.Node",
+    );
+    expect(tsNamespace!.dependencies).not.toContain(
+      "cjs-namespace@1.0.0::ts.createNode",
+    );
+    expect(tsNamespace!.dependencies).not.toContain(
+      "cjs-namespace@1.0.0::ts.server",
+    );
   });
 
   it("handles function plus namespace with export equals patterns", () => {
@@ -1170,6 +1158,39 @@ describe("buildPackageGraph", () => {
     );
     expect(slotMember?.parentSymbolId).toBe(betweenInner?.id);
     expect(slotMember?.enclosingModuleDeclarationId).toBe(outerModuleId);
+
+    const innerModule = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "InnerSpec" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+    expect(innerModule?.dependencies).not.toContain(
+      "ambient-module-block-nesting@1.0.0::InnerSpec.InnerOnlySymbol",
+    );
+
+    const containerNamespace = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "ContainerNs" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+    expect(containerNamespace?.dependencies).not.toContain(
+      "ambient-module-block-nesting@1.0.0::ContainerNs.ContainerMember",
+    );
+  });
+
+  it("keeps nested global container dependencies semantic-only", () => {
+    const graphResult = buildPackageGraph(
+      makePackageInfo("ambient-module-global-inner"),
+    );
+    const globalNamespace = graphResult.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "global" &&
+        symbolNode.kindName === "ModuleDeclaration",
+    );
+    expect(globalNamespace).toBeDefined();
+    expect(globalNamespace?.dependencies).not.toContain(
+      "ambient-module-global-inner@1.0.0::global.BufferCtor",
+    );
   });
 
   it("handles duplicate symbol names from the SAME file (e.g. overloads) and assigns unique IDs", () => {

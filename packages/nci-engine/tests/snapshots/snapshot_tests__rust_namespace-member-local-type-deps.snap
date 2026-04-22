@@ -16,9 +16,7 @@ expression: "& rust_graph"
       "signature": "declare namespace core {\n  interface Router {\n    handle(path: string): void;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-member-local-type-deps@1.0.0::core.d.ts::core.Router"
-      ],
+      "dependencies": [],
       "isInternal": true,
       "modifiers": [
         "declare"
@@ -77,10 +75,7 @@ expression: "& rust_graph"
       "signature": "declare namespace surface {\n  interface RouterOptions {\n    strict: boolean;\n  }\n\n  function createRouter(options?: RouterOptions): core.Router;\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "namespace-member-local-type-deps@1.0.0::surface.RouterOptions",
-        "namespace-member-local-type-deps@1.0.0::surface.createRouter"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare"

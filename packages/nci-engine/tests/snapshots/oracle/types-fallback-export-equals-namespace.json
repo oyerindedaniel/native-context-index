@@ -81,9 +81,7 @@
       "signature": "declare namespace AlphaNamespace {\n  interface ParseShape {\n    mode: \"parsed\";\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-alpha/index.d.ts::AlphaNamespace.ParseShape"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {
@@ -139,9 +137,7 @@
       "signature": "declare namespace BetaNamespace {\n  interface TransferOptions {\n    strategy: \"stream\";\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "types-fallback-export-equals-namespace@1.0.0::node_modules/@types/runtime-no-types-beta/index.d.ts::BetaNamespace.TransferOptions"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {

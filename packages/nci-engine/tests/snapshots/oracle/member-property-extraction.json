@@ -224,10 +224,7 @@
       "jsDoc": "Exported namespace: qualified `Ns.Child.member` parents, including nested interface\n`PropertySignature` / `MethodSignature` and a namespace-level function export.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "member-property-extraction@1.0.0::CaliperNS.BenchOpts",
-        "member-property-extraction@1.0.0::CaliperNS.snapshot"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export",
@@ -311,9 +308,7 @@
       "jsDoc": "Nested namespace + class: `*.prototype.*` members resolve parent to the qualified class\nsymbol (`OuterNS.InnerWidget`), matching `parent_name_for_dotted_member` (prefix before `prototype`).",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "member-property-extraction@1.0.0::OuterNS.InnerWidget"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export",

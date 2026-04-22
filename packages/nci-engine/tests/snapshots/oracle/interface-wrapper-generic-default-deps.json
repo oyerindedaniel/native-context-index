@@ -12,10 +12,7 @@
       "signature": "declare namespace wrapper {\n  interface Locals extends core.Locals {}\n\n  interface Handler<\n    Params = core.ParamsShape,\n    Query = core.QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > extends core.Handler<Params, Query, LocalsType> {}\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Handler",
-        "interface-wrapper-generic-default-deps@1.0.0::wrapper.Locals"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "declare"
@@ -73,12 +70,7 @@
       "signature": "declare namespace core {\n  interface ParamsShape {\n    id: string;\n  }\n\n  interface QueryShape {\n    search: string;\n  }\n\n  interface Locals {\n    tenant: string;\n  }\n\n  interface Handler<\n    Params = ParamsShape,\n    Query = QueryShape,\n    LocalsType extends Record<string, any> = Record<string, any>,\n  > {\n    (params: Params, query: Query): LocalsType;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Handler",
-        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.Locals",
-        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.ParamsShape",
-        "interface-wrapper-generic-default-deps@1.0.0::core.d.ts::core.QueryShape"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {

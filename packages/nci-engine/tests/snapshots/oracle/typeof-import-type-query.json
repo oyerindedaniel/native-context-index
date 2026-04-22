@@ -77,9 +77,7 @@
       "jsDoc": "Edge case: non-exported `declare namespace` in an external module (undici-style)\nwith `var` members typed as `typeof import(\"./dep\").Name` — must merge nested type\nrefs into the namespace dependencies like TS `extractTypeReferences` on the subtree.",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "typeof-import-type-query@1.0.0::index.d.ts::NS.box"
-      ],
+      "dependencies": [],
       "isInternal": true
     },
     {

@@ -338,44 +338,6 @@ function applyAmbientModuleEnclosure(
   }
 }
 
-function mergeDirectNamespaceMemberDependencies(
-  rows: ParsedExport[],
-  namespaceIndex: number,
-  nestedStartIndex: number,
-): void {
-  if (nestedStartIndex >= rows.length || namespaceIndex >= nestedStartIndex)
-    return;
-  const namespaceRow = rows[namespaceIndex];
-  if (!namespaceRow) return;
-  const namespacePrefix = `${namespaceRow.name}.`;
-  const seen = new Set(
-    (namespaceRow.dependencies ?? []).map(
-      (dependency) =>
-        `${dependency.name}::${dependency.importPath ?? ""}::${dependency.resolutionHint ?? "type"}`,
-    ),
-  );
-  const extra: TypeReference[] = [];
-  for (let index = nestedStartIndex; index < rows.length; index += 1) {
-    const nestedRow = rows[index];
-    if (!nestedRow || !nestedRow.name.startsWith(namespacePrefix)) continue;
-    const tail = nestedRow.name.slice(namespacePrefix.length);
-    if (tail.length === 0 || tail.includes(".")) continue;
-    const directMemberRef: TypeReference = {
-      name: nestedRow.name,
-      resolutionHint:
-        nestedRow.symbolSpace === "value" && nestedRow.isTypeOnly !== true
-          ? "value"
-          : "type",
-    };
-    const dedupeKey = `${directMemberRef.name}::${directMemberRef.importPath ?? ""}::${directMemberRef.resolutionHint ?? "type"}`;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    extra.push(directMemberRef);
-  }
-  if (extra.length === 0) return;
-  namespaceRow.dependencies = [...(namespaceRow.dependencies ?? []), ...extra];
-}
-
 /** Extract architectural metadata from a direct TypeScript declaration statement (class, interface, function, etc.). */
 function extractDirectExport(
   statement: ts.Statement,
@@ -507,7 +469,6 @@ function extractDirectExport(
       statement.body &&
       ts.isModuleBlock(statement.body)
     ) {
-      const nestedStartIndex = exports.length;
       for (const subStatement of statement.body.statements) {
         const isSubExported = isExportedDeclaration(subStatement);
         exports.push(
@@ -520,7 +481,6 @@ function extractDirectExport(
           ),
         );
       }
-      mergeDirectNamespaceMemberDependencies(exports, 0, nestedStartIndex);
     }
 
     if (ts.isClassDeclaration(statement)) {

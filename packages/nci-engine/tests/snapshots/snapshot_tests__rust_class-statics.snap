@@ -34,9 +34,7 @@ expression: "& rust_graph"
       "signature": "export namespace Cache {\n  export interface Options {\n    ttl: number;\n  }\n}",
       "isTypeOnly": false,
       "symbolSpace": "value",
-      "dependencies": [
-        "class-statics@1.0.0::Cache.Options"
-      ],
+      "dependencies": [],
       "isInternal": false,
       "modifiers": [
         "export"

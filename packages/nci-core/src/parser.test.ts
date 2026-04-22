@@ -471,29 +471,6 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     expect(dependencyNames).not.toContain("Query");
     expect(dependencyNames).not.toContain("LocalsType");
   });
-
-  it("keeps namespace container deps on direct members only", () => {
-    const parsed = parseFile(
-      path.join(
-        FIXTURES_DIR,
-        "interface-wrapper-generic-default-deps",
-        "index.d.ts",
-      ),
-    );
-    const wrapper = parsed.exports.find(
-      (exportItem) => exportItem.name === "wrapper",
-    );
-    expect(wrapper).toBeDefined();
-    const dependencyNames =
-      wrapper?.dependencies?.map((reference) => reference.name) ?? [];
-    expect(dependencyNames).toEqual(
-      expect.arrayContaining(["wrapper.Handler", "wrapper.Locals"]),
-    );
-    expect(dependencyNames).not.toContain("core.Handler");
-    expect(dependencyNames).not.toContain("core.Locals");
-    expect(dependencyNames).not.toContain("core.ParamsShape");
-    expect(dependencyNames).not.toContain("core.QueryShape");
-  });
 });
 
 describe("parseExports dependencies — Relationship Tracking", () => {

@@ -829,54 +829,6 @@ fn extract_export_all(
     let _ = source_text; // Used for consistency; export_all is self-contained
 }
 
-/// Adds direct child declaration refs to namespace/module container dependencies.
-fn merge_direct_member_dependencies_into_namespace(
-    exports: &mut [ParsedExport],
-    ns_idx: usize,
-    nested_start: usize,
-) {
-    if nested_start >= exports.len() || ns_idx >= nested_start {
-        return;
-    }
-    let (head, nested_slice) = exports.split_at_mut(nested_start);
-    let Some(ns) = head.get_mut(ns_idx) else {
-        return;
-    };
-    let namespace_prefix = format!("{}.", ns.name.as_ref());
-    let mut seen: HashSet<(SharedString, Option<SharedString>)> = ns
-        .dependencies
-        .iter()
-        .map(|dependency| (dependency.name.clone(), dependency.import_path.clone()))
-        .collect();
-    let mut extra: Vec<TypeReference> = Vec::new();
-    for nested in nested_slice.iter() {
-        let nested_name = nested.name.as_ref();
-        let Some(member_tail) = nested_name.strip_prefix(&namespace_prefix) else {
-            continue;
-        };
-        if member_tail.is_empty() || member_tail.contains('.') {
-            continue;
-        }
-        let direct_member_ref = TypeReference {
-            name: nested.name.clone(),
-            import_path: None,
-        };
-        let dedupe_key = (
-            direct_member_ref.name.clone(),
-            direct_member_ref.import_path.clone(),
-        );
-        if seen.insert(dedupe_key) {
-            extra.push(direct_member_ref);
-        }
-    }
-    if extra.is_empty() {
-        return;
-    }
-    let mut merged = ns.dependencies.to_vec();
-    merged.extend(extra);
-    ns.dependencies = merged.into();
-}
-
 /// Stamps `enclosing_module_declaration_name` for rows lexically inside an ambient module block.
 /// Skips the `ModuleDeclaration` row whose `name` equals the innermost ambient name (no self-edge).
 fn apply_ambient_module_enclosure(exports: &mut [ParsedExport], ambient: Option<&SharedString>) {
@@ -1002,10 +954,6 @@ fn extract_module_declaration<'a>(
             local_decls,
             Some(module_name.clone()),
         );
-    }
-
-    if exports.len() > before_len {
-        merge_direct_member_dependencies_into_namespace(exports, module_row_idx, before_len);
     }
 
     // Tag rows with the effective enclosing namespace simple name. Nested identifier namespaces
