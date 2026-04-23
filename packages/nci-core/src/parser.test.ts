@@ -492,6 +492,24 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     expect(dependencyNames).not.toContain("GenericParam");
     expect(dependencyNames).not.toContain("GenericParam.field");
   });
+
+  it("extracts ambient qualified generic constraints from method signatures", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "ambient-qualified-constraint-deps",
+        "index.d.ts",
+      ),
+    );
+    const streamBridge = parsed.exports.find(
+      (exportItem) => exportItem.name === "StreamBridge",
+    );
+    expect(streamBridge).toBeDefined();
+    const dependencyNames =
+      streamBridge?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("NodeJS.WritableStream");
+    expect(dependencyNames).toContain("LocalSink");
+  });
 });
 
 describe("parseExports dependencies — Relationship Tracking", () => {

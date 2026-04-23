@@ -540,6 +540,7 @@ fn resolve_dependency_ids_for_symbol(
     protocol_regex: &Regex,
     dependency_stub_roots: Option<&HashSet<String>>,
     stub_self_exempt_root: Option<&str>,
+    ambient_qualified_node_stub_index: &HashMap<SharedString, SharedString>,
     rel_to_abs: &HashMap<SharedString, SharedString>,
 ) -> Vec<SharedString> {
     let abs_lookup = dash_norm_abs(
@@ -828,6 +829,13 @@ fn resolve_dependency_ids_for_symbol(
         target_ids.retain(|symbol_id| symbol_id.as_ref() != symbol_node.id.as_ref());
 
         if !target_ids.is_empty() {
+            if let Some(ambient_stub) = resolve_ambient_node_stub_id(
+                raw_dep.name.as_ref(),
+                ambient_qualified_node_stub_index,
+            ) {
+                resolved_ids.insert(ambient_stub);
+                continue;
+            }
             for symbol_id in target_ids.drain(..) {
                 resolved_ids.insert(symbol_id);
             }
@@ -864,15 +872,21 @@ fn resolve_dependency_ids_for_symbol(
                         resolved_ids.insert(stub.into());
                     }
                 }
-                if let Some((qualifier, member_path)) = namespace_qual
-                    && let Some(ns_import) = import_map.get(qualifier)
-                    && let Some(stub) = try_external_module_stub_id(
-                        ns_import.source.as_ref(),
-                        member_path,
-                        protocol_regex,
-                    )
-                {
-                    resolved_ids.insert(stub.into());
+                if let Some((qualifier, member_path)) = namespace_qual {
+                    if let Some(ns_import) = import_map.get(qualifier) {
+                        if let Some(stub) = try_external_module_stub_id(
+                            ns_import.source.as_ref(),
+                            member_path,
+                            protocol_regex,
+                        ) {
+                            resolved_ids.insert(stub.into());
+                        }
+                    } else if let Some(ambient_stub) = resolve_ambient_node_stub_id(
+                        raw_dep.name.as_ref(),
+                        ambient_qualified_node_stub_index,
+                    ) {
+                        resolved_ids.insert(ambient_stub);
+                    }
                 }
             }
         }
@@ -1294,14 +1308,32 @@ pub fn build_package_graph(
 
     let mut id_to_kind: HashMap<SharedString, SymbolKind> =
         HashMap::with_capacity(symbols.len().min(65536));
-    for symbol_node in &symbols {
-        id_to_kind.insert(symbol_node.id.clone(), symbol_node.kind);
-    }
-
     let mut id_to_file_path: HashMap<SharedString, SharedString> =
         HashMap::with_capacity(symbols.len().min(65536));
+    let mut ambient_qualified_node_stub_index: HashMap<SharedString, SharedString> = HashMap::new();
     for symbol_node in &symbols {
+        id_to_kind.insert(symbol_node.id.clone(), symbol_node.kind);
         id_to_file_path.insert(symbol_node.id.clone(), symbol_node.file_path.clone());
+        if !symbol_node.name.as_ref().starts_with("NodeJS.")
+            || symbol_node.raw_dependencies.is_empty()
+        {
+            continue;
+        }
+        for raw_dependency in symbol_node.raw_dependencies.iter() {
+            if raw_dependency.import_path.is_some() {
+                continue;
+            }
+            if let Some((qualifier, member_path)) =
+                split_import_namespace_member(raw_dependency.name.as_ref())
+                && NODE_BUILTINS.contains(qualifier)
+            {
+                ambient_qualified_node_stub_index.insert(
+                    symbol_node.name.clone(),
+                    SharedString::from(format!("node::{qualifier}::{member_path}")),
+                );
+                break;
+            }
+        }
     }
     profile::profile_log(
         &graph_profile_label(&package_info.name, "graph.ids_maps"),
@@ -1323,7 +1355,6 @@ pub fn build_package_graph(
     let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
     let module_specifier_cache: DashMap<(SharedString, SharedString), Vec<SharedString>> =
         DashMap::new();
-
     if parallel_resolve_deps {
         let indexed: Vec<(usize, Vec<SharedString>)> = symbols
             .iter()
@@ -1349,6 +1380,7 @@ pub fn build_package_graph(
                     protocol_regex,
                     dependency_stub_roots_ref,
                     stub_self_exempt_for_resolve,
+                    &ambient_qualified_node_stub_index,
                     rel_to_abs,
                 );
                 (symbol_index, deps)
@@ -1380,6 +1412,7 @@ pub fn build_package_graph(
                 protocol_regex,
                 dependency_stub_roots_ref,
                 stub_self_exempt_for_resolve,
+                &ambient_qualified_node_stub_index,
                 rel_to_abs,
             );
             symbol_node.dependencies = SharedVec::from(deps);
@@ -1558,6 +1591,27 @@ fn split_import_namespace_member(qualified_name: &str) -> Option<(&str, &str)> {
         return None;
     }
     Some((&qualified_name[..dot], &qualified_name[dot + 1..]))
+}
+
+fn ambient_nodejs_namespace_stub_id(qualified_name: &str) -> Option<SharedString> {
+    let (qualifier, member_path) = split_import_namespace_member(qualified_name)?;
+    if qualifier != "NodeJS" || member_path.is_empty() {
+        return None;
+    }
+    Some(SharedString::from(format!("node::NodeJS::{member_path}")))
+}
+
+fn resolve_ambient_node_stub_id(
+    dependency_name: &str,
+    ambient_qualified_node_stub_index: &HashMap<SharedString, SharedString>,
+) -> Option<SharedString> {
+    if !dependency_name.starts_with("NodeJS.") {
+        return None;
+    }
+    ambient_qualified_node_stub_index
+        .get(dependency_name)
+        .cloned()
+        .or_else(|| ambient_nodejs_namespace_stub_id(dependency_name))
 }
 
 /// Stable edge when the target module is not part of this package graph (no extra crawl).
@@ -2194,6 +2248,39 @@ mod tests {
                 .all(|dependency_id| !dependency_id.as_ref().ends_with("::GenericParam.field")),
             "Carrier must not include placeholder-derived indexed access deps: {:?}",
             carrier.dependencies
+        );
+    }
+
+    #[test]
+    fn graph_resolves_ambient_nodejs_qualified_constraints_to_node_stubs() {
+        let pkg_dir = fixture_dir("ambient-qualified-constraint-deps");
+        let info = PackageInfo {
+            name: "ambient-qualified-constraint-deps".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let stream_bridge = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "StreamBridge")
+            .expect("StreamBridge symbol");
+
+        assert!(
+            stream_bridge.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref() == "ambient-qualified-constraint-deps@1.0.0::LocalSink"
+            }),
+            "StreamBridge should include LocalSink dependency: {:?}",
+            stream_bridge.dependencies
+        );
+        assert!(
+            stream_bridge
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref() == "node::stream::Writable"),
+            "StreamBridge should include node::stream::Writable dependency: {:?}",
+            stream_bridge.dependencies
         );
     }
 

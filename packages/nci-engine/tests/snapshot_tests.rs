@@ -531,6 +531,10 @@ snapshot_test!(
     snapshot_generic_intersection_placeholder_filtering,
     "generic-intersection-placeholder-filtering"
 );
+snapshot_test!(
+    snapshot_ambient_qualified_constraint_deps,
+    "ambient-qualified-constraint-deps"
+);
 
 #[test]
 fn all_oracles_have_tests() {

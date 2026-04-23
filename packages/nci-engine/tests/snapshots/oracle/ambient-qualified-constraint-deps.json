@@ -1,0 +1,189 @@
+{
+  "package": "ambient-qualified-constraint-deps",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::LocalSink",
+      "name": "LocalSink",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface LocalSink {\n  write(chunk: Uint8Array): void;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::LocalSink.write",
+      "name": "LocalSink.write",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "write(chunk: Uint8Array): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::LocalSink"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::StreamBridge",
+      "name": "StreamBridge",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "export interface StreamBridge {\n  pipeToNodeWritable<T extends NodeJS.WritableStream>(output: T): T;\n  pipeToLocal<U extends LocalSink>(output: U): U;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "ambient-qualified-constraint-deps@1.0.0::LocalSink",
+        "node::stream::Writable"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::StreamBridge.pipeToNodeWritable",
+      "name": "StreamBridge.pipeToNodeWritable",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "pipeToNodeWritable<T extends NodeJS.WritableStream>(output: T): T;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "node::stream::Writable"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::StreamBridge"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::StreamBridge.pipeToLocal",
+      "name": "StreamBridge.pipeToLocal",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "pipeToLocal<U extends LocalSink>(output: U): U;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "ambient-qualified-constraint-deps@1.0.0::LocalSink"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::StreamBridge"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream",
+      "name": "stream",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace stream {\n  interface Writable {\n    write(chunk: Uint8Array): void;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable",
+      "name": "stream.Writable",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "interface Writable {\n    write(chunk: Uint8Array): void;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream",
+      "enclosingModuleDeclarationId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable.write",
+      "name": "stream.Writable.write",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "write(chunk: Uint8Array): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable",
+      "enclosingModuleDeclarationId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::NodeJS",
+      "name": "NodeJS",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "declare namespace NodeJS {\n  interface WritableStream extends stream.Writable {}\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "surfaceDependencies": [
+        "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable"
+      ],
+      "isInternal": true
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::NodeJS.WritableStream",
+      "name": "NodeJS.WritableStream",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "interface WritableStream extends stream.Writable {}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable"
+      ],
+      "isInternal": true,
+      "heritage": [
+        "stream.Writable"
+      ],
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::NodeJS",
+      "enclosingModuleDeclarationId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::NodeJS"
+    },
+    {
+      "id": "ambient-qualified-constraint-deps@1.0.0::NodeJS.WritableStream.write",
+      "name": "NodeJS.WritableStream.write",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "ambient-qualified-constraint-deps",
+      "filePath": "index.d.ts",
+      "signature": "write(chunk: Uint8Array): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "isInherited": true,
+      "inheritedFromSources": [
+        "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream.Writable.write"
+      ],
+      "parentSymbolId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::NodeJS.WritableStream",
+      "enclosingModuleDeclarationId": "ambient-qualified-constraint-deps@1.0.0::index.d.ts::stream"
+    }
+  ],
+  "totalSymbols": 11,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

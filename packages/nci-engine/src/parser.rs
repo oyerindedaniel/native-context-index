@@ -2040,6 +2040,19 @@ fn extract_interface_members<'a>(
                 }
             }
             TSSignature::TSMethodSignature(method_sig) => {
+                let mut method_type_parameter_names: HashSet<SharedString> = HashSet::new();
+                if let Some(type_parameters) = &method_sig.type_parameters {
+                    for type_parameter in &type_parameters.params {
+                        method_type_parameter_names
+                            .insert(SharedString::from(type_parameter.name.name.as_ref()));
+                        if let Some(constraint) = &type_parameter.constraint {
+                            collect_type_refs(constraint, &mut deps_map);
+                        }
+                        if let Some(default_type) = &type_parameter.default {
+                            collect_type_refs(default_type, &mut deps_map);
+                        }
+                    }
+                }
                 if let Some(return_type) = &method_sig.return_type {
                     collect_type_refs(&return_type.type_annotation, &mut deps_map);
                 }
@@ -2047,6 +2060,9 @@ fn extract_interface_members<'a>(
                     if let Some(anno) = &param.type_annotation {
                         collect_type_refs(&anno.type_annotation, &mut deps_map);
                     }
+                }
+                for method_type_parameter_name in method_type_parameter_names {
+                    deps_map.remove(&method_type_parameter_name);
                 }
             }
             _ => {}
@@ -2486,6 +2502,19 @@ fn extract_type_literal_members<'a>(
                 }
             }
             TSSignature::TSMethodSignature(method_sig) => {
+                let mut method_type_parameter_names: HashSet<SharedString> = HashSet::new();
+                if let Some(type_parameters) = &method_sig.type_parameters {
+                    for type_parameter in &type_parameters.params {
+                        method_type_parameter_names
+                            .insert(SharedString::from(type_parameter.name.name.as_ref()));
+                        if let Some(constraint) = &type_parameter.constraint {
+                            collect_type_refs(constraint, &mut deps_map);
+                        }
+                        if let Some(default_type) = &type_parameter.default {
+                            collect_type_refs(default_type, &mut deps_map);
+                        }
+                    }
+                }
                 if let Some(return_type) = &method_sig.return_type {
                     collect_type_refs(&return_type.type_annotation, &mut deps_map);
                 }
@@ -2493,6 +2522,9 @@ fn extract_type_literal_members<'a>(
                     if let Some(anno) = &param.type_annotation {
                         collect_type_refs(&anno.type_annotation, &mut deps_map);
                     }
+                }
+                for method_type_parameter_name in method_type_parameter_names {
+                    deps_map.remove(&method_type_parameter_name);
                 }
             }
             _ => {}
@@ -2721,6 +2753,18 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
                 }
             }
             TSSignature::TSMethodSignature(method_sig) => {
+                if let Some(type_parameters) = &method_sig.type_parameters {
+                    for type_parameter in &type_parameters.params {
+                        type_parameter_names
+                            .insert(SharedString::from(type_parameter.name.name.as_ref()));
+                        if let Some(constraint) = &type_parameter.constraint {
+                            collect_type_refs(constraint, &mut refs);
+                        }
+                        if let Some(default_type) = &type_parameter.default {
+                            collect_type_refs(default_type, &mut refs);
+                        }
+                    }
+                }
                 if let Some(return_type) = &method_sig.return_type {
                     collect_type_refs(&return_type.type_annotation, &mut refs);
                 }
@@ -2846,6 +2890,16 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
                         }
                     }
                     TSSignature::TSMethodSignature(method_sig) => {
+                        if let Some(type_parameters) = &method_sig.type_parameters {
+                            for type_parameter in &type_parameters.params {
+                                if let Some(constraint) = &type_parameter.constraint {
+                                    collect_type_refs(constraint, refs);
+                                }
+                                if let Some(default_type) = &type_parameter.default {
+                                    collect_type_refs(default_type, refs);
+                                }
+                            }
+                        }
                         if let Some(return_type) = &method_sig.return_type {
                             collect_type_refs(&return_type.type_annotation, refs);
                         }
@@ -3755,6 +3809,31 @@ mod tests {
         assert!(
             !dep_names.contains(&"GenericParam.field"),
             "placeholder-derived indexed access GenericParam.field must not become dependency: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
+    fn parse_extracts_ambient_qualified_constraints_from_method_signatures() {
+        let result = parse_fixture_file("ambient-qualified-constraint-deps", "index.d.ts");
+        let stream_bridge = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "StreamBridge".into())
+            .expect("StreamBridge export");
+        let dep_names: Vec<&str> = stream_bridge
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"NodeJS.WritableStream"),
+            "missing NodeJS.WritableStream in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"LocalSink"),
+            "missing LocalSink in deps: {:?}",
             dep_names
         );
     }

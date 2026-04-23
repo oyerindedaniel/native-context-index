@@ -562,6 +562,22 @@ describe("buildPackageGraph", () => {
     ).toBe(false);
   });
 
+  it("resolves ambient NodeJS qualified generic constraints to node stubs", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("ambient-qualified-constraint-deps"),
+    );
+    const bridge = graph.symbols.find(
+      (symbol) => symbol.name === "StreamBridge",
+    );
+    expect(bridge).toBeDefined();
+    expect(bridge!.dependencies).toEqual(
+      expect.arrayContaining([
+        "ambient-qualified-constraint-deps@1.0.0::LocalSink",
+        "node::stream::Writable",
+      ]),
+    );
+  });
+
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(makePackageInfo("triple-slash-refs"));
 

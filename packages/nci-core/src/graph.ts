@@ -603,9 +603,27 @@ export function buildPackageGraph(
     }
   }
 
+  const ambientQualifiedNodeStubIndex = new Map<string, string>();
   const idToFilePath = new Map<string, string>();
   for (const symbolNode of symbols) {
     idToFilePath.set(symbolNode.id, symbolNode.filePath);
+    if (
+      !symbolNode.name.startsWith("NodeJS.") ||
+      !symbolNode.rawDependencies ||
+      symbolNode.rawDependencies.length === 0
+    ) {
+      continue;
+    }
+    for (const rawDependency of symbolNode.rawDependencies) {
+      if (rawDependency.importPath) continue;
+      const qualified = splitImportNamespaceMember(rawDependency.name);
+      if (!qualified || !NODE_BUILTINS.has(qualified.qualifier)) continue;
+      ambientQualifiedNodeStubIndex.set(
+        symbolNode.name,
+        `node::${qualified.qualifier}::${qualified.memberPath}`,
+      );
+      break;
+    }
   }
 
   if (profiling) {
@@ -715,6 +733,26 @@ export function buildPackageGraph(
       qualifier: qualifiedName.slice(0, dot),
       memberPath: qualifiedName.slice(dot + 1),
     };
+  }
+
+  function ambientNodejsNamespaceStubId(qualifiedName: string): string | null {
+    const qualified = splitImportNamespaceMember(qualifiedName);
+    if (
+      !qualified ||
+      qualified.qualifier !== "NodeJS" ||
+      qualified.memberPath.length === 0
+    ) {
+      return null;
+    }
+    return `node::NodeJS::${qualified.memberPath}`;
+  }
+
+  function resolveAmbientNodeStubId(dependencyName: string): string | null {
+    if (!dependencyName.startsWith("NodeJS.")) return null;
+    return (
+      ambientQualifiedNodeStubIndex.get(dependencyName) ||
+      ambientNodejsNamespaceStubId(dependencyName)
+    );
   }
 
   /**
@@ -1003,6 +1041,11 @@ export function buildPackageGraph(
         }
 
         if (targetIds.length > 0) {
+          const ambientStub = resolveAmbientNodeStubId(rawDep.name);
+          if (ambientStub) {
+            resolvedIds.add(ambientStub);
+            continue;
+          }
           for (const symbolId of targetIds) {
             resolvedIds.add(symbolId);
           }
@@ -1041,6 +1084,9 @@ export function buildPackageGraph(
                   namespaceQual.memberPath,
                 );
                 if (stub) resolvedIds.add(stub);
+              } else {
+                const ambientStub = resolveAmbientNodeStubId(rawDep.name);
+                if (ambientStub) resolvedIds.add(ambientStub);
               }
             }
           }
