@@ -1,0 +1,5 @@
+{
+  "name": "generic-intersection-placeholder-filtering",
+  "version": "1.0.0",
+  "types": "./index.d.ts"
+}

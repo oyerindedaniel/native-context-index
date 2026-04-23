@@ -471,6 +471,27 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     expect(dependencyNames).not.toContain("Query");
     expect(dependencyNames).not.toContain("LocalsType");
   });
+
+  it("filters placeholder-derived refs while preserving concrete intersections", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "generic-intersection-placeholder-filtering",
+        "index.d.ts",
+      ),
+    );
+    const carrier = parsed.exports.find(
+      (exportItem) => exportItem.name === "Carrier",
+    );
+    expect(carrier).toBeDefined();
+    const dependencyNames =
+      carrier?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("ConcreteLeft");
+    expect(dependencyNames).toContain("ConcreteRight");
+    expect(dependencyNames).toContain("Slot");
+    expect(dependencyNames).not.toContain("GenericParam");
+    expect(dependencyNames).not.toContain("GenericParam.field");
+  });
 });
 
 describe("parseExports dependencies — Relationship Tracking", () => {

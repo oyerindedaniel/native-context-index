@@ -1242,7 +1242,12 @@ function visitTypeNode(
     }
     if (indexedObjectName && indexPropertyName) {
       const name = `${indexedObjectName}.${indexPropertyName}`;
-      if (!BUILTIN_TYPES.has(name)) refs.set(name, { name });
+      if (
+        !BUILTIN_TYPES.has(name) &&
+        !isShadowedTypeParameter(name, activeTypeParameters)
+      ) {
+        refs.set(name, { name });
+      }
     }
   }
 

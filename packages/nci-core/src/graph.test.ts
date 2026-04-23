@@ -537,6 +537,31 @@ describe("buildPackageGraph", () => {
     );
   });
 
+  it("keeps concrete intersections and filters placeholder-derived indexed access deps", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("generic-intersection-placeholder-filtering"),
+    );
+    const carrier = graph.symbols.find((symbol) => symbol.name === "Carrier");
+    expect(carrier).toBeDefined();
+    expect(carrier!.dependencies).toEqual(
+      expect.arrayContaining([
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft",
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight",
+        "generic-intersection-placeholder-filtering@1.0.0::Slot",
+      ]),
+    );
+    expect(
+      carrier!.dependencies.some((dependencyId) =>
+        dependencyId.endsWith("::GenericParam"),
+      ),
+    ).toBe(false);
+    expect(
+      carrier!.dependencies.some((dependencyId) =>
+        dependencyId.endsWith("::GenericParam.field"),
+      ),
+    ).toBe(false);
+  });
+
   it("builds graph including symbols from triple-slash referenced files", () => {
     const graph = buildPackageGraph(makePackageInfo("triple-slash-refs"));
 

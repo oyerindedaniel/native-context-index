@@ -527,6 +527,10 @@ snapshot_test!(
     snapshot_interface_wrapper_generic_default_deps,
     "interface-wrapper-generic-default-deps"
 );
+snapshot_test!(
+    snapshot_generic_intersection_placeholder_filtering,
+    "generic-intersection-placeholder-filtering"
+);
 
 #[test]
 fn all_oracles_have_tests() {

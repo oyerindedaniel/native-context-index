@@ -1,0 +1,243 @@
+{
+  "package": "generic-intersection-placeholder-filtering",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft",
+      "name": "ConcreteLeft",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "export interface ConcreteLeft {\n  left: boolean;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft.left",
+      "name": "ConcreteLeft.left",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "left: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight",
+      "name": "ConcreteRight",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "export interface ConcreteRight {\n  right: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight.right",
+      "name": "ConcreteRight.right",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "right: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Slot",
+      "name": "Slot",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "export interface Slot {\n  field: ConcreteRight;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Slot.field",
+      "name": "Slot.field",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "field: ConcreteRight;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Slot"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Slot.field.right",
+      "name": "Slot.field.right",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "right: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Slot.field"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier",
+      "name": "Carrier",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "export interface Carrier<GenericParam extends Slot = Slot> {\n  mixed: GenericParam & ConcreteLeft;\n  concretePair: ConcreteLeft & ConcreteRight;\n  indexed: GenericParam[\"field\"] & ConcreteLeft;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft",
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight",
+        "generic-intersection-placeholder-filtering@1.0.0::Slot"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.mixed",
+      "name": "Carrier.mixed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "mixed: GenericParam & ConcreteLeft;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.mixed.left",
+      "name": "Carrier.mixed.left",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "left: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier.mixed"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.concretePair",
+      "name": "Carrier.concretePair",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "concretePair: ConcreteLeft & ConcreteRight;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft",
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.concretePair.left",
+      "name": "Carrier.concretePair.left",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "left: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier.concretePair"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.concretePair.right",
+      "name": "Carrier.concretePair.right",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "right: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier.concretePair"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.indexed",
+      "name": "Carrier.indexed",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "indexed: GenericParam[\"field\"] & ConcreteLeft;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier"
+    },
+    {
+      "id": "generic-intersection-placeholder-filtering@1.0.0::Carrier.indexed.left",
+      "name": "Carrier.indexed.left",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "generic-intersection-placeholder-filtering",
+      "filePath": "index.d.ts",
+      "signature": "left: boolean;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "generic-intersection-placeholder-filtering@1.0.0::Carrier.indexed"
+    }
+  ],
+  "totalSymbols": 15,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

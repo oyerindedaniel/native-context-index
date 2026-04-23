@@ -2139,6 +2139,65 @@ mod tests {
     }
 
     #[test]
+    fn graph_keeps_concrete_intersections_and_filters_placeholder_indexed_access() {
+        let pkg_dir = fixture_dir("generic-intersection-placeholder-filtering");
+        let info = PackageInfo {
+            name: "generic-intersection-placeholder-filtering"
+                .to_string()
+                .into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+        let carrier = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "Carrier")
+            .expect("Carrier symbol");
+
+        assert!(
+            carrier.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref()
+                    == "generic-intersection-placeholder-filtering@1.0.0::ConcreteLeft"
+            }),
+            "Carrier should include ConcreteLeft dependency: {:?}",
+            carrier.dependencies
+        );
+        assert!(
+            carrier.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref()
+                    == "generic-intersection-placeholder-filtering@1.0.0::ConcreteRight"
+            }),
+            "Carrier should include ConcreteRight dependency: {:?}",
+            carrier.dependencies
+        );
+        assert!(
+            carrier.dependencies.iter().any(|dependency_id| {
+                dependency_id.as_ref() == "generic-intersection-placeholder-filtering@1.0.0::Slot"
+            }),
+            "Carrier should include Slot dependency: {:?}",
+            carrier.dependencies
+        );
+        assert!(
+            carrier
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().ends_with("::GenericParam")),
+            "Carrier must not include generic placeholder deps: {:?}",
+            carrier.dependencies
+        );
+        assert!(
+            carrier
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().ends_with("::GenericParam.field")),
+            "Carrier must not include placeholder-derived indexed access deps: {:?}",
+            carrier.dependencies
+        );
+    }
+
+    #[test]
     fn dependency_stub_roots_short_circuits_listed_packages_to_npm_stub_edges() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()

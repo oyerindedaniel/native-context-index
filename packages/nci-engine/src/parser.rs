@@ -3720,6 +3720,46 @@ mod tests {
     }
 
     #[test]
+    fn parse_filters_placeholder_derived_refs_and_keeps_concrete_intersections() {
+        let result = parse_fixture_file("generic-intersection-placeholder-filtering", "index.d.ts");
+        let carrier = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "Carrier".into())
+            .expect("Carrier export");
+        let dep_names: Vec<&str> = carrier
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_ref())
+            .collect();
+        assert!(
+            dep_names.contains(&"ConcreteLeft"),
+            "missing ConcreteLeft in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"ConcreteRight"),
+            "missing ConcreteRight in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            dep_names.contains(&"Slot"),
+            "missing Slot in deps: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"GenericParam"),
+            "generic placeholder GenericParam must not become dependency: {:?}",
+            dep_names
+        );
+        assert!(
+            !dep_names.contains(&"GenericParam.field"),
+            "placeholder-derived indexed access GenericParam.field must not become dependency: {:?}",
+            dep_names
+        );
+    }
+
+    #[test]
     fn triple_slash_after_block_comment_prolog() {
         let source = r#"/**
  * Long license banner must not hide following reference directives.
