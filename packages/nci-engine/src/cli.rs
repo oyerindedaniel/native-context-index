@@ -692,16 +692,16 @@ fn with_plain_index_progress(
     let start = Instant::now();
     let packages_completed = Arc::new(AtomicUsize::new(0));
     let packages_completed_for_callback = Arc::clone(&packages_completed);
-    opts.on_package_done = Some(Arc::new(move |p: pipeline::PackageProgress| {
+    opts.on_package_done = Some(Arc::new(move |progress: pipeline::PackageProgress| {
         let one_based_index = packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
         let elapsed = start.elapsed();
-        let src = match p.source {
+        let source_label = match progress.source {
             GraphSource::Cached => "cached",
             GraphSource::Crawled => "crawled",
         };
         eprintln!(
-            "[{one_based_index}/{total}] {} {} ({src}) +{elapsed:?}",
-            p.name, p.version,
+            "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{elapsed:?}",
+            progress.name, progress.version, progress.total_symbols,
         );
         let _ = io::stderr().flush();
     }));

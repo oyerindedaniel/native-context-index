@@ -30,12 +30,12 @@ pub enum GraphSource {
     Crawled,
 }
 
-/// Per-package progress for CLI plain output (after outcome is final for this run).
 #[derive(Clone)]
 pub struct PackageProgress {
     pub name: SharedString,
     pub version: SharedString,
     pub source: GraphSource,
+    pub total_symbols: usize,
 }
 
 #[derive(Debug)]
@@ -173,6 +173,20 @@ fn index_metadata_from_graph(graph: &PackageGraph) -> PackageIndexMetadata {
     }
 }
 
+fn indexed_total_symbols(indexed: &IndexedGraph) -> usize {
+    indexed
+        .graph
+        .as_ref()
+        .map(|graph| graph.total_symbols)
+        .or_else(|| {
+            indexed
+                .cache_metadata
+                .as_ref()
+                .map(|metadata| metadata.total_symbols)
+        })
+        .unwrap_or(0)
+}
+
 // One read-only `NciDatabase` per OS thread for cache probes (Rayon workers). Path is tracked so a
 // different `nci.sqlite` on a later run reopens. See `release_read_only_sqlite_thread_local`.
 thread_local! {
@@ -182,7 +196,7 @@ thread_local! {
 /// Drop the per-thread read-only handle on cache **miss** after a probe that had a live RO
 /// connection (hits keep reuse). Miss paths soon crawl and may enqueue a save; closing here avoids
 /// holding an idle handle through that work and trims extra concurrent readers (minor WAL
-/// checkpoint / `BUSY` hygiene), not because an open RO connection continuously locks the DB.
+/// checkpoint / `BUSY` hygiene).
 /// No-op if this thread never got a live read-only connection (avoids clearing a failed-open slot
 /// so the next probe retries after the writer creates the file).
 fn release_read_only_sqlite_thread_local() {
@@ -494,12 +508,14 @@ pub fn index_packages(
                         cache_metadata: None,
                     }
                 };
+                let total_symbols = indexed_total_symbols(&indexed);
                 *slot.lock().expect("indexed result mutex poisoned") = Some(indexed);
                 if let Some(cb) = package_done_writer.as_ref() {
                     cb(PackageProgress {
                         name: package.name.clone(),
                         version: package.version.clone(),
                         source: GraphSource::Crawled,
+                        total_symbols,
                     });
                 }
             }
@@ -519,12 +535,14 @@ pub fn index_packages(
                 index_engine_cache_key.as_str(),
             )
         {
+            let total_symbols = indexed_total_symbols(&indexed);
             *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
             if let Some(cb) = on_package_done.as_ref() {
                 cb(PackageProgress {
                     name: package.name.clone(),
                     version: package.version.clone(),
                     source: GraphSource::Cached,
+                    total_symbols,
                 });
             }
             return;
@@ -534,6 +552,7 @@ pub fn index_packages(
 
         let persist_skipped = cache_sqlite_path.is_none() || cache::package_dir_is_symlink(package);
         if persist_skipped {
+            let total_symbols = graph.total_symbols;
             *results[i].lock().expect("indexed result mutex poisoned") = Some(IndexedGraph {
                 graph: Some(graph),
                 source: GraphSource::Crawled,
@@ -544,6 +563,7 @@ pub fn index_packages(
                     name: package.name.clone(),
                     version: package.version.clone(),
                     source: GraphSource::Crawled,
+                    total_symbols,
                 });
             }
             return;
@@ -555,6 +575,7 @@ pub fn index_packages(
         let save_tx = Arc::clone(save_tx);
         if let Err(send_error) = save_tx.send((i, package.clone(), graph)) {
             let (_i, _pkg, graph) = send_error.0;
+            let total_symbols = graph.total_symbols;
             warn!(
                 package = %package.name.as_ref(),
                 "save queue disconnected before persist; returning crawled graph without save"
@@ -569,6 +590,7 @@ pub fn index_packages(
                     name: package.name.clone(),
                     version: package.version.clone(),
                     source: GraphSource::Crawled,
+                    total_symbols,
                 });
             }
         }
