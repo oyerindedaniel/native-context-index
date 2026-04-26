@@ -2619,9 +2619,22 @@ fn extract_type_literal_members<'a>(
     }
 }
 
-/// Extracts type references from a function declaration (params + return type).
+/// Extracts type references from a function declaration.
 fn extract_type_refs_from_function(func_decl: &Function<'_>) -> Vec<TypeReference> {
     let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut type_parameter_names: HashSet<SharedString> = HashSet::new();
+
+    if let Some(type_parameters) = func_decl.type_parameters.as_ref() {
+        for type_parameter in &type_parameters.params {
+            type_parameter_names.insert(SharedString::from(type_parameter.name.name.as_ref()));
+            if let Some(constraint) = type_parameter.constraint.as_ref() {
+                collect_type_refs(constraint, &mut refs);
+            }
+            if let Some(default_type) = type_parameter.default.as_ref() {
+                collect_type_refs(default_type, &mut refs);
+            }
+        }
+    }
 
     for param in &func_decl.params.items {
         if let Some(type_annotation) = &param.type_annotation {
@@ -2631,6 +2644,10 @@ fn extract_type_refs_from_function(func_decl: &Function<'_>) -> Vec<TypeReferenc
 
     if let Some(return_type) = &func_decl.return_type {
         collect_type_refs(&return_type.type_annotation, &mut refs);
+    }
+
+    for type_parameter_name in type_parameter_names {
+        refs.remove(&type_parameter_name);
     }
 
     refs.into_values().collect()

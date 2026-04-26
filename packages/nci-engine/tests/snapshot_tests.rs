@@ -516,6 +516,10 @@ snapshot_test!(
     "generic-default-type-parameter-deps"
 );
 snapshot_test!(
+    snapshot_function_generic_default_type_parameter_deps,
+    "function-generic-default-type-parameter-deps"
+);
+snapshot_test!(
     snapshot_type_alias_call_signature_deps,
     "type-alias-call-signature-deps"
 );

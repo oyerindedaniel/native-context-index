@@ -472,6 +472,26 @@ describe("buildPackageGraph", () => {
     );
   });
 
+  it("tracks function generic default dependencies", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("function-generic-default-type-parameter-deps"),
+    );
+    const usePagedQuery = graph.symbols.find(
+      (symbol) => symbol.name === "usePagedQuery",
+    );
+    expect(usePagedQuery).toBeDefined();
+    expect(usePagedQuery!.dependencies).toEqual(
+      expect.arrayContaining([
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::DefaultError",
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::InfiniteData",
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::QueryKey",
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::RequestOptions",
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::Client",
+        "function-generic-default-type-parameter-deps@1.0.0::core.d.ts::RequestResult",
+      ]),
+    );
+  });
+
   it("tracks call-signature dependencies inside type literal aliases", () => {
     const graph = buildPackageGraph(
       makePackageInfo("type-alias-call-signature-deps"),

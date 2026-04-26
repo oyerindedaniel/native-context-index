@@ -450,6 +450,32 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     expect(dependencyNames).toContain("QueryShape");
   });
 
+  it("extracts function generic default type parameter references", () => {
+    const parsed = parseFile(
+      path.join(
+        FIXTURES_DIR,
+        "function-generic-default-type-parameter-deps",
+        "index.d.ts",
+      ),
+    );
+    const usePagedQuery = parsed.exports.find(
+      (exportItem) => exportItem.name === "usePagedQuery",
+    );
+    expect(usePagedQuery).toBeDefined();
+    const dependencyNames =
+      usePagedQuery?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(dependencyNames).toContain("core.DefaultError");
+    expect(dependencyNames).toContain("core.InfiniteData");
+    expect(dependencyNames).toContain("core.QueryKey");
+    expect(dependencyNames).toContain("core.RequestOptions");
+    expect(dependencyNames).toContain("core.Client");
+    expect(dependencyNames).toContain("core.RequestResult");
+    expect(dependencyNames).not.toContain("TData");
+    expect(dependencyNames).not.toContain("TError");
+    expect(dependencyNames).not.toContain("TResult");
+    expect(dependencyNames).not.toContain("TKey");
+  });
+
   it("tracks interface generic defaults and excludes generic placeholders", () => {
     const parsed = parseFile(
       path.join(
