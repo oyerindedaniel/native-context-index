@@ -37,7 +37,7 @@ pub struct FilterConfig {
     pub exclude_patterns: Vec<String>,
 
     /// When non-empty, only packages whose names match at least one of these globs are kept
-    /// (e.g. repeatable CLI `--package` or `.nci.toml` `packages`).
+    /// (e.g. repeatable CLI `--package` or `nci.config.json` `packages.include`).
     pub include_globs: Vec<String>,
 }
 
@@ -50,12 +50,8 @@ pub struct IgnoreRule {
 
 impl FilterConfig {
     pub fn with_nciignore_file(mut self, project_root: &Path) -> Self {
-        let path = project_root.join(".nciignore");
-        if path.is_file()
-            && let Ok(text) = fs::read_to_string(&path)
-        {
-            self.nciignore_rules.extend(parse_nciignore_lines(&text));
-        }
+        self.nciignore_rules
+            .extend(load_nciignore_rules_from_dir(project_root));
         self.project_root = Some(project_root.to_path_buf());
         self
     }
@@ -106,6 +102,17 @@ impl FilterConfig {
             })
             .collect()
     }
+}
+
+fn load_nciignore_rules_from_dir(base_dir: &Path) -> Vec<IgnoreRule> {
+    let path = base_dir.join(".nciignore");
+    if !path.is_file() {
+        return Vec::new();
+    }
+    if let Ok(text) = fs::read_to_string(&path) {
+        return parse_nciignore_lines(&text);
+    }
+    Vec::new()
 }
 
 fn load_allowed_package_names_from_package_json(
@@ -537,6 +544,20 @@ mod tests {
 
         assert_eq!(config.nciignore_rules.len(), 1);
         assert_eq!(config.nciignore_rules[0].pattern, "pre-existing");
+    }
+
+    #[test]
+    fn load_nciignore_rules_from_dir_reads_only_target_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("root");
+        let child = root.join("child");
+        std::fs::create_dir_all(&child).unwrap();
+        std::fs::write(root.join(".nciignore"), "root-only\n").unwrap();
+        std::fs::write(child.join(".nciignore"), "child-only\n").unwrap();
+
+        let child_rules = load_nciignore_rules_from_dir(&child);
+        assert_eq!(child_rules.len(), 1);
+        assert_eq!(child_rules[0].pattern, "child-only");
     }
 
     #[test]

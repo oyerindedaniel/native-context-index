@@ -1,5 +1,6 @@
 //! `nci` binary — command tree, config merge, and output formatting.
 
+use std::collections::HashSet;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
@@ -18,7 +19,7 @@ use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
 use nci_engine::filter::FilterConfig;
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::resolver::normalize_dependency_stub_list;
-use nci_engine::scanner::{self, ScanError, find_package_in_node_modules};
+use nci_engine::scanner::{self, ScanError};
 use nci_engine::storage::{
     DatabaseStatusReport, NciDatabase, StorageError, verify_sqlite_file_header,
 };
@@ -63,7 +64,7 @@ pub struct Cli {
         long,
         global = true,
         value_name = "PATH",
-        help = "Path to nci.sqlite (overrides .nci.toml)"
+        help = "Path to nci.sqlite (overrides nci.config.json)"
     )]
     database: Option<PathBuf>,
 
@@ -71,7 +72,7 @@ pub struct Cli {
         long,
         global = true,
         value_enum,
-        help = "Output format for supported commands (overrides .nci.toml)"
+        help = "Output format for supported commands (overrides nci.config.json)"
     )]
     format: Option<OutputFormat>,
 
@@ -81,7 +82,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Interactive setup (or -y): create .nci.toml and open the database")]
+    #[command(about = "Interactive setup (or -y): create nci.config.json and open the database")]
     Init {
         #[arg(short = 'y', long, help = "Accept all defaults (non-interactive)")]
         defaults: bool,
@@ -182,7 +183,7 @@ struct BulkIndexArgs {
         short = 'r',
         long,
         value_name = "DIR",
-        help = "Project root; default from .nci.toml or `.`"
+        help = "Project root; default from nci.config.json or `.`"
     )]
     project_root: Option<PathBuf>,
 
@@ -190,16 +191,10 @@ struct BulkIndexArgs {
     #[arg(long, allow_hyphen_values = true)]
     max_hops: Option<i64>,
 
-    #[arg(long, help = "Parallel package indexing (default true)")]
-    parallel: Option<bool>,
-
-    #[arg(long)]
-    parallel_resolve_deps: Option<bool>,
-
     #[arg(long = "package", value_name = "GLOB")]
     package_globs: Vec<String>,
 
-    /// Emit `npm::…` stubs only for this package root (repeatable); union with `.nci.toml` `dependency_stub_packages`.
+    /// Emit `npm::…` stubs only for this package root (repeatable); union with `nci.config.json` `dependency_stub_packages`.
     #[arg(long = "dependency-stub-package", value_name = "PKG")]
     dependency_stub_packages: Vec<String>,
 
@@ -252,40 +247,50 @@ fn run_binary_path() -> Result<(), String> {
     Ok(())
 }
 
-fn load_file_for_root(project_root: &Path) -> Option<NciConfigFile> {
-    config::load_config_file(project_root)
+#[derive(Clone)]
+struct CommandContext {
+    config_dir: PathBuf,
+    project_root: PathBuf,
+    file: Option<NciConfigFile>,
 }
 
-/// Directory containing `.nci.toml` is discovered from `-r` when set, otherwise cwd.
-fn index_config_discovery_dir(bulk: &BulkIndexArgs) -> Result<PathBuf, String> {
-    let base = bulk
-        .project_root
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("."));
-    fs::canonicalize(&base).map_err(|err| format!("project root {}: {err}", base.display()))
-}
-
-fn index_effective_project_root(
-    bulk: &BulkIndexArgs,
-    file: Option<&NciConfigFile>,
-    discovery_dir: &Path,
-) -> Result<PathBuf, String> {
-    if bulk.project_root.is_some() {
-        return Ok(discovery_dir.to_path_buf());
-    }
-    if let Some(toml_cfg) = file
-        && let Some(root_str) = &toml_cfg.project_root
-    {
-        let path = Path::new(root_str);
-        let joined = if path.is_absolute() {
-            path.to_path_buf()
+fn resolve_command_context(
+    project_root_override: Option<&PathBuf>,
+) -> Result<CommandContext, String> {
+    let start_dir = if let Some(root_override) = project_root_override {
+        root_override.clone()
+    } else {
+        PathBuf::from(".")
+    };
+    let discovery_dir = fs::canonicalize(&start_dir)
+        .map_err(|err| format!("project root {}: {err}", start_dir.display()))?;
+    let discovered = config::discover_config(&discovery_dir)?;
+    if let Some((config_dir, file_cfg)) = discovered {
+        let project_root = if project_root_override.is_some() {
+            discovery_dir.clone()
+        } else if let Some(root_str) = &file_cfg.project_root {
+            let raw = Path::new(root_str);
+            let joined = if raw.is_absolute() {
+                raw.to_path_buf()
+            } else {
+                config_dir.join(raw)
+            };
+            fs::canonicalize(&joined)
+                .map_err(|err| format!("config project_root {}: {err}", joined.display()))?
         } else {
-            discovery_dir.join(path)
+            config_dir.clone()
         };
-        return fs::canonicalize(&joined)
-            .map_err(|err| format!("config project_root {}: {err}", joined.display()));
+        return Ok(CommandContext {
+            config_dir,
+            project_root,
+            file: Some(file_cfg),
+        });
     }
-    Ok(discovery_dir.to_path_buf())
+    Ok(CommandContext {
+        config_dir: discovery_dir.clone(),
+        project_root: discovery_dir,
+        file: None,
+    })
 }
 
 fn effective_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<OutputFormat, String> {
@@ -299,7 +304,7 @@ fn effective_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<OutputFor
             return Ok(parsed);
         }
         return Err(format!(
-            "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
+            "invalid format in nci.config.json: {format_str:?} (expected plain, json, or jsonl)"
         ));
     }
     Ok(OutputFormat::Plain)
@@ -328,24 +333,50 @@ fn sql_rows_format(cli: &Cli, file: Option<&NciConfigFile>) -> Result<SqlRowsFor
             "json" => Ok(SqlRowsFormat::Json),
             "jsonl" => Ok(SqlRowsFormat::Jsonl),
             _ => Err(format!(
-                "invalid format in .nci.toml: {format_str:?} (expected plain, json, or jsonl)"
+                "invalid format in nci.config.json: {format_str:?} (expected plain, json, or jsonl)"
             )),
         };
     }
     Ok(SqlRowsFormat::default())
 }
 
-fn merge_database_path(cli: &Cli, file: Option<&NciConfigFile>) -> Option<PathBuf> {
-    cli.database
-        .clone()
-        .or_else(|| file.and_then(|toml| toml.database.clone()))
+fn resolve_database_path_from_config(
+    config_dir: &Path,
+    configured_database_path: PathBuf,
+) -> PathBuf {
+    if configured_database_path.is_absolute() {
+        return configured_database_path;
+    }
+    config_dir.join(configured_database_path)
 }
 
-fn resolve_database_path(cli: &Cli, file: Option<&NciConfigFile>) -> Result<PathBuf, String> {
-    merge_database_path(cli, file)
+fn merge_database_path(
+    cli: &Cli,
+    file: Option<&NciConfigFile>,
+    config_dir: &Path,
+) -> Option<PathBuf> {
+    if let Some(cli_database_path) = &cli.database {
+        return Some(cli_database_path.clone());
+    }
+    file.and_then(|config_file| {
+        config_file
+            .database
+            .clone()
+            .map(|configured_database_path| {
+                resolve_database_path_from_config(config_dir, configured_database_path)
+            })
+    })
+}
+
+fn resolve_database_path(
+    cli: &Cli,
+    file: Option<&NciConfigFile>,
+    config_dir: &Path,
+) -> Result<PathBuf, String> {
+    merge_database_path(cli, file, config_dir)
         .or_else(nci_sqlite_path)
         .ok_or_else(|| {
-            "could not resolve database path; set `database` in .nci.toml, pass --database, or set a writable user cache directory / NCI_CACHE_DIR"
+            "could not resolve database path; set `database` in nci.config.json, pass --database, or set a writable user cache directory / NCI_CACHE_DIR"
                 .to_string()
         })
 }
@@ -360,8 +391,9 @@ fn open_database_at(path: &Path) -> Result<NciDatabase, String> {
 fn open_database(
     cli: &Cli,
     file: Option<&NciConfigFile>,
+    config_dir: &Path,
 ) -> Result<(PathBuf, NciDatabase), String> {
-    let path = resolve_database_path(cli, file)?;
+    let path = resolve_database_path(cli, file, config_dir)?;
     let db = open_database_at(&path)?;
     Ok((path, db))
 }
@@ -425,8 +457,6 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         file_cfg.database = database_cli.or_else(nci_sqlite_path);
         file_cfg.project_root = Some(".".to_string());
         file_cfg.format = Some("plain".into());
-        file_cfg.parallel = Some(true);
-        file_cfg.parallel_resolve_deps = Some(true);
         file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
         if file_cfg.database.is_none() {
             return Err(
@@ -469,16 +499,6 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         }
         file_cfg.format = Some(fmt);
 
-        let par_line: String = Input::with_theme(&theme)
-            .with_prompt("Parallel package indexing by default (true/false)")
-            .default("true".into())
-            .interact_text()
-            .map_err(|err| err.to_string())?;
-        let par = par_line.trim().eq_ignore_ascii_case("true")
-            || par_line.trim() == "1"
-            || par_line.trim().eq_ignore_ascii_case("yes");
-        file_cfg.parallel = Some(par);
-        file_cfg.parallel_resolve_deps = Some(true);
         file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
     }
 
@@ -502,13 +522,14 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
 }
 
 fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
-    let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
-    let file = load_file_for_root(&fs::canonicalize(".").unwrap_or_else(|_| cwd.clone()));
-    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
+    let context = resolve_command_context(None)?;
+    let file = context.file.as_ref();
+    let config_dir = context.config_dir.as_path();
+    let fmt = envelope_output_format(effective_format(cli, file)?);
 
     match cmd {
         DbCommands::Init => {
-            let (path, database) = open_database(cli, file.as_ref())?;
+            let (path, database) = open_database(cli, file, config_dir)?;
             let schema = database
                 .stored_schema_version()
                 .map_err(|err| err.to_string())?;
@@ -530,7 +551,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::Status => {
-            let path = resolve_database_path(cli, file.as_ref())?;
+            let path = resolve_database_path(cli, file, config_dir)?;
             let database = open_database_at(&path)?;
             let report = database
                 .status_report(&path)
@@ -544,7 +565,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::Clear => {
-            let (_, db) = open_database(cli, file.as_ref())?;
+            let (_, db) = open_database(cli, file, config_dir)?;
             db.clear_all_packages().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("cleared all packages"),
@@ -555,7 +576,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::Remove { name, version } => {
-            let (_, db) = open_database(cli, file.as_ref())?;
+            let (_, db) = open_database(cli, file, config_dir)?;
             db.delete_package(name, version)
                 .map_err(|err| err.to_string())?;
             match fmt {
@@ -568,7 +589,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::RemoveGlob { pattern } => {
-            let (_, db) = open_database(cli, file.as_ref())?;
+            let (_, db) = open_database(cli, file, config_dir)?;
             let n = db
                 .delete_packages_matching_name_glob(pattern.as_str())
                 .map_err(|err| err.to_string())?;
@@ -588,7 +609,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                     "nci db destroy: refusing without --force (deletes the SQLite file on disk)",
                 );
             }
-            let path = resolve_database_path(cli, file.as_ref())?;
+            let path = resolve_database_path(cli, file, config_dir)?;
             verify_sqlite_file_header(&path).map_err(|err| err.to_string())?;
             // Drop any connection by not opening; remove file
             fs::remove_file(&path).map_err(|err| err.to_string())?;
@@ -601,7 +622,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::Vacuum => {
-            let (_, db) = open_database(cli, file.as_ref())?;
+            let (_, db) = open_database(cli, file, config_dir)?;
             db.vacuum().map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => println!("vacuum complete"),
@@ -612,7 +633,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::WalCheckpoint => {
-            let (_, db) = open_database(cli, file.as_ref())?;
+            let (_, db) = open_database(cli, file, config_dir)?;
             db.wal_checkpoint_truncate()
                 .map_err(|err| err.to_string())?;
             match fmt {
@@ -628,34 +649,104 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
 
 fn build_filter(file: Option<&NciConfigFile>, package_globs_cli: &[String]) -> FilterConfig {
     let mut filter = FilterConfig::default();
-    let mut globs: Vec<String> = Vec::new();
-    if let Some(toml_cfg) = file
-        && let Some(pkgs) = &toml_cfg.packages
+    if let Some(file_cfg) = file
+        && let Some(package_filters) = &file_cfg.packages
     {
-        globs.extend(pkgs.iter().cloned());
+        filter.include_globs = package_filters.include.clone().unwrap_or_default();
+        filter.exclude_patterns = package_filters.exclude.clone().unwrap_or_default();
     }
-    globs.extend(package_globs_cli.iter().cloned());
-    filter.include_globs = globs;
     filter
+        .include_globs
+        .extend(package_globs_cli.iter().cloned());
+    filter
+}
+
+fn expand_workspace_pattern(project_root: &Path, pattern: &str) -> Vec<PathBuf> {
+    let normalized = pattern.replace('\\', "/");
+    if normalized.ends_with("/*") {
+        let base = normalized.trim_end_matches("/*");
+        let base_dir = project_root.join(base);
+        if !base_dir.is_dir() {
+            return Vec::new();
+        }
+        let mut dirs = Vec::new();
+        if let Ok(entries) = fs::read_dir(base_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                }
+            }
+        }
+        return dirs;
+    }
+    let direct = project_root.join(normalized);
+    if direct.is_dir() {
+        vec![direct]
+    } else {
+        Vec::new()
+    }
+}
+
+fn collect_node_modules_roots(project_root: &Path, file: Option<&NciConfigFile>) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    roots.push(project_root.join("node_modules"));
+    if let Some(file_cfg) = file
+        && let Some(workspaces) = &file_cfg.workspaces
+    {
+        for pattern in workspaces {
+            let workspace_dirs = expand_workspace_pattern(project_root, pattern);
+            for workspace_dir in workspace_dirs {
+                roots.push(workspace_dir.join("node_modules"));
+            }
+        }
+    }
+    let mut seen_canonical: HashSet<PathBuf> = HashSet::new();
+    let mut deduped: Vec<PathBuf> = Vec::new();
+    for root in roots {
+        if !root.is_dir() {
+            continue;
+        }
+        let canonical = fs::canonicalize(&root).unwrap_or(root.clone());
+        if seen_canonical.insert(canonical) {
+            deduped.push(root);
+        }
+    }
+    deduped
+}
+
+fn scan_filtered_packages_across_roots(
+    node_modules_roots: &[PathBuf],
+    opts: &IndexOptions,
+) -> Result<Vec<nci_engine::types::PackageInfo>, ScanError> {
+    let mut all_packages = Vec::new();
+    for root in node_modules_roots {
+        let mut found = pipeline::scan_filtered_packages(root, opts)?;
+        all_packages.append(&mut found);
+    }
+    Ok(pipeline::dedupe_packages_by_canonical_dir(all_packages))
+}
+
+fn scan_all_packages_across_roots(
+    node_modules_roots: &[PathBuf],
+) -> Result<Vec<nci_engine::types::PackageInfo>, ScanError> {
+    let mut all_packages = Vec::new();
+    for root in node_modules_roots {
+        let mut found = scanner::scan_packages(root)?;
+        all_packages.append(&mut found);
+    }
+    Ok(pipeline::dedupe_packages_by_canonical_dir(all_packages))
 }
 
 fn build_index_options(
     cli: &Cli,
     file: Option<&NciConfigFile>,
+    config_dir: &Path,
     project_root: PathBuf,
     bulk: &BulkIndexArgs,
 ) -> Result<IndexOptions, String> {
-    let db_path = merge_database_path(cli, file);
+    let db_path = merge_database_path(cli, file, config_dir);
     let max_hops = max_hops_from_user_value(bulk.max_hops.or(file.and_then(|toml| toml.max_hops)))?;
-    let parallel = bulk
-        .parallel
-        .or(file.and_then(|toml| toml.parallel))
-        .unwrap_or(true);
-    let parallel_resolve_deps = bulk
-        .parallel_resolve_deps
-        .or(file.and_then(|toml| toml.parallel_resolve_deps))
-        .unwrap_or(true);
-
     let filter = build_filter(file, &bulk.package_globs);
 
     let mut stub_list_from_config: Vec<String> = Vec::new();
@@ -669,12 +760,12 @@ fn build_index_options(
 
     Ok(IndexOptions {
         max_hops,
-        parallel,
+        parallel: true,
         enable_package_cache: true,
         db_path,
         project_root: Some(project_root),
         filter,
-        parallel_resolve_deps,
+        parallel_resolve_deps: true,
         dependency_stub_packages,
         ..Default::default()
     })
@@ -709,18 +800,27 @@ fn with_plain_index_progress(
 }
 
 fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> Result<(), String> {
-    let discovery = index_config_discovery_dir(bulk)?;
-    let file = load_file_for_root(&discovery);
-    let project_root = index_effective_project_root(bulk, file.as_ref(), &discovery)?;
-    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
+    let context = resolve_command_context(bulk.project_root.as_ref())?;
+    let file = context.file.as_ref();
+    let config_dir = context.config_dir.clone();
+    let project_root = context.project_root.clone();
+    let fmt = envelope_output_format(effective_format(cli, file)?);
+    let node_modules_roots = collect_node_modules_roots(&project_root, file);
+    if node_modules_roots.is_empty() {
+        return emit_error(
+            fmt,
+            &format!(
+                "no node_modules directories found under {}",
+                project_root.display()
+            ),
+        );
+    }
 
     if bulk.dry_run {
-        let node_modules = project_root.join("node_modules");
-        let packages = scanner::scan_packages(&node_modules)
+        let mut opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
+        opts.filter = build_filter(file, &bulk.package_globs).with_nciignore_file(&config_dir);
+        let filtered = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
             .map_err(|scan_err: ScanError| scan_err.to_string())?;
-        let filter =
-            build_filter(file.as_ref(), &bulk.package_globs).with_nciignore_file(&project_root);
-        let filtered = filter.apply(packages);
         match fmt {
             OutputFormat::Plain => {
                 println!("dry-run: {} package(s) would be indexed", filtered.len());
@@ -746,30 +846,23 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
 
     match target {
         Some(IndexTarget::Package { name, version }) => {
-            let node_modules = project_root.join("node_modules");
-            if !node_modules.is_dir() {
-                return emit_error(
-                    fmt,
-                    &format!("node_modules missing: {}", node_modules.display()),
-                );
-            }
-            let package = find_package_in_node_modules(&node_modules, name, version)
+            let packages = scan_all_packages_across_roots(&node_modules_roots)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
-            let opts = build_index_options(cli, file.as_ref(), project_root.clone(), bulk)?;
+            let package = packages
+                .into_iter()
+                .find(|pkg| pkg.name.as_ref() == name && pkg.version.as_ref() == version)
+                .ok_or_else(|| {
+                    format!("package {name}@{version} not found in discovered node_modules roots")
+                })?;
+            let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
             let opts = with_plain_index_progress(opts, 1, fmt);
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
             print_index_summary(fmt, &out)?;
         }
         None => {
-            let node_modules = project_root.join("node_modules");
-            if !node_modules.is_dir() {
-                return emit_error(
-                    fmt,
-                    &format!("node_modules missing: {}", node_modules.display()),
-                );
-            }
-            let opts = build_index_options(cli, file.as_ref(), project_root, bulk)?;
-            let packages = pipeline::scan_filtered_packages(&node_modules, &opts)
+            let mut opts = build_index_options(cli, file, &config_dir, project_root, bulk)?;
+            opts.filter = opts.filter.with_nciignore_file(&config_dir);
+            let packages = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
             let opts = with_plain_index_progress(opts, packages.len(), fmt);
             let indexed = pipeline::index_packages(&packages, Some(opts));
@@ -809,11 +902,11 @@ fn print_index_summary(
 }
 
 fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
-    let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
-    let project_root = fs::canonicalize(".").unwrap_or(cwd);
-    let file = load_file_for_root(&project_root);
-    let fmt = envelope_output_format(effective_format(cli, file.as_ref())?);
-    let (_, database) = open_database(cli, file.as_ref())?;
+    let context = resolve_command_context(None)?;
+    let file = context.file.as_ref();
+    let config_dir = context.config_dir.as_path();
+    let fmt = envelope_output_format(effective_format(cli, file)?);
+    let (_, database) = open_database(cli, file, config_dir)?;
 
     match command {
         QueryCommands::Find { limit, fts_query } => {
@@ -911,11 +1004,11 @@ fn run_sql(
     sql_parts: &[String],
     max_rows: Option<usize>,
 ) -> Result<(), String> {
-    let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
-    let project_root = fs::canonicalize(".").unwrap_or(cwd);
-    let file = load_file_for_root(&project_root);
-    let rows_fmt = sql_rows_format(cli, file.as_ref())?;
-    let path = resolve_database_path(cli, file.as_ref())?;
+    let context = resolve_command_context(None)?;
+    let file = context.file.as_ref();
+    let config_dir = context.config_dir.as_path();
+    let rows_fmt = sql_rows_format(cli, file)?;
+    let path = resolve_database_path(cli, file, config_dir)?;
 
     let database = NciDatabase::open_read_only(&path).map_err(|err| err.to_string())?;
 
