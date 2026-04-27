@@ -608,7 +608,7 @@ pub struct SymbolNode {
 
     /// Dedupe keys when merging [`Self::raw_dependencies`] across merged symbol rows.
     #[serde(skip)]
-    pub dep_dedupe_keys: Option<HashSet<(SharedString, SharedString)>>,
+    pub dep_dedupe_keys: Option<HashSet<(SharedString, SharedString, Option<SymbolSpace>)>>,
 
     /// Original type references for resolution.
     #[serde(skip)]

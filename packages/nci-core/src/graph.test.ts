@@ -543,6 +543,48 @@ describe("buildPackageGraph", () => {
     );
   });
 
+  it("prunes namespace edge for plain merged type refs but keeps qualified refs", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("merged-namespace-plain-type-refs"),
+    );
+
+    const usesPlain = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "UsesPlain",
+    );
+    const usesArray = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "UsesArray",
+    );
+    const usesGeneric = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "UsesGeneric",
+    );
+    const usesQualified = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "UsesQualified",
+    );
+
+    expect(usesPlain).toBeDefined();
+    expect(usesArray).toBeDefined();
+    expect(usesGeneric).toBeDefined();
+    expect(usesQualified).toBeDefined();
+
+    const dispatcherClassId =
+      "merged-namespace-plain-type-refs@1.0.0::Dispatcher";
+    const dispatcherNamespaceId =
+      "merged-namespace-plain-type-refs@1.0.0::Dispatcher#2";
+
+    expect(usesPlain!.dependencies).toContain(dispatcherClassId);
+    expect(usesArray!.dependencies).toContain(dispatcherClassId);
+    expect(usesGeneric!.dependencies).toContain(dispatcherClassId);
+    expect(usesPlain!.dependencies).not.toContain(dispatcherNamespaceId);
+    expect(usesArray!.dependencies).not.toContain(dispatcherNamespaceId);
+    expect(usesGeneric!.dependencies).not.toContain(dispatcherNamespaceId);
+
+    expect(usesQualified!.dependencies).toEqual(
+      expect.arrayContaining([
+        "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options",
+      ]),
+    );
+  });
+
   it("tracks call-signature dependencies inside type literal aliases", () => {
     const graph = buildPackageGraph(
       makePackageInfo("type-alias-call-signature-deps"),

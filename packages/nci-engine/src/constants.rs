@@ -3,7 +3,7 @@ use phf::phf_set;
 /// Default cap on discovery edges from each package entry (`0` = entry files only).
 pub const DEFAULT_MAX_HOPS: usize = 10;
 
-/// User-facing value for “no hop cap” in CLI / `.nci.toml`. Internally mapped to [`usize::MAX`].
+/// User-facing value for "no hop cap" in CLI / `nci.config.json`. Internally mapped to [`usize::MAX`].
 pub const MAX_HOPS_UNLIMITED: i64 = -1;
 
 /// Convert merged CLI/config `max_hops` (`None` → default cap, [`MAX_HOPS_UNLIMITED`] → [`usize::MAX`]).

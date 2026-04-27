@@ -20,7 +20,8 @@ use crate::resolver::{
 };
 use crate::types::{
     MergeProvenance, MergeProvenanceKind, PackageEntry, PackageGraph, PackageInfo, ParsedImport,
-    ResolvedSymbol, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
+    ResolvedSymbol, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, TypeReference,
+    Visibility,
 };
 
 /// Parent directory of a package-relative path (already forward-slash normalized by [`make_relative_to_package`]).
@@ -391,6 +392,7 @@ fn merge_resolved_into_node(
                         dep.import_path
                             .clone()
                             .unwrap_or_else(|| SharedString::from("")),
+                        dep.resolution_hint,
                     )
                 })
                 .collect()
@@ -402,6 +404,7 @@ fn merge_resolved_into_node(
                     .import_path
                     .clone()
                     .unwrap_or_else(|| SharedString::from("")),
+                raw_dep.resolution_hint,
             );
             if set.insert(key) {
                 existing.raw_dependencies.push(raw_dep.clone());
@@ -828,7 +831,10 @@ fn resolve_dependency_ids_for_symbol(
         }
 
         if !target_ids.is_empty() {
+            let prefer_non_namespace_targets =
+                should_prefer_non_namespace_for_plain_type_ref(raw_dep);
             let mut filtered_target_ids: Vec<SharedString> = Vec::with_capacity(target_ids.len());
+            let mut namespace_target_ids: Vec<SharedString> = Vec::with_capacity(2);
             for symbol_id in target_ids.drain(..) {
                 if symbol_id.as_ref() == symbol_node.id.as_ref() {
                     continue;
@@ -844,8 +850,15 @@ fn resolve_dependency_ids_for_symbol(
                     .copied()
                     .unwrap_or(SymbolKind::Unknown);
                 if kind_matches_resolution_hint(candidate_kind, raw_dep.resolution_hint) {
-                    filtered_target_ids.push(symbol_id);
+                    if prefer_non_namespace_targets && candidate_kind == SymbolKind::Namespace {
+                        namespace_target_ids.push(symbol_id);
+                    } else {
+                        filtered_target_ids.push(symbol_id);
+                    }
                 }
+            }
+            if filtered_target_ids.is_empty() {
+                filtered_target_ids.extend(namespace_target_ids);
             }
             target_ids = filtered_target_ids;
         }
@@ -1660,6 +1673,12 @@ fn kind_matches_resolution_hint(kind: SymbolKind, hint: Option<SymbolSpace>) -> 
                 | SymbolKind::PropertySignature
         ),
     }
+}
+
+fn should_prefer_non_namespace_for_plain_type_ref(raw_dep: &TypeReference) -> bool {
+    raw_dep.resolution_hint == Some(SymbolSpace::Type)
+        && raw_dep.import_path.is_none()
+        && !raw_dep.name.as_ref().contains('.')
 }
 
 /// Stable edge when the target module is not part of this package graph (no extra crawl).

@@ -375,11 +375,12 @@ export function buildPackageGraph(
       existing.rawDependencies = existing.rawDependencies || [];
       const existingDeps = new Set(
         existing.rawDependencies.map(
-          (dep) => `${dep.name}::${dep.importPath || ""}`,
+          (dep) =>
+            `${dep.name}::${dep.importPath || ""}::${dep.resolutionHint || ""}`,
         ),
       );
       for (const rawDep of resolved.dependencies) {
-        const depKey = `${rawDep.name}::${rawDep.importPath || ""}`;
+        const depKey = `${rawDep.name}::${rawDep.importPath || ""}::${rawDep.resolutionHint || ""}`;
         if (!existingDeps.has(depKey)) {
           existingDeps.add(depKey);
           existing.rawDependencies.push(rawDep);
@@ -1024,18 +1025,33 @@ export function buildPackageGraph(
           }
         }
         if (targetIds.length > 0) {
+          const preferNonNamespaceTargets =
+            shouldPreferNonNamespaceForPlainTypeRef(rawDep);
           const filteredTargetIds: string[] = [];
+          const namespaceTargetIds: string[] = [];
           for (const symbolId of targetIds) {
             if (symbolId === symbolNode.id) continue;
-            if (
-              isExternalDependencyStub(symbolId) ||
-              kindMatchesResolutionHint(
-                idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown,
-                rawDep.resolutionHint,
-              )
-            ) {
+            if (isExternalDependencyStub(symbolId)) {
               filteredTargetIds.push(symbolId);
+              continue;
             }
+            const candidateKind =
+              idToKind.get(symbolId) ?? ts.SyntaxKind.Unknown;
+            if (
+              kindMatchesResolutionHint(candidateKind, rawDep.resolutionHint)
+            ) {
+              if (
+                preferNonNamespaceTargets &&
+                candidateKind === ts.SyntaxKind.ModuleDeclaration
+              ) {
+                namespaceTargetIds.push(symbolId);
+              } else {
+                filteredTargetIds.push(symbolId);
+              }
+            }
+          }
+          if (filteredTargetIds.length === 0) {
+            filteredTargetIds.push(...namespaceTargetIds);
           }
           targetIds = filteredTargetIds;
         }
@@ -1406,5 +1422,17 @@ function kindMatchesResolutionHint(
     kind === ts.SyntaxKind.PropertySignature ||
     kind === ts.SyntaxKind.CallSignature ||
     kind === ts.SyntaxKind.IndexSignature
+  );
+}
+
+function shouldPreferNonNamespaceForPlainTypeRef(rawDep: {
+  name: string;
+  importPath?: string;
+  resolutionHint?: "type" | "value";
+}): boolean {
+  return (
+    rawDep.resolutionHint === "type" &&
+    !rawDep.importPath &&
+    !rawDep.name.includes(".")
   );
 }

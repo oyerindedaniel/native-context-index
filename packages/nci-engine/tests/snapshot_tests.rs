@@ -543,6 +543,10 @@ snapshot_test!(
     snapshot_wildcard_internal_subpath_collision,
     "wildcard-internal-subpath-collision"
 );
+snapshot_test!(
+    snapshot_merged_namespace_plain_type_refs,
+    "merged-namespace-plain-type-refs"
+);
 
 #[test]
 fn all_oracles_have_tests() {

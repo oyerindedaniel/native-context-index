@@ -48,7 +48,7 @@ pub struct IndexedGraph {
 #[derive(Clone)]
 pub struct IndexOptions {
     /// Upper bound on discovery edges from each package entry (default: 10).
-    /// Use [`usize::MAX`] for no hop cap (CLI / `.nci.toml` use `max_hops = -1` → [`crate::constants::MAX_HOPS_UNLIMITED`]).
+    /// Use [`usize::MAX`] for no hop cap (CLI / `nci.config.json` use `max_hops = -1` → [`crate::constants::MAX_HOPS_UNLIMITED`]).
     pub max_hops: usize,
 
     /// Whether to run in parallel (default: true).
@@ -93,7 +93,7 @@ pub struct IndexOptions {
     /// only. Backoff between retries is fixed internally (bounded ms + clock jitter).
     pub save_retry_count: u32,
 
-    /// Normalized npm package roots for dependency stubbing (merged from `.nci.toml` and CLI).
+    /// Normalized npm package roots for dependency stubbing (merged from `nci.config.json` and CLI).
     pub dependency_stub_packages: Vec<String>,
 
     /// Optional hook after each package’s index outcome is final (cache hit, persist skipped,

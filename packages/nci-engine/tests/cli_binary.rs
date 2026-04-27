@@ -432,6 +432,42 @@ fn index_dry_run_composes_nciignore_with_package_filters() {
 }
 
 #[test]
+fn index_dry_run_exclude_wins_over_nciignore_negation() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_minimal_pkg(proj.path(), "other-pkg", "1.0.0");
+    write_minimal_pkg(proj.path(), "shadow-blocked", "1.0.0");
+    write_minimal_pkg(proj.path(), "shadow-kept", "1.0.0");
+    fs::write(
+        proj.path().join(".nciignore"),
+        "shadow-*\n!shadow-blocked\n",
+    )
+    .unwrap();
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{
+  "packages": {
+    "exclude": ["shadow-blocked"]
+  }
+}"#,
+    )
+    .unwrap();
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output).unwrap();
+    assert!(output_text.contains("\"other-pkg\""));
+    assert!(!output_text.contains("\"shadow-blocked\""));
+    assert!(!output_text.contains("\"shadow-kept\""));
+}
+
+#[test]
 fn sql_schema_includes_packages_ddl() {
     let proj = tempdir().unwrap();
     let cache = tempdir().unwrap();

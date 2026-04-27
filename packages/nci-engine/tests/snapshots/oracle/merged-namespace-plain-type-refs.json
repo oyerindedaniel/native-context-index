@@ -1,0 +1,238 @@
+{
+  "package": "merged-namespace-plain-type-refs",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::Dispatcher",
+      "name": "Dispatcher",
+      "kind": 264,
+      "kindName": "ClassDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export declare class Dispatcher {\n  close(): void;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::Dispatcher.prototype.close",
+      "name": "Dispatcher.prototype.close",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "close(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::Dispatcher#2",
+      "name": "Dispatcher",
+      "kind": 268,
+      "kindName": "ModuleDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export declare namespace Dispatcher {\n  interface Options {\n    retries: number;\n  }\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesPlain",
+      "name": "UsesPlain",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesPlain {\n  current: Dispatcher;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesPlain.current",
+      "name": "UsesPlain.current",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "current: Dispatcher;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::UsesPlain"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesPlain.current.close",
+      "name": "UsesPlain.current.close",
+      "kind": 175,
+      "kindName": "MethodDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "close(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::UsesPlain.current"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesArray",
+      "name": "UsesArray",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesArray {\n  items: Dispatcher[];\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesArray.items",
+      "name": "UsesArray.items",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "items: Dispatcher[];",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::UsesArray"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesGeneric",
+      "name": "UsesGeneric",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesGeneric {\n  sequence: Array<Dispatcher>;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesGeneric.sequence",
+      "name": "UsesGeneric.sequence",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "sequence: Array<Dispatcher>;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::Dispatcher"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::UsesGeneric"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesQualified",
+      "name": "UsesQualified",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "export interface UsesQualified {\n  options: Dispatcher.Options;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::UsesQualified.options",
+      "name": "UsesQualified.options",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "options: Dispatcher.Options;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options"
+      ],
+      "isInternal": false,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::UsesQualified"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options",
+      "name": "Dispatcher.Options",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "interface Options {\n    retries: number;\n  }",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::Dispatcher#2",
+      "enclosingModuleDeclarationId": "merged-namespace-plain-type-refs@1.0.0::Dispatcher#2"
+    },
+    {
+      "id": "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options.retries",
+      "name": "Dispatcher.Options.retries",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "merged-namespace-plain-type-refs",
+      "filePath": "index.d.ts",
+      "signature": "retries: number;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "merged-namespace-plain-type-refs@1.0.0::index.d.ts::Dispatcher.Options",
+      "enclosingModuleDeclarationId": "merged-namespace-plain-type-refs@1.0.0::Dispatcher#2"
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

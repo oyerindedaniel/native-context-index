@@ -7,7 +7,6 @@ import {
   extractTypeReferences,
   getFileSource,
 } from "./parser.js";
-import type { ParsedExport } from "./types.js";
 
 const FIXTURES_DIR = path.resolve(__dirname, "../fixtures");
 
@@ -525,6 +524,38 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     const resultDeps =
       resultExport?.dependencies?.map((reference) => reference.name) ?? [];
     expect(resultDeps).toContain("Entity");
+  });
+
+  it("tracks plain and namespace-qualified refs for merged class+namespace names", () => {
+    const parsed = parseFile(
+      path.join(FIXTURES_DIR, "merged-namespace-plain-type-refs", "index.d.ts"),
+    );
+
+    const usesPlain = parsed.exports.find(
+      (exportItem) => exportItem.name === "UsesPlain",
+    );
+    expect(usesPlain).toBeDefined();
+    expect(usesPlain?.dependencies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Dispatcher",
+          resolutionHint: "type",
+        }),
+      ]),
+    );
+
+    const usesQualified = parsed.exports.find(
+      (exportItem) => exportItem.name === "UsesQualified",
+    );
+    expect(usesQualified).toBeDefined();
+    expect(usesQualified?.dependencies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Dispatcher.Options",
+          resolutionHint: "type",
+        }),
+      ]),
+    );
   });
 
   it("tracks interface generic defaults and excludes generic placeholders", () => {
