@@ -539,6 +539,10 @@ snapshot_test!(
     snapshot_ambient_qualified_constraint_deps,
     "ambient-qualified-constraint-deps"
 );
+snapshot_test!(
+    snapshot_wildcard_internal_subpath_collision,
+    "wildcard-internal-subpath-collision"
+);
 
 #[test]
 fn all_oracles_have_tests() {

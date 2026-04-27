@@ -1382,7 +1382,7 @@ fn extract_declaration<'a>(
                     type_alias.span
                 },
             );
-            let mut deps_map: HashMap<SharedString, TypeReference> = HashMap::new();
+            let mut deps_map: HashMap<String, TypeReference> = HashMap::new();
             collect_type_refs(&type_alias.type_annotation, &mut deps_map);
             if let Some(type_parameters) = type_alias.type_parameters.as_ref() {
                 for type_parameter in &type_parameters.params {
@@ -2061,9 +2061,15 @@ fn extract_interface_members<'a>(
                         collect_type_refs(&anno.type_annotation, &mut deps_map);
                     }
                 }
-                for method_type_parameter_name in method_type_parameter_names {
-                    deps_map.remove(&method_type_parameter_name);
-                }
+                deps_map.retain(|_, dependency| {
+                    let first_segment = dependency
+                        .name
+                        .as_ref()
+                        .split('.')
+                        .next()
+                        .unwrap_or(dependency.name.as_ref());
+                    !method_type_parameter_names.contains(first_segment)
+                });
             }
             _ => {}
         }
@@ -2523,9 +2529,15 @@ fn extract_type_literal_members<'a>(
                         collect_type_refs(&anno.type_annotation, &mut deps_map);
                     }
                 }
-                for method_type_parameter_name in method_type_parameter_names {
-                    deps_map.remove(&method_type_parameter_name);
-                }
+                deps_map.retain(|_, dependency| {
+                    let first_segment = dependency
+                        .name
+                        .as_ref()
+                        .split('.')
+                        .next()
+                        .unwrap_or(dependency.name.as_ref());
+                    !method_type_parameter_names.contains(first_segment)
+                });
             }
             _ => {}
         }
@@ -2621,7 +2633,7 @@ fn extract_type_literal_members<'a>(
 
 /// Extracts type references from a function declaration.
 fn extract_type_refs_from_function(func_decl: &Function<'_>) -> Vec<TypeReference> {
-    let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut refs: HashMap<String, TypeReference> = HashMap::new();
     let mut type_parameter_names: HashSet<SharedString> = HashSet::new();
 
     if let Some(type_parameters) = func_decl.type_parameters.as_ref() {
@@ -2646,16 +2658,22 @@ fn extract_type_refs_from_function(func_decl: &Function<'_>) -> Vec<TypeReferenc
         collect_type_refs(&return_type.type_annotation, &mut refs);
     }
 
-    for type_parameter_name in type_parameter_names {
-        refs.remove(&type_parameter_name);
-    }
+    refs.retain(|_, dependency| {
+        let first_segment = dependency
+            .name
+            .as_ref()
+            .split('.')
+            .next()
+            .unwrap_or(dependency.name.as_ref());
+        !type_parameter_names.contains(first_segment)
+    });
 
     refs.into_values().collect()
 }
 
 /// Extracts type references from a class declaration (heritage + members).
 fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
-    let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut refs: HashMap<String, TypeReference> = HashMap::new();
 
     if let Some(super_class) = &class_decl.super_class {
         if let Some(type_args) = &class_decl.super_type_arguments {
@@ -2666,11 +2684,12 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
         if let Some(name) = expression_to_string(super_class)
             && !BUILTIN_TYPES.contains(name.as_ref())
         {
-            refs.insert(
-                name.clone(),
+            insert_type_reference(
+                &mut refs,
                 TypeReference {
                     name,
                     import_path: None,
+                    resolution_hint: Some(SymbolSpace::Type),
                 },
             );
         }
@@ -2684,11 +2703,12 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
         }
         let name = ts_type_name_to_string(&implement.expression);
         if !BUILTIN_TYPES.contains(name.as_ref()) {
-            refs.insert(
-                name.clone(),
+            insert_type_reference(
+                &mut refs,
                 TypeReference {
                     name,
                     import_path: None,
+                    resolution_hint: Some(SymbolSpace::Type),
                 },
             );
         }
@@ -2726,7 +2746,7 @@ fn extract_type_refs_from_class(class_decl: &Class<'_>) -> Vec<TypeReference> {
 
 /// Extracts type references from an interface declaration (heritage + members).
 fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> Vec<TypeReference> {
-    let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut refs: HashMap<String, TypeReference> = HashMap::new();
     let mut type_parameter_names: HashSet<SharedString> = HashSet::new();
 
     if let Some(type_parameters) = iface_decl.type_parameters.as_ref() {
@@ -2751,11 +2771,12 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
         if let Some(name) = expression_to_string(&heritage.expression)
             && !BUILTIN_TYPES.contains(name.as_ref())
         {
-            refs.insert(
-                name.clone(),
+            insert_type_reference(
+                &mut refs,
                 TypeReference {
                     name,
                     import_path: None,
+                    resolution_hint: Some(SymbolSpace::Type),
                 },
             );
         }
@@ -2805,12 +2826,13 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
         }
     }
 
-    refs.retain(|dependency_name, _| {
-        let first_segment = dependency_name
+    refs.retain(|_, dependency| {
+        let first_segment = dependency
+            .name
             .as_ref()
             .split('.')
             .next()
-            .unwrap_or(dependency_name.as_ref());
+            .unwrap_or(dependency.name.as_ref());
         !type_parameter_names.contains(first_segment)
     });
 
@@ -2818,7 +2840,7 @@ fn extract_type_refs_from_interface(iface_decl: &TSInterfaceDeclaration<'_>) -> 
 }
 
 fn extract_type_refs_from_ts_type(ts_type: &TSType<'_>) -> Vec<TypeReference> {
-    let mut refs: HashMap<SharedString, TypeReference> = HashMap::new();
+    let mut refs: HashMap<String, TypeReference> = HashMap::new();
     collect_type_refs(ts_type, &mut refs);
     refs.into_values().collect()
 }
@@ -2836,16 +2858,17 @@ fn ts_qualified_name_to_string(qualified_name: &TSQualifiedName<'_>) -> SharedSt
 }
 
 /// Recursive visitor that collects type references from any TSType.
-fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, TypeReference>) {
+fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<String, TypeReference>) {
     match ts_type {
         TSType::TSTypeReference(type_ref) => {
             let name = ts_type_name_to_string(&type_ref.type_name);
             if !BUILTIN_TYPES.contains(name.as_ref()) {
-                refs.insert(
-                    name.clone(),
+                insert_type_reference(
+                    refs,
                     TypeReference {
                         name: name.clone(),
                         import_path: None,
+                        resolution_hint: Some(SymbolSpace::Type),
                     },
                 );
             }
@@ -2972,11 +2995,12 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
             TSTypeQueryExprName::IdentifierReference(ident) => {
                 let name = SharedString::from(ident.name.as_ref());
                 if !BUILTIN_TYPES.contains(name.as_ref()) {
-                    refs.insert(
-                        name.clone(),
+                    insert_type_reference(
+                        refs,
                         TypeReference {
                             name,
                             import_path: None,
+                            resolution_hint: Some(SymbolSpace::Value),
                         },
                     );
                 }
@@ -2988,18 +3012,26 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
                     let name = SharedString::from(leaf);
                     let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
                     if !BUILTIN_TYPES.contains(name.as_ref()) {
-                        refs.insert(name.clone(), TypeReference { name, import_path });
+                        insert_type_reference(
+                            refs,
+                            TypeReference {
+                                name,
+                                import_path,
+                                resolution_hint: Some(SymbolSpace::Value),
+                            },
+                        );
                     }
                 }
             }
             TSTypeQueryExprName::QualifiedName(qualified_name) => {
                 let name = ts_qualified_name_to_string(qualified_name);
                 if !BUILTIN_TYPES.contains(name.as_ref()) {
-                    refs.insert(
-                        name.clone(),
+                    insert_type_reference(
+                        refs,
                         TypeReference {
                             name,
                             import_path: None,
+                            resolution_hint: Some(SymbolSpace::Value),
                         },
                     );
                 }
@@ -3013,7 +3045,14 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
                 let name = SharedString::from(leaf);
                 let import_path = Some(SharedString::from(import_type.source.value.as_ref()));
                 if !BUILTIN_TYPES.contains(name.as_ref()) {
-                    refs.insert(name.clone(), TypeReference { name, import_path });
+                    insert_type_reference(
+                        refs,
+                        TypeReference {
+                            name,
+                            import_path,
+                            resolution_hint: Some(SymbolSpace::Type),
+                        },
+                    );
                 }
             }
         }
@@ -3028,6 +3067,24 @@ fn collect_type_refs(ts_type: &TSType<'_>, refs: &mut HashMap<SharedString, Type
 
         _ => {}
     }
+}
+
+fn type_reference_dedupe_key(reference: &TypeReference) -> String {
+    let import_path = reference.import_path.as_deref().unwrap_or("");
+    let resolution_hint = match reference.resolution_hint {
+        Some(SymbolSpace::Type) => "type",
+        Some(SymbolSpace::Value) => "value",
+        None => "none",
+    };
+    format!(
+        "{}::{import_path}::{resolution_hint}",
+        reference.name.as_ref()
+    )
+}
+
+fn insert_type_reference(refs: &mut HashMap<String, TypeReference>, reference: TypeReference) {
+    let dedupe_key = type_reference_dedupe_key(&reference);
+    refs.insert(dedupe_key, reference);
 }
 
 /// Extracts heritage clauses from a class declaration using source spans (parity with TS `getText`).
@@ -3672,6 +3729,45 @@ mod tests {
             dep_names.contains(&"provider.readConfig"),
             "qualified typeof ref should be preserved: {:?}",
             dep_names
+        );
+    }
+
+    #[test]
+    fn parse_keeps_both_type_and_value_hints_for_same_name_reference() {
+        let result = parse_fixture_file(
+            "wildcard-internal-subpath-collision",
+            "dist/internal/runtime.d.ts",
+        );
+        let alias = result
+            .exports
+            .iter()
+            .find(|export_item| export_item.name == "EntityDual".into())
+            .expect("EntityDual export");
+        let entity_type_ref_count = alias
+            .dependencies
+            .iter()
+            .filter(|dependency| {
+                dependency.name.as_ref() == "Entity"
+                    && dependency.resolution_hint == Some(SymbolSpace::Type)
+            })
+            .count();
+        let entity_value_ref_count = alias
+            .dependencies
+            .iter()
+            .filter(|dependency| {
+                dependency.name.as_ref() == "Entity"
+                    && dependency.resolution_hint == Some(SymbolSpace::Value)
+            })
+            .count();
+        assert_eq!(
+            entity_type_ref_count, 1,
+            "type reference for Entity should be preserved: {:?}",
+            alias.dependencies
+        );
+        assert_eq!(
+            entity_value_ref_count, 1,
+            "value reference for typeof Entity should be preserved: {:?}",
+            alias.dependencies
         );
     }
 

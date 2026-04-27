@@ -80,6 +80,10 @@ pub struct TypeReference {
     /// The module specifier if it's an inline `import()`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub import_path: Option<SharedString>,
+
+    /// Type vs value namespace hint for dependency resolution.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution_hint: Option<SymbolSpace>,
 }
 
 // ─── Symbol Kind ───────────────────────────────────────────────
@@ -215,7 +219,7 @@ pub enum Deprecation {
 // ─── Parser Output ─────────────────────────────────────────────
 
 /// TypeScript type namespace vs value namespace for a declaration site (not re-export flags).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SymbolSpace {
     #[default]

@@ -1,0 +1,322 @@
+---
+source: packages/nci-engine/tests/snapshot_tests.rs
+expression: "& rust_graph"
+---
+{
+  "package": "wildcard-internal-subpath-collision",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity",
+      "name": "Entity",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "entryVisibility": [
+        "dist/internal/runtime.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "export interface Entity {\n  id: string;\n  source: \"runtime\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity#2",
+      "name": "Entity",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "entryVisibility": [
+        "dist/internal/runtime.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "declare const Entity: {\n  create(id: string): Entity;\n}",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity"
+      ],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity#3",
+      "name": "Entity",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/model.d.ts",
+      "signature": "export interface Entity {\n  id: string;\n  source: \"model\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity.create",
+      "name": "Entity.create",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Entity",
+      "kind": 174,
+      "kindName": "MethodSignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "signature": "create(id: string): Entity;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity.id",
+      "name": "Entity.id",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Entity#3",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/model.d.ts",
+      "additionalFiles": [
+        "dist/internal/runtime.d.ts"
+      ],
+      "entryVisibility": [
+        "dist/internal/model.d.ts",
+        "dist/internal/runtime.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope",
+          "overload_key"
+        ]
+      },
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity.source",
+      "name": "Entity.source",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Entity#3",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/model.d.ts",
+      "signature": "source: \"model\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Entity.source#2",
+      "name": "Entity.source",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Entity",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "signature": "source: \"runtime\";",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::EntityDual",
+      "name": "EntityDual",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "entryVisibility": [
+        "dist/internal/runtime.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "export type EntityDual = Entity | typeof Entity;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity",
+        "wildcard-internal-subpath-collision@1.0.0::Entity#2"
+      ],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::EntityModel",
+      "name": "EntityModel",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/model.d.ts",
+      "entryVisibility": [
+        "dist/internal/model.d.ts",
+        "dist/index.d.ts"
+      ],
+      "signature": "export interface Entity {\n  id: string;\n  source: \"model\";\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Result",
+      "name": "Result",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/result.d.ts",
+      "entryVisibility": [
+        "dist/internal/result.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "export interface Result {\n  ok: true;\n  entity: Entity;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity#3"
+      ],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Result.entity",
+      "name": "Result.entity",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Result",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/result.d.ts",
+      "signature": "entity: Entity;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity#3"
+      ],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::Result.ok",
+      "name": "Result.ok",
+      "parentSymbolId": "wildcard-internal-subpath-collision@1.0.0::Result",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/result.d.ts",
+      "signature": "ok: true;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::createEntity",
+      "name": "createEntity",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "entryVisibility": [
+        "dist/internal/runtime.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "export declare function createEntity(id: string): Result;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Result"
+      ],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    },
+    {
+      "id": "wildcard-internal-subpath-collision@1.0.0::makeEntityValue",
+      "name": "makeEntityValue",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "wildcard-internal-subpath-collision",
+      "filePath": "dist/internal/runtime.d.ts",
+      "entryVisibility": [
+        "dist/internal/runtime.d.ts",
+        "dist/index.d.ts"
+      ],
+      "mergeProvenance": {
+        "kinds": [
+          "merge_scope"
+        ]
+      },
+      "signature": "export declare function makeEntityValue(): Entity;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [
+        "wildcard-internal-subpath-collision@1.0.0::Entity"
+      ],
+      "reExportedFrom": "dist/index.d.ts",
+      "isInternal": false,
+      "modifiers": [
+        "declare",
+        "export"
+      ]
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 4,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

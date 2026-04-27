@@ -476,6 +476,57 @@ describe("extractTypeReferences — Detailed Extraction Logic", () => {
     expect(dependencyNames).not.toContain("TKey");
   });
 
+  it("extracts wildcard-internal dependency refs under type/value collisions", () => {
+    const fixtureBase = path.join(
+      FIXTURES_DIR,
+      "wildcard-internal-subpath-collision",
+      "dist",
+      "internal",
+    );
+    const runtimeParsed = parseFile(path.join(fixtureBase, "runtime.d.ts"));
+    const resultParsed = parseFile(path.join(fixtureBase, "result.d.ts"));
+
+    const createEntity = runtimeParsed.exports.find(
+      (exportItem) => exportItem.name === "createEntity",
+    );
+    expect(createEntity).toBeDefined();
+    const createEntityDeps =
+      createEntity?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(createEntityDeps).toContain("Result");
+
+    const makeEntityValue = runtimeParsed.exports.find(
+      (exportItem) => exportItem.name === "makeEntityValue",
+    );
+    expect(makeEntityValue).toBeDefined();
+    const makeEntityValueDeps =
+      makeEntityValue?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(makeEntityValueDeps).toContain("Entity");
+
+    const entityDual = runtimeParsed.exports.find(
+      (exportItem) => exportItem.name === "EntityDual",
+    );
+    expect(entityDual).toBeDefined();
+    const entityDualDeps = entityDual?.dependencies ?? [];
+    const entityDualTypeEntityCount = entityDualDeps.filter(
+      (reference) =>
+        reference.name === "Entity" && reference.resolutionHint === "type",
+    ).length;
+    const entityDualValueEntityCount = entityDualDeps.filter(
+      (reference) =>
+        reference.name === "Entity" && reference.resolutionHint === "value",
+    ).length;
+    expect(entityDualTypeEntityCount).toBe(1);
+    expect(entityDualValueEntityCount).toBe(1);
+
+    const resultExport = resultParsed.exports.find(
+      (exportItem) => exportItem.name === "Result",
+    );
+    expect(resultExport).toBeDefined();
+    const resultDeps =
+      resultExport?.dependencies?.map((reference) => reference.name) ?? [];
+    expect(resultDeps).toContain("Entity");
+  });
+
   it("tracks interface generic defaults and excludes generic placeholders", () => {
     const parsed = parseFile(
       path.join(

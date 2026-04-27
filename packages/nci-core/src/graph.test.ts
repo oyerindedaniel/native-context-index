@@ -492,6 +492,57 @@ describe("buildPackageGraph", () => {
     );
   });
 
+  it("keeps wildcard internal collision dependencies stable", () => {
+    const graph = buildPackageGraph(
+      makePackageInfo("wildcard-internal-subpath-collision"),
+    );
+
+    expect(graph.totalFiles).toBe(4);
+
+    const resultSymbol = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "Result",
+    );
+    expect(resultSymbol).toBeDefined();
+    expect(resultSymbol!.dependencies).toContain(
+      "wildcard-internal-subpath-collision@1.0.0::Entity#3",
+    );
+
+    const createEntity = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "createEntity",
+    );
+    expect(createEntity).toBeDefined();
+    expect(createEntity!.dependencies).toContain(
+      "wildcard-internal-subpath-collision@1.0.0::Result",
+    );
+
+    const runtimeEntity = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "Entity" &&
+        symbolNode.kindName === "InterfaceDeclaration" &&
+        symbolNode.filePath === "dist/internal/runtime.d.ts",
+    );
+    const runtimeEntityValue = graph.symbols.find(
+      (symbolNode) =>
+        symbolNode.name === "Entity" &&
+        symbolNode.kindName === "VariableStatement" &&
+        symbolNode.filePath === "dist/internal/runtime.d.ts",
+    );
+    expect(runtimeEntity).toBeDefined();
+    expect(runtimeEntityValue).toBeDefined();
+    expect(runtimeEntityValue!.dependencies).toContain(runtimeEntity!.id);
+
+    const entityDual = graph.symbols.find(
+      (symbolNode) => symbolNode.name === "EntityDual",
+    );
+    expect(entityDual).toBeDefined();
+    expect(entityDual!.dependencies).toContain(
+      "wildcard-internal-subpath-collision@1.0.0::Entity",
+    );
+    expect(entityDual!.dependencies).toContain(
+      "wildcard-internal-subpath-collision@1.0.0::Entity#2",
+    );
+  });
+
   it("tracks call-signature dependencies inside type literal aliases", () => {
     const graph = buildPackageGraph(
       makePackageInfo("type-alias-call-signature-deps"),

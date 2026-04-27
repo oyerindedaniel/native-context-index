@@ -533,6 +533,7 @@ fn resolve_dependency_ids_for_symbol(
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     file_local_member_tail_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     name_to_ids: &HashMap<SharedString, Vec<SharedString>>,
+    id_to_kind: &HashMap<SharedString, SymbolKind>,
     id_to_file_path: &HashMap<SharedString, SharedString>,
     import_maps_per_file: &HashMap<SharedString, HashMap<SharedString, ParsedImport>>,
     triple_slash_edges: &HashMap<SharedString, Vec<SharedString>>,
@@ -826,7 +827,28 @@ fn resolve_dependency_ids_for_symbol(
             }
         }
 
-        target_ids.retain(|symbol_id| symbol_id.as_ref() != symbol_node.id.as_ref());
+        if !target_ids.is_empty() {
+            let mut filtered_target_ids: Vec<SharedString> = Vec::with_capacity(target_ids.len());
+            for symbol_id in target_ids.drain(..) {
+                if symbol_id.as_ref() == symbol_node.id.as_ref() {
+                    continue;
+                }
+                if symbol_id.as_ref().starts_with("npm::")
+                    || symbol_id.as_ref().starts_with("node::")
+                {
+                    filtered_target_ids.push(symbol_id);
+                    continue;
+                }
+                let candidate_kind = id_to_kind
+                    .get(&symbol_id)
+                    .copied()
+                    .unwrap_or(SymbolKind::Unknown);
+                if kind_matches_resolution_hint(candidate_kind, raw_dep.resolution_hint) {
+                    filtered_target_ids.push(symbol_id);
+                }
+            }
+            target_ids = filtered_target_ids;
+        }
 
         if !target_ids.is_empty() {
             if let Some(ambient_stub) = resolve_ambient_node_stub_id(
@@ -1373,6 +1395,7 @@ pub fn build_package_graph(
                     &file_local_to_ids,
                     &file_local_member_tail_to_ids,
                     &name_to_ids,
+                    &id_to_kind,
                     &id_to_file_path,
                     &import_maps_per_file,
                     &triple_slash_edges,
@@ -1405,6 +1428,7 @@ pub fn build_package_graph(
                 &file_local_to_ids,
                 &file_local_member_tail_to_ids,
                 &name_to_ids,
+                &id_to_kind,
                 &id_to_file_path,
                 &import_maps_per_file,
                 &triple_slash_edges,
@@ -1612,6 +1636,30 @@ fn resolve_ambient_node_stub_id(
         .get(dependency_name)
         .cloned()
         .or_else(|| ambient_nodejs_namespace_stub_id(dependency_name))
+}
+
+fn kind_matches_resolution_hint(kind: SymbolKind, hint: Option<SymbolSpace>) -> bool {
+    match hint {
+        None => true,
+        Some(SymbolSpace::Value) => matches!(
+            kind,
+            SymbolKind::Variable
+                | SymbolKind::Function
+                | SymbolKind::Class
+                | SymbolKind::Enum
+                | SymbolKind::Namespace
+        ),
+        Some(SymbolSpace::Type) => matches!(
+            kind,
+            SymbolKind::Interface
+                | SymbolKind::TypeAlias
+                | SymbolKind::Class
+                | SymbolKind::Enum
+                | SymbolKind::Namespace
+                | SymbolKind::MethodSignature
+                | SymbolKind::PropertySignature
+        ),
+    }
 }
 
 /// Stable edge when the target module is not part of this package graph (no extra crawl).
@@ -2140,6 +2188,68 @@ mod tests {
                 .dependencies
                 .iter()
                 .any(|dependency_id| dependency_id.as_ref().contains("TransferOptions"))
+        );
+    }
+
+    #[test]
+    fn wildcard_collision_type_position_prefers_type_symbol_over_value_homonym() {
+        let pkg_dir = fixture_dir("wildcard-internal-subpath-collision");
+        let info = PackageInfo {
+            name: "wildcard-internal-subpath-collision".to_string().into(),
+            version: "1.0.0".to_string().into(),
+            dir: normalize_path(pkg_dir.as_path()),
+            is_scoped: false,
+        };
+        let graph = build_package_graph(&info, None);
+
+        let result_symbol = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "Result")
+            .expect("Result symbol");
+        assert!(
+            result_symbol
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().ends_with("::Entity#3")),
+            "Result must resolve to model Entity type: {:?}",
+            result_symbol.dependencies
+        );
+
+        let create_method = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "Entity.create")
+            .expect("Entity.create symbol");
+        assert!(
+            create_method
+                .dependencies
+                .iter()
+                .all(|dependency_id| !dependency_id.as_ref().ends_with("::Entity#2")),
+            "Type-position member return must not bind value-space Entity: {:?}",
+            create_method.dependencies
+        );
+
+        let entity_dual = graph
+            .symbols
+            .iter()
+            .find(|symbol| symbol.name.as_ref() == "EntityDual")
+            .expect("EntityDual symbol");
+        assert!(
+            entity_dual
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().ends_with("::Entity")),
+            "EntityDual should keep type-space Entity dependency: {:?}",
+            entity_dual.dependencies
+        );
+        assert!(
+            entity_dual
+                .dependencies
+                .iter()
+                .any(|dependency_id| dependency_id.as_ref().ends_with("::Entity#2")),
+            "EntityDual should keep value-space typeof Entity dependency: {:?}",
+            entity_dual.dependencies
         );
     }
 
