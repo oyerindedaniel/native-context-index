@@ -652,8 +652,16 @@ fn build_filter(file: Option<&NciConfigFile>, package_globs_cli: &[String]) -> F
     if let Some(file_cfg) = file
         && let Some(package_filters) = &file_cfg.packages
     {
-        filter.include_globs = package_filters.include.clone().unwrap_or_default();
-        filter.exclude_patterns = package_filters.exclude.clone().unwrap_or_default();
+        if let Some(include_globs) = &package_filters.include {
+            filter.include_globs.reserve(include_globs.len());
+            filter.include_globs.extend(include_globs.iter().cloned());
+        }
+        if let Some(exclude_patterns) = &package_filters.exclude {
+            filter.exclude_patterns.reserve(exclude_patterns.len());
+            filter
+                .exclude_patterns
+                .extend(exclude_patterns.iter().cloned());
+        }
     }
     filter
         .include_globs
@@ -818,7 +826,7 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
 
     if bulk.dry_run {
         let mut opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
-        opts.filter = build_filter(file, &bulk.package_globs).with_nciignore_file(&config_dir);
+        opts.filter = opts.filter.with_nciignore_file(&config_dir);
         let filtered = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
             .map_err(|scan_err: ScanError| scan_err.to_string())?;
         match fmt {
