@@ -36,6 +36,8 @@ pub struct PackageProgress {
     pub version: SharedString,
     pub source: GraphSource,
     pub total_symbols: usize,
+    /// True when this package row is already persisted (cache hit or successful save).
+    pub persisted: bool,
 }
 
 #[derive(Debug)]
@@ -43,6 +45,7 @@ pub struct IndexedGraph {
     pub graph: Option<PackageGraph>,
     pub source: GraphSource,
     pub cache_metadata: Option<PackageIndexMetadata>,
+    pub persisted: bool,
 }
 
 #[derive(Clone)]
@@ -263,6 +266,7 @@ fn try_package_cache_hit(
                     graph: Some(cached_graph),
                     source: GraphSource::Cached,
                     cache_metadata: None,
+                    persisted: true,
                 });
             }
             trace!(
@@ -280,6 +284,7 @@ fn try_package_cache_hit(
                 graph: None,
                 source: GraphSource::Cached,
                 cache_metadata: Some(meta),
+                persisted: true,
             })
         } else {
             trace!(
@@ -442,7 +447,7 @@ pub fn index_packages(
             };
             while let Ok((idx, package, graph)) = save_rx.recv() {
                 let slot = &results_thread[idx];
-                let indexed = if let Some(ref mut db) = db_opt {
+                let (indexed, persisted) = if let Some(ref mut db) = db_opt {
                     let mut last_err = None;
                     let mut saved = false;
                     for attempt in 0..save_attempts {
@@ -471,19 +476,27 @@ pub fn index_packages(
                     }
                     if saved {
                         if retain {
-                            IndexedGraph {
-                                graph: Some(graph),
-                                source: GraphSource::Crawled,
-                                cache_metadata: None,
-                            }
+                            (
+                                IndexedGraph {
+                                    graph: Some(graph),
+                                    source: GraphSource::Crawled,
+                                    cache_metadata: None,
+                                    persisted: true,
+                                },
+                                true,
+                            )
                         } else {
                             let meta = index_metadata_from_graph(&graph);
                             drop(graph);
-                            IndexedGraph {
-                                graph: None,
-                                source: GraphSource::Crawled,
-                                cache_metadata: Some(meta),
-                            }
+                            (
+                                IndexedGraph {
+                                    graph: None,
+                                    source: GraphSource::Crawled,
+                                    cache_metadata: Some(meta),
+                                    persisted: true,
+                                },
+                                true,
+                            )
                         }
                     } else {
                         let err = last_err.expect("save_package failed without error");
@@ -495,18 +508,26 @@ pub fn index_packages(
                         );
                         let meta = index_metadata_from_graph(&graph);
                         drop(graph);
-                        IndexedGraph {
-                            graph: None,
-                            source: GraphSource::Crawled,
-                            cache_metadata: Some(meta),
-                        }
+                        (
+                            IndexedGraph {
+                                graph: None,
+                                source: GraphSource::Crawled,
+                                cache_metadata: Some(meta),
+                                persisted: false,
+                            },
+                            false,
+                        )
                     }
                 } else {
-                    IndexedGraph {
-                        graph: Some(graph),
-                        source: GraphSource::Crawled,
-                        cache_metadata: None,
-                    }
+                    (
+                        IndexedGraph {
+                            graph: Some(graph),
+                            source: GraphSource::Crawled,
+                            cache_metadata: None,
+                            persisted: false,
+                        },
+                        false,
+                    )
                 };
                 let total_symbols = indexed_total_symbols(&indexed);
                 *slot.lock().expect("indexed result mutex poisoned") = Some(indexed);
@@ -516,6 +537,7 @@ pub fn index_packages(
                         version: package.version.clone(),
                         source: GraphSource::Crawled,
                         total_symbols,
+                        persisted,
                     });
                 }
             }
@@ -543,6 +565,7 @@ pub fn index_packages(
                     version: package.version.clone(),
                     source: GraphSource::Cached,
                     total_symbols,
+                    persisted: true,
                 });
             }
             return;
@@ -557,6 +580,7 @@ pub fn index_packages(
                 graph: Some(graph),
                 source: GraphSource::Crawled,
                 cache_metadata: None,
+                persisted: false,
             });
             if let Some(cb) = on_package_done.as_ref() {
                 cb(PackageProgress {
@@ -564,6 +588,7 @@ pub fn index_packages(
                     version: package.version.clone(),
                     source: GraphSource::Crawled,
                     total_symbols,
+                    persisted: false,
                 });
             }
             return;
@@ -584,6 +609,7 @@ pub fn index_packages(
                 graph: Some(graph),
                 source: GraphSource::Crawled,
                 cache_metadata: None,
+                persisted: false,
             });
             if let Some(cb) = on_package_done.as_ref() {
                 cb(PackageProgress {
@@ -591,6 +617,7 @@ pub fn index_packages(
                     version: package.version.clone(),
                     source: GraphSource::Crawled,
                     total_symbols,
+                    persisted: false,
                 });
             }
         }

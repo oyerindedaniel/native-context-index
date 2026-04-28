@@ -26,6 +26,14 @@ pub struct NciConfigFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
 
+    /// Startup banner visibility: `auto` | `on` | `off`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub banner: Option<String>,
+
+    /// Progress messages visibility: `auto` | `on` | `off`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<String>,
+
     /// `0` = entry files only; `-1` = unlimited (see `nci_engine::constants::MAX_HOPS_UNLIMITED`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_hops: Option<i64>,
@@ -95,6 +103,8 @@ mod tests {
             database: Some(temp.path().join("x.sqlite")),
             project_root: Some(".".into()),
             format: Some("json".into()),
+            banner: Some("auto".into()),
+            progress: Some("auto".into()),
             max_hops: Some(7),
             packages: Some(PackageFiltersConfig {
                 include: Some(vec!["@types/*".into()]),
@@ -107,6 +117,8 @@ mod tests {
             .expect("load ok")
             .expect("parsed");
         assert_eq!(loaded.max_hops, Some(7));
+        assert_eq!(loaded.banner.as_deref(), Some("auto"));
+        assert_eq!(loaded.progress.as_deref(), Some("auto"));
         assert_eq!(
             loaded
                 .packages

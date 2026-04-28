@@ -50,6 +50,7 @@ nco-react-index.json
 **/nci-report-rust.json
 packages/nci-core/docs/
 docs/
+todo/
 
 # nci npm: downloaded native binary (postinstall)
 packages/nci/vendor/
@@ -68,4 +69,5 @@ snapshot.md
 context_summary.md
 *.txt
 rust-pelumi
+BRAND_COLOR_SYSTEM.md
 

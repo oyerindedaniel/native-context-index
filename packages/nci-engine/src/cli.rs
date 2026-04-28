@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
-use dialoguer::{Input, theme::ColorfulTheme};
+use dialoguer::Input;
 use serde::Serialize;
 
 use nci_engine::cache::nci_sqlite_path;
@@ -24,6 +24,48 @@ use nci_engine::storage::{
     DatabaseStatusReport, NciDatabase, StorageError, verify_sqlite_file_header,
 };
 use serde_json::Value;
+
+const CLI_ABOUT: &str = "Native Context Index — index and query TypeScript declaration graphs";
+mod style;
+use style::{
+    ProgressTone, emit_progress_line, emit_ui_line_stdout, init_prompt_theme, print_banner,
+};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum BannerMode {
+    Auto,
+    On,
+    Off,
+}
+
+impl BannerMode {
+    fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Self::Auto),
+            "on" => Some(Self::On),
+            "off" => Some(Self::Off),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum ProgressMode {
+    Auto,
+    On,
+    Off,
+}
+
+impl ProgressMode {
+    fn parse(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "auto" => Some(Self::Auto),
+            "on" => Some(Self::On),
+            "off" => Some(Self::Off),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, ValueEnum)]
 enum OutputFormat {
@@ -57,7 +99,7 @@ enum SqlRowsFormat {
 #[command(
     name = "nci",
     version,
-    about = "Native Context Index — index and query TypeScript declaration graphs"
+    about = CLI_ABOUT
 )]
 pub struct Cli {
     #[arg(
@@ -87,8 +129,11 @@ enum Commands {
         #[arg(short = 'y', long, help = "Accept all defaults (non-interactive)")]
         defaults: bool,
     },
-    #[command(subcommand)]
-    Db(DbCommands),
+    #[command(about = "Database maintenance and lifecycle commands")]
+    Db {
+        #[command(subcommand)]
+        command: DbCommands,
+    },
     #[command(about = "Scan node_modules and update the index")]
     Index {
         #[command(subcommand)]
@@ -96,6 +141,7 @@ enum Commands {
         #[command(flatten)]
         args: BulkIndexArgs,
     },
+    #[command(about = "Search and inspect indexed package data")]
     Query {
         #[command(subcommand)]
         command: QueryCommands,
@@ -146,8 +192,20 @@ enum Commands {
 enum DbCommands {
     #[command(about = "Open the database and run migrations (non-interactive)")]
     Init,
-    #[command(about = "Database path, size, journal mode, integrity check")]
-    Status,
+    #[command(about = "Database path/size and health checks (optional)")]
+    Status {
+        #[arg(
+            long,
+            conflicts_with = "deep",
+            help = "Run PRAGMA quick_check (can still take time on large DBs)"
+        )]
+        check: bool,
+        #[arg(
+            long,
+            help = "Run full PRAGMA integrity_check (can take minutes on large DBs)"
+        )]
+        deep: bool,
+    },
     #[command(about = "Delete all indexed package rows")]
     Clear,
     #[command(about = "Remove one package from the index")]
@@ -204,24 +262,45 @@ struct BulkIndexArgs {
 
 #[derive(Subcommand)]
 enum QueryCommands {
+    #[command(about = "Full-text search symbols by query text")]
     Find {
         #[arg(short = 'n', long, default_value_t = 20)]
         limit: usize,
         #[arg(required = true)]
         fts_query: String,
     },
+    #[command(about = "List packages currently indexed in the database")]
     Packages,
+    #[command(about = "List symbols for a package name/version")]
     Symbols {
         name: String,
         version: String,
+        #[arg(
+            short = 'n',
+            long,
+            default_value_t = 100,
+            help = "Max symbols to return in this page"
+        )]
+        limit: usize,
+        #[arg(
+            long,
+            default_value_t = 0,
+            help = "Skip this many symbols before returning results"
+        )]
+        offset: usize,
     },
 }
 
 pub fn run() -> Result<(), String> {
+    let raw_args: Vec<String> = std::env::args().collect();
+    if is_top_level_help_request(&raw_args) {
+        return run_top_level_help();
+    }
+
     let cli = Cli::parse();
     match &cli.command {
         Commands::Init { defaults } => run_init(*defaults, cli.database.clone()),
-        Commands::Db(db) => run_db(&cli, db),
+        Commands::Db { command } => run_db(&cli, command),
         Commands::Index { target, args } => run_index(&cli, target.as_ref(), args),
         Commands::Query { command } => run_query(&cli, command),
         Commands::Sql {
@@ -240,10 +319,27 @@ pub fn run() -> Result<(), String> {
     }
 }
 
+fn is_top_level_help_request(args: &[String]) -> bool {
+    args.len() == 2 && (args[1] == "--help" || args[1] == "-h")
+}
+
+fn run_top_level_help() -> Result<(), String> {
+    let context = resolve_command_context(None)?;
+    if should_print_banner(OutputFormat::Plain, context.file.as_ref())? {
+        print_banner();
+    }
+    let mut command = Cli::command();
+    command
+        .print_long_help()
+        .map_err(|io_error| io_error.to_string())?;
+    println!();
+    Ok(())
+}
+
 fn run_binary_path() -> Result<(), String> {
     let path = std::env::current_exe()
         .map_err(|err| format!("nci binary-path: could not resolve current executable: {err}"))?;
-    println!("{}", path.display());
+    println!("{}", display_path(&path));
     Ok(())
 }
 
@@ -419,8 +515,79 @@ fn emit_error(fmt: OutputFormat, msg: &str) -> Result<(), String> {
     }
 }
 
+fn display_path(path: &Path) -> String {
+    let raw = path.to_string_lossy();
+    raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_string()
+}
+
+fn effective_banner_mode(file: Option<&NciConfigFile>) -> Result<BannerMode, String> {
+    if let Ok(env_value) = std::env::var("NCI_BANNER")
+        && !env_value.trim().is_empty()
+    {
+        return BannerMode::parse(&env_value).ok_or_else(|| {
+            format!("invalid NCI_BANNER value {env_value:?} (expected auto, on, or off)")
+        });
+    }
+    if let Some(config_file) = file
+        && let Some(configured_banner_mode) = &config_file.banner
+    {
+        return BannerMode::parse(configured_banner_mode).ok_or_else(|| {
+            format!(
+                "invalid banner in nci.config.json: {:?} (expected auto, on, or off)",
+                configured_banner_mode
+            )
+        });
+    }
+    Ok(BannerMode::Auto)
+}
+
+fn should_print_banner(fmt: OutputFormat, file: Option<&NciConfigFile>) -> Result<bool, String> {
+    if fmt != OutputFormat::Plain {
+        return Ok(false);
+    }
+    let mode = effective_banner_mode(file)?;
+    Ok(match mode {
+        BannerMode::On => true,
+        BannerMode::Off => false,
+        BannerMode::Auto => std::io::stdout().is_terminal(),
+    })
+}
+
+fn effective_progress_mode(file: Option<&NciConfigFile>) -> Result<ProgressMode, String> {
+    if let Ok(env_value) = std::env::var("NCI_PROGRESS")
+        && !env_value.trim().is_empty()
+    {
+        return ProgressMode::parse(&env_value).ok_or_else(|| {
+            format!("invalid NCI_PROGRESS value {env_value:?} (expected auto, on, or off)")
+        });
+    }
+    if let Some(config_file) = file
+        && let Some(configured_progress_mode) = &config_file.progress
+    {
+        return ProgressMode::parse(configured_progress_mode).ok_or_else(|| {
+            format!(
+                "invalid progress in nci.config.json: {:?} (expected auto, on, or off)",
+                configured_progress_mode
+            )
+        });
+    }
+    Ok(ProgressMode::Auto)
+}
+
+fn should_print_progress(fmt: OutputFormat, file: Option<&NciConfigFile>) -> Result<bool, String> {
+    if fmt != OutputFormat::Plain {
+        return Ok(false);
+    }
+    let mode = effective_progress_mode(file)?;
+    Ok(match mode {
+        ProgressMode::On => true,
+        ProgressMode::Off => false,
+        ProgressMode::Auto => std::io::stderr().is_terminal(),
+    })
+}
+
 fn print_status_plain(r: &DatabaseStatusReport) {
-    println!("path: {}", r.path.display());
+    println!("path: {}", display_path(&r.path));
     if let Some(sz) = r.file_size_bytes {
         println!("file_size_bytes: {sz}");
     } else {
@@ -434,7 +601,15 @@ fn print_status_plain(r: &DatabaseStatusReport) {
     );
     println!("journal_mode: {}", r.journal_mode);
     println!("schema_version: {}", r.schema_version);
-    println!("integrity_check: {}", r.integrity_check);
+    if let (Some(check_kind), Some(check_value)) = (&r.integrity_check_kind, &r.integrity_check) {
+        println!("{check_kind}: {check_value}");
+    } else {
+        emit_ui_line_stdout(
+            ProgressTone::Note,
+            "db status",
+            "integrity_check skipped (use --check or --deep)",
+        );
+    }
     if let Some(ref env_value) = r.nci_cache_dir_env {
         println!("NCI_CACHE_DIR (env override, may differ from DB path): {env_value}");
     }
@@ -457,6 +632,7 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         file_cfg.database = database_cli.or_else(nci_sqlite_path);
         file_cfg.project_root = Some(".".to_string());
         file_cfg.format = Some("plain".into());
+        file_cfg.progress = Some("auto".into());
         file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
         if file_cfg.database.is_none() {
             return Err(
@@ -465,11 +641,11 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
             );
         }
     } else {
-        let theme = ColorfulTheme::default();
+        let theme = init_prompt_theme();
         let default_db = database_cli
             .clone()
             .or_else(nci_sqlite_path)
-            .map(|path_buf| path_buf.display().to_string())
+            .map(|path_buf| display_path(&path_buf))
             .unwrap_or_else(|| "(no default cache path)".into());
 
         let db_line: String = Input::with_theme(&theme)
@@ -498,8 +674,20 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
             ));
         }
         file_cfg.format = Some(fmt);
-
-        file_cfg.max_hops = Some(DEFAULT_MAX_HOPS as i64);
+        file_cfg.progress = Some("auto".into());
+        let max_hops_line: String = Input::with_theme(&theme)
+            .with_prompt("Default max hops (0 = entry only, -1 = unlimited)")
+            .default(DEFAULT_MAX_HOPS.to_string())
+            .interact_text()
+            .map_err(|err| err.to_string())?;
+        let max_hops_value = max_hops_line.trim().parse::<i64>().map_err(|_| {
+            format!(
+                "invalid max hops {max_hops_line:?}; expected an integer like {}, 0, or -1",
+                DEFAULT_MAX_HOPS
+            )
+        })?;
+        max_hops_from_user_value(Some(max_hops_value))?;
+        file_cfg.max_hops = Some(max_hops_value);
     }
 
     config::write_config_file(&project_root, &file_cfg)?;
@@ -509,14 +697,20 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
         .clone()
         .ok_or_else(|| "database path missing after init".to_string())?;
     let database = open_database_at(&db_path)?;
-    let schema = database
+    let _schema = database
         .stored_schema_version()
         .map_err(|err| err.to_string())?;
-    println!("{}", db_path.display());
-    println!("sqlite schema version {schema}");
-    println!(
-        "wrote {}",
-        config::config_path_for_project_root(&project_root).display()
+    let written_config_path = config::config_path_for_project_root(&project_root);
+    if should_print_banner(OutputFormat::Plain, Some(&file_cfg))? {
+        print_banner();
+    }
+    emit_ui_line_stdout(ProgressTone::Done, "init", "initialization complete");
+    println!("Database: {}", display_path(&db_path));
+    println!("Config: {}", display_path(&written_config_path));
+    emit_ui_line_stdout(
+        ProgressTone::Step,
+        "init",
+        "next: nci index; then nci query packages",
     );
     Ok(())
 }
@@ -526,17 +720,30 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
     let file = context.file.as_ref();
     let config_dir = context.config_dir.as_path();
     let fmt = envelope_output_format(effective_format(cli, file)?);
+    let show_progress = should_print_progress(fmt, file)?;
 
     match cmd {
         DbCommands::Init => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db init", ProgressTone::Step, "starting");
+            }
             let (path, database) = open_database(cli, file, config_dir)?;
             let schema = database
                 .stored_schema_version()
                 .map_err(|err| err.to_string())?;
+            if show_progress {
+                emit_progress_line(
+                    "db init",
+                    ProgressTone::Done,
+                    &format!("done +{:?}", started.elapsed()),
+                );
+            }
             match fmt {
                 OutputFormat::Plain => {
-                    println!("{}", path.display());
-                    println!("sqlite schema version {schema}");
+                    emit_ui_line_stdout(ProgressTone::Done, "db init", "database initialized");
+                    println!("Database: {}", display_path(&path));
+                    println!("Schema: v{schema}");
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({
@@ -550,12 +757,54 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             }
             Ok(())
         }
-        DbCommands::Status => {
+        DbCommands::Status { check, deep } => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db status", ProgressTone::Step, "opening database");
+            }
             let path = resolve_database_path(cli, file, config_dir)?;
             let database = open_database_at(&path)?;
+            if show_progress {
+                emit_progress_line("db status", ProgressTone::Step, "reading metadata");
+            }
+            let check_mode = if *deep {
+                Some("deep")
+            } else if *check {
+                Some("quick")
+            } else {
+                None
+            };
+            if show_progress {
+                match check_mode {
+                    Some("deep") => {
+                        emit_progress_line(
+                            "db status",
+                            ProgressTone::Step,
+                            "running integrity_check (deep; may take minutes)",
+                        );
+                    }
+                    Some("quick") => {
+                        emit_progress_line("db status", ProgressTone::Step, "running quick_check");
+                    }
+                    _ => {
+                        emit_progress_line(
+                            "db status",
+                            ProgressTone::Note,
+                            "skipping integrity scan (use --check or --deep)",
+                        );
+                    }
+                }
+            }
             let report = database
-                .status_report(&path)
+                .status_report(&path, check_mode)
                 .map_err(|err| err.to_string())?;
+            if show_progress {
+                emit_progress_line(
+                    "db status",
+                    ProgressTone::Done,
+                    &format!("done +{:?}", started.elapsed()),
+                );
+            }
             match fmt {
                 OutputFormat::Plain => print_status_plain(&report),
                 OutputFormat::Json | OutputFormat::Jsonl => {
@@ -568,7 +817,9 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             let (_, db) = open_database(cli, file, config_dir)?;
             db.clear_all_packages().map_err(|err| err.to_string())?;
             match fmt {
-                OutputFormat::Plain => println!("cleared all packages"),
+                OutputFormat::Plain => {
+                    emit_ui_line_stdout(ProgressTone::Done, "db clear", "cleared all packages")
+                }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": "cleared" }))?
                 }
@@ -580,7 +831,11 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             db.delete_package(name, version)
                 .map_err(|err| err.to_string())?;
             match fmt {
-                OutputFormat::Plain => println!("removed {name} {version}"),
+                OutputFormat::Plain => emit_ui_line_stdout(
+                    ProgressTone::Done,
+                    "db remove",
+                    &format!("removed {name} {version}"),
+                ),
                 OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({
                     "ok": true,
                     "data": { "name": name, "version": version }
@@ -594,7 +849,11 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 .delete_packages_matching_name_glob(pattern.as_str())
                 .map_err(|err| err.to_string())?;
             match fmt {
-                OutputFormat::Plain => println!("removed {n} package(s) matching {pattern}"),
+                OutputFormat::Plain => emit_ui_line_stdout(
+                    ProgressTone::Done,
+                    "db remove-glob",
+                    &format!("removed {n} package(s) matching {pattern}"),
+                ),
                 OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({
                     "ok": true,
                     "data": { "pattern": pattern, "removed": n }
@@ -614,7 +873,11 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             // Drop any connection by not opening; remove file
             fs::remove_file(&path).map_err(|err| err.to_string())?;
             match fmt {
-                OutputFormat::Plain => println!("removed {}", path.display()),
+                OutputFormat::Plain => emit_ui_line_stdout(
+                    ProgressTone::Done,
+                    "db destroy",
+                    &format!("removed {}", display_path(&path)),
+                ),
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": { "path": path } }))?
                 }
@@ -622,10 +885,23 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::Vacuum => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db vacuum", ProgressTone::Step, "starting");
+            }
             let (_, db) = open_database(cli, file, config_dir)?;
             db.vacuum().map_err(|err| err.to_string())?;
+            if show_progress {
+                emit_progress_line(
+                    "db vacuum",
+                    ProgressTone::Done,
+                    &format!("done +{:?}", started.elapsed()),
+                );
+            }
             match fmt {
-                OutputFormat::Plain => println!("vacuum complete"),
+                OutputFormat::Plain => {
+                    emit_ui_line_stdout(ProgressTone::Done, "db vacuum", "vacuum complete")
+                }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": "vacuum" }))?
                 }
@@ -633,11 +909,26 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
         DbCommands::WalCheckpoint => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db wal-checkpoint", ProgressTone::Step, "starting");
+            }
             let (_, db) = open_database(cli, file, config_dir)?;
             db.wal_checkpoint_truncate()
                 .map_err(|err| err.to_string())?;
+            if show_progress {
+                emit_progress_line(
+                    "db wal-checkpoint",
+                    ProgressTone::Done,
+                    &format!("done +{:?}", started.elapsed()),
+                );
+            }
             match fmt {
-                OutputFormat::Plain => println!("wal_checkpoint(TRUNCATE) complete"),
+                OutputFormat::Plain => emit_ui_line_stdout(
+                    ProgressTone::Done,
+                    "db wal-checkpoint",
+                    "wal_checkpoint(TRUNCATE) complete",
+                ),
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({ "ok": true, "data": "wal_checkpoint" }))?
                 }
@@ -780,12 +1071,8 @@ fn build_index_options(
 }
 
 /// Per-package stderr progress for `nci index` plain output only ([`OutputFormat::Plain`]).
-fn with_plain_index_progress(
-    mut opts: IndexOptions,
-    total: usize,
-    fmt: OutputFormat,
-) -> IndexOptions {
-    if fmt != OutputFormat::Plain || total == 0 {
+fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool) -> IndexOptions {
+    if !enabled || total == 0 {
         return opts;
     }
     let start = Instant::now();
@@ -796,13 +1083,17 @@ fn with_plain_index_progress(
         let elapsed = start.elapsed();
         let source_label = match progress.source {
             GraphSource::Cached => "cached",
-            GraphSource::Crawled => "crawled",
+            GraphSource::Crawled if progress.persisted => "indexed",
+            GraphSource::Crawled => "indexed (not persisted)",
         };
-        eprintln!(
-            "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{elapsed:?}",
-            progress.name, progress.version, progress.total_symbols,
+        emit_progress_line(
+            "index package",
+            ProgressTone::Done,
+            &format!(
+                "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{elapsed:?}",
+                progress.name, progress.version, progress.total_symbols,
+            ),
         );
-        let _ = io::stderr().flush();
     }));
     opts
 }
@@ -813,6 +1104,7 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
     let config_dir = context.config_dir.clone();
     let project_root = context.project_root.clone();
     let fmt = envelope_output_format(effective_format(cli, file)?);
+    let show_progress = should_print_progress(fmt, file)?;
     let node_modules_roots = collect_node_modules_roots(&project_root, file);
     if node_modules_roots.is_empty() {
         return emit_error(
@@ -825,13 +1117,32 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
     }
 
     if bulk.dry_run {
+        let dry_run_started = Instant::now();
+        if show_progress {
+            emit_progress_line("index dry-run", ProgressTone::Step, "scanning packages");
+        }
         let mut opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
         opts.filter = opts.filter.with_nciignore_file(&config_dir);
         let filtered = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
             .map_err(|scan_err: ScanError| scan_err.to_string())?;
+        if show_progress {
+            emit_progress_line(
+                "index dry-run",
+                ProgressTone::Done,
+                &format!(
+                    "done ({} package(s)) +{:?}",
+                    filtered.len(),
+                    dry_run_started.elapsed()
+                ),
+            );
+        }
         match fmt {
             OutputFormat::Plain => {
-                println!("dry-run: {} package(s) would be indexed", filtered.len());
+                emit_ui_line_stdout(
+                    ProgressTone::Note,
+                    "index dry-run",
+                    &format!("{} package(s) would be indexed", filtered.len()),
+                );
                 for pkg in &filtered {
                     println!("{} {}", pkg.name, pkg.version);
                 }
@@ -854,6 +1165,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
 
     match target {
         Some(IndexTarget::Package { name, version }) => {
+            let discover_started = Instant::now();
+            if show_progress {
+                emit_progress_line("index", ProgressTone::Step, "discovering package target");
+            }
             let packages = scan_all_packages_across_roots(&node_modules_roots)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
             let package = packages
@@ -862,17 +1177,43 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 .ok_or_else(|| {
                     format!("package {name}@{version} not found in discovered node_modules roots")
                 })?;
+            if show_progress {
+                emit_progress_line(
+                    "index",
+                    ProgressTone::Done,
+                    &format!("target resolved +{:?}", discover_started.elapsed()),
+                );
+            }
             let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
-            let opts = with_plain_index_progress(opts, 1, fmt);
+            let opts = with_plain_index_progress(opts, 1, show_progress);
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
             print_index_summary(fmt, &out)?;
         }
         None => {
+            let scan_started = Instant::now();
+            if show_progress {
+                emit_progress_line(
+                    "index",
+                    ProgressTone::Step,
+                    "scanning and filtering packages",
+                );
+            }
             let mut opts = build_index_options(cli, file, &config_dir, project_root, bulk)?;
             opts.filter = opts.filter.with_nciignore_file(&config_dir);
             let packages = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
-            let opts = with_plain_index_progress(opts, packages.len(), fmt);
+            if show_progress {
+                emit_progress_line(
+                    "index",
+                    ProgressTone::Done,
+                    &format!(
+                        "package set ready ({} package(s)) +{:?}",
+                        packages.len(),
+                        scan_started.elapsed()
+                    ),
+                );
+            }
+            let opts = with_plain_index_progress(opts, packages.len(), show_progress);
             let indexed = pipeline::index_packages(&packages, Some(opts));
             print_index_summary(fmt, &indexed)?;
         }
@@ -885,23 +1226,37 @@ fn print_index_summary(
     fmt: OutputFormat,
     indexed: &[pipeline::IndexedGraph],
 ) -> Result<(), String> {
-    let n = indexed.len();
+    let total_packages = indexed.len();
     let cached = indexed
         .iter()
         .filter(|indexed| indexed.source == GraphSource::Cached)
         .count();
-    let crawled = n - cached;
+    let indexed_now = indexed
+        .iter()
+        .filter(|indexed| indexed.source == GraphSource::Crawled && indexed.persisted)
+        .count();
+    let not_persisted = indexed
+        .iter()
+        .filter(|indexed| indexed.source == GraphSource::Crawled && !indexed.persisted)
+        .count();
     match fmt {
         OutputFormat::Plain => {
-            println!("{n} packages indexed (cached: {cached}, crawled: {crawled})");
+            emit_ui_line_stdout(
+                ProgressTone::Done,
+                "index",
+                &format!(
+                    "{total_packages} package(s) complete (cached: {cached}, indexed: {indexed_now}, not persisted: {not_persisted})"
+                ),
+            );
         }
         OutputFormat::Json | OutputFormat::Jsonl => {
             print_json(&serde_json::json!({
                 "ok": true,
                 "data": {
-                    "total": n,
+                    "total": total_packages,
                     "cached": cached,
-                    "crawled": crawled,
+                    "indexed": indexed_now,
+                    "not_persisted": not_persisted,
                 }
             }))?;
         }
@@ -956,13 +1311,24 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                 }
             }
         }
-        QueryCommands::Symbols { name, version } => {
-            let symbols = database
-                .list_package_symbols(name, version)
+        QueryCommands::Symbols {
+            name,
+            version,
+            limit,
+            offset,
+        } => {
+            let (total_symbols, symbols) = database
+                .list_package_symbols_page(name, version, *limit, *offset)
                 .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => {
-                    println!("{} symbols", symbols.len());
+                    println!(
+                        "showing {} of {} symbols (offset {}, limit {})",
+                        symbols.len(),
+                        total_symbols,
+                        offset,
+                        limit
+                    );
                     for symbol in symbols {
                         println!("{}", symbol.name);
                     }
@@ -973,6 +1339,9 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                         "data": {
                             "name": name,
                             "version": version,
+                            "total": total_symbols,
+                            "offset": offset,
+                            "limit": limit,
                             "symbols": symbols,
                         }
                     }))?;

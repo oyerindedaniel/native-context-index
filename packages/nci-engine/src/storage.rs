@@ -33,7 +33,8 @@ pub struct DatabaseStatusReport {
     pub database_size_bytes_approx: u64,
     pub journal_mode: String,
     pub schema_version: u32,
-    pub integrity_check: String,
+    pub integrity_check: Option<String>,
+    pub integrity_check_kind: Option<String>,
     /// Value of `NCI_CACHE_DIR` when that env var is set in this process.
     /// Independent of [`Self::path`]: `--database` may point elsewhere.
     pub nci_cache_dir_env: Option<String>,
@@ -241,6 +242,20 @@ impl NciDatabase {
         }
     }
 
+    /// One-line summary from `PRAGMA quick_check`: `ok` or first issue line.
+    pub fn pragma_quick_check_line(&self) -> StorageResult<String> {
+        let mut statement = self
+            .connection
+            .prepare("PRAGMA quick_check")
+            .map_err(StorageError::from)?;
+        let mut rows = statement.query([]).map_err(StorageError::from)?;
+        if let Some(row) = rows.next().map_err(StorageError::from)? {
+            Ok(row.get::<_, String>(0)?)
+        } else {
+            Ok(String::new())
+        }
+    }
+
     pub fn vacuum(&self) -> StorageResult<()> {
         self.connection.execute("VACUUM", [])?;
         Ok(())
@@ -254,14 +269,28 @@ impl NciDatabase {
     }
 
     /// Fill [`DatabaseStatusReport`] using this connection plus optional filesystem metadata for `path`.
-    pub fn status_report(&self, db_path: &Path) -> StorageResult<DatabaseStatusReport> {
+    pub fn status_report(
+        &self,
+        db_path: &Path,
+        check_mode: Option<&str>,
+    ) -> StorageResult<DatabaseStatusReport> {
         let page_size = self.pragma_page_size()?;
         let page_count = self.pragma_page_count()?;
         let approx = (page_size.max(0) as u64).saturating_mul(page_count.max(0) as u64);
         let file_size_bytes = std::fs::metadata(db_path).ok().map(|meta| meta.len());
         let journal_mode = self.journal_mode_label()?;
         let schema_version = self.stored_schema_version()?;
-        let integrity_check = self.pragma_integrity_check_line()?;
+        let (integrity_check, integrity_check_kind) = match check_mode {
+            Some("deep") => (
+                Some(self.pragma_integrity_check_line()?),
+                Some("integrity_check".to_string()),
+            ),
+            Some("quick") => (
+                Some(self.pragma_quick_check_line()?),
+                Some("quick_check".to_string()),
+            ),
+            _ => (None, None),
+        };
         let nci_cache_dir_env =
             std::env::var_os("NCI_CACHE_DIR").map(|value| value.to_string_lossy().into_owned());
         Ok(DatabaseStatusReport {
@@ -273,6 +302,7 @@ impl NciDatabase {
             journal_mode,
             schema_version,
             integrity_check,
+            integrity_check_kind,
             nci_cache_dir_env,
         })
     }
@@ -786,21 +816,52 @@ impl NciDatabase {
         Ok(())
     }
 
-    pub fn list_package_symbols(
+    pub fn list_package_symbols_page(
         &self,
         package_name: &str,
         package_version: &str,
-    ) -> StorageResult<Vec<SymbolNode>> {
-        let package_info = PackageInfo {
-            name: SharedString::from(package_name),
-            version: SharedString::from(package_version),
-            dir: SharedString::from(""),
-            is_scoped: package_name.starts_with('@'),
+        limit: usize,
+        offset: usize,
+    ) -> StorageResult<(usize, Vec<SymbolNode>)> {
+        let package_row_id = self
+            .connection
+            .query_row(
+                "SELECT package_id FROM packages WHERE name = ?1 AND version = ?2",
+                rusqlite::params![package_name, package_version],
+                |package_row| package_row.get::<_, i64>(0),
+            )
+            .optional()?;
+        let Some(package_row_id) = package_row_id else {
+            return Ok((0, Vec::new()));
         };
-        Ok(self
-            .load_package(&package_info)
-            .map(|graph| graph.symbols)
-            .unwrap_or_default())
+
+        let total_symbol_count: usize = self.connection.query_row(
+            "SELECT COUNT(*) FROM symbols WHERE package_id = ?1",
+            [package_row_id],
+            |count_row| count_row.get::<_, i64>(0),
+        )? as usize;
+
+        let mut symbol_id_stmt = self.connection.prepare(
+            "SELECT symbol_id
+             FROM symbols
+             WHERE package_id = ?1
+             ORDER BY symbol_id
+             LIMIT ?2 OFFSET ?3",
+        )?;
+        let symbol_id_rows = symbol_id_stmt.query_map(
+            rusqlite::params![package_row_id, limit as i64, offset as i64],
+            |symbol_id_row| symbol_id_row.get::<_, i64>(0),
+        )?;
+
+        let mut paged_symbols = Vec::new();
+        for symbol_id_result in symbol_id_rows {
+            let symbol_row_id = symbol_id_result?;
+            if let Some(symbol_node) = self.load_symbol_row_by_id(symbol_row_id)? {
+                paged_symbols.push(symbol_node);
+            }
+        }
+
+        Ok((total_symbol_count, paged_symbols))
     }
 
     pub fn find_symbols_fts(
@@ -1584,6 +1645,63 @@ mod tests {
         assert_eq!(loaded.total_files, 3);
         assert_eq!(loaded.crawl_duration_ms, 12.0);
         assert_eq!(loaded.build_duration_ms, 7.0);
+    }
+
+    #[test]
+    fn list_package_symbols_page_returns_total_and_requested_slice() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("symbols-page.sqlite");
+        let mut database = NciDatabase::open(&db_path).expect("open");
+
+        let package_info = PackageInfo {
+            name: SharedString::from("page-demo"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/page-demo"),
+            is_scoped: false,
+        };
+
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![
+                minimal_symbol("sym-0", "name-0"),
+                minimal_symbol("sym-1", "name-1"),
+                minimal_symbol("sym-2", "name-2"),
+                minimal_symbol("sym-3", "name-3"),
+                minimal_symbol("sym-4", "name-4"),
+            ],
+            total_symbols: 5,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+
+        let (total_symbols, symbols_page) = database
+            .list_package_symbols_page("page-demo", "1.0.0", 2, 1)
+            .expect("page query");
+
+        assert_eq!(total_symbols, 5);
+        assert_eq!(symbols_page.len(), 2);
+        assert_eq!(symbols_page[0].name.as_ref(), "name-1");
+        assert_eq!(symbols_page[1].name.as_ref(), "name-2");
+    }
+
+    #[test]
+    fn list_package_symbols_page_returns_empty_for_unknown_package() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let db_path = temp.path().join("symbols-page-miss.sqlite");
+        let database = NciDatabase::open(&db_path).expect("open");
+
+        let (total_symbols, symbols_page) = database
+            .list_package_symbols_page("missing-package", "9.9.9", 50, 0)
+            .expect("page query");
+
+        assert_eq!(total_symbols, 0);
+        assert!(symbols_page.is_empty());
     }
 
     #[test]
