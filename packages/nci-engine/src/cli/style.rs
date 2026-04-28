@@ -77,7 +77,7 @@ fn progress_tag_color(tone: ProgressTone) -> (u8, u8, u8) {
         ProgressTone::Done => DONE_RGB,
         ProgressTone::Warn => WARN_RGB,
         ProgressTone::Error => ERROR_RGB,
-        ProgressTone::Summary => BANNER_PRIMARY_RGB,
+        ProgressTone::Summary => BANNER_DARK_RGB,
     }
 }
 
