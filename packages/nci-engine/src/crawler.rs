@@ -12,8 +12,8 @@ use crate::parser;
 use crate::parser::ParseResult;
 use crate::profile;
 use crate::resolver::{
-    make_relative_to_package, normalize_path, normalize_path_with_dashmap,
-    resolve_module_specifier, specifier_is_dependency_stub,
+    is_declaration_file_path, make_relative_to_package, normalize_path_with_dashmap,
+    resolve_module_specifier, resolve_triple_slash_ref, specifier_is_dependency_stub,
 };
 use crate::types::{
     CrawlResult, ParsedExport, ParsedImport, ResolvedSymbol, SharedString, SharedVec, SymbolKind,
@@ -461,6 +461,9 @@ impl CrawlSession {
                     if !Path::new(target_path.as_ref()).exists() {
                         continue;
                     }
+                    if !is_declaration_file_path(Path::new(target_path.as_ref())) {
+                        continue;
+                    }
                     if hop.contains_key(&target_path) {
                         circular_acc.insert(format!(
                             "{} -> {}",
@@ -497,11 +500,14 @@ impl CrawlSession {
             if !resolved_paths.is_empty() {
                 for ref_path in &resolved_paths {
                     let referenced = self.norm_path(Path::new(ref_path.as_ref()));
+                    if !is_declaration_file_path(Path::new(referenced.as_ref())) {
+                        continue;
+                    }
                     triple_edges.push((normalized_path.clone(), referenced.clone()));
                     targets.push(referenced);
                 }
             } else if let Some(ref_path) =
-                resolve_triple_slash_ref(reference.as_ref(), normalized_path)
+                resolve_triple_slash_ref(reference.as_ref(), normalized_path.as_ref())
             {
                 let referenced = self.norm_path(Path::new(ref_path.as_ref()));
                 triple_edges.push((normalized_path.clone(), referenced.clone()));
@@ -631,7 +637,7 @@ impl CrawlSession {
             let ref_paths: Vec<SharedString> = if !resolved_paths.is_empty() {
                 resolved_paths
             } else {
-                resolve_triple_slash_ref(reference.as_ref(), &normalized_path)
+                resolve_triple_slash_ref(reference.as_ref(), normalized_path.as_ref())
                     .into_iter()
                     .collect()
             };
@@ -995,20 +1001,10 @@ fn resolve_local_assignment(
     results
 }
 
-/// Resolves a triple-slash reference path relative to the current file.
-fn resolve_triple_slash_ref(ref_path: &str, current_file: &SharedString) -> Option<SharedString> {
-    let dir = Path::new(current_file.as_ref()).parent()?;
-    let resolved = dir.join(ref_path);
-    if resolved.exists() {
-        Some(normalize_path(&resolved))
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resolver::normalize_path;
     use std::collections::HashSet;
     use std::fs;
     use std::path::Path;
@@ -1131,6 +1127,40 @@ mod tests {
             "stub-listed roots must not add stub package files to visited set: {:?}",
             stubbed.visited_files
         );
+    }
+
+    #[test]
+    fn crawl_skips_implementation_extensions_but_follows_adjacent_declaration_surfaces() {
+        let entry = fixture_entry_absolute("crawl-skips-implementation-extensions", "index.d.ts");
+        let result = crawl(&[entry], None);
+
+        let visited: Vec<String> = result
+            .visited_files
+            .iter()
+            .map(|visited_path| visited_path.as_ref().replace('\\', "/"))
+            .collect();
+        assert!(
+            !visited
+                .iter()
+                .any(|visited_path| visited_path.ends_with("impl.mjs")),
+            "runtime .mjs must not be visited: {visited:?}"
+        );
+        assert!(
+            !visited.iter().any(|visited_path| {
+                (visited_path.ends_with(".js")
+                    || visited_path.ends_with(".mjs")
+                    || visited_path.ends_with(".cjs"))
+                    && !visited_path.contains(".d.")
+            }),
+            "raw implementation extensions must not be visited: {visited:?}"
+        );
+        assert!(
+            visited
+                .iter()
+                .any(|visited_path| visited_path.ends_with("api.d.mts")),
+            "expected ./api.js -> api.d.mts: {visited:?}"
+        );
+        assert_eq!(visited.len(), 2, "entry + api.d.mts only: {visited:?}");
     }
 
     #[test]

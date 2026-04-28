@@ -166,6 +166,40 @@ describe("crawl", () => {
     expect(result.visitedFiles.length).toBe(3);
   });
 
+  it("does not enqueue runtime .mjs or raw .js while still resolving .js to declaration siblings", () => {
+    const result = crawl(
+      path.join(
+        FIXTURES_DIR,
+        "crawl-skips-implementation-extensions",
+        "index.d.ts",
+      ),
+    );
+
+    const normalizedVisitedPaths = result.visitedFiles.map((visitedPath) =>
+      visitedPath.replace(/\\/g, "/"),
+    );
+    expect(
+      normalizedVisitedPaths.some((visitedPath) =>
+        visitedPath.endsWith("impl.mjs"),
+      ),
+    ).toBe(false);
+    expect(
+      normalizedVisitedPaths.some(
+        (visitedPath) =>
+          (visitedPath.endsWith(".js") ||
+            visitedPath.endsWith(".mjs") ||
+            visitedPath.endsWith(".cjs")) &&
+          !visitedPath.includes(".d."),
+      ),
+    ).toBe(false);
+    expect(
+      normalizedVisitedPaths.some((visitedPath) =>
+        visitedPath.endsWith("api.d.mts"),
+      ),
+    ).toBe(true);
+    expect(result.visitedFiles.length).toBe(2);
+  });
+
   it("discovers triple-slash path refs after a leading block comment banner", () => {
     const result = crawl(
       path.join(FIXTURES_DIR, "triple-slash-after-block-comment", "index.d.ts"),

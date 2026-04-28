@@ -192,6 +192,17 @@ describe("resolveTypesEntry", () => {
     expect(resolved[0]!).toMatch(/mod\.d\.ts$/);
   });
 
+  it("maps a .js specifier to a sibling .d.mts when no .d.ts exists", () => {
+    const indexFile = path.join(
+      FIXTURES_DIR,
+      "crawl-skips-implementation-extensions",
+      "index.d.ts",
+    );
+    const resolved = resolveModuleSpecifier("./api.js", indexFile);
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]!.replace(/\\/g, "/")).toMatch(/api\.d\.mts$/);
+  });
+
   it("handles invalid conditional exports gracefully", () => {
     const packageDir = path.join(FIXTURES_DIR, "invalid-conditional-exports");
     const result = resolveTypesEntry(packageDir);

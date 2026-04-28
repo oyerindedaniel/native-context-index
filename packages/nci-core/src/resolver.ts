@@ -438,6 +438,14 @@ function extractWildcardPattern(value: unknown): string | null {
   return null;
 }
 
+/** True for `.d.ts` / `.d.mts` / `.d.cts` declaration surfaces only. */
+export function isDeclarationFilePath(filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, "/");
+  return (
+    norm.endsWith(".d.ts") || norm.endsWith(".d.mts") || norm.endsWith(".d.cts")
+  );
+}
+
 /**
  * Resolve a module specifier relative to the current file.
  */
@@ -473,6 +481,13 @@ export function resolveModuleSpecifier(
         if (isFileSafe(resolved)) return [normalizePath(resolved)];
       }
 
+      if (extMatch[1] === "js") {
+        resolved = path.resolve(dir, base + ".d.mts");
+        if (isFileSafe(resolved)) return [normalizePath(resolved)];
+        resolved = path.resolve(dir, base + ".d.cts");
+        if (isFileSafe(resolved)) return [normalizePath(resolved)];
+      }
+
       resolved = path.resolve(dir, base, "index.d.ts");
       if (isFileSafe(resolved)) return [normalizePath(resolved)];
     }
@@ -481,7 +496,9 @@ export function resolveModuleSpecifier(
     if (isFileSafe(resolved)) return [normalizePath(resolved)];
 
     resolved = path.resolve(dir, specifier);
-    if (isFileSafe(resolved)) return [normalizePath(resolved)];
+    if (isFileSafe(resolved) && isDeclarationFilePath(resolved)) {
+      return [normalizePath(resolved)];
+    }
 
     resolved = path.resolve(dir, specifier, "index.d.ts");
     if (isFileSafe(resolved)) return [normalizePath(resolved)];

@@ -632,6 +632,17 @@ fn resolve_relative_specifier(specifier: &str, current_file: &str) -> Vec<Shared
             }
         }
 
+        if matched_ext == ".js" {
+            let dmts_path = current_dir.join(format!("{}.d.mts", base));
+            if is_file_safe(&dmts_path) {
+                return vec![normalize_path(&dmts_path)];
+            }
+            let dcts_path = current_dir.join(format!("{}.d.cts", base));
+            if is_file_safe(&dcts_path) {
+                return vec![normalize_path(&dcts_path)];
+            }
+        }
+
         // Try index.d.ts fallback
         let index_path = current_dir.join(base).join("index.d.ts");
         if is_file_safe(&index_path) {
@@ -858,7 +869,7 @@ fn find_package_dir(package_name: &str, start_dir: &Path) -> Option<PathBuf> {
 pub fn resolve_triple_slash_ref(reference: &str, current_file: &str) -> Option<SharedString> {
     let current_dir = Path::new(current_file).parent()?;
     let ref_path = current_dir.join(reference);
-    if is_file_safe(&ref_path) {
+    if is_file_safe(&ref_path) && is_declaration_file_path(&ref_path) {
         Some(normalize_path(&ref_path))
     } else {
         None
@@ -936,8 +947,8 @@ fn is_declaration_file(path_str: &str) -> bool {
     path_str.ends_with(".d.ts") || path_str.ends_with(".d.mts") || path_str.ends_with(".d.cts")
 }
 
-/// Checks if a `PathBuf` points to a declaration file.
-fn is_declaration_file_path(path: &Path) -> bool {
+/// `true` when `path` is a `.d.ts` / `.d.mts` / `.d.cts` file (declaration surface only).
+pub fn is_declaration_file_path(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     is_declaration_file(&path_str)
 }
@@ -1071,6 +1082,23 @@ mod tests {
         assert!(!is_declaration_file("index.ts"));
         assert!(!is_declaration_file("index.js"));
         assert!(!is_declaration_file("index.json"));
+    }
+
+    #[test]
+    fn resolve_module_specifier_js_prefers_adjacent_dmts_without_dts() {
+        let fixture = fixture_dir("crawl-skips-implementation-extensions");
+        let index = normalize_path(&fixture.join("index.d.ts"));
+        let paths = resolve_module_specifier("./api.js", index.as_ref());
+        assert_eq!(paths.len(), 1);
+        let joined = paths[0].as_ref().replace('\\', "/");
+        assert!(joined.ends_with("api.d.mts"), "got {:?}", paths);
+    }
+
+    #[test]
+    fn resolve_triple_slash_ref_rejects_implementation_files() {
+        let fixture = fixture_dir("crawl-skips-implementation-extensions");
+        let index = normalize_path(&fixture.join("index.d.ts"));
+        assert!(resolve_triple_slash_ref("./impl.mjs", index.as_ref()).is_none());
     }
 
     // ─── resolve_export_condition tests ────────────────────────

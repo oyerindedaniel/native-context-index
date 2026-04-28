@@ -346,6 +346,10 @@ snapshot_test!(snapshot_deep_chain, "deep-chain");
 snapshot_test!(snapshot_wildcard_reexport, "wildcard-reexport");
 snapshot_test!(snapshot_triple_slash_refs, "triple-slash-refs");
 snapshot_test!(
+    snapshot_crawl_skips_implementation_extensions,
+    "crawl-skips-implementation-extensions"
+);
+snapshot_test!(
     snapshot_triple_slash_after_block_comment,
     "triple-slash-after-block-comment"
 );

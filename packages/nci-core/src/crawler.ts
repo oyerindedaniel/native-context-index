@@ -3,7 +3,11 @@ import path from "node:path";
 import ts from "typescript";
 import { parseFile } from "./parser.js";
 import { npmPackageRoot } from "./npm-package-root.js";
-import { resolveModuleSpecifier, normalizePath } from "./resolver.js";
+import {
+  resolveModuleSpecifier,
+  normalizePath,
+  isDeclarationFilePath,
+} from "./resolver.js";
 import type {
   CrawlResult,
   ParsedExport,
@@ -284,6 +288,7 @@ export function crawl(
           if (fromHop >= maxHops) return;
           const normalizedTarget = normalizePath(absPath);
           if (!fs.existsSync(normalizedTarget)) return;
+          if (!isDeclarationFilePath(normalizedTarget)) return;
           if (hop.has(normalizedTarget)) {
             circularRefs.push(`${normalizedPath} -> ${normalizedTarget}`);
           } else {
@@ -316,6 +321,7 @@ export function crawl(
           );
           if (resolvedPaths.length > 0) {
             for (const refPath of resolvedPaths) {
+              if (!isDeclarationFilePath(refPath)) continue;
               recordTripleSlashEdge(normalizedPath, refPath);
               tryEnqueue(refPath);
             }
@@ -820,6 +826,7 @@ function resolveTripleSlashRef(
 ): string | null {
   const dir = path.dirname(currentFile);
   const resolved = path.resolve(dir, refPath);
-  if (fs.existsSync(resolved)) return normalizePath(resolved);
-  return null;
+  if (!fs.existsSync(resolved)) return null;
+  if (!isDeclarationFilePath(resolved)) return null;
+  return normalizePath(resolved);
 }
