@@ -255,14 +255,14 @@ struct BulkIndexArgs {
     project_root: Option<PathBuf>,
 
     /// `0` = entry only; `-1` = unlimited (see `MAX_HOPS_UNLIMITED`).
-    #[arg(long, allow_hyphen_values = true)]
+    #[arg(short = 'm', long, allow_hyphen_values = true)]
     max_hops: Option<i64>,
 
-    #[arg(long = "package", value_name = "GLOB")]
+    #[arg(short = 'p', long = "package", value_name = "GLOB")]
     package_globs: Vec<String>,
 
     /// Emit `npm::…` stubs only for this package root (repeatable); union with `nci.config.json` `dependency_stub_packages`.
-    #[arg(long = "dependency-stub-package", value_name = "PKG")]
+    #[arg(short = 's', long = "dependency-stub-package", value_name = "PKG")]
     dependency_stub_packages: Vec<String>,
 
     #[arg(long)]
@@ -599,22 +599,25 @@ fn should_print_progress(fmt: OutputFormat, file: Option<&NciConfigFile>) -> Res
     })
 }
 
-fn print_status_plain(r: &DatabaseStatusReport) {
-    println!("path: {}", display_path(&r.path));
-    if let Some(sz) = r.file_size_bytes {
+fn print_status_plain(status_report: &DatabaseStatusReport) {
+    println!("path: {}", display_path(&status_report.path));
+    if let Some(sz) = status_report.file_size_bytes {
         println!("file_size_bytes: {sz}");
     } else {
         println!("file_size_bytes: (unavailable)");
     }
-    println!("page_size: {}", r.page_size);
-    println!("page_count: {}", r.page_count);
+    println!("page_size: {}", status_report.page_size);
+    println!("page_count: {}", status_report.page_count);
     println!(
         "database_size_bytes_approx: {}",
-        r.database_size_bytes_approx
+        status_report.database_size_bytes_approx
     );
-    println!("journal_mode: {}", r.journal_mode);
-    println!("schema_version: {}", r.schema_version);
-    if let (Some(check_kind), Some(check_value)) = (&r.integrity_check_kind, &r.integrity_check) {
+    println!("journal_mode: {}", status_report.journal_mode);
+    println!("schema_version: {}", status_report.schema_version);
+    if let (Some(check_kind), Some(check_value)) = (
+        &status_report.integrity_check_kind,
+        &status_report.integrity_check,
+    ) {
         println!("{check_kind}: {check_value}");
     } else {
         emit_ui_line_stdout(
@@ -623,7 +626,7 @@ fn print_status_plain(r: &DatabaseStatusReport) {
             "integrity_check skipped (use --check or --deep)",
         );
     }
-    if let Some(ref env_value) = r.nci_cache_dir_env {
+    if let Some(ref env_value) = status_report.nci_cache_dir_env {
         println!("NCI_CACHE_DIR (env override, may differ from DB path): {env_value}");
     }
 }
@@ -1180,6 +1183,19 @@ fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool
     if !enabled || total == 0 {
         return opts;
     }
+    fn status_token(raw_status: &str) -> String {
+        raw_status
+            .trim()
+            .chars()
+            .map(|character| {
+                if character.is_whitespace() {
+                    '_'
+                } else {
+                    character.to_ascii_uppercase()
+                }
+            })
+            .collect()
+    }
     let start = Instant::now();
     let packages_completed = Arc::new(AtomicUsize::new(0));
     let packages_completed_for_callback = Arc::clone(&packages_completed);
@@ -1187,15 +1203,16 @@ fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool
         let one_based_index = packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
         let elapsed = start.elapsed();
         let (source_label, tone) = match progress.source {
-            GraphSource::Cached => ("cached", ProgressTone::Note),
-            GraphSource::Crawled if progress.persisted => ("indexed", ProgressTone::Done),
-            GraphSource::Crawled => ("indexed (not persisted)", ProgressTone::Error),
+            GraphSource::Cached => ("CACHED", ProgressTone::Note),
+            GraphSource::Crawled if progress.persisted => ("INDEXED", ProgressTone::Done),
+            GraphSource::Crawled => ("NOT_PERSISTED", ProgressTone::Error),
         };
         emit_progress_line(
             "index package",
             tone,
             &format!(
-                "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{}",
+                "[{one_based_index}/{total}] [{}] {} {} symbols={} +{}",
+                status_token(source_label),
                 progress.name,
                 progress.version,
                 progress.total_symbols,
@@ -1356,7 +1373,7 @@ fn print_index_summary(
                 ProgressTone::Summary,
                 "index",
                 &format!(
-                    "{total_packages} package(s) complete (cached: {cached}, indexed: {indexed_now}, not persisted: {not_persisted})"
+                    "{total_packages} package(s) complete | cached={cached} indexed={indexed_now} not_persisted={not_persisted}"
                 ),
             );
         }

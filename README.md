@@ -1,4 +1,4 @@
-# native-context-modules
+# native-context-index
 
 Monorepo for the Native Context Index: TypeScript tooling, Rust `nci` CLI, and related packages.
 
