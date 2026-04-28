@@ -1,5 +1,3 @@
-//! `nci` binary — command tree, config merge, and output formatting.
-
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
@@ -10,7 +8,7 @@ use std::time::Instant;
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
-use dialoguer::Input;
+use dialoguer::{Confirm, Input};
 use serde::Serialize;
 
 use nci_engine::cache::nci_sqlite_path;
@@ -28,7 +26,8 @@ use serde_json::Value;
 const CLI_ABOUT: &str = "Native Context Index — index and query TypeScript declaration graphs";
 mod style;
 use style::{
-    ProgressTone, emit_progress_line, emit_ui_line_stdout, init_prompt_theme, print_banner,
+    ProgressTone, emit_progress_line, emit_ui_line_stdout, format_elapsed, init_prompt_theme,
+    print_banner,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -206,17 +205,27 @@ enum DbCommands {
         )]
         deep: bool,
     },
-    #[command(about = "Delete all indexed package rows")]
-    Clear,
-    #[command(about = "Remove one package from the index")]
-    Remove { name: String, version: String },
+    #[command(about = "Delete all indexed package rows (prompts unless -y)")]
+    Clear {
+        #[arg(short = 'y', long, help = "Skip confirmation prompt")]
+        yes: bool,
+    },
+    #[command(about = "Remove one package from the index (prompts unless -y)")]
+    Remove {
+        name: String,
+        version: String,
+        #[arg(short = 'y', long, help = "Skip confirmation prompt")]
+        yes: bool,
+    },
     #[command(
         name = "remove-glob",
-        about = "Remove packages whose name matches a SQLite GLOB (* and ?, case-sensitive). Example: react* deletes all react-prefixed names for every indexed version."
+        about = "Remove packages whose name matches a SQLite GLOB (* and ?, case-sensitive) (prompts unless -y). Example: react* deletes all react-prefixed names for every indexed version."
     )]
     RemoveGlob {
         #[arg(value_name = "PATTERN")]
         pattern: String,
+        #[arg(short = 'y', long, help = "Skip confirmation prompt")]
+        yes: bool,
     },
     #[command(about = "Delete the SQLite file on disk (requires --force)")]
     Destroy {
@@ -271,6 +280,10 @@ enum QueryCommands {
     },
     #[command(about = "List packages currently indexed in the database")]
     Packages,
+    #[command(about = "List indexed versions for a package name")]
+    PackageVersions { name: String },
+    #[command(about = "List declared package dependencies for a package name/version")]
+    PackageDeps { name: String, version: String },
     #[command(about = "List symbols for a package name/version")]
     Symbols {
         name: String,
@@ -736,7 +749,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 emit_progress_line(
                     "db init",
                     ProgressTone::Done,
-                    &format!("done +{:?}", started.elapsed()),
+                    &format!("done +{}", format_elapsed(started.elapsed())),
                 );
             }
             match fmt {
@@ -802,7 +815,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 emit_progress_line(
                     "db status",
                     ProgressTone::Done,
-                    &format!("done +{:?}", started.elapsed()),
+                    &format!("done +{}", format_elapsed(started.elapsed())),
                 );
             }
             match fmt {
@@ -813,7 +826,12 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             }
             Ok(())
         }
-        DbCommands::Clear => {
+        DbCommands::Clear { yes } => {
+            confirm_destructive_action(
+                *yes,
+                "db clear",
+                "This will delete all indexed package rows. Continue?",
+            )?;
             let (_, db) = open_database(cli, file, config_dir)?;
             db.clear_all_packages().map_err(|err| err.to_string())?;
             match fmt {
@@ -826,10 +844,66 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             }
             Ok(())
         }
-        DbCommands::Remove { name, version } => {
+        DbCommands::Remove { name, version, yes } => {
+            confirm_destructive_action(
+                *yes,
+                "db remove",
+                &format!("Remove {name}@{version} from the index?"),
+            )?;
             let (_, db) = open_database(cli, file, config_dir)?;
-            db.delete_package(name, version)
+            let rows_removed = db
+                .delete_package_count(name, version)
                 .map_err(|err| err.to_string())?;
+            if rows_removed == 0 {
+                let known_versions = db
+                    .list_package_versions(name)
+                    .map_err(|err| err.to_string())?;
+                match fmt {
+                    OutputFormat::Plain => {
+                        emit_ui_line_stdout(
+                            ProgressTone::Error,
+                            "db remove",
+                            &format!("package {name}@{version} not found"),
+                        );
+                        if known_versions.is_empty() {
+                            emit_ui_line_stdout(
+                                ProgressTone::Note,
+                                "db remove",
+                                "hint: run `nci query packages` to inspect indexed packages",
+                            );
+                        } else {
+                            emit_ui_line_stdout(
+                                ProgressTone::Note,
+                                "db remove",
+                                &format!(
+                                    "indexed versions for {name}: {}",
+                                    known_versions.join(", ")
+                                ),
+                            );
+                        }
+                        return Err(String::new());
+                    }
+                    OutputFormat::Json | OutputFormat::Jsonl => {
+                        let extra_hint = if known_versions.is_empty() {
+                            "; no indexed package with that name (run `nci query packages`)"
+                        } else {
+                            ""
+                        };
+                        return emit_error(
+                            fmt,
+                            &format!(
+                                "nci db remove: package {name}@{version} not found; indexed versions: {}{}",
+                                if known_versions.is_empty() {
+                                    "(none)".to_string()
+                                } else {
+                                    known_versions.join(", ")
+                                },
+                                extra_hint
+                            ),
+                        );
+                    }
+                }
+            }
             match fmt {
                 OutputFormat::Plain => emit_ui_line_stdout(
                     ProgressTone::Done,
@@ -843,20 +917,27 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             }
             Ok(())
         }
-        DbCommands::RemoveGlob { pattern } => {
+        DbCommands::RemoveGlob { pattern, yes } => {
+            confirm_destructive_action(
+                *yes,
+                "db remove-glob",
+                &format!(
+                    "Remove all indexed packages matching pattern {pattern:?}? This affects all versions."
+                ),
+            )?;
             let (_, db) = open_database(cli, file, config_dir)?;
-            let n = db
+            let removed_count = db
                 .delete_packages_matching_name_glob(pattern.as_str())
                 .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => emit_ui_line_stdout(
                     ProgressTone::Done,
                     "db remove-glob",
-                    &format!("removed {n} package(s) matching {pattern}"),
+                    &format!("removed {removed_count} package(s) matching {pattern}"),
                 ),
                 OutputFormat::Json | OutputFormat::Jsonl => print_json(&serde_json::json!({
                     "ok": true,
-                    "data": { "pattern": pattern, "removed": n }
+                    "data": { "pattern": pattern, "removed": removed_count }
                 }))?,
             }
             Ok(())
@@ -895,7 +976,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 emit_progress_line(
                     "db vacuum",
                     ProgressTone::Done,
-                    &format!("done +{:?}", started.elapsed()),
+                    &format!("done +{}", format_elapsed(started.elapsed())),
                 );
             }
             match fmt {
@@ -920,7 +1001,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                 emit_progress_line(
                     "db wal-checkpoint",
                     ProgressTone::Done,
-                    &format!("done +{:?}", started.elapsed()),
+                    &format!("done +{}", format_elapsed(started.elapsed())),
                 );
             }
             match fmt {
@@ -936,6 +1017,30 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+fn confirm_destructive_action(yes: bool, scope: &str, prompt: &str) -> Result<(), String> {
+    if yes {
+        return Ok(());
+    }
+    if !io::stdout().is_terminal() {
+        emit_ui_line_stdout(
+            ProgressTone::Warn,
+            scope,
+            "confirmation required in non-interactive mode; re-run with -y",
+        );
+        return Err(String::new());
+    }
+    let confirmed = Confirm::with_theme(&init_prompt_theme())
+        .with_prompt(prompt)
+        .default(false)
+        .interact()
+        .map_err(|err| err.to_string())?;
+    if !confirmed {
+        emit_ui_line_stdout(ProgressTone::Warn, scope, "cancelled by user");
+        return Err(String::new());
+    }
+    Ok(())
 }
 
 fn build_filter(file: Option<&NciConfigFile>, package_globs_cli: &[String]) -> FilterConfig {
@@ -1081,17 +1186,20 @@ fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool
     opts.on_package_done = Some(Arc::new(move |progress: pipeline::PackageProgress| {
         let one_based_index = packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
         let elapsed = start.elapsed();
-        let source_label = match progress.source {
-            GraphSource::Cached => "cached",
-            GraphSource::Crawled if progress.persisted => "indexed",
-            GraphSource::Crawled => "indexed (not persisted)",
+        let (source_label, tone) = match progress.source {
+            GraphSource::Cached => ("cached", ProgressTone::Note),
+            GraphSource::Crawled if progress.persisted => ("indexed", ProgressTone::Done),
+            GraphSource::Crawled => ("indexed (not persisted)", ProgressTone::Error),
         };
         emit_progress_line(
             "index package",
-            ProgressTone::Done,
+            tone,
             &format!(
-                "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{elapsed:?}",
-                progress.name, progress.version, progress.total_symbols,
+                "[{one_based_index}/{total}] {} {} ({source_label}) symbols={} +{}",
+                progress.name,
+                progress.version,
+                progress.total_symbols,
+                format_elapsed(elapsed),
             ),
         );
     }));
@@ -1130,9 +1238,9 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 "index dry-run",
                 ProgressTone::Done,
                 &format!(
-                    "done ({} package(s)) +{:?}",
+                    "done ({} package(s)) +{}",
                     filtered.len(),
-                    dry_run_started.elapsed()
+                    format_elapsed(dry_run_started.elapsed())
                 ),
             );
         }
@@ -1181,7 +1289,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 emit_progress_line(
                     "index",
                     ProgressTone::Done,
-                    &format!("target resolved +{:?}", discover_started.elapsed()),
+                    &format!(
+                        "target resolved +{}",
+                        format_elapsed(discover_started.elapsed())
+                    ),
                 );
             }
             let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
@@ -1207,9 +1318,9 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                     "index",
                     ProgressTone::Done,
                     &format!(
-                        "package set ready ({} package(s)) +{:?}",
+                        "package set ready ({} package(s)) +{}",
                         packages.len(),
-                        scan_started.elapsed()
+                        format_elapsed(scan_started.elapsed())
                     ),
                 );
             }
@@ -1242,7 +1353,7 @@ fn print_index_summary(
     match fmt {
         OutputFormat::Plain => {
             emit_ui_line_stdout(
-                ProgressTone::Done,
+                ProgressTone::Summary,
                 "index",
                 &format!(
                     "{total_packages} package(s) complete (cached: {cached}, indexed: {indexed_now}, not persisted: {not_persisted})"
@@ -1311,6 +1422,75 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                 }
             }
         }
+        QueryCommands::PackageVersions { name } => {
+            let versions = database
+                .list_package_versions(name)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    if versions.is_empty() {
+                        emit_ui_line_stdout(
+                            ProgressTone::Note,
+                            "query package-versions",
+                            &format!("no indexed versions found for {name}"),
+                        );
+                    } else {
+                        emit_ui_line_stdout(
+                            ProgressTone::Summary,
+                            "query package-versions",
+                            &format!("{} version(s) found for {name}", versions.len()),
+                        );
+                        for version in versions {
+                            println!("{version}");
+                        }
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": { "name": name, "versions": versions }
+                    }))?;
+                }
+            }
+        }
+        QueryCommands::PackageDeps { name, version } => {
+            let dependency_names = database
+                .list_package_dependencies(name, version)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    if dependency_names.is_empty() {
+                        emit_ui_line_stdout(
+                            ProgressTone::Note,
+                            "query package-deps",
+                            &format!("no declared dependencies found for {name}@{version}"),
+                        );
+                    } else {
+                        emit_ui_line_stdout(
+                            ProgressTone::Summary,
+                            "query package-deps",
+                            &format!(
+                                "{} declared dependency name(s) found for {name}@{version}",
+                                dependency_names.len()
+                            ),
+                        );
+                        for dependency_name in dependency_names {
+                            println!("{dependency_name}");
+                        }
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": {
+                            "name": name,
+                            "version": version,
+                            "dependencies": dependency_names,
+                        }
+                    }))?;
+                }
+            }
+        }
         QueryCommands::Symbols {
             name,
             version,
@@ -1322,12 +1502,16 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                 .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => {
-                    println!(
-                        "showing {} of {} symbols (offset {}, limit {})",
-                        symbols.len(),
-                        total_symbols,
-                        offset,
-                        limit
+                    emit_ui_line_stdout(
+                        ProgressTone::Summary,
+                        "query symbols",
+                        &format!(
+                            "showing {} of {} symbols (offset {}, limit {})",
+                            symbols.len(),
+                            total_symbols,
+                            offset,
+                            limit
+                        ),
                     );
                     for symbol in symbols {
                         println!("{}", symbol.name);

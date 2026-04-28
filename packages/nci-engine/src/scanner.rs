@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -170,13 +171,53 @@ fn read_package_info(package_dir: &Path, fallback_name: &str) -> Option<PackageI
     let name = SharedString::from(parsed["name"].as_str().unwrap_or(fallback_name));
 
     let version = SharedString::from(parsed["version"].as_str().unwrap_or("0.0.0"));
+    let declared_dependencies = declared_dependency_names(&parsed);
 
     Some(PackageInfo {
         is_scoped: name.starts_with('@'),
         name,
         version,
         dir: normalize_path(package_dir),
+        declared_dependencies,
     })
+}
+
+fn declared_dependency_names(
+    parsed_package_json: &serde_json::Value,
+) -> crate::types::SharedVec<SharedString> {
+    let mut dependency_names: BTreeSet<String> = BTreeSet::new();
+    collect_dependency_section_keys(parsed_package_json, "dependencies", &mut dependency_names);
+    collect_dependency_section_keys(
+        parsed_package_json,
+        "peerDependencies",
+        &mut dependency_names,
+    );
+    collect_dependency_section_keys(
+        parsed_package_json,
+        "optionalDependencies",
+        &mut dependency_names,
+    );
+    let deps: Vec<SharedString> = dependency_names
+        .into_iter()
+        .map(SharedString::from)
+        .collect();
+    crate::types::SharedVec::from(deps.into_boxed_slice())
+}
+
+fn collect_dependency_section_keys(
+    parsed_package_json: &serde_json::Value,
+    section_key: &str,
+    out: &mut BTreeSet<String>,
+) {
+    let Some(section) = parsed_package_json
+        .get(section_key)
+        .and_then(|value| value.as_object())
+    else {
+        return;
+    };
+    for dependency_name in section.keys() {
+        out.insert(dependency_name.to_string());
+    }
 }
 
 #[cfg(test)]

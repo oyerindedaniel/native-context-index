@@ -22,7 +22,7 @@ use crate::profile::phases_enabled;
 use crate::resolver::normalize_path;
 use crate::scanner::{ScanError, scan_packages};
 use crate::storage::NciDatabase;
-use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo, SharedString};
+use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo, SharedString, SharedVec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraphSource {
@@ -666,6 +666,7 @@ pub fn index_single(
         version: version.into(),
         dir: normalize_path(package_dir),
         is_scoped: name.starts_with('@'),
+        declared_dependencies: SharedVec::from([]),
     };
 
     build_package_graph(&info, options)
@@ -945,6 +946,7 @@ mod tests {
                 version: SharedString::from("1.0.0"),
                 dir: normalize_path(dir),
                 is_scoped: false,
+                declared_dependencies: SharedVec::from([]),
             };
             assert!(
                 ro.has_cached_package(&info, cache_key.as_str()),

@@ -2116,6 +2116,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph = build_package_graph(&info, None);
@@ -2134,6 +2135,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph = build_package_graph(&info, None);
@@ -2167,6 +2169,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let query_wrapper = graph
@@ -2218,6 +2221,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
 
@@ -2280,6 +2284,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let wrapper_namespace = graph
@@ -2331,6 +2336,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let carrier = graph
@@ -2388,6 +2394,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let stream_bridge = graph
@@ -2426,6 +2433,7 @@ mod tests {
             version: "1.0.0".into(),
             dir: normalize_path(&fixture),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph_plain = build_package_graph(&info, None);
@@ -2494,6 +2502,7 @@ mod tests {
             version: "1.0.0".into(),
             dir: normalize_path(pkg.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let mut stub_roots = HashSet::new();
         stub_roots.insert("self-stub-pkg".to_string());
@@ -2534,6 +2543,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(&fixture),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
 
@@ -2666,6 +2676,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(&fixture),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
 
@@ -2698,6 +2709,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph = build_package_graph(&info, None);
@@ -2761,6 +2773,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(&fixture),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let find = |name: &str| {
@@ -2920,6 +2933,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let alias_symbol = graph
@@ -2946,6 +2960,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let extended = graph
@@ -2972,6 +2987,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let root_contract = graph
@@ -3006,6 +3022,7 @@ mod tests {
             version: "1.0.0".to_string().into(),
             dir: normalize_path(pkg_dir.as_path()),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = build_package_graph(&info, None);
         let variable_row = graph.symbols.iter().find(|symbol_node| {

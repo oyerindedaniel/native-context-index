@@ -82,6 +82,15 @@ CREATE TABLE IF NOT EXISTS symbol_surface_dependencies (
     PRIMARY KEY(from_symbol_id, to_symbol_id_text)
 );
 
+CREATE TABLE IF NOT EXISTS package_dependencies (
+    package_id INTEGER NOT NULL REFERENCES packages(package_id) ON DELETE CASCADE,
+    dependency_name TEXT NOT NULL,
+    PRIMARY KEY(package_id, dependency_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_package_dependencies_name
+    ON package_dependencies(dependency_name);
+
 CREATE TABLE IF NOT EXISTS symbol_inherited_from_sources (
     symbol_id INTEGER NOT NULL REFERENCES symbols(symbol_id) ON DELETE CASCADE,
     source_symbol_id_text TEXT NOT NULL,

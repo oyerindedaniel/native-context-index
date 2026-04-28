@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 use nci_engine::graph::build_package_graph;
 use nci_engine::resolver::normalize_path;
-use nci_engine::types::{PackageGraph, PackageInfo, SharedString};
+use nci_engine::types::{PackageGraph, PackageInfo, SharedString, SharedVec};
 
 fn fixtures_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -102,6 +102,7 @@ fn build_fixture_graph(fixture_name: &str) -> PackageGraph {
         name: name.into(),
         version: version.into(),
         dir: normalize_path(&fixture_dir),
+        declared_dependencies: SharedVec::from([]),
     };
 
     let mut graph = build_package_graph(&info, None);

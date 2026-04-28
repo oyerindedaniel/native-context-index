@@ -48,6 +48,9 @@ pub struct PackageInfo {
 
     /// Whether this is a scoped package (`@scope/name`).
     pub is_scoped: bool,
+
+    /// Declared package dependency names from package.json (dependencies, peerDependencies, optionalDependencies).
+    pub declared_dependencies: SharedVec<SharedString>,
 }
 
 // ─── Resolver Output ───────────────────────────────────────────

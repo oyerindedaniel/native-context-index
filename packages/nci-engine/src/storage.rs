@@ -367,6 +367,44 @@ impl NciDatabase {
         Ok(out)
     }
 
+    /// (ascending lexical order).
+    pub fn list_package_versions(&self, package_name: &str) -> StorageResult<Vec<String>> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT version FROM packages WHERE name = ?1 ORDER BY version")?;
+        let rows = statement.query_map(rusqlite::params![package_name], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    pub fn list_package_dependencies(
+        &self,
+        package_name: &str,
+        package_version: &str,
+    ) -> StorageResult<Vec<String>> {
+        let mut statement = self.connection.prepare(
+            "SELECT package_dependencies.dependency_name
+             FROM package_dependencies
+             JOIN packages ON packages.package_id = package_dependencies.package_id
+             WHERE packages.name = ?1 AND packages.version = ?2
+             ORDER BY package_dependencies.dependency_name",
+        )?;
+        let rows = statement
+            .query_map(rusqlite::params![package_name, package_version], |row| {
+                row.get::<_, String>(0)
+            })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// Loads the graph row for `(name, version)` (unique after [`Self::save_package`]). Cache validity is
     /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `engine_cache_key`, not this `SELECT`.
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
@@ -653,6 +691,9 @@ impl NciDatabase {
         let package_id = transaction.last_insert_rowid();
 
         {
+            let mut insert_declared_dependency = transaction.prepare(
+                "INSERT OR IGNORE INTO package_dependencies (package_id, dependency_name) VALUES (?1, ?2)",
+            )?;
             let mut insert_symbol = transaction.prepare(
                 "INSERT INTO symbols (
                 package_id, id, name, kind, kind_name, file_path, signature,
@@ -686,6 +727,11 @@ impl NciDatabase {
             let mut insert_decorator = transaction.prepare(
                 "INSERT INTO symbol_decorators (symbol_id, name, arguments) VALUES (?1, ?2, ?3)",
             )?;
+
+            for dependency_name in package_info.declared_dependencies.iter() {
+                insert_declared_dependency
+                    .execute(rusqlite::params![package_id, dependency_name])?;
+            }
 
             for symbol_node in &graph.symbols {
                 let (deprecated_flag, deprecated_message) =
@@ -974,6 +1020,7 @@ impl NciDatabase {
             version: SharedString::from(""),
             dir: SharedString::from(""),
             is_scoped: package_name.starts_with('@'),
+            declared_dependencies: SharedVec::from([]),
         };
 
         let dependencies: SharedVec<SharedString> = {
@@ -1212,6 +1259,18 @@ impl NciDatabase {
         Ok(())
     }
 
+    pub fn delete_package_count(
+        &self,
+        package_name: &str,
+        package_version: &str,
+    ) -> StorageResult<usize> {
+        let rows_removed = self.connection.execute(
+            "DELETE FROM packages WHERE name = ?1 AND version = ?2",
+            rusqlite::params![package_name, package_version],
+        )?;
+        Ok(rows_removed)
+    }
+
     /// Delete every indexed package row whose `name` matches SQLite `GLOB` `pattern`
     /// (all versions). Child symbol rows cascade. Returns the number of package rows removed.
     pub fn delete_packages_matching_name_glob(&self, pattern: &str) -> StorageResult<usize> {
@@ -1244,6 +1303,7 @@ impl NciDatabase {
                AND (
                  name = 'nci_meta'
                  OR name = 'packages'
+                 OR name = 'package_dependencies'
                  OR name = 'symbols'
                  OR name = 'symbols_fts'
                  OR name LIKE 'symbol\\_%' ESCAPE '\\'
@@ -1501,6 +1561,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/x"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let mut sym = minimal_symbol("sym-dep", "fnDep");
         sym.since = Some(SharedString::from("v4.5.6"));
@@ -1542,6 +1603,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/x"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let mut sym = minimal_symbol("sym-mp", "fnMp");
         sym.merge_provenance = Some(MergeProvenance {
@@ -1621,6 +1683,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/x"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph = PackageGraph {
@@ -1658,6 +1721,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/page-demo"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let graph = PackageGraph {
@@ -1715,6 +1779,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/x"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
 
         let mut sym = minimal_symbol("sym-inh", "Child.x");
@@ -1770,6 +1835,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/l"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let mut symbols = Vec::with_capacity(N);
         for index in 0..N {
@@ -1812,6 +1878,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/r"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph1 = PackageGraph {
             package: package_info.name.clone(),
@@ -1866,6 +1933,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/pkg-fts-test"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = PackageGraph {
             package: package_info.name.clone(),
@@ -1909,6 +1977,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/c"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = PackageGraph {
             package: package_info.name.clone(),
@@ -1992,6 +2061,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/i"),
             is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
         };
         let graph = PackageGraph {
             package: package_info.name.clone(),

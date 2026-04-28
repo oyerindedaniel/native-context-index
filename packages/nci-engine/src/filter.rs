@@ -243,7 +243,7 @@ fn package_matches_glob(package_name: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::SharedString;
+    use crate::types::{SharedString, SharedVec};
 
     fn sample_package(package_name: &str) -> PackageInfo {
         PackageInfo {
@@ -251,6 +251,7 @@ mod tests {
             version: SharedString::from("1.0.0"),
             dir: SharedString::from("/virtual/pkg"),
             is_scoped: package_name.starts_with('@'),
+            declared_dependencies: SharedVec::from([]),
         }
     }
 

@@ -1,4 +1,5 @@
 use std::io::{self, IsTerminal, Write};
+use std::time::Duration;
 
 use dialoguer::{
     console::{Style, style},
@@ -19,15 +20,23 @@ const BANNER_PRIMARY_RGB: (u8, u8, u8) = (0x5A, 0x3C, 0xF0);
 const BANNER_DARK_RGB: (u8, u8, u8) = (0x44, 0x29, 0xC6);
 const BANNER_LIGHT_RGB: (u8, u8, u8) = (0x7A, 0x63, 0xF5);
 const DONE_RGB: (u8, u8, u8) = (0x2D, 0xC9, 0x7B);
+const WARN_RGB: (u8, u8, u8) = (0xE8, 0xB9, 0x3A);
+const ERROR_RGB: (u8, u8, u8) = (0xE0, 0x5A, 0x5A);
 const STEP_TAG: &str = "==>";
 const NOTE_TAG: &str = "[~]";
 const DONE_TAG: &str = "[ok]";
+const WARN_TAG: &str = "[!]";
+const ERROR_TAG: &str = "[x]";
+const SUMMARY_TAG: &str = "[#]";
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProgressTone {
     Step,
     Note,
     Done,
+    Warn,
+    Error,
+    Summary,
 }
 
 fn should_color(stream: Stream) -> bool {
@@ -55,6 +64,9 @@ fn progress_tag(tone: ProgressTone) -> &'static str {
         ProgressTone::Step => STEP_TAG,
         ProgressTone::Note => NOTE_TAG,
         ProgressTone::Done => DONE_TAG,
+        ProgressTone::Warn => WARN_TAG,
+        ProgressTone::Error => ERROR_TAG,
+        ProgressTone::Summary => SUMMARY_TAG,
     }
 }
 
@@ -63,7 +75,27 @@ fn progress_tag_color(tone: ProgressTone) -> (u8, u8, u8) {
         ProgressTone::Step => BANNER_PRIMARY_RGB,
         ProgressTone::Note => BANNER_LIGHT_RGB,
         ProgressTone::Done => DONE_RGB,
+        ProgressTone::Warn => WARN_RGB,
+        ProgressTone::Error => ERROR_RGB,
+        ProgressTone::Summary => BANNER_PRIMARY_RGB,
     }
+}
+
+pub(crate) fn format_elapsed(elapsed: Duration) -> String {
+    let elapsed_ms = elapsed.as_millis();
+    if elapsed_ms < 1_000 {
+        return format!("{elapsed_ms}ms");
+    }
+    let elapsed_seconds = elapsed.as_secs_f64();
+    if elapsed_seconds < 10.0 {
+        return format!("{elapsed_seconds:.2}s");
+    }
+    if elapsed_seconds < 60.0 {
+        return format!("{elapsed_seconds:.1}s");
+    }
+    let minutes = (elapsed_seconds / 60.0).floor() as u64;
+    let seconds = elapsed_seconds - (minutes as f64 * 60.0);
+    format!("{minutes}m {seconds:.1}s")
 }
 
 pub(crate) fn emit_progress_line(scope: &str, tone: ProgressTone, message: &str) {

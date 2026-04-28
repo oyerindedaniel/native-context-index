@@ -5,6 +5,7 @@ use std::path::Path;
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use rusqlite::Connection;
 use tempfile::tempdir;
 
 fn nci_cmd() -> Command {
@@ -170,6 +171,42 @@ fn write_minimal_pkg_at(pkg: &Path, name: &str, version: &str) {
     fs::write(pkg.join("index.d.ts"), "export declare const x: number;\n").unwrap();
 }
 
+fn seed_indexed_package_row(db_path: &Path, package_name: &str, package_version: &str) {
+    let connection = Connection::open(db_path).expect("open sqlite");
+    connection
+        .execute(
+            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, engine_version)
+             VALUES (?1, ?2, 0, 0, 0, 0, 'test')",
+            [package_name, package_version],
+        )
+        .expect("insert package");
+}
+
+fn write_pkg_with_dependencies(
+    root: &Path,
+    name: &str,
+    version: &str,
+    dependencies_json: &str,
+    peer_dependencies_json: &str,
+) {
+    let pkg = root.join("node_modules").join(name);
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(
+        pkg.join("package.json"),
+        format!(
+            r#"{{
+"name":"{name}",
+"version":"{version}",
+"types":"./index.d.ts",
+"dependencies": {dependencies_json},
+"peerDependencies": {peer_dependencies_json}
+}}"#
+        ),
+    )
+    .unwrap();
+    fs::write(pkg.join("index.d.ts"), "export declare const x: number;\n").unwrap();
+}
+
 #[test]
 fn index_dry_run_scans_workspace_node_modules_from_config() {
     let proj = tempdir().unwrap();
@@ -199,6 +236,149 @@ fn index_dry_run_scans_workspace_node_modules_from_config() {
         .success()
         .stdout(predicate::str::contains("\"root-pkg\""))
         .stdout(predicate::str::contains("\"workspace-pkg\""));
+}
+
+#[test]
+fn query_package_versions_lists_versions_for_name() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("versions.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    seed_indexed_package_row(&db_path, "demo-pkg", "1.0.0");
+    seed_indexed_package_row(&db_path, "demo-pkg", "2.0.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package-versions",
+            "demo-pkg",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1.0.0"))
+        .stdout(predicate::str::contains("2.0.0"));
+}
+
+#[test]
+fn db_remove_missing_version_shows_available_versions_hint() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("remove.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    seed_indexed_package_row(&db_path, "demo-pkg", "1.0.0");
+    seed_indexed_package_row(&db_path, "demo-pkg", "1.1.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "--database",
+            db_path.to_str().unwrap(),
+            "remove",
+            "demo-pkg",
+            "9.9.9",
+            "-y",
+        ])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "indexed versions for demo-pkg: 1.0.0, 1.1.0",
+        ));
+}
+
+#[test]
+fn db_clear_requires_yes_in_non_interactive_mode() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("clear-confirm.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args(["db", "--database", db_path.to_str().unwrap(), "clear"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(
+            "[!] db clear: confirmation required",
+        ));
+}
+
+#[test]
+fn query_package_deps_lists_declared_package_dependencies() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("deps.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_pkg_with_dependencies(
+        proj.path(),
+        "deps-pkg",
+        "1.2.3",
+        r#"{"react":"^19.2.0"}"#,
+        r#"{"@types/node":"^22.0.0"}"#,
+    );
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "deps-pkg",
+            "1.2.3",
+        ])
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package-deps",
+            "deps-pkg",
+            "1.2.3",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("@types/node"))
+        .stdout(predicate::str::contains("react"));
 }
 
 #[test]
@@ -672,7 +852,7 @@ fn index_one_package_smoke() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("packages indexed"));
+        .stdout(predicate::str::contains("package(s) complete"));
 
     nci_cmd()
         .current_dir(proj.path())

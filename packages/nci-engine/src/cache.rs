@@ -63,7 +63,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::types::SharedString;
+    use crate::types::{SharedString, SharedVec};
 
     static CACHE_ENV_MUTEX: Mutex<()> = Mutex::new(());
 
@@ -73,6 +73,7 @@ mod tests {
             version: SharedString::from(package_version),
             dir: SharedString::from(directory),
             is_scoped: package_name.starts_with('@'),
+            declared_dependencies: SharedVec::from([]),
         }
     }
 
