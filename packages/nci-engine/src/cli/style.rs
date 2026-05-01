@@ -2,7 +2,7 @@ use std::io::{self, IsTerminal, Write};
 use std::time::Duration;
 
 use dialoguer::{
-    console::{Style, style},
+    console::{Color, Style, style},
     theme::ColorfulTheme,
 };
 use supports_color::{Stream, on as supports_color_on};
@@ -19,7 +19,7 @@ const CLI_BANNER_FILLED_LINES: [&str; 6] = [
 const BANNER_PRIMARY_RGB: (u8, u8, u8) = (0x5A, 0x3C, 0xF0);
 const BANNER_DARK_RGB: (u8, u8, u8) = (0x44, 0x29, 0xC6);
 const BANNER_LIGHT_RGB: (u8, u8, u8) = (0x7A, 0x63, 0xF5);
-const DONE_RGB: (u8, u8, u8) = (0x2D, 0xC9, 0x7B);
+const DONE_RGB: (u8, u8, u8) = (0x02, 0x75, 0x82);
 const WARN_RGB: (u8, u8, u8) = (0xE8, 0xB9, 0x3A);
 const ERROR_RGB: (u8, u8, u8) = (0xE0, 0x5A, 0x5A);
 const STEP_TAG: &str = "==>";
@@ -126,7 +126,8 @@ pub(crate) fn init_prompt_theme() -> ColorfulTheme {
     ColorfulTheme {
         prompt_prefix: style("[]".to_string()).dim(),
         success_prefix: style(success_prefix_text),
-        values_style: Style::new().color256(42),
+        // Nearest 6×6×6 xterm-256 slot for accent `#027582` (`console::Color` has no RGB in this dependency graph).
+        values_style: Style::new().fg(Color::Color256(31)),
         ..ColorfulTheme::default()
     }
 }

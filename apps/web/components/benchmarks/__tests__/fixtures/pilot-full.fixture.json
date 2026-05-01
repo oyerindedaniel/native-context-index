@@ -1,0 +1,25 @@
+{
+  "generatedAtIso": "2026-05-01T00:00:00.000Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 1,
+    "skippedCount": 0,
+    "successCount": 1,
+    "failureCount": 0,
+    "successRate": 1
+  },
+  "byStrategy": [],
+  "byDifficulty": [],
+  "byTask": [],
+  "byPackage": [],
+  "ganttSeries": [
+    {
+      "runId": "run-1",
+      "taskId": "uuid-v7-signature",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 1030,
+      "difficulty": "easy"
+    }
+  ]
+}

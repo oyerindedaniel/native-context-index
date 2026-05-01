@@ -8,9 +8,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
-    "check-types": "next typegen && tsc --noEmit"
+    "check-types": "next typegen && tsc --noEmit",
+    "bench:pilot": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=true --include-cloud=false --model-id=composer-2-fast",
+    "bench:full": "tsx benchmarks/benchmark-cli.ts --mode=full --execute=true --include-cloud=true --model-id=composer-2-fast",
+    "bench:prepare": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=false --include-cloud=false --model-id=composer-2-fast",
+    "test:benchmarks": "vitest run benchmarks/__tests__"
   },
   "dependencies": {
+    "@cursor/sdk": "^1.0.10",
+    "@repo/benchmark-contract": "workspace:*",
     "@repo/ui": "workspace:*",
     "next": "16.1.5",
     "react": "^19.2.0",
@@ -23,6 +29,8 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
-    "typescript": "5.9.2"
+    "tsx": "^4.21.0",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
   }
 }

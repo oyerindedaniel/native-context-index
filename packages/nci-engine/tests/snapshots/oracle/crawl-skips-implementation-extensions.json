@@ -1,0 +1,57 @@
+{
+  "package": "crawl-skips-implementation-extensions",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "crawl-skips-implementation-extensions@1.0.0::EntryMarker",
+      "name": "EntryMarker",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "crawl-skips-implementation-extensions",
+      "filePath": "index.d.ts",
+      "signature": "export type EntryMarker = 1;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "crawl-skips-implementation-extensions@1.0.0::ReExportedApi",
+      "name": "ReExportedApi",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "crawl-skips-implementation-extensions",
+      "filePath": "index.d.ts",
+      "signature": "export type ReExportedApi = ApiType;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [
+        "crawl-skips-implementation-extensions@1.0.0::api.d.mts::ApiType"
+      ],
+      "isInternal": false,
+      "modifiers": [
+        "export"
+      ]
+    },
+    {
+      "id": "crawl-skips-implementation-extensions@1.0.0::api.d.mts::ApiType",
+      "name": "ApiType",
+      "kind": 266,
+      "kindName": "TypeAliasDeclaration",
+      "package": "crawl-skips-implementation-extensions",
+      "filePath": "api.d.mts",
+      "signature": "export type ApiType = string;",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 3,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}
