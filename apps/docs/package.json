@@ -9,13 +9,14 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "bench:pilot": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=true --include-cloud=false --model-id=composer-2-fast",
-    "bench:full": "tsx benchmarks/benchmark-cli.ts --mode=full --execute=true --include-cloud=true --model-id=composer-2-fast",
-    "bench:prepare": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=false --include-cloud=false --model-id=composer-2-fast",
+    "bench:pilot": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=true --include-cloud=false --model-id=composer-2",
+    "bench:pilot:one": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=true --include-cloud=false --model-id=composer-2 --task-limit=1",
+    "bench:full": "tsx benchmarks/benchmark-cli.ts --mode=full --execute=true --include-cloud=true --model-id=composer-2",
+    "bench:prepare": "tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=false --include-cloud=false --model-id=composer-2",
     "test:benchmarks": "vitest run benchmarks/__tests__"
   },
   "dependencies": {
-    "@cursor/sdk": "^1.0.10",
+    "@cursor/sdk": "^1.0.12",
     "@repo/benchmark-contract": "workspace:*",
     "@repo/ui": "workspace:*",
     "next": "16.1.5",
@@ -25,12 +26,21 @@
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/express": "5.0.6",
+    "@types/lodash": "4.17.24",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
+    "effect": "3.21.2",
     "eslint": "^9.39.1",
+    "express": "5.2.1",
+    "lodash": "4.18.1",
+    "pnpm": "10.33.2",
+    "react-hook-form": "7.74.0",
+    "swr": "2.4.1",
     "tsx": "^4.21.0",
-    "typescript": "5.9.2",
+    "typescript": "6.0.3",
+    "uuid": "14.0.0",
     "vitest": "^3.2.4"
   }
 }

@@ -48,8 +48,8 @@ poc-oracle.ts
 nco-react-index.json
 **/nci-report.json
 **/nci-report-rust.json
-packages/nci-core/docs/
-docs/
+/packages/*/docs/
+/docs/
 todo/
 
 # nci npm: downloaded native binary (postinstall)

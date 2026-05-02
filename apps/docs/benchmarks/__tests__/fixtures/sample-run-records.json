@@ -1,0 +1,38 @@
+[
+  {
+    "runId": "run-1",
+    "timestampIso": "2026-05-01T00:00:00.000Z",
+    "runtime": "local",
+    "strategy": "baseline",
+    "taskId": "uuid-v7-signature",
+    "packageId": "uuid",
+    "packageVersion": "14.0.0",
+    "difficulty": "easy",
+    "lane": "artifact_only",
+    "prompt": "prompt",
+    "promptContract": {
+      "strategy": "baseline",
+      "lane": "artifact_only",
+      "requiresNciCliUsage": false,
+      "requiresSqlEvidence": false,
+      "requiresGithubEvidence": false
+    },
+    "responseText": "{}",
+    "evidence": {
+      "declarationPaths": ["node_modules/uuid/dist/index.d.ts"]
+    },
+    "modelId": "local-default",
+    "durationMs": 820,
+    "runtimeMetrics": {
+      "toolCallsStarted": 2,
+      "toolCallsCompleted": 2,
+      "toolCallsErrored": 0,
+      "totalTokenCount": 1400
+    },
+    "isCorrect": true,
+    "missingSubstrings": [],
+    "forbiddenMatches": [],
+    "retries": 0,
+    "status": "success"
+  }
+]

@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.119",
-    "@cursor/sdk": "^1.0.9",
+    "@cursor/sdk": "^1.0.12",
     "@oyerinde/caliper": "^0.2.3",
     "@pulumi/aws": "^7.24.0",
     "@reduxjs/toolkit": "^2.11.2",

@@ -872,7 +872,7 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                             emit_ui_line_stdout(
                                 ProgressTone::Note,
                                 "db remove",
-                                "hint: run `nci query packages` to inspect indexed packages",
+                                "run `nci query packages` to inspect indexed packages",
                             );
                         } else {
                             emit_ui_line_stdout(
@@ -1330,6 +1330,32 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
             opts.filter = opts.filter.with_nciignore_file(&config_dir);
             let packages = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
+            if packages.is_empty() {
+                match fmt {
+                    OutputFormat::Plain => {
+                        emit_ui_line_stdout(
+                            ProgressTone::Warn,
+                            "index",
+                            &format!(
+                                "no matching package found to index +{}",
+                                format_elapsed(scan_started.elapsed())
+                            ),
+                        );
+                        emit_ui_line_stdout(
+                            ProgressTone::Note,
+                            "index",
+                            "check nci.config.json project_root/package filters, or verify the package is installed",
+                        );
+                        return Err(String::new());
+                    }
+                    OutputFormat::Json | OutputFormat::Jsonl => {
+                        return emit_error(
+                            fmt,
+                            "nci index: no packages matched filters; check project_root/package filters or package installation",
+                        );
+                    }
+                }
+            }
             if show_progress {
                 emit_progress_line(
                     "index",

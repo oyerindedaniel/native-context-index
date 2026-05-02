@@ -1,0 +1,154 @@
+{
+  "version": "2026-05-01",
+  "selection_policy": "tiered_package_artifacts",
+  "packages": [
+    {
+      "id": "uuid",
+      "tier": "easy",
+      "registry": "npm",
+      "package_name": "uuid",
+      "package_version": "14.0.0",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "uuidjs",
+        "repo": "uuid",
+        "default_branch": "main",
+        "pinned_sha": "89a5ebcc56999fc25c95350f922693b71fb11d32",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "swr",
+      "tier": "easy",
+      "registry": "npm",
+      "package_name": "swr",
+      "package_version": "2.4.1",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "vercel",
+        "repo": "swr",
+        "default_branch": "main",
+        "pinned_sha": "46f3954a35c39771ba3dcc00af774e4002062418",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "react-hook-form",
+      "tier": "medium",
+      "registry": "npm",
+      "package_name": "react-hook-form",
+      "package_version": "7.74.0",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "react-hook-form",
+        "repo": "react-hook-form",
+        "default_branch": "master",
+        "pinned_sha": "aa6f795df03c1c51a34d3da5e78862614100d4dc",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "express",
+      "tier": "medium",
+      "registry": "npm",
+      "package_name": "express",
+      "package_version": "5.2.1",
+      "language_family": "javascript",
+      "declaration_source": "external_types",
+      "types_package_name": "@types/express",
+      "types_package_version": "5.0.6",
+      "github": {
+        "owner": "expressjs",
+        "repo": "express",
+        "default_branch": "master",
+        "pinned_sha": "6340c1eaaedc0ddcae8be8df2cdb1d2e961cbf2f",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "lodash",
+      "tier": "medium",
+      "registry": "npm",
+      "package_name": "lodash",
+      "package_version": "4.18.1",
+      "language_family": "javascript",
+      "declaration_source": "external_types",
+      "types_package_name": "@types/lodash",
+      "types_package_version": "4.17.24",
+      "github": {
+        "owner": "lodash",
+        "repo": "lodash",
+        "default_branch": "main",
+        "pinned_sha": "3a546c4fe6c1224c601c6b61fde12bbae1e30182",
+        "license": "NOASSERTION"
+      }
+    },
+    {
+      "id": "pnpm",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "pnpm",
+      "package_version": "10.33.2",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "pnpm",
+        "repo": "pnpm",
+        "default_branch": "main",
+        "pinned_sha": "4bf61ba1fee1251549475a212ba3f595d22ad02d",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "typescript",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "typescript",
+      "package_version": "5.9.2",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "microsoft",
+        "repo": "TypeScript",
+        "default_branch": "main",
+        "pinned_sha": "f350b52331494b68c90ab02e2b6d0828d2a22a74",
+        "license": "Apache-2.0"
+      }
+    },
+    {
+      "id": "nextjs",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "next",
+      "package_version": "16.1.5",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "vercel",
+        "repo": "next.js",
+        "default_branch": "canary",
+        "pinned_sha": "65340b27724dc2878e4fcef4b8608ad06e7b4cc8",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "effect",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "effect",
+      "package_version": "3.17.14",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "Effect-TS",
+        "repo": "effect",
+        "default_branch": "main",
+        "pinned_sha": "70ce155cd73a3b4cd723fe955454b5837b428f76",
+        "license": "MIT"
+      }
+    }
+  ]
+}

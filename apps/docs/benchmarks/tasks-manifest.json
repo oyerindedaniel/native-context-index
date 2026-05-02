@@ -1,0 +1,114 @@
+{
+  "version": "2026-05-01",
+  "evaluation_focus": "declaration_valid_symbol_resolution",
+  "tasks": [
+    {
+      "id": "uuid-v7-signature",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "uuid",
+      "question": "Return the exported TypeScript signature for uuid.v7 and include the declaration file path.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["v7", "options", "Uint8Array", "string", ".d.ts"],
+        "forbidden_substrings": ["guess", "unsure"]
+      }
+    },
+    {
+      "id": "swr-response-generic",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "swr",
+      "question": "Identify the generic parameters used by SWRResponse and provide the declaration path.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["SWRResponse", "Data", "Error", ".d.ts"],
+        "forbidden_substrings": ["unknown source"]
+      }
+    },
+    {
+      "id": "react-hook-form-controller-props",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "react-hook-form",
+      "question": "Provide the declaration signature for ControllerProps and include all top-level generic parameters.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["ControllerProps", "TFieldValues", "TName", ".d.ts"],
+        "forbidden_substrings": ["no declarations found"]
+      }
+    },
+    {
+      "id": "express-request-handler",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "express",
+      "question": "From @types/express, return the RequestHandler generic declaration and file path.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["RequestHandler", "ParamsDictionary", "Response", ".d.ts"],
+        "forbidden_substrings": ["express source js only"]
+      }
+    },
+    {
+      "id": "lodash-get-overloads",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "lodash",
+      "question": "From @types/lodash, return one get overload that uses an object generic and path generic.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["get<TObject", "TPath", ".d.ts"],
+        "forbidden_substrings": ["runtime implementation"]
+      }
+    },
+    {
+      "id": "typescript-program-api",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "typescript",
+      "question": "Return the declaration signature for createProgram including the file path and argument names.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["createProgram", "rootNames", "CompilerOptions", ".d.ts"],
+        "forbidden_substrings": ["transpiled output only"]
+      }
+    },
+    {
+      "id": "nextjs-app-router-handler-context",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "nextjs",
+      "question": "Return the declaration type used for App Router route handler context params and file path.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["RouteContext", "params", ".d.ts"],
+        "forbidden_substrings": ["pages router"]
+      }
+    },
+    {
+      "id": "pnpm-workspace-state-shape",
+      "difficulty": "hard",
+      "lane": "architecture_github",
+      "package_id": "pnpm",
+      "question": "Using pnpm declarations as authority and GitHub for orientation, return the declaration shape of workspace state used by recursive commands.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["workspace", "state", ".d.ts"],
+        "forbidden_substrings": ["readme claim only"]
+      }
+    },
+    {
+      "id": "effect-gen-adapter-signature",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "effect",
+      "question": "In Effect package declarations, identify the exact TypeScript type signature path that powers Effect.gen and explain which generic constraints on the adapter drive inferred success/error/environment types.",
+      "verifier": {
+        "type": "json_contract",
+        "required_substrings": ["Effect.gen", "YieldWrap", "Variance", ".d.ts"],
+        "forbidden_substrings": ["runtime-only", "blog"]
+      }
+    }
+  ]
+}

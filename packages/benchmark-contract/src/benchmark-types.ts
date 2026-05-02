@@ -1,3 +1,5 @@
+import type { SDKToolUseMessage } from "@cursor/sdk";
+
 export type BenchmarkDifficulty = "easy" | "medium" | "hard";
 export type BenchmarkLane =
   | "artifact_only"
@@ -90,6 +92,7 @@ export interface AgentRuntimeMetrics {
   totalTokenCount?: number;
   inputTokenCount?: number;
   outputTokenCount?: number;
+  toolCallDetails?: SDKToolUseMessage[];
 }
 
 export interface CapabilityCheck {
@@ -98,13 +101,11 @@ export interface CapabilityCheck {
 }
 
 export interface CapabilityMatrix {
+  cursorApiKey: CapabilityCheck;
   local: {
     nciCli: CapabilityCheck;
-    githubCli: CapabilityCheck;
-    githubAuth: CapabilityCheck;
   };
   cloud: {
-    cursorApiKey: CapabilityCheck;
     connectedRepositories?: CapabilityCheck;
   };
 }
@@ -142,6 +143,8 @@ export interface BenchmarkRunFile {
   generatedAtIso: string;
   protocolVersion: string;
   mode: "pilot" | "full";
+  /** Output file stem (e.g. `7a-20260501-234438-pilot`) for pairing run + metrics + web exports. */
+  runStem?: string;
   capabilities: CapabilityMatrix;
   indexingMetrics: NciStageResult[];
   records: BenchmarkRunRecord[];
