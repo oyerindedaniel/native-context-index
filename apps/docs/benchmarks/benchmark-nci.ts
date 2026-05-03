@@ -9,12 +9,20 @@ export function executeCommand(
   command: string,
   commandArguments: string[],
   cwdPath: string,
-): Promise<{ success: boolean; output: string; durationMs: number }> {
+): Promise<{
+  success: boolean;
+  output: string;
+  durationMs: number;
+  exitCode: number;
+  stderr: string;
+}> {
   return runShellCommand(command, commandArguments, cwdPath).then((result) => {
     return {
       success: result.exitCode === 0,
       output: result.output,
       durationMs: result.durationMs,
+      exitCode: result.exitCode,
+      stderr: result.stderr,
     };
   });
 }

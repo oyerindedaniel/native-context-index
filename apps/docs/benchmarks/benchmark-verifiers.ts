@@ -8,6 +8,20 @@ function includesCaseInsensitive(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function requireStringField(
+  parsedJson: Record<string, unknown>,
+  fieldName: string,
+  missingSubstrings: string[],
+): void {
+  if (!isNonEmptyString(parsedJson[fieldName])) {
+    missingSubstrings.push(fieldName);
+  }
+}
+
 export function verifyResponse(
   responseText: string,
   verifier: TaskVerifier,
@@ -28,9 +42,12 @@ export function verifyResponse(
     }
   }
 
-  if (verifier.type === "json_contract") {
+  if (
+    verifier.type === "json_contract" ||
+    verifier.type === "practical_json_contract"
+  ) {
     try {
-      const parsedJson = JSON.parse(responseText) as {
+      const parsedJson = JSON.parse(responseText) as Record<string, unknown> & {
         declaration_paths?: unknown;
         nci_query_evidence?: unknown;
         nci_sql_evidence?: unknown;
@@ -57,6 +74,16 @@ export function verifyResponse(
         typeof parsedJson.github_evidence !== "string"
       ) {
         missingSubstrings.push("github_evidence");
+      }
+      if (verifier.type === "practical_json_contract") {
+        requireStringField(parsedJson, "recommendation", missingSubstrings);
+        requireStringField(parsedJson, "tradeoffs", missingSubstrings);
+        requireStringField(
+          parsedJson,
+          "implementation_notes",
+          missingSubstrings,
+        );
+        requireStringField(parsedJson, "evidence", missingSubstrings);
       }
     } catch {
       missingSubstrings.push("valid_json");

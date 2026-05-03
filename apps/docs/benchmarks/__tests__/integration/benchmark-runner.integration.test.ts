@@ -109,6 +109,7 @@ describe("benchmark runner integration", () => {
       {
         workspaceRoot: sandboxRoot,
         docsRoot,
+        taskManifestFileName: "tasks-manifest.json",
         mode: "pilot",
         protocolVersion: "test",
         modelId: "composer-2",
@@ -228,6 +229,7 @@ describe("benchmark runner integration", () => {
       {
         workspaceRoot: sandboxRoot,
         docsRoot,
+        taskManifestFileName: "tasks-manifest.json",
         mode: "full",
         protocolVersion: "test",
         modelId: "composer-2",
@@ -263,5 +265,112 @@ describe("benchmark runner integration", () => {
     expect(runOutput.records[0]?.skippedReason).toBe(
       "cursor_api_key_unavailable",
     );
+  });
+
+  it("can run against an alternate task manifest filename", async () => {
+    const sandboxRoot = await mkdtemp(
+      path.join(tmpdir(), "nci-bench-alt-manifest-"),
+    );
+    const docsRoot = path.join(sandboxRoot, "apps", "docs");
+    const benchmarkRoot = path.join(docsRoot, "benchmarks");
+    const webDataRoot = path.join(
+      sandboxRoot,
+      "apps",
+      "web",
+      "data",
+      "benchmarks",
+    );
+    await mkdir(benchmarkRoot, { recursive: true });
+    await mkdir(webDataRoot, { recursive: true });
+
+    await writeFile(
+      path.join(benchmarkRoot, "package-manifest.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          selection_policy: "test",
+          packages: [
+            {
+              id: "swr",
+              tier: "medium",
+              registry: "npm",
+              package_name: "swr",
+              package_version: "2.4.1",
+              language_family: "typescript",
+              declaration_source: "bundled",
+              github: {
+                owner: "vercel",
+                repo: "swr",
+                default_branch: "main",
+                pinned_sha: "sha",
+                license: "MIT",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.join(benchmarkRoot, "tasks-manifest.practical.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          evaluation_focus: "practical",
+          tasks: [
+            {
+              id: "swr-practical",
+              difficulty: "medium",
+              lane: "artifact_only",
+              package_id: "swr",
+              question: "Recommend SWR mutation flow",
+              verifier: {
+                type: "practical_json_contract",
+                required_substrings: ["mutate"],
+                forbidden_substrings: ["manual DOM update"],
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const outputStem = "cc-test-practical";
+
+    await runBenchmarksWithDependencies(
+      {
+        workspaceRoot: sandboxRoot,
+        docsRoot,
+        taskManifestFileName: "tasks-manifest.practical.json",
+        mode: "pilot",
+        protocolVersion: "test",
+        modelId: "composer-2",
+        nciBinaryPath: path.join(sandboxRoot, "target", "debug", "nci.exe"),
+        performExecution: false,
+        includeCloudRuntime: false,
+        outputStem,
+      },
+      {
+        runIndexingStage: async (packageEntry: PackageEntry) =>
+          stageResult("indexing_metrics", packageEntry.id),
+        runSqlStage: async (packageEntry: PackageEntry) =>
+          stageResult("sql_validation", packageEntry.id),
+        detectCapabilities: async () => createCapabilities(),
+      },
+    );
+
+    const runOutput = JSON.parse(
+      await readFile(
+        path.join(benchmarkRoot, "runs", `${outputStem}-run.json`),
+        "utf8",
+      ),
+    ) as { records: Array<{ taskId: string; prompt: string }> };
+    expect(runOutput.records[0]?.taskId).toBe("swr-practical");
+    expect(runOutput.records[0]?.prompt).toContain('"recommendation"');
   });
 });

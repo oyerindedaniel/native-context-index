@@ -3,13 +3,17 @@ import type {
   BenchmarkStrategy,
   PackageEntry,
   PromptContract,
+  TaskVerifier,
 } from "@repo/benchmark-contract/benchmark-types";
+
+import { buildNciFirstAgentPrimer } from "./nci-first-agent-primer";
 
 interface PromptBuildInput {
   strategy: BenchmarkStrategy;
   lane: BenchmarkLane;
   packageEntry: PackageEntry;
   taskQuestion: string;
+  taskVerifier: TaskVerifier;
   nciBinaryPath: string;
 }
 
@@ -43,7 +47,13 @@ function buildArtifactInstruction(packageEntry: PackageEntry): string {
 
 function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
   if (strategy === "nci_first") {
-    return "Use the NCI binary above. Use query for flexible symbol lookup; use a read-only sql probe when graph facts help. Use grep/glob or read_file only if you still need extra confirmation.";
+    return [
+      "Run **`sql --schema`** when you need the exact column list.",
+      "Prefer **query** for discovery; use read-only **sql** for relational facts from the tables above.",
+      'On **Windows PowerShell**, invoke NCI as **`& "<path-to-nci.exe>" <subcommand> …`** so `sql` / `query` are real arguments (never `"…nci.exe" sql …` without `&`).',
+      "Cap **`query find`** rows with **`-n` / `--limit`** (default 20). **`--max-rows` is only for `nci sql`**, not `query find`.",
+      "Use grep/read_file only when NCI output is insufficient.",
+    ].join(" ");
   }
   return [
     "Do not run nci commands in this baseline run.",
@@ -54,8 +64,8 @@ function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
 function buildNciFirstBinarySection(nciBinaryPath: string): string {
   return [
     `NCI binary: ${nciBinaryPath}`,
-    'Subcommands (same executable): `sql --schema` for table layout; `query find "<phrase>"` for symbol discovery; `sql --format json -c` for read-only SQL—any valid pattern is fine; shape the query from the schema and what you need (joins, filters, aggregates, etc.); use `--max-rows` only to cap how many rows come back.',
-    "Put representative stdout (or a clear empty/error note) in nci_query_evidence and nci_sql_evidence.",
+    'Subcommands (same executable): **`sql --schema`** prints DDL; **`query find "<phrase>"`** for FTS discovery (row cap: **`-n` / `--limit`**, not `--max-rows`); **`sql --format json -c`** with your own read-only `SELECT` (row cap: **`--max-rows`**).',
+    "Put representative stdout (or a clear empty/error note) in **`nci_query_evidence`** and **`nci_sql_evidence`**.",
   ].join("\n");
 }
 
@@ -69,11 +79,23 @@ function buildLaneInstruction(lane: BenchmarkLane): string {
   return "Analyze architecture-level behavior with GitHub orientation and declaration-grounded validation.";
 }
 
-export function buildBenchmarkPrompt(
-  input: PromptBuildInput,
-): PromptBuildResult {
-  const promptContract = buildContract(input.strategy, input.lane);
-  const requiredJsonSchema = [
+function buildRequiredJsonSchema(verifier: TaskVerifier): string {
+  if (verifier.type === "practical_json_contract") {
+    return [
+      "{",
+      '  "recommendation": "specific recommendation that answers the engineering question",',
+      '  "tradeoffs": "important tradeoffs, risks, and rejected alternatives",',
+      '  "implementation_notes": "implementation steps or constraints a developer can act on",',
+      '  "declaration_paths": ["path1.d.ts"],',
+      '  "evidence": "how cited declarations/source evidence support the recommendation",',
+      '  "nci_query_evidence": "required for nci_first, otherwise empty string",',
+      '  "nci_sql_evidence": "required for nci_first, otherwise empty string",',
+      '  "github_evidence": "required for non-artifact lanes, otherwise empty string"',
+      "}",
+    ].join("\n");
+  }
+
+  return [
     "{",
     '  "answer": "short factual answer",',
     '  "declaration_paths": ["path1.d.ts"],',
@@ -82,17 +104,30 @@ export function buildBenchmarkPrompt(
     '  "github_evidence": "required for non-artifact lanes, otherwise empty string"',
     "}",
   ].join("\n");
+}
+
+export function buildBenchmarkPrompt(
+  input: PromptBuildInput,
+): PromptBuildResult {
+  const promptContract = buildContract(input.strategy, input.lane);
+  const requiredJsonSchema = buildRequiredJsonSchema(input.taskVerifier);
 
   const promptSections = [
     "You are running a benchmark. Follow instructions exactly.",
     buildArtifactInstruction(input.packageEntry),
     ...(input.strategy === "nci_first"
       ? [
+          buildNciFirstAgentPrimer(),
           buildNciFirstBinarySection(input.nciBinaryPath),
           buildStrategyInstruction(input.strategy),
         ]
       : [buildStrategyInstruction(input.strategy)]),
     buildLaneInstruction(input.lane),
+    ...(input.taskVerifier.type === "practical_json_contract"
+      ? [
+          "This is a practical engineering-design task. Give a concrete recommendation, cite declaration/source evidence, and explain tradeoffs without generic blog-style advice.",
+        ]
+      : []),
     `Task: ${input.taskQuestion}`,
     "Reply with one JSON object only (no markdown). Schema:",
     requiredJsonSchema,

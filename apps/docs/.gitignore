@@ -37,3 +37,6 @@ next-env.d.ts
 
 # benchmark run outputs (JSON traces, metrics, temp notes — regenerate locally)
 benchmarks/runs/
+benchmarks/.pilot-sequential-step.json
+benchmarks/.pilot-practical-sequential-step.json
+nci-first-agent-primer.md

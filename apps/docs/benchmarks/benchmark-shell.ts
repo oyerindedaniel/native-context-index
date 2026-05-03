@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 export interface ShellCommandResult {
   exitCode: number;
   output: string;
+  stdout: string;
+  stderr: string;
   durationMs: number;
 }
 
@@ -34,6 +36,8 @@ export function runShellCommand(
       resolve({
         exitCode: exitCode ?? 1,
         output: `${stdoutOutput}\n${stderrOutput}`.trim(),
+        stdout: stdoutOutput,
+        stderr: stderrOutput,
         durationMs: Date.now() - startedAt,
       });
     });

@@ -7,7 +7,10 @@ export type BenchmarkLane =
   | "architecture_github";
 export type BenchmarkRuntime = "local" | "cloud";
 export type BenchmarkStrategy = "baseline" | "nci_first";
-export type VerifierType = "contains_all" | "json_contract";
+export type VerifierType =
+  | "contains_all"
+  | "json_contract"
+  | "practical_json_contract";
 
 export interface PackageEntry {
   id: string;
@@ -34,11 +37,28 @@ export interface PackageManifest {
   packages: PackageEntry[];
 }
 
-export interface TaskVerifier {
-  type: VerifierType;
+export interface ContainsAllVerifier {
+  type: "contains_all";
   required_substrings: string[];
   forbidden_substrings: string[];
 }
+
+export interface JsonContractVerifier {
+  type: "json_contract";
+  required_substrings: string[];
+  forbidden_substrings: string[];
+}
+
+export interface PracticalJsonContractVerifier {
+  type: "practical_json_contract";
+  required_substrings: string[];
+  forbidden_substrings: string[];
+}
+
+export type TaskVerifier =
+  | ContainsAllVerifier
+  | JsonContractVerifier
+  | PracticalJsonContractVerifier;
 
 export interface BenchmarkTask {
   id: string;

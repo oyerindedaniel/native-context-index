@@ -9,6 +9,8 @@ function digestOutput(outputText: string): string {
   return createHash("sha256").update(outputText).digest("hex").slice(0, 16);
 }
 
+const STDERR_TAIL_MAX_CHARS = 2000;
+
 export function buildSqlCommand(packageEntry: PackageEntry): string {
   return [
     "SELECT p.name, p.version, COUNT(s.symbol_id) AS symbol_count",
@@ -34,6 +36,11 @@ export async function runSqlValidationStage(
     workspaceRoot,
   );
 
+  const stderrTail =
+    queryResult.stderr.length > STDERR_TAIL_MAX_CHARS
+      ? queryResult.stderr.slice(-STDERR_TAIL_MAX_CHARS)
+      : queryResult.stderr;
+
   return {
     stageType: "sql_validation",
     packageId: packageEntry.id,
@@ -44,6 +51,8 @@ export async function runSqlValidationStage(
     metadata: {
       packageName: packageEntry.package_name,
       packageVersion: packageEntry.package_version,
+      exitCode: queryResult.exitCode,
+      stderrTail,
     },
   };
 }

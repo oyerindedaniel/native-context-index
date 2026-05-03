@@ -1,0 +1,102 @@
+{
+  "version": "2026-05-01",
+  "evaluation_focus": "practical_engineering_design_with_declaration_grounding",
+  "tasks": [
+    {
+      "id": "effect-services-errors-environment",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "effect",
+      "question": "Recommend how a team should model service dependencies and typed failures with Effect for a non-trivial workflow. Explain how the environment, error, and success type parameters should guide the architecture.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Effect", "Context", "Layer", ".d.ts"],
+        "forbidden_substrings": ["throw untyped errors", "global singleton"]
+      }
+    },
+    {
+      "id": "nextjs-app-router-auth-boundaries",
+      "difficulty": "medium",
+      "lane": "architecture_github",
+      "package_id": "nextjs",
+      "question": "For a current Next.js App Router application, recommend the safest practical auth boundary design for route handlers and server components. Explain where session validation should happen, how request/response APIs constrain the design, and what should stay out of client components.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["NextRequest", "NextResponse", "cookies", ".d.ts"],
+        "forbidden_substrings": ["use localStorage for sessions", "client-only auth"]
+      }
+    },
+    {
+      "id": "swr-dashboard-mutation-revalidation",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "swr",
+      "question": "Design a practical SWR data flow for a dashboard that performs optimistic edits while avoiding stale UI after mutation. Recommend when to use mutate, optimistic data, rollback, and revalidation, grounded in SWR mutation/cache declarations.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["mutate", "optimisticData", "rollbackOnError", ".d.ts"],
+        "forbidden_substrings": ["disable revalidation everywhere", "manual DOM update"]
+      }
+    },
+    {
+      "id": "react-hook-form-reusable-field-types",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "react-hook-form",
+      "question": "Recommend the best way to build a reusable typed field component with React Hook Form without losing nested path inference. Explain how Control, FieldValues, FieldPath, and controller props constrain the component API.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Control", "FieldValues", "FieldPath", ".d.ts"],
+        "forbidden_substrings": ["any everywhere", "string name only"]
+      }
+    },
+    {
+      "id": "express5-async-error-middleware",
+      "difficulty": "medium",
+      "lane": "architecture_github",
+      "package_id": "express",
+      "question": "For an Express 5 TypeScript API, recommend a practical async route error-handling pattern. Explain how RequestHandler and error middleware typings affect whether to wrap handlers, throw directly, or call next.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["RequestHandler", "ErrorRequestHandler", "NextFunction", ".d.ts"],
+        "forbidden_substrings": ["swallow errors", "ignore rejected promises"]
+      }
+    },
+    {
+      "id": "typescript-codegen-program-vs-parser",
+      "difficulty": "hard",
+      "lane": "architecture_github",
+      "package_id": "typescript",
+      "question": "For a TypeScript code generation tool, recommend when to use createProgram instead of a lightweight source-file parse. Explain the tradeoff between type-checker accuracy, project config, performance, and the relevant compiler API declarations.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["createProgram", "CompilerOptions", "SourceFile", ".d.ts"],
+        "forbidden_substrings": ["always use regex", "ignore tsconfig"]
+      }
+    },
+    {
+      "id": "pnpm-workspace-command-design",
+      "difficulty": "hard",
+      "lane": "architecture_github",
+      "package_id": "pnpm",
+      "question": "Recommend how to design a workspace-aware command that runs across many pnpm projects without corrupting shared state. Ground the answer in pnpm workspace/recursive command types and explain concurrency, filtering, and state tradeoffs.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["workspace", "recursive", "filter", ".d.ts"],
+        "forbidden_substrings": ["mutate all packages blindly", "single package only"]
+      }
+    },
+    {
+      "id": "lodash-path-access-type-safety",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "lodash",
+      "question": "For a TypeScript codebase that relies on lodash get for nested config access, recommend a practical strategy for balancing runtime fallback behavior with compile-time path safety. Explain what lodash declarations can and cannot guarantee.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["get", "TObject", "TPath", ".d.ts"],
+        "forbidden_substrings": ["trust any string path", "remove validation"]
+      }
+    }
+  ]
+}

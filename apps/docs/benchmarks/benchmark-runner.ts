@@ -4,7 +4,9 @@ import path from "node:path";
 import { Agent } from "@cursor/sdk";
 import type { SDKMessage, SDKToolUseMessage } from "@cursor/sdk";
 import type {
+  AgentEvidence,
   AgentRuntimeMetrics,
+  BenchmarkDifficulty,
   BenchmarkRunFile,
   BenchmarkRunRecord,
   BenchmarkRuntime,
@@ -12,6 +14,7 @@ import type {
   CapabilityMatrix,
   NciStageResult,
   PackageManifest,
+  PromptContract,
   TaskManifest,
 } from "@repo/benchmark-contract/benchmark-types";
 import { detectCapabilities } from "./benchmark-capabilities";
@@ -24,16 +27,56 @@ import {
 import { resolveNciBinaryPath } from "./benchmark-runtime";
 import { runSqlValidationStage } from "./benchmark-sql-validation";
 import { verifyResponse } from "./benchmark-verifiers";
+import {
+  DEFAULT_PILOT_SEQUENTIAL_STEP_FILENAME,
+  pickNextPilotTask,
+  readPilotSequentialStepState,
+  syncCompletedIdsWithPilotSet,
+  writePilotSequentialStepState,
+} from "./benchmark-sequential-step";
+import { shuffleArray } from "./benchmark-task-order";
+
+export const DEFAULT_TASK_MANIFEST_FILE_NAME = "tasks-manifest.json";
 
 export interface RunnerOptions {
   workspaceRoot: string;
   docsRoot: string;
+  taskManifestFileName: string;
+  /**
+   * Stored in outputs / filename stem; enables `sequentialStep` only when `pilot`. Does not select tasks by itself.
+   */
   mode: "pilot" | "full";
   protocolVersion: string;
   modelId: string;
   nciBinaryPath?: string;
   performExecution: boolean;
   includeCloudRuntime: boolean;
+  /**
+   * Restrict runs to these task ids only (manifest order among matches). Omit to include every task
+   * (after `difficultyFilter`, if any).
+   */
+  taskIds?: string[];
+  /**
+   * Restrict runs to tasks whose `difficulty` is listed (e.g. `easy,medium`). Omit for all difficulties.
+   * Example: replicate the old pilot slice with `--difficulty=easy,medium --task-limit=4`.
+   */
+  difficultyFilter?: BenchmarkDifficulty[];
+  /**
+   * After task selection, order tasks by manifest (default) or shuffle before `taskLimit`.
+   * Use `random` with `taskLimit: 1` to sample one task without always using the first.
+   */
+  taskOrder?: "manifest" | "random";
+  /** When `taskOrder` is `random`, optional string seed for a reproducible shuffle. */
+  randomSeed?: string;
+  /**
+   * Pilot only: each invocation runs the **next** pilot task in manifest order, then advances
+   * persisted progress (see `sequentialStepStatePath`). Ignores `taskOrder`/`taskLimit`.
+   */
+  sequentialStep?: boolean;
+  /** JSON file tracking completed pilot task IDs (default: `benchmarks/.pilot-sequential-step.json`). */
+  sequentialStepStatePath?: string;
+  /** Clear sequential-step progress before running (or exit after clear if `sequentialStep` is false). */
+  resetSequentialStep?: boolean;
   /** Limit how many tasks run after mode selection (manifest order). Omit for no limit. */
   taskLimit?: number;
   /** Log progress to the console (tool lines and periodic heartbeats during agent runs). */
@@ -43,16 +86,29 @@ export interface RunnerOptions {
 }
 
 function buildRunOutputStem(mode: "pilot" | "full"): string {
-  const d = new Date();
+  const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
-  const datePart = `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-  const timePart = `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+  const datePart = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}`;
+  const timePart = `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
   const pair = randomBytes(1).toString("hex");
   return `${pair}-${datePart}-${timePart}-${mode}`;
 }
 
 function logBench(line: string): void {
   console.log(`[bench] ${line}`);
+}
+
+function resolveTaskManifestPath(
+  benchmarkRoot: string,
+  taskManifestFileName: string,
+): string {
+  if (
+    path.basename(taskManifestFileName) !== taskManifestFileName ||
+    taskManifestFileName.length === 0
+  ) {
+    throw new Error(`Invalid task manifest filename: ${taskManifestFileName}`);
+  }
+  return path.join(benchmarkRoot, taskManifestFileName);
 }
 
 interface ExecutionResult {
@@ -71,9 +127,11 @@ interface RunnerDependencies {
 
 type TaskDefinition = TaskManifest["tasks"][number];
 
+type PackageEntry = PackageManifest["packages"][number];
+
 interface RunCombination {
   task: TaskDefinition;
-  packageEntry: PackageManifest["packages"][number];
+  packageEntry: PackageEntry;
   runtime: BenchmarkRuntime;
   strategy: BenchmarkStrategy;
 }
@@ -83,6 +141,81 @@ function createEmptyRuntimeMetrics(): AgentRuntimeMetrics {
     toolCallsStarted: 0,
     toolCallsCompleted: 0,
     toolCallsErrored: 0,
+  };
+}
+
+function buildBenchmarkRunRecord(
+  shared: {
+    task: TaskDefinition;
+    packageEntry: PackageEntry;
+    runtime: BenchmarkRuntime;
+    strategy: BenchmarkStrategy;
+    prompt: string;
+    promptContract: PromptContract;
+    modelId: string;
+    indexingStage?: NciStageResult;
+  },
+  outcome:
+    | { kind: "skipped"; skippedReason: string }
+    | {
+        kind: "executed";
+        responseText: string;
+        evidence: AgentEvidence;
+        durationMs: number;
+        sdkDurationMs?: number;
+        runtimeMetrics: AgentRuntimeMetrics;
+        isCorrect: boolean;
+        missingSubstrings: string[];
+        forbiddenMatches: string[];
+        status: "success" | "failure";
+        errorMessage?: string;
+        sqlValidationStage?: NciStageResult;
+      },
+): BenchmarkRunRecord {
+  const head = {
+    runId: randomUUID(),
+    timestampIso: new Date().toISOString(),
+    runtime: shared.runtime,
+    strategy: shared.strategy,
+    taskId: shared.task.id,
+    packageId: shared.packageEntry.id,
+    packageVersion: shared.packageEntry.package_version,
+    difficulty: shared.task.difficulty,
+    lane: shared.task.lane,
+    prompt: shared.prompt,
+    promptContract: shared.promptContract,
+    modelId: shared.modelId,
+    indexingStage: shared.indexingStage,
+    retries: 0,
+  };
+  if (outcome.kind === "skipped") {
+    return {
+      ...head,
+      responseText: "",
+      evidence: { declarationPaths: [] },
+      durationMs: 0,
+      sdkDurationMs: 0,
+      runtimeMetrics: createEmptyRuntimeMetrics(),
+      isCorrect: false,
+      missingSubstrings: [],
+      forbiddenMatches: [],
+      status: "skipped",
+      skippedReason: outcome.skippedReason,
+    };
+  }
+  return {
+    ...head,
+    responseText: outcome.responseText,
+    evidence: outcome.evidence,
+    durationMs: outcome.durationMs,
+    sdkDurationMs: outcome.sdkDurationMs,
+    runtimeMetrics: outcome.runtimeMetrics,
+    isCorrect: outcome.isCorrect,
+    missingSubstrings: outcome.missingSubstrings,
+    forbiddenMatches: outcome.forbiddenMatches,
+    status: outcome.status,
+    errorMessage: outcome.errorMessage,
+    sqlValidationStage: outcome.sqlValidationStage,
   };
 }
 
@@ -185,20 +318,43 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
 }
 
-function selectTaskIds(
+export function filterManifestTasksForRun(
   taskManifest: TaskManifest,
-  mode: "pilot" | "full",
-): Set<string> {
-  if (mode === "full") {
-    return new Set(taskManifest.tasks.map((task) => task.id));
+  filters: {
+    taskIds?: string[];
+    difficultyFilter?: BenchmarkDifficulty[];
+  },
+): TaskDefinition[] {
+  const idAllowlist =
+    filters.taskIds !== undefined && filters.taskIds.length > 0
+      ? new Set(filters.taskIds)
+      : undefined;
+  const difficultyAllowlist =
+    filters.difficultyFilter !== undefined &&
+    filters.difficultyFilter.length > 0
+      ? new Set(filters.difficultyFilter)
+      : undefined;
+
+  if (idAllowlist) {
+    const manifestIds = new Set(taskManifest.tasks.map((task) => task.id));
+    for (const taskId of idAllowlist) {
+      if (!manifestIds.has(taskId)) {
+        throw new Error(
+          `Unknown task id in --task-ids: ${taskId} (not present in task manifest).`,
+        );
+      }
+    }
   }
-  const pilotTaskIds = taskManifest.tasks
-    .filter(
-      (task) => task.difficulty === "easy" || task.difficulty === "medium",
-    )
-    .slice(0, 4)
-    .map((task) => task.id);
-  return new Set(pilotTaskIds);
+
+  return taskManifest.tasks.filter((task) => {
+    if (idAllowlist && !idAllowlist.has(task.id)) {
+      return false;
+    }
+    if (difficultyAllowlist && !difficultyAllowlist.has(task.difficulty)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 interface AgentRunProgress {
@@ -375,7 +531,10 @@ export async function runBenchmarksWithDependencies(
 ): Promise<void> {
   const benchmarkRoot = path.join(options.docsRoot, "benchmarks");
   const packageManifestPath = path.join(benchmarkRoot, "package-manifest.json");
-  const taskManifestPath = path.join(benchmarkRoot, "tasks-manifest.json");
+  const taskManifestPath = resolveTaskManifestPath(
+    benchmarkRoot,
+    options.taskManifestFileName,
+  );
   const nciBinaryPath = resolveNciBinaryPath(
     options.workspaceRoot,
     options.nciBinaryPath,
@@ -389,21 +548,100 @@ export async function runBenchmarksWithDependencies(
     nciBinaryPath,
   );
 
+  const defaultSequentialStatePath = path.join(
+    benchmarkRoot,
+    DEFAULT_PILOT_SEQUENTIAL_STEP_FILENAME,
+  );
+  const resolvedSequentialStatePath =
+    options.sequentialStepStatePath === undefined
+      ? defaultSequentialStatePath
+      : path.isAbsolute(options.sequentialStepStatePath)
+        ? options.sequentialStepStatePath
+        : path.join(options.docsRoot, options.sequentialStepStatePath);
+
+  if (options.resetSequentialStep) {
+    const emptyState: { version: 1; completedTaskIds: never[] } = {
+      version: 1,
+      completedTaskIds: [],
+    };
+    await writePilotSequentialStepState(
+      resolvedSequentialStatePath,
+      emptyState,
+    );
+    logBench(`reset sequential step state: ${resolvedSequentialStatePath}`);
+    if (!options.sequentialStep) {
+      return;
+    }
+  }
+
   if (options.verbose) {
     logBench(
-      `mode=${options.mode} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} taskLimit=${options.taskLimit ?? "none"}`,
+      `mode=${options.mode} manifest=${options.taskManifestFileName} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} sequentialStep=${options.sequentialStep ?? false} taskOrder=${options.taskOrder ?? "manifest"} randomSeed=${options.randomSeed ?? "none"} taskLimit=${options.taskLimit ?? "none"} taskIds=${options.taskIds?.join(",") ?? "none"} difficulty=${options.difficultyFilter?.join(",") ?? "none"}`,
     );
     logBench(
       `capabilities: cursorApiKey=${capabilities.cursorApiKey.available ? "ok" : "no"} nciCli=${capabilities.local.nciCli.available ? "ok" : "no"}`,
     );
   }
 
-  const selectedTaskIds = selectTaskIds(taskManifest, options.mode);
-  let selectedTasks = taskManifest.tasks.filter((task) =>
-    selectedTaskIds.has(task.id),
-  );
-  if (options.taskLimit !== undefined) {
-    selectedTasks = selectedTasks.slice(0, options.taskLimit);
+  const orderedModeTasks = filterManifestTasksForRun(taskManifest, {
+    taskIds: options.taskIds,
+    difficultyFilter: options.difficultyFilter,
+  });
+
+  let sequentialAdvanceTaskId: string | undefined;
+  let selectedTasks: TaskDefinition[];
+
+  if (options.sequentialStep) {
+    if (options.mode !== "pilot") {
+      throw new Error("sequentialStep is only supported with mode=pilot");
+    }
+    if (options.verbose && options.taskOrder === "random") {
+      logBench(
+        "task order is manifest (random ignored while sequentialStep is enabled)",
+      );
+    }
+
+    let stepState = await readPilotSequentialStepState(
+      resolvedSequentialStatePath,
+    );
+    const pilotOrderedIds = orderedModeTasks.map((task) => task.id);
+    stepState = {
+      version: 1,
+      completedTaskIds: syncCompletedIdsWithPilotSet(
+        stepState.completedTaskIds,
+        pilotOrderedIds,
+      ),
+    };
+
+    const nextTask = pickNextPilotTask(
+      orderedModeTasks,
+      stepState.completedTaskIds,
+    );
+    if (!nextTask) {
+      logBench(
+        "pilot sequential step: all tasks in this pilot set are complete — use --reset-sequential-step=true to run the sequence again from the first task",
+      );
+      return;
+    }
+
+    sequentialAdvanceTaskId = nextTask.id;
+    selectedTasks = [nextTask];
+
+    if (options.verbose) {
+      const doneCount = stepState.completedTaskIds.length;
+      const total = orderedModeTasks.length;
+      logBench(
+        `sequential step: task ${doneCount + 1}/${total} — ${nextTask.id}`,
+      );
+    }
+  } else {
+    selectedTasks = orderedModeTasks;
+    if (options.taskOrder === "random") {
+      selectedTasks = shuffleArray(selectedTasks, options.randomSeed);
+    }
+    if (options.taskLimit !== undefined) {
+      selectedTasks = selectedTasks.slice(0, options.taskLimit);
+    }
   }
   const packageById = new Map(
     packageManifest.packages.map((packageEntry) => [
@@ -473,6 +711,7 @@ export async function runBenchmarksWithDependencies(
       lane: task.lane,
       packageEntry,
       taskQuestion: task.question,
+      taskVerifier: task.verifier,
       nciBinaryPath,
     });
     const skippedReason = shouldSkipRun(
@@ -487,32 +726,21 @@ export async function runBenchmarksWithDependencies(
       if (options.verbose) {
         logBench(`${progressLabel} skipped (${skippedReason})`);
       }
-      runRecords.push({
-        runId: randomUUID(),
-        timestampIso: new Date().toISOString(),
-        runtime,
-        strategy,
-        taskId: task.id,
-        packageId: packageEntry.id,
-        packageVersion: packageEntry.package_version,
-        difficulty: task.difficulty,
-        lane: task.lane,
-        prompt: promptBuildResult.prompt,
-        promptContract: promptBuildResult.contract,
-        responseText: "",
-        evidence: { declarationPaths: [] },
-        modelId: options.modelId,
-        durationMs: 0,
-        sdkDurationMs: 0,
-        runtimeMetrics: createEmptyRuntimeMetrics(),
-        isCorrect: false,
-        missingSubstrings: [],
-        forbiddenMatches: [],
-        retries: 0,
-        status: "skipped",
-        skippedReason,
-        indexingStage,
-      });
+      runRecords.push(
+        buildBenchmarkRunRecord(
+          {
+            task,
+            packageEntry,
+            runtime,
+            strategy,
+            prompt: promptBuildResult.prompt,
+            promptContract: promptBuildResult.contract,
+            modelId: options.modelId,
+            indexingStage,
+          },
+          { kind: "skipped", skippedReason },
+        ),
+      );
       continue;
     }
 
@@ -541,33 +769,34 @@ export async function runBenchmarksWithDependencies(
       promptBuildResult.contract,
     );
 
-    runRecords.push({
-      runId: randomUUID(),
-      timestampIso: new Date().toISOString(),
-      runtime,
-      strategy,
-      taskId: task.id,
-      packageId: packageEntry.id,
-      packageVersion: packageEntry.package_version,
-      difficulty: task.difficulty,
-      lane: task.lane,
-      prompt: promptBuildResult.prompt,
-      promptContract: promptBuildResult.contract,
-      responseText: executionResult.responseText,
-      evidence,
-      modelId: options.modelId,
-      durationMs: executionResult.durationMs,
-      sdkDurationMs: executionResult.sdkDurationMs,
-      runtimeMetrics: executionResult.runtimeMetrics,
-      isCorrect: verifierResult.isCorrect,
-      missingSubstrings: verifierResult.missingSubstrings,
-      forbiddenMatches: verifierResult.forbiddenMatches,
-      retries: 0,
-      status: executionResult.errorMessage ? "failure" : "success",
-      errorMessage: executionResult.errorMessage,
-      indexingStage,
-      sqlValidationStage: sqlValidationResult,
-    });
+    runRecords.push(
+      buildBenchmarkRunRecord(
+        {
+          task,
+          packageEntry,
+          runtime,
+          strategy,
+          prompt: promptBuildResult.prompt,
+          promptContract: promptBuildResult.contract,
+          modelId: options.modelId,
+          indexingStage,
+        },
+        {
+          kind: "executed",
+          responseText: executionResult.responseText,
+          evidence,
+          durationMs: executionResult.durationMs,
+          sdkDurationMs: executionResult.sdkDurationMs,
+          runtimeMetrics: executionResult.runtimeMetrics,
+          isCorrect: verifierResult.isCorrect,
+          missingSubstrings: verifierResult.missingSubstrings,
+          forbiddenMatches: verifierResult.forbiddenMatches,
+          status: executionResult.errorMessage ? "failure" : "success",
+          errorMessage: executionResult.errorMessage,
+          sqlValidationStage: sqlValidationResult,
+        },
+      ),
+    );
   }
 
   const runStem = options.outputStem ?? buildRunOutputStem(options.mode);
@@ -651,7 +880,7 @@ export async function runBenchmarksWithDependencies(
       missingSubstrings: record.missingSubstrings,
       forbiddenMatches: record.forbiddenMatches,
       skippedReason: record.skippedReason,
-      sqlValidationSuccess: record.sqlValidationStage?.success,
+      harnessSqlProbeSuccess: record.sqlValidationStage?.success,
     })),
   };
 
@@ -677,6 +906,28 @@ export async function runBenchmarksWithDependencies(
     "utf8",
   );
   await writeFile(fullOutputPath, JSON.stringify(fullDataset, null, 2), "utf8");
+
+  if (options.sequentialStep && sequentialAdvanceTaskId) {
+    const currentState = await readPilotSequentialStepState(
+      resolvedSequentialStatePath,
+    );
+    const nextCompletedTaskIds = syncCompletedIdsWithPilotSet(
+      currentState.completedTaskIds,
+      orderedModeTasks.map((task) => task.id),
+    );
+    if (!nextCompletedTaskIds.includes(sequentialAdvanceTaskId)) {
+      nextCompletedTaskIds.push(sequentialAdvanceTaskId);
+      await writePilotSequentialStepState(resolvedSequentialStatePath, {
+        version: 1,
+        completedTaskIds: nextCompletedTaskIds,
+      });
+      if (options.verbose) {
+        logBench(
+          `sequential step advanced: ${sequentialAdvanceTaskId} (${nextCompletedTaskIds.length}/${orderedModeTasks.length})`,
+        );
+      }
+    }
+  }
 
   if (options.verbose) {
     logBench(`done. records=${runRecords.length} stem=${runStem}`);

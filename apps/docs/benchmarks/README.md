@@ -63,6 +63,8 @@
 - Web benchmark component tests: `pnpm --filter web run test:benchmarks`
 - Optional NCI binary override: `--nci-binary-path=<absolute-path-to-nci-executable>`
 
+From `apps/docs`, run `dotenv -e .env -- tsx benchmarks/benchmark-cli.ts` with extra flags, or use a `package.json` script and pass more flags after `--`, e.g. `pnpm run bench:full:practical -- --task-ids=<id>`. See `benchmark-cli.ts` and `benchmark-cli-args.ts` for supported options (`--task-limit`, `--task-ids`, `--difficulty`, etc.).
+
 ## Model selection
 
 - Benchmark execution uses `composer-2` by default.

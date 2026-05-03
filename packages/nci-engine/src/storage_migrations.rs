@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     parent_symbol_id TEXT,
     enclosing_module_declaration_id TEXT,
     merge_provenance_json TEXT,
+    entry_visibility_json TEXT,
     UNIQUE(package_id, id)
 );
 

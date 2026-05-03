@@ -486,7 +486,7 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id, merge_provenance_json
+                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -518,6 +518,7 @@ impl NciDatabase {
                     symbol_row.get::<_, Option<String>>(21)?,
                     symbol_row.get::<_, Option<String>>(22)?,
                     symbol_row.get::<_, Option<String>>(23)?,
+                    symbol_row.get::<_, Option<String>>(24)?,
                 ))
             })
             .ok()?;
@@ -552,9 +553,11 @@ impl NciDatabase {
                 parent_symbol_id_opt,
                 enclosing_module_declaration_id_opt,
                 merge_provenance_json_opt,
+                entry_visibility_json_opt,
             ) = row_result;
 
             let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
+            let entry_visibility = entry_visibility_from_db(entry_visibility_json_opt);
 
             let dependencies = SharedVec::from(
                 deps_map
@@ -616,7 +619,7 @@ impl NciDatabase {
                 package: package_info.name.clone(),
                 file_path: SharedString::from(file_path_text),
                 additional_files,
-                entry_visibility: None,
+                entry_visibility,
                 merge_provenance,
                 signature: signature_opt.map(SharedString::from),
                 js_doc: js_doc_opt.map(SharedString::from),
@@ -701,8 +704,8 @@ impl NciDatabase {
                 deprecated_flag, deprecated_message, visibility,
                 since_tag, since_major, since_minor, since_patch,
                 is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                enclosing_module_declaration_id, merge_provenance_json
-                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+                enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
+                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
             )?;
 
             let mut insert_inherited = transaction.prepare(
@@ -747,6 +750,8 @@ impl NciDatabase {
                     .merge_provenance
                     .as_ref()
                     .and_then(|provenance| serde_json::to_string(provenance).ok());
+                let entry_visibility_json =
+                    entry_visibility_to_db(symbol_node.entry_visibility.as_ref());
 
                 insert_symbol.execute(rusqlite::params![
                     package_id,
@@ -786,6 +791,7 @@ impl NciDatabase {
                         .as_ref()
                         .map(|value| value.as_ref()),
                     merge_provenance_json,
+                    entry_visibility_json,
                 ])?;
 
                 let symbol_row_id = transaction.last_insert_rowid();
@@ -945,7 +951,7 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id, merge_provenance_json
+                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -974,6 +980,7 @@ impl NciDatabase {
                         symbol_row.get::<_, Option<String>>(21)?,
                         symbol_row.get::<_, Option<String>>(22)?,
                         symbol_row.get::<_, Option<String>>(23)?,
+                        symbol_row.get::<_, Option<String>>(24)?,
                     ))
                 },
             )
@@ -1004,6 +1011,7 @@ impl NciDatabase {
             parent_symbol_id_opt,
             enclosing_module_declaration_id_opt,
             merge_provenance_json_opt,
+            entry_visibility_json_opt,
         )) = row_opt
         else {
             return Ok(None);
@@ -1147,6 +1155,7 @@ impl NciDatabase {
             parse_symbol_space_from_db(&symbol_space_text).unwrap_or(SymbolSpace::Value);
 
         let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
+        let entry_visibility = entry_visibility_from_db(entry_visibility_json_opt);
 
         Ok(Some(SymbolNode {
             id: SharedString::from(id_text),
@@ -1160,7 +1169,7 @@ impl NciDatabase {
             package: package_info.name.clone(),
             file_path: SharedString::from(file_path_text),
             additional_files,
-            entry_visibility: None,
+            entry_visibility,
             merge_provenance,
             signature: signature_opt.map(SharedString::from),
             js_doc: js_doc_opt.map(SharedString::from),
@@ -1426,6 +1435,35 @@ fn merge_provenance_from_db(json_text: Option<String>) -> Option<MergeProvenance
     json_text.and_then(|text| serde_json::from_str(&text).ok())
 }
 
+fn entry_visibility_to_db(paths: Option<&SharedVec<SharedString>>) -> Option<String> {
+    paths.and_then(|vec| {
+        if vec.is_empty() {
+            return None;
+        }
+        let as_refs: Vec<&str> = vec.iter().map(|shared| shared.as_ref()).collect();
+        serde_json::to_string(&as_refs).ok()
+    })
+}
+
+fn entry_visibility_from_db(json_text: Option<String>) -> Option<SharedVec<SharedString>> {
+    json_text.and_then(|text| {
+        if text.is_empty() {
+            return None;
+        }
+        let paths: Vec<String> = serde_json::from_str(&text).ok()?;
+        if paths.is_empty() {
+            return None;
+        }
+        Some(SharedVec::from(
+            paths
+                .into_iter()
+                .map(SharedString::from)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        ))
+    })
+}
+
 fn deprecation_to_columns(deprecation: Option<&Deprecation>) -> (i64, Option<String>) {
     match deprecation {
         None | Some(Deprecation::Flag(false)) => (0, None),
@@ -1634,6 +1672,55 @@ mod tests {
                 ],
             })
         );
+    }
+
+    #[test]
+    fn entry_visibility_roundtrips_through_sqlite() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("entry_visibility.sqlite");
+        let mut database = NciDatabase::open(&path).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("demo-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/x"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let mut sym = minimal_symbol("sym-ev", "exportedFn");
+        sym.file_path = SharedString::from("dist/deep/foo.d.ts");
+        sym.entry_visibility = Some(SharedVec::from(
+            vec![
+                SharedString::from("dist/index.d.ts"),
+                SharedString::from("dist/barrel.d.ts"),
+            ]
+            .into_boxed_slice(),
+        ));
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym],
+            total_symbols: 1,
+            total_files: 2,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+        let loaded = database.load_package(&package_info).expect("load");
+        let ev = loaded.symbols[0]
+            .entry_visibility
+            .as_ref()
+            .expect("entry_visibility");
+        assert_eq!(ev.len(), 2);
+        assert_eq!(ev[0].as_ref(), "dist/index.d.ts");
+        assert_eq!(ev[1].as_ref(), "dist/barrel.d.ts");
+        assert_eq!(loaded.symbols[0].file_path.as_ref(), "dist/deep/foo.d.ts");
+
+        let (_total, paged) = database
+            .list_package_symbols_page("demo-pkg", "1.0.0", 5, 0)
+            .expect("page");
+        assert_eq!(paged[0].entry_visibility.as_ref().map(|v| v.len()), Some(2));
     }
 
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {

@@ -61,4 +61,55 @@ describe("benchmark verifiers", () => {
     expect(result.isCorrect).toBe(false);
     expect(result.missingSubstrings).toContain("valid_json");
   });
+
+  it("enforces practical json structure and substring gates", () => {
+    const verifier: TaskVerifier = {
+      type: "practical_json_contract",
+      required_substrings: ["RequestHandler"],
+      forbidden_substrings: ["hand-wave"],
+    };
+    const result = verifyResponse(
+      JSON.stringify({
+        recommendation:
+          "Use async handlers with centralized middleware around RequestHandler.",
+        tradeoffs: "Tradeoffs include explicit error mapping.",
+        implementation_notes: "Wrap route handlers and keep middleware typed.",
+        declaration_paths: ["node_modules/@types/express/index.d.ts"],
+        evidence: "Declaration evidence comes from RequestHandler middleware.",
+        nci_query_evidence: "",
+        nci_sql_evidence: "",
+        github_evidence: "",
+      }),
+      verifier,
+      baselineContract,
+    );
+    expect(result.isCorrect).toBe(true);
+  });
+
+  it("fails practical json when required fields are empty", () => {
+    const verifier: TaskVerifier = {
+      type: "practical_json_contract",
+      required_substrings: [],
+      forbidden_substrings: [],
+    };
+    const result = verifyResponse(
+      JSON.stringify({
+        recommendation: "",
+        tradeoffs: "Tradeoffs around cache freshness.",
+        implementation_notes: "",
+        declaration_paths: [],
+        evidence: "",
+        nci_query_evidence: "",
+        nci_sql_evidence: "",
+        github_evidence: "",
+      }),
+      verifier,
+      baselineContract,
+    );
+    expect(result.isCorrect).toBe(false);
+    expect(result.missingSubstrings).toContain("recommendation");
+    expect(result.missingSubstrings).toContain("implementation_notes");
+    expect(result.missingSubstrings).toContain("declaration_paths");
+    expect(result.missingSubstrings).toContain("evidence");
+  });
 });

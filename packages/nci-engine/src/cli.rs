@@ -271,9 +271,17 @@ struct BulkIndexArgs {
 
 #[derive(Subcommand)]
 enum QueryCommands {
-    #[command(about = "Full-text search symbols by query text")]
+    #[command(
+        about = "Full-text search symbols by query text",
+        long_about = "Full-text search over indexed symbols (FTS). Row cap is -n/--limit (default 20). The sql subcommand's --max-rows flag does not apply here; use -n/--limit to limit hits, or use `nci sql` with --max-rows for SQL result caps."
+    )]
     Find {
-        #[arg(short = 'n', long, default_value_t = 20)]
+        #[arg(
+            short = 'n',
+            long,
+            default_value_t = 20,
+            help = "Max symbol hits to print (not --max-rows; that flag is only for `nci sql`)"
+        )]
         limit: usize,
         #[arg(required = true)]
         fts_query: String,
