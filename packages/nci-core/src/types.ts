@@ -278,6 +278,19 @@ export interface SymbolNode {
   package: string;
   /** File path relative to package root */
   filePath: string;
+  /**
+   * Npm package that owns {@link sourceFilePath} (indexed package name for in-tree symbols;
+   * the dependency package id after the first `node_modules/<pkg>/` segment for `__nci_external__` paths).
+   * Populated by `buildPackageGraph` via `symbol-source-identity.ts`.
+   */
+  sourcePackageName?: string;
+  /**
+   * Semver of the source package when it is the indexed package; `null` / omitted for external
+   * dependency declarations (install-folder names are not treated as authoritative semver).
+   */
+  sourcePackageVersion?: string | null;
+  /** Path relative to {@link sourcePackageName} (same as `filePath` for in-package symbols). */
+  sourceFilePath?: string;
   /** Additional files that contribute to this symbol (for multi-file declarations) */
   additionalFiles?: string[];
   /** Full type signature */

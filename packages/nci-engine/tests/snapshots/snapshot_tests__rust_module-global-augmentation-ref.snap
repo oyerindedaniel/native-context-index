@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "index.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const ENTRY: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -30,6 +33,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "extra-entry.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "extra-entry.d.ts",
       "signature": "declare const EXTRA_ENTRY: 2",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -47,6 +53,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -71,6 +80,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -96,6 +108,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -120,6 +135,9 @@ expression: "& rust_graph"
       "kindName": "ModuleDeclaration",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -144,6 +162,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -167,6 +188,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "global-types.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "global-types.d.ts",
       "entryVisibility": [
         "extra-entry.d.ts",
         "index.d.ts"
@@ -191,6 +215,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "index.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const usesGlobalInterface: MyGlobalType",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -210,6 +237,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "index.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const usesPick: typeof PICK_TYPE",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -229,6 +259,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "module-global-augmentation-ref",
       "filePath": "extra-entry.d.ts",
+      "sourcePackageName": "module-global-augmentation-ref",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "extra-entry.d.ts",
       "signature": "declare const usesPickFromExtra: typeof PICK_TYPE",
       "isTypeOnly": false,
       "symbolSpace": "value",

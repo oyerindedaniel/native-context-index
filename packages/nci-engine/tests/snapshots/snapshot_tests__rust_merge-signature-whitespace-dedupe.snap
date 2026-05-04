@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "merge-signature-whitespace-dedupe",
       "filePath": "vendor-copy-a.d.ts",
+      "sourcePackageName": "merge-signature-whitespace-dedupe",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "vendor-copy-a.d.ts",
       "additionalFiles": [
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"
@@ -41,6 +44,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "merge-signature-whitespace-dedupe",
       "filePath": "vendor-copy-distinct.d.ts",
+      "sourcePackageName": "merge-signature-whitespace-dedupe",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "vendor-copy-distinct.d.ts",
       "signature": "readonly extraMember: boolean;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -58,6 +64,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "merge-signature-whitespace-dedupe",
       "filePath": "vendor-copy-a.d.ts",
+      "sourcePackageName": "merge-signature-whitespace-dedupe",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "vendor-copy-a.d.ts",
       "additionalFiles": [
         "vendor-copy-b.d.ts",
         "vendor-copy-distinct.d.ts"
@@ -84,6 +93,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "merge-signature-whitespace-dedupe",
       "filePath": "index.d.ts",
+      "sourcePackageName": "merge-signature-whitespace-dedupe",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const mergeSignatureWhitespaceDedupeRoot: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",

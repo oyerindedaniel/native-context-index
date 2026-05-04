@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "id-stability-sort",
       "filePath": "z-file.d.ts",
+      "sourcePackageName": "id-stability-sort",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "z-file.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -34,6 +37,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "id-stability-sort",
       "filePath": "a-file.d.ts",
+      "sourcePackageName": "id-stability-sort",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "a-file.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],

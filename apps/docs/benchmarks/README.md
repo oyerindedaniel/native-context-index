@@ -56,6 +56,7 @@
 
 ## Commands
 
+- Clean benchmark outputs (`benchmarks/runs` + `apps/web/data/benchmarks`): `pnpm --filter docs run bench:clean`
 - Prepare only, no execution: `pnpm --filter docs run bench:prepare`
 - Pilot execution: `pnpm --filter docs run bench:pilot`
 - Full execution: `pnpm --filter docs run bench:full`

@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "TypeAliasDeclaration",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "sourcePackageName": "wildcard-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "types.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -32,6 +35,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "sourcePackageName": "wildcard-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "types.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -52,6 +58,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "sourcePackageName": "wildcard-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "types.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -69,6 +78,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-reexport",
       "filePath": "types.d.ts",
+      "sourcePackageName": "wildcard-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "types.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -85,6 +97,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "wildcard-reexport",
       "filePath": "index.d.ts",
+      "sourcePackageName": "wildcard-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const LIB_VERSION: string",
       "isTypeOnly": false,
       "symbolSpace": "value",

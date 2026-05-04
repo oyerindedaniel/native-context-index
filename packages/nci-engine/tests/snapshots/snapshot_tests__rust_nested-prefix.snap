@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "ExportDeclaration",
       "package": "nested-prefix",
       "filePath": "index.d.ts",
+      "sourcePackageName": "nested-prefix",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "export * as Mid from './mid.js'",
       "isTypeOnly": false,
       "symbolSpace": "value",
@@ -27,6 +30,9 @@ expression: "& rust_graph"
       "kindName": "ExportDeclaration",
       "package": "nested-prefix",
       "filePath": "mid.d.ts",
+      "sourcePackageName": "nested-prefix",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "mid.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -45,6 +51,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "nested-prefix",
       "filePath": "inner.d.ts",
+      "sourcePackageName": "nested-prefix",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "inner.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],
@@ -65,6 +74,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "nested-prefix",
       "filePath": "inner.d.ts",
+      "sourcePackageName": "nested-prefix",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "inner.d.ts",
       "signature": "declare const val: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",

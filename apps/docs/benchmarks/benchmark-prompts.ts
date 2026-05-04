@@ -7,6 +7,7 @@ import type {
 } from "@repo/benchmark-contract/benchmark-types";
 
 import { buildNciFirstAgentPrimer } from "./nci-first-agent-primer";
+import { normalizeResponseJsonText } from "./benchmark-verifiers";
 
 interface PromptBuildInput {
   strategy: BenchmarkStrategy;
@@ -46,6 +47,10 @@ function buildArtifactInstruction(packageEntry: PackageEntry): string {
 }
 
 function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
+  const workspaceMutationGuardrail =
+    "Do not run package managers (`npm install`, `pnpm install`, `yarn install`), do not create temporary dependency projects, and do not create/delete files to repair environment issues during this benchmark. If declarations appear missing, continue with available evidence and report the gap.";
+  const compilationGuardrail =
+    "Do not attempt `tsc -e` or ad-hoc compile probes during benchmark runs; use declaration evidence from NCI/query/snippet directly unless compilation is explicitly required by the task.";
   if (strategy === "nci_first") {
     return [
       "Run **`sql --schema`** when you need the exact column list.",
@@ -53,11 +58,15 @@ function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
       'On **Windows PowerShell**, invoke NCI as **`& "<path-to-nci.exe>" <subcommand> …`** so `sql` / `query` are real arguments (never `"…nci.exe" sql …` without `&`).',
       "Cap **`query find`** rows with **`-n` / `--limit`** (default 20). **`--max-rows` is only for `nci sql`**, not `query find`.",
       "Use grep/read_file only when NCI output is insufficient.",
+      workspaceMutationGuardrail,
+      compilationGuardrail,
     ].join(" ");
   }
   return [
     "Do not run nci commands in this baseline run.",
     "Use direct declaration reading and allowed repository exploration only.",
+    workspaceMutationGuardrail,
+    compilationGuardrail,
   ].join(" ");
 }
 
@@ -145,8 +154,9 @@ export function parseEvidenceFromResponse(responseText: string): {
   nciQuerySnippet?: string;
   nciSqlSnippet?: string;
 } {
+  const normalizedResponseText = normalizeResponseJsonText(responseText);
   try {
-    const parsedJson = JSON.parse(responseText) as {
+    const parsedJson = JSON.parse(normalizedResponseText) as {
       declaration_paths?: unknown;
       nci_query_evidence?: unknown;
       nci_sql_evidence?: unknown;

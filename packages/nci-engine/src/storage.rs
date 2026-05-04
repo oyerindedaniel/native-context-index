@@ -10,6 +10,7 @@ use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
 
 use crate::storage_migrations::{META_SCHEMA_KEY, MIGRATIONS, read_schema_version};
+use crate::symbol_source_identity::symbol_source_row_from_encoded_path;
 use crate::types::{
     DecoratorMetadata, Deprecation, MergeProvenance, PackageGraph, PackageIndexMetadata,
     PackageInfo, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, Visibility,
@@ -38,6 +39,60 @@ pub struct DatabaseStatusReport {
     /// Value of `NCI_CACHE_DIR` when that env var is set in this process.
     /// Independent of [`Self::path`]: `--database` may point elsewhere.
     pub nci_cache_dir_env: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolSearchFilters {
+    pub package_name: Option<String>,
+    pub package_version: Option<String>,
+    pub source_package_name: Option<String>,
+    pub kind_name: Option<String>,
+    pub file_path_contains: Option<String>,
+    pub include_internal: bool,
+}
+
+impl Default for SymbolSearchFilters {
+    fn default() -> Self {
+        Self {
+            package_name: None,
+            package_version: None,
+            source_package_name: None,
+            kind_name: None,
+            file_path_contains: None,
+            include_internal: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolSourceIdentity {
+    pub package_name: String,
+    pub package_version: Option<String>,
+    pub file_path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolSearchHit {
+    pub symbol_row_id: i64,
+    pub id: String,
+    pub name: String,
+    pub kind_name: String,
+    pub package_name: String,
+    pub package_version: String,
+    pub source: SymbolSourceIdentity,
+    pub file_path: String,
+    pub signature_snippet: Option<String>,
+    pub is_internal: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SymbolSnippet {
+    pub id: String,
+    pub signature: Option<String>,
+    pub js_doc: Option<String>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -165,6 +220,26 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
 
 pub struct NciDatabase {
     connection: Connection,
+}
+
+fn signature_snippet(signature_text: Option<&str>) -> Option<String> {
+    const MAX_SIGNATURE_SNIPPET_CHARS: usize = 320;
+    let signature_text = signature_text?.trim();
+    if signature_text.is_empty() {
+        return None;
+    }
+    let mut snippet = String::new();
+    for signature_character in signature_text.chars().take(MAX_SIGNATURE_SNIPPET_CHARS) {
+        snippet.push(signature_character);
+    }
+    if signature_text.chars().count() > MAX_SIGNATURE_SNIPPET_CHARS {
+        snippet.push_str("...");
+    }
+    Some(snippet)
+}
+
+fn contains_like_pattern(input_text: Option<&str>) -> Option<String> {
+    input_text.map(|value| format!("%{value}%"))
 }
 
 impl NciDatabase {
@@ -405,6 +480,29 @@ impl NciDatabase {
         Ok(out)
     }
 
+    pub fn list_source_packages_for_indexed_package(
+        &self,
+        package_name: &str,
+        package_version: &str,
+    ) -> StorageResult<Vec<String>> {
+        let mut statement = self.connection.prepare(
+            "SELECT DISTINCT indexed_symbol.source_package_name
+             FROM symbols AS indexed_symbol
+             JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+             WHERE package_info.name = ?1 AND package_info.version = ?2
+             ORDER BY indexed_symbol.source_package_name",
+        )?;
+        let rows = statement
+            .query_map(rusqlite::params![package_name, package_version], |row| {
+                row.get::<_, String>(0)
+            })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// Loads the graph row for `(name, version)` (unique after [`Self::save_package`]). Cache validity is
     /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `engine_cache_key`, not this `SELECT`.
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
@@ -486,7 +584,8 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
+                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json,
+                        source_package_name, source_package_version, source_file_path
                  FROM symbols WHERE package_id = ?1 ORDER BY symbol_id",
             )
             .ok()?;
@@ -519,6 +618,9 @@ impl NciDatabase {
                     symbol_row.get::<_, Option<String>>(22)?,
                     symbol_row.get::<_, Option<String>>(23)?,
                     symbol_row.get::<_, Option<String>>(24)?,
+                    symbol_row.get::<_, String>(25)?,
+                    symbol_row.get::<_, Option<String>>(26)?,
+                    symbol_row.get::<_, String>(27)?,
                 ))
             })
             .ok()?;
@@ -554,6 +656,9 @@ impl NciDatabase {
                 enclosing_module_declaration_id_opt,
                 merge_provenance_json_opt,
                 entry_visibility_json_opt,
+                source_package_name_text,
+                source_package_version_opt,
+                source_file_path_text,
             ) = row_result;
 
             let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
@@ -618,6 +723,9 @@ impl NciDatabase {
                 kind_name: SharedString::from(kind_name_text),
                 package: package_info.name.clone(),
                 file_path: SharedString::from(file_path_text),
+                source_package_name: SharedString::from(source_package_name_text),
+                source_package_version: source_package_version_opt.map(SharedString::from),
+                source_file_path: SharedString::from(source_file_path_text),
                 additional_files,
                 entry_visibility,
                 merge_provenance,
@@ -704,8 +812,9 @@ impl NciDatabase {
                 deprecated_flag, deprecated_message, visibility,
                 since_tag, since_major, since_minor, since_patch,
                 is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
-                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
+                enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json,
+                source_package_name, source_package_version, source_file_path
+                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)",
             )?;
 
             let mut insert_inherited = transaction.prepare(
@@ -753,6 +862,12 @@ impl NciDatabase {
                 let entry_visibility_json =
                     entry_visibility_to_db(symbol_node.entry_visibility.as_ref());
 
+                let persisted_source = symbol_source_row_from_encoded_path(
+                    package_info.name.as_ref(),
+                    package_info.version.as_ref(),
+                    symbol_node.file_path.as_ref(),
+                );
+
                 insert_symbol.execute(rusqlite::params![
                     package_id,
                     symbol_node.id.as_ref(),
@@ -792,6 +907,9 @@ impl NciDatabase {
                         .map(|value| value.as_ref()),
                     merge_provenance_json,
                     entry_visibility_json,
+                    persisted_source.source_package_name.as_str(),
+                    persisted_source.source_package_version.as_deref(),
+                    persisted_source.source_file_path.as_str(),
                 ])?;
 
                 let symbol_row_id = transaction.last_insert_rowid();
@@ -942,6 +1060,230 @@ impl NciDatabase {
         Ok(output)
     }
 
+    pub fn find_symbol_hits_fts(
+        &self,
+        fts_match_query: &str,
+        filters: &SymbolSearchFilters,
+        limit: usize,
+    ) -> StorageResult<Vec<SymbolSearchHit>> {
+        let file_path_like = contains_like_pattern(filters.file_path_contains.as_deref());
+        let include_internal = if filters.include_internal {
+            1_i64
+        } else {
+            0_i64
+        };
+        let name_prefix_like = format!("{fts_match_query}%");
+        let mut statement = self.connection.prepare(
+            "SELECT indexed_symbol.symbol_id
+             FROM symbols_fts
+             JOIN symbols AS indexed_symbol ON indexed_symbol.symbol_id = symbols_fts.rowid
+             JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+             WHERE symbols_fts MATCH ?1
+               AND (?2 IS NULL OR package_info.name = ?2)
+               AND (?3 IS NULL OR package_info.version = ?3)
+               AND (?4 IS NULL OR indexed_symbol.source_package_name = ?4)
+               AND (?5 IS NULL OR indexed_symbol.kind_name = ?5)
+               AND (?6 IS NULL OR indexed_symbol.file_path LIKE ?6)
+               AND (?7 != 0 OR indexed_symbol.is_internal = 0)
+             ORDER BY CASE
+                    WHEN indexed_symbol.name = ?8 THEN 0
+                    WHEN indexed_symbol.name LIKE ?9 THEN 1
+                    ELSE 2
+               END,
+               bm25(symbols_fts),
+               indexed_symbol.is_internal,
+               indexed_symbol.symbol_id
+             LIMIT ?10",
+        )?;
+        let symbol_id_rows = statement.query_map(
+            rusqlite::params![
+                fts_match_query,
+                filters.package_name.as_deref(),
+                filters.package_version.as_deref(),
+                filters.source_package_name.as_deref(),
+                filters.kind_name.as_deref(),
+                file_path_like.as_deref(),
+                include_internal,
+                fts_match_query,
+                name_prefix_like,
+                limit as i64,
+            ],
+            |match_row| match_row.get::<_, i64>(0),
+        )?;
+
+        let mut output = Vec::new();
+        for symbol_id_result in symbol_id_rows {
+            let symbol_row_id = symbol_id_result?;
+            if let Some(search_hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
+                output.push(search_hit);
+            }
+        }
+        Ok(output)
+    }
+
+    pub fn find_symbol_hits_exact_name(
+        &self,
+        symbol_name: &str,
+        filters: &SymbolSearchFilters,
+        limit: usize,
+    ) -> StorageResult<Vec<SymbolSearchHit>> {
+        let file_path_like = contains_like_pattern(filters.file_path_contains.as_deref());
+        let include_internal = if filters.include_internal {
+            1_i64
+        } else {
+            0_i64
+        };
+        let mut statement = self.connection.prepare(
+            "SELECT indexed_symbol.symbol_id
+             FROM symbols AS indexed_symbol
+             JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+             WHERE indexed_symbol.name = ?1
+               AND (?2 IS NULL OR package_info.name = ?2)
+               AND (?3 IS NULL OR package_info.version = ?3)
+               AND (?4 IS NULL OR indexed_symbol.source_package_name = ?4)
+               AND (?5 IS NULL OR indexed_symbol.kind_name = ?5)
+               AND (?6 IS NULL OR indexed_symbol.file_path LIKE ?6)
+               AND (?7 != 0 OR indexed_symbol.is_internal = 0)
+             ORDER BY indexed_symbol.is_internal, indexed_symbol.symbol_id
+             LIMIT ?8",
+        )?;
+        let symbol_id_rows = statement.query_map(
+            rusqlite::params![
+                symbol_name,
+                filters.package_name.as_deref(),
+                filters.package_version.as_deref(),
+                filters.source_package_name.as_deref(),
+                filters.kind_name.as_deref(),
+                file_path_like.as_deref(),
+                include_internal,
+                limit as i64,
+            ],
+            |match_row| match_row.get::<_, i64>(0),
+        )?;
+
+        let mut output = Vec::new();
+        for symbol_id_result in symbol_id_rows {
+            let symbol_row_id = symbol_id_result?;
+            if let Some(search_hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
+                output.push(search_hit);
+            }
+        }
+        Ok(output)
+    }
+
+    pub fn load_symbol_search_hit_by_stable_id(
+        &self,
+        stable_symbol_id: &str,
+    ) -> StorageResult<Option<SymbolSearchHit>> {
+        let symbol_row_id = self
+            .connection
+            .query_row(
+                "SELECT symbol_id FROM symbols WHERE id = ?1 ORDER BY symbol_id LIMIT 1",
+                [stable_symbol_id],
+                |symbol_row| symbol_row.get::<_, i64>(0),
+            )
+            .optional()?;
+        match symbol_row_id {
+            Some(row_id) => self.load_symbol_search_hit_by_row_id(row_id),
+            None => Ok(None),
+        }
+    }
+
+    pub fn load_symbol_snippet_by_stable_id(
+        &self,
+        stable_symbol_id: &str,
+    ) -> StorageResult<Option<SymbolSnippet>> {
+        self.connection
+            .query_row(
+                "SELECT id, signature, js_doc
+                 FROM symbols
+                 WHERE id = ?1
+                 ORDER BY symbol_id
+                 LIMIT 1",
+                [stable_symbol_id],
+                |symbol_row| {
+                    Ok(SymbolSnippet {
+                        id: symbol_row.get::<_, String>(0)?,
+                        signature: symbol_row.get::<_, Option<String>>(1)?,
+                        js_doc: symbol_row.get::<_, Option<String>>(2)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn load_symbol_search_hit_by_row_id(
+        &self,
+        symbol_row_id: i64,
+    ) -> StorageResult<Option<SymbolSearchHit>> {
+        let row_opt = self
+            .connection
+            .query_row(
+                "SELECT package_info.name, package_info.version, indexed_symbol.id,
+                        indexed_symbol.name, indexed_symbol.kind_name, indexed_symbol.file_path,
+                        indexed_symbol.signature, indexed_symbol.is_internal,
+                        indexed_symbol.source_package_name, indexed_symbol.source_package_version,
+                        indexed_symbol.source_file_path
+                 FROM symbols AS indexed_symbol
+                 JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+                 WHERE indexed_symbol.symbol_id = ?1",
+                [symbol_row_id],
+                |symbol_row| {
+                    Ok((
+                        symbol_row.get::<_, String>(0)?,
+                        symbol_row.get::<_, String>(1)?,
+                        symbol_row.get::<_, String>(2)?,
+                        symbol_row.get::<_, String>(3)?,
+                        symbol_row.get::<_, String>(4)?,
+                        symbol_row.get::<_, String>(5)?,
+                        symbol_row.get::<_, Option<String>>(6)?,
+                        symbol_row.get::<_, i64>(7)?,
+                        symbol_row.get::<_, String>(8)?,
+                        symbol_row.get::<_, Option<String>>(9)?,
+                        symbol_row.get::<_, String>(10)?,
+                    ))
+                },
+            )
+            .optional()?;
+
+        let Some((
+            package_name,
+            package_version,
+            symbol_id,
+            symbol_name,
+            kind_name,
+            file_path,
+            signature,
+            is_internal_int,
+            source_package_name,
+            source_package_version,
+            source_file_path,
+        )) = row_opt
+        else {
+            return Ok(None);
+        };
+
+        let source = SymbolSourceIdentity {
+            package_name: source_package_name,
+            package_version: source_package_version,
+            file_path: source_file_path,
+        };
+
+        Ok(Some(SymbolSearchHit {
+            symbol_row_id,
+            id: symbol_id,
+            name: symbol_name,
+            kind_name,
+            package_name,
+            package_version,
+            source,
+            file_path,
+            signature_snippet: signature_snippet(signature.as_deref()),
+            is_internal: is_internal_int != 0,
+        }))
+    }
+
     fn load_symbol_row_by_id(&self, symbol_row_id: i64) -> StorageResult<Option<SymbolNode>> {
         let row_opt = self
             .connection
@@ -951,7 +1293,8 @@ impl NciDatabase {
                         deprecated_flag, deprecated_message, visibility,
                         since_tag, since_major, since_minor, since_patch,
                         is_internal, is_global_augmentation, is_inherited, parent_symbol_id,
-                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json
+                        enclosing_module_declaration_id, merge_provenance_json, entry_visibility_json,
+                        source_package_name, source_package_version, source_file_path
                  FROM symbols WHERE symbol_id = ?1",
                 [symbol_row_id],
                 |symbol_row| {
@@ -981,6 +1324,9 @@ impl NciDatabase {
                         symbol_row.get::<_, Option<String>>(22)?,
                         symbol_row.get::<_, Option<String>>(23)?,
                         symbol_row.get::<_, Option<String>>(24)?,
+                        symbol_row.get::<_, String>(25)?,
+                        symbol_row.get::<_, Option<String>>(26)?,
+                        symbol_row.get::<_, String>(27)?,
                     ))
                 },
             )
@@ -1012,6 +1358,9 @@ impl NciDatabase {
             enclosing_module_declaration_id_opt,
             merge_provenance_json_opt,
             entry_visibility_json_opt,
+            source_package_name_text,
+            source_package_version_opt,
+            source_file_path_text,
         )) = row_opt
         else {
             return Ok(None);
@@ -1168,6 +1517,9 @@ impl NciDatabase {
             kind_name: SharedString::from(kind_name_text),
             package: package_info.name.clone(),
             file_path: SharedString::from(file_path_text),
+            source_package_name: SharedString::from(source_package_name_text),
+            source_package_version: source_package_version_opt.map(SharedString::from),
+            source_file_path: SharedString::from(source_file_path_text),
             additional_files,
             entry_visibility,
             merge_provenance,
@@ -1564,6 +1916,7 @@ fn decorator_arguments_json(arguments: &[SharedString]) -> String {
 mod tests {
     use super::*;
     use crate::cache::index_engine_cache_key;
+    use crate::symbol_source_identity::symbol_source_row_from_encoded_path;
     use crate::types::{MergeProvenance, MergeProvenanceKind, PackageGraph};
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -1724,6 +2077,8 @@ mod tests {
     }
 
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {
+        let relative_path = "index.d.ts";
+        let source_row = symbol_source_row_from_encoded_path("demo-pkg", "1.0.0", relative_path);
         SymbolNode {
             id: SharedString::from(id_str),
             name: SharedString::from(name_str),
@@ -1733,7 +2088,10 @@ mod tests {
             kind: SymbolKind::Function,
             kind_name: SharedString::from("FunctionDeclaration"),
             package: SharedString::from("demo-pkg"),
-            file_path: SharedString::from("index.d.ts"),
+            file_path: SharedString::from(relative_path),
+            source_package_name: SharedString::from(source_row.source_package_name),
+            source_package_version: source_row.source_package_version.map(SharedString::from),
+            source_file_path: SharedString::from(source_row.source_file_path),
             additional_files: None,
             entry_visibility: None,
             merge_provenance: None,
@@ -2036,6 +2394,150 @@ mod tests {
             .expect("save");
         let hits = database.find_symbols_fts("Hello", 10).expect("fts");
         assert!(!hits.is_empty());
+    }
+
+    #[test]
+    fn scoped_fts_search_filters_package_and_source_identity() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("scoped-fts.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("@pulumi/aws"),
+            version: SharedString::from("7.8.0"),
+            dir: SharedString::from("/aws"),
+            is_scoped: true,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let mut external_symbol = minimal_symbol(
+            "@pulumi/aws@7.8.0::__nci_external__/__up__/@pulumi+pulumi@3.159.0/node_modules/@pulumi/pulumi/output.d.ts::OutputInstance",
+            "OutputInstance",
+        );
+        external_symbol.file_path = SharedString::from(
+            "__nci_external__/__up__/@pulumi+pulumi@3.159.0/node_modules/@pulumi/pulumi/output.d.ts",
+        );
+        external_symbol.signature = Some(SharedString::from(
+            "export interface OutputInstance<T> { apply<U>(func: (value: T) => U): Output<U>; }",
+        ));
+        let mut local_symbol = minimal_symbol("@pulumi/aws@7.8.0::Provider", "Provider");
+        local_symbol.signature = Some(SharedString::from(
+            "export declare class Provider { readonly region: pulumi.Output<string>; }",
+        ));
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![external_symbol, local_symbol],
+            total_symbols: 2,
+            total_files: 2,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+
+        let filters = SymbolSearchFilters {
+            package_name: Some("@pulumi/aws".to_string()),
+            source_package_name: Some("@pulumi/pulumi".to_string()),
+            ..SymbolSearchFilters::default()
+        };
+        let hits = database
+            .find_symbol_hits_fts("OutputInstance", &filters, 10)
+            .expect("scoped fts");
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "OutputInstance");
+        assert_eq!(hits[0].package_name, "@pulumi/aws");
+        assert_eq!(hits[0].package_version, "7.8.0");
+        assert_eq!(hits[0].source.package_name, "@pulumi/pulumi");
+        assert_eq!(hits[0].source.package_version, None);
+        assert_eq!(hits[0].source.file_path, "output.d.ts");
+        assert!(
+            hits[0]
+                .signature_snippet
+                .as_deref()
+                .is_some_and(|snippet| snippet.contains("apply"))
+        );
+    }
+
+    #[test]
+    fn scoped_fts_external_source_filter_flat_node_modules() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp_dir.path().join("flat-node-modules.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("app-root"),
+            version: SharedString::from("0.1.0"),
+            dir: SharedString::from("/app"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let mut external_add = minimal_symbol("app-root@0.1.0::ext", "add");
+        external_add.file_path =
+            SharedString::from("__nci_external__/__up__/node_modules/lodash/add.d.ts");
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![external_add],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+        let filters = SymbolSearchFilters {
+            package_name: Some("app-root".to_string()),
+            source_package_name: Some("lodash".to_string()),
+            ..SymbolSearchFilters::default()
+        };
+        let hits = database
+            .find_symbol_hits_fts("add", &filters, 10)
+            .expect("fts");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].source.package_name, "lodash");
+        assert_eq!(hits[0].source.file_path, "add.d.ts");
+        assert_eq!(hits[0].source.package_version, None);
+    }
+
+    #[test]
+    fn exact_symbol_search_uses_name_column() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp.path().join("exact-symbol.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("exact-demo"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/exact-demo"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![
+                minimal_symbol("exact-demo@1.0.0::Output", "Output"),
+                minimal_symbol("exact-demo@1.0.0::OutputInstance", "OutputInstance"),
+            ],
+            total_symbols: 2,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+        let filters = SymbolSearchFilters {
+            package_name: Some("exact-demo".to_string()),
+            package_version: Some("1.0.0".to_string()),
+            ..SymbolSearchFilters::default()
+        };
+        let hits = database
+            .find_symbol_hits_exact_name("Output", &filters, 10)
+            .expect("exact search");
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].name, "Output");
+        assert_eq!(hits[0].id, "exact-demo@1.0.0::Output");
     }
 
     #[test]

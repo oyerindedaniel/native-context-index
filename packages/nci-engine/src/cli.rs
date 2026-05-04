@@ -19,15 +19,17 @@ use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, ScanError};
 use nci_engine::storage::{
-    DatabaseStatusReport, NciDatabase, StorageError, verify_sqlite_file_header,
+    DatabaseStatusReport, NciDatabase, StorageError, SymbolSearchFilters, SymbolSearchHit,
+    verify_sqlite_file_header,
 };
 use serde_json::Value;
 
 const CLI_ABOUT: &str = "Native Context Index — index and query TypeScript declaration graphs";
+mod spinner_draw_line;
 mod style;
 use style::{
-    ProgressTone, emit_progress_line, emit_ui_line_stdout, format_elapsed, init_prompt_theme,
-    print_banner,
+    ProgressTone, TtyProgressSpinner, emit_progress_line, emit_ui_line_stdout, format_elapsed,
+    init_prompt_theme, print_banner,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -283,15 +285,103 @@ enum QueryCommands {
             help = "Max symbol hits to print (not --max-rows; that flag is only for `nci sql`)"
         )]
         limit: usize,
+        #[arg(
+            long = "package",
+            value_name = "NAME",
+            help = "Filter hits to an indexed package name"
+        )]
+        package_name: Option<String>,
+        #[arg(
+            long = "package-version",
+            value_name = "VERSION",
+            help = "Filter hits to one indexed package version"
+        )]
+        package_version: Option<String>,
+        #[arg(
+            long = "source-package",
+            value_name = "NAME",
+            help = "Filter hits to declarations from this source package"
+        )]
+        source_package_name: Option<String>,
+        #[arg(
+            long = "kind",
+            value_name = "KIND",
+            help = "Filter hits to a kind_name such as InterfaceDeclaration"
+        )]
+        kind_name: Option<String>,
+        #[arg(
+            long = "file",
+            value_name = "TEXT",
+            help = "Filter hits whose stored file_path contains this text"
+        )]
+        file_path_contains: Option<String>,
+        #[arg(
+            long,
+            help = "Hide symbols marked internal to the package export surface"
+        )]
+        public_only: bool,
         #[arg(required = true)]
         fts_query: String,
     },
+    #[command(about = "Exact symbol-name search with package/source filters")]
+    Symbol {
+        #[arg(required = true)]
+        name: String,
+        #[arg(
+            short = 'n',
+            long,
+            default_value_t = 20,
+            help = "Max exact symbol hits to print"
+        )]
+        limit: usize,
+        #[arg(
+            long = "package",
+            value_name = "NAME",
+            help = "Filter hits to an indexed package name"
+        )]
+        package_name: Option<String>,
+        #[arg(
+            long = "package-version",
+            value_name = "VERSION",
+            help = "Filter hits to one indexed package version"
+        )]
+        package_version: Option<String>,
+        #[arg(
+            long = "source-package",
+            value_name = "NAME",
+            help = "Filter hits to declarations from this source package"
+        )]
+        source_package_name: Option<String>,
+        #[arg(
+            long = "kind",
+            value_name = "KIND",
+            help = "Filter hits to a kind_name such as InterfaceDeclaration"
+        )]
+        kind_name: Option<String>,
+        #[arg(
+            long = "file",
+            value_name = "TEXT",
+            help = "Filter hits whose stored file_path contains this text"
+        )]
+        file_path_contains: Option<String>,
+        #[arg(
+            long,
+            help = "Hide symbols marked internal to the package export surface"
+        )]
+        public_only: bool,
+    },
+    #[command(about = "Show one symbol by stable symbol id")]
+    Show { id: String },
+    #[command(about = "Print cite-ready signature snippet for a stable symbol id")]
+    Snippet { id: String },
     #[command(about = "List packages currently indexed in the database")]
     Packages,
     #[command(about = "List indexed versions for a package name")]
     PackageVersions { name: String },
     #[command(about = "List declared package dependencies for a package name/version")]
     PackageDeps { name: String, version: String },
+    #[command(about = "List distinct source packages for one indexed package version")]
+    SourcePackages { name: String, version: String },
     #[command(about = "List symbols for a package name/version")]
     Symbols {
         name: String,
@@ -783,14 +873,16 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
         }
         DbCommands::Status { check, deep } => {
             let started = Instant::now();
-            if show_progress {
-                emit_progress_line("db status", ProgressTone::Step, "opening database");
+            let spinner = if show_progress && io::stderr().is_terminal() {
+                TtyProgressSpinner::try_start()
+            } else {
+                None
+            };
+            if show_progress && spinner.is_none() {
+                emit_progress_line("db status", ProgressTone::Step, "checking database");
             }
             let path = resolve_database_path(cli, file, config_dir)?;
             let database = open_database_at(&path)?;
-            if show_progress {
-                emit_progress_line("db status", ProgressTone::Step, "reading metadata");
-            }
             let check_mode = if *deep {
                 Some("deep")
             } else if *check {
@@ -798,30 +890,12 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             } else {
                 None
             };
-            if show_progress {
-                match check_mode {
-                    Some("deep") => {
-                        emit_progress_line(
-                            "db status",
-                            ProgressTone::Step,
-                            "running integrity_check (deep; may take minutes)",
-                        );
-                    }
-                    Some("quick") => {
-                        emit_progress_line("db status", ProgressTone::Step, "running quick_check");
-                    }
-                    _ => {
-                        emit_progress_line(
-                            "db status",
-                            ProgressTone::Note,
-                            "skipping integrity scan (use --check or --deep)",
-                        );
-                    }
-                }
-            }
             let report = database
                 .status_report(&path, check_mode)
                 .map_err(|err| err.to_string())?;
+            if let Some(tty_progress_spinner) = spinner {
+                tty_progress_spinner.finish();
+            }
             if show_progress {
                 emit_progress_line(
                     "db status",
@@ -1426,6 +1500,88 @@ fn print_index_summary(
     Ok(())
 }
 
+fn build_symbol_search_filters(
+    package_name: &Option<String>,
+    package_version: &Option<String>,
+    source_package_name: &Option<String>,
+    kind_name: &Option<String>,
+    file_path_contains: &Option<String>,
+    public_only: bool,
+) -> SymbolSearchFilters {
+    SymbolSearchFilters {
+        package_name: package_name.clone(),
+        package_version: package_version.clone(),
+        source_package_name: source_package_name.clone(),
+        kind_name: kind_name.clone(),
+        file_path_contains: file_path_contains.clone(),
+        include_internal: !public_only,
+    }
+}
+
+fn print_symbol_search_hits_plain(search_hits: &[SymbolSearchHit]) {
+    for search_hit in search_hits {
+        let source_version = search_hit
+            .source
+            .package_version
+            .as_deref()
+            .map(|version| format!("@{version}"))
+            .unwrap_or_default();
+        println!(
+            "{} [{}] {}@{} source={}{} file={} id={}",
+            search_hit.name,
+            search_hit.kind_name,
+            search_hit.package_name,
+            search_hit.package_version,
+            search_hit.source.package_name,
+            source_version,
+            search_hit.source.file_path,
+            search_hit.id
+        );
+        if let Some(signature_snippet) = &search_hit.signature_snippet {
+            println!("  signature: {signature_snippet}");
+        }
+    }
+}
+
+fn is_fts_syntax_error(error_text: &str) -> bool {
+    error_text.contains("fts5: syntax error")
+}
+
+fn sanitize_fts_query(fts_query_text: &str) -> Option<String> {
+    let tokens: Vec<String> = fts_query_text
+        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .filter(|token| !token.is_empty())
+        .map(ToOwned::to_owned)
+        .collect();
+    if tokens.is_empty() {
+        None
+    } else {
+        Some(tokens.join(" "))
+    }
+}
+
+fn print_no_symbol_hits_message(
+    package_name: &Option<String>,
+    package_version: &Option<String>,
+    source_package_name: &Option<String>,
+) {
+    let package_hint = package_name
+        .as_deref()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "<any>".to_string());
+    let version_hint = package_version
+        .as_deref()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "<any>".to_string());
+    let source_hint = source_package_name
+        .as_deref()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| "<any>".to_string());
+    println!(
+        "No symbols matched. Check `--package`/`--package-version` scope and `--source-package` filter. current scope: package={package_hint} version={version_hint} source={source_hint}"
+    );
+}
+
 fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
     let context = resolve_command_context(None)?;
     let file = context.file.as_ref();
@@ -1434,21 +1590,138 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
     let (_, database) = open_database(cli, file, config_dir)?;
 
     match command {
-        QueryCommands::Find { limit, fts_query } => {
-            let symbols = database
-                .find_symbols_fts(fts_query, *limit)
+        QueryCommands::Find {
+            limit,
+            package_name,
+            package_version,
+            source_package_name,
+            kind_name,
+            file_path_contains,
+            public_only,
+            fts_query,
+        } => {
+            let filters = build_symbol_search_filters(
+                package_name,
+                package_version,
+                source_package_name,
+                kind_name,
+                file_path_contains,
+                *public_only,
+            );
+            let search_hits = match database.find_symbol_hits_fts(fts_query, &filters, *limit) {
+                Ok(found_hits) => found_hits,
+                Err(storage_error) => {
+                    let error_text = storage_error.to_string();
+                    if is_fts_syntax_error(&error_text) {
+                        if let Some(sanitized_query) = sanitize_fts_query(fts_query) {
+                            database
+                                .find_symbol_hits_fts(&sanitized_query, &filters, *limit)
+                                .map_err(|err| {
+                                    format!(
+                                        "{error_text} (fallback query `{sanitized_query}` failed: {err})"
+                                    )
+                                })?
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        return Err(error_text);
+                    }
+                }
+            };
+            match fmt {
+                OutputFormat::Plain => {
+                    print_symbol_search_hits_plain(&search_hits);
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(
+                        &serde_json::json!({ "ok": true, "data": { "symbols": search_hits } }),
+                    )?;
+                }
+            }
+        }
+        QueryCommands::Symbol {
+            name,
+            limit,
+            package_name,
+            package_version,
+            source_package_name,
+            kind_name,
+            file_path_contains,
+            public_only,
+        } => {
+            let filters = build_symbol_search_filters(
+                package_name,
+                package_version,
+                source_package_name,
+                kind_name,
+                file_path_contains,
+                *public_only,
+            );
+            let search_hits = database
+                .find_symbol_hits_exact_name(name, &filters, *limit)
                 .map_err(|err| err.to_string())?;
             match fmt {
                 OutputFormat::Plain => {
-                    for symbol in symbols {
-                        println!(
-                            "{} [{}] {}",
-                            symbol.name, symbol.kind_name, symbol.file_path
+                    if search_hits.is_empty() {
+                        print_no_symbol_hits_message(
+                            package_name,
+                            package_version,
+                            source_package_name,
                         );
+                    } else {
+                        print_symbol_search_hits_plain(&search_hits);
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({ "ok": true, "data": { "symbols": symbols } }))?;
+                    print_json(
+                        &serde_json::json!({ "ok": true, "data": { "symbols": search_hits } }),
+                    )?;
+                }
+            }
+        }
+        QueryCommands::Show { id } => {
+            let search_hit = database
+                .load_symbol_search_hit_by_stable_id(id)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    if let Some(search_hit) = search_hit {
+                        print_symbol_search_hits_plain(std::slice::from_ref(&search_hit));
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(
+                        &serde_json::json!({ "ok": true, "data": { "symbol": search_hit } }),
+                    )?;
+                }
+            }
+        }
+        QueryCommands::Snippet { id } => {
+            let snippet = database
+                .load_symbol_snippet_by_stable_id(id)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    if let Some(snippet) = snippet {
+                        if let Some(signature_text) = snippet.signature {
+                            println!("{signature_text}");
+                        }
+                        if let Some(js_doc_text) = snippet.js_doc
+                            && !js_doc_text.trim().is_empty()
+                        {
+                            if io::stdout().is_terminal() {
+                                println!();
+                            }
+                            println!("{js_doc_text}");
+                        }
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": { "snippet": snippet }
+                    }))?;
                 }
             }
         }
@@ -1539,6 +1812,23 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                             "dependencies": dependency_names,
                         }
                     }))?;
+                }
+            }
+        }
+        QueryCommands::SourcePackages { name, version } => {
+            let source_packages = database
+                .list_source_packages_for_indexed_package(name, version)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    for source_package in source_packages {
+                        println!("{source_package}");
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(
+                        &serde_json::json!({ "ok": true, "data": { "source_packages": source_packages } }),
+                    )?;
                 }
             }
         }

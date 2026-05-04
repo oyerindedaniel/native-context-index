@@ -1,6 +1,10 @@
 use std::io::{self, IsTerminal, Write};
-use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
 
+use super::spinner_draw_line::format_tty_spinner_frame;
 use dialoguer::{
     console::{Color, Style, style},
     theme::ColorfulTheme,
@@ -19,6 +23,15 @@ const CLI_BANNER_FILLED_LINES: [&str; 6] = [
 const BANNER_PRIMARY_RGB: (u8, u8, u8) = (0x5A, 0x3C, 0xF0);
 const BANNER_DARK_RGB: (u8, u8, u8) = (0x44, 0x29, 0xC6);
 const BANNER_LIGHT_RGB: (u8, u8, u8) = (0x7A, 0x63, 0xF5);
+/// Gradient applied top-to-bottom to [`CLI_BANNER_FILLED_LINES`] (cycles if line count changes).
+const BANNER_LINE_PALETTE: [(u8, u8, u8); 6] = [
+    BANNER_DARK_RGB,
+    BANNER_PRIMARY_RGB,
+    BANNER_LIGHT_RGB,
+    BANNER_LIGHT_RGB,
+    BANNER_PRIMARY_RGB,
+    BANNER_DARK_RGB,
+];
 const DONE_RGB: (u8, u8, u8) = (0x02, 0x75, 0x82);
 const WARN_RGB: (u8, u8, u8) = (0xE8, 0xB9, 0x3A);
 const ERROR_RGB: (u8, u8, u8) = (0xE0, 0x5A, 0x5A);
@@ -93,9 +106,9 @@ pub(crate) fn format_elapsed(elapsed: Duration) -> String {
     if elapsed_seconds < 60.0 {
         return format!("{elapsed_seconds:.1}s");
     }
-    let minutes = (elapsed_seconds / 60.0).floor() as u64;
-    let seconds = elapsed_seconds - (minutes as f64 * 60.0);
-    format!("{minutes}m {seconds:.1}s")
+    let whole_minutes = (elapsed_seconds / 60.0).floor() as u64;
+    let remainder_seconds = elapsed_seconds - (whole_minutes as f64 * 60.0);
+    format!("{whole_minutes}m {remainder_seconds:.1}s")
 }
 
 pub(crate) fn emit_progress_line(scope: &str, tone: ProgressTone, message: &str) {
@@ -106,6 +119,75 @@ pub(crate) fn emit_progress_line(scope: &str, tone: ProgressTone, message: &str)
     };
     eprintln!("{tag} {scope}: {message}");
     let _ = io::stderr().flush();
+}
+
+pub(crate) struct TtyProgressSpinner {
+    stop_flag: Arc<AtomicBool>,
+    spinner_thread_join: Option<JoinHandle<()>>,
+}
+
+const HIDE_CURSOR: &str = "\x1b[?25l";
+const SHOW_CURSOR: &str = "\x1b[?25h";
+const ERASE_LINE: &str = "\r\x1b[2K";
+
+impl TtyProgressSpinner {
+    pub fn try_start() -> Option<Self> {
+        if !io::stderr().is_terminal() {
+            return None;
+        }
+        let stderr_supports_ansi_color = should_color(Stream::Stderr);
+        let spinner_foreground_rgb = progress_tag_color(ProgressTone::Step);
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let stop_flag_for_thread = Arc::clone(&stop_flag);
+        let _ignored = write!(io::stderr(), "{HIDE_CURSOR}");
+        let _ignored = io::stderr().flush();
+        let spinner_thread_join = thread::spawn(move || {
+            let frame_duration = Duration::from_millis(80);
+            let mut next_tick = Instant::now() + frame_duration;
+            let mut frame_index = 0usize;
+            while !stop_flag_for_thread.load(Ordering::Relaxed) {
+                let drawable_line = format_tty_spinner_frame(
+                    frame_index,
+                    stderr_supports_ansi_color,
+                    spinner_foreground_rgb,
+                );
+                let _ignored = write!(io::stderr(), "{ERASE_LINE}{drawable_line}");
+                let _ignored = io::stderr().flush();
+                frame_index = frame_index.wrapping_add(1);
+                let now = Instant::now();
+                if next_tick > now {
+                    thread::sleep(next_tick - now);
+                }
+                next_tick += frame_duration;
+            }
+            let _ignored = write!(io::stderr(), "{ERASE_LINE}");
+            let _ignored = io::stderr().flush();
+        });
+        Some(Self {
+            stop_flag,
+            spinner_thread_join: Some(spinner_thread_join),
+        })
+    }
+
+    /// Joins the ticker thread and clears the stderr line (via [`Drop`]).
+    pub fn finish(self) {
+        drop(self);
+    }
+
+    fn stop_and_join_thread(&mut self) {
+        self.stop_flag.store(true, Ordering::Relaxed);
+        if let Some(join_handle) = self.spinner_thread_join.take() {
+            let _ignored = join_handle.join();
+        }
+        let _ignored = write!(io::stderr(), "{ERASE_LINE}{SHOW_CURSOR}");
+        let _ignored = io::stderr().flush();
+    }
+}
+
+impl Drop for TtyProgressSpinner {
+    fn drop(&mut self) {
+        self.stop_and_join_thread();
+    }
 }
 
 pub(crate) fn emit_ui_line_stdout(tone: ProgressTone, scope: &str, message: &str) {
@@ -134,23 +216,16 @@ pub(crate) fn init_prompt_theme() -> ColorfulTheme {
 
 pub(crate) fn print_banner() {
     if should_color(Stream::Stdout) && io::stdout().is_terminal() {
-        let palette = [
-            BANNER_DARK_RGB,
-            BANNER_PRIMARY_RGB,
-            BANNER_LIGHT_RGB,
-            BANNER_LIGHT_RGB,
-            BANNER_PRIMARY_RGB,
-            BANNER_DARK_RGB,
-        ];
-        for (line, color) in CLI_BANNER_FILLED_LINES.iter().zip(palette.iter()) {
-            println!("{}", colorize_line(line, *color));
+        for (line_index, banner_line) in CLI_BANNER_FILLED_LINES.iter().enumerate() {
+            let palette_rgb = BANNER_LINE_PALETTE[line_index % BANNER_LINE_PALETTE.len()];
+            println!("{}", colorize_line(banner_line, palette_rgb));
         }
         println!("{}", colorize_line(CLI_BRAND_LINE, BANNER_PRIMARY_RGB));
         return;
     }
 
-    for line in CLI_BANNER_FILLED_LINES {
-        println!("{line}");
+    for banner_line in CLI_BANNER_FILLED_LINES {
+        println!("{banner_line}");
     }
     println!("{CLI_BRAND_LINE}");
 }

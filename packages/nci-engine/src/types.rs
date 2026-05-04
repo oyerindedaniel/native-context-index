@@ -528,6 +528,14 @@ pub struct SymbolNode {
     /// File path relative to package root.
     pub file_path: SharedString,
 
+    /// Npm package that owns `source_file_path` (indexed package for in-tree files; dependency id after `node_modules/` for externals).
+    pub source_package_name: SharedString,
+    /// Semver of the source package when it is the indexed package; unset for external dependency declarations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_package_version: Option<SharedString>,
+    /// Path relative to `source_package_name` root (same as `file_path` for in-package symbols).
+    pub source_file_path: SharedString,
+
     /// Additional files that contribute to this symbol.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additional_files: Option<SharedVec<SharedString>>,

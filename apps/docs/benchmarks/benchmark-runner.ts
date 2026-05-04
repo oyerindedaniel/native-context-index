@@ -77,6 +77,11 @@ export interface RunnerOptions {
   sequentialStepStatePath?: string;
   /** Clear sequential-step progress before running (or exit after clear if `sequentialStep` is false). */
   resetSequentialStep?: boolean;
+  /**
+   * When true, sequential step advances only if every record for the selected task is success + correct.
+   * Default false preserves "always advance after running the task" behavior.
+   */
+  sequentialStepRequireCorrectness?: boolean;
   /** Limit how many tasks run after mode selection (manifest order). Omit for no limit. */
   taskLimit?: number;
   /** Log progress to the console (tool lines and periodic heartbeats during agent runs). */
@@ -411,8 +416,9 @@ async function executeSingleRun(
     }, heartbeatMs);
   }
 
+  let agent: Awaited<ReturnType<typeof Agent.create>> | undefined;
   try {
-    const agent = await Agent.create({
+    agent = await Agent.create({
       name: runName,
       model: { id: modelId },
       apiKey: process.env.CURSOR_API_KEY,
@@ -436,7 +442,6 @@ async function executeSingleRun(
     const runResult = await run.wait();
     const responseText = runResult.result ?? "";
     const durationMs = Date.now() - startedAt;
-    agent.close();
     if (progress?.verbose && performExecution) {
       logBench(
         `${progress.label} finished in ${durationMs}ms (sdk ${runResult.durationMs ?? "?"}ms, status=${runResult.status})`,
@@ -465,6 +470,9 @@ async function executeSingleRun(
   } finally {
     if (heartbeat) {
       clearInterval(heartbeat);
+    }
+    if (agent !== undefined) {
+      await agent[Symbol.asyncDispose]();
     }
   }
 }
@@ -576,7 +584,7 @@ export async function runBenchmarksWithDependencies(
 
   if (options.verbose) {
     logBench(
-      `mode=${options.mode} manifest=${options.taskManifestFileName} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} sequentialStep=${options.sequentialStep ?? false} taskOrder=${options.taskOrder ?? "manifest"} randomSeed=${options.randomSeed ?? "none"} taskLimit=${options.taskLimit ?? "none"} taskIds=${options.taskIds?.join(",") ?? "none"} difficulty=${options.difficultyFilter?.join(",") ?? "none"}`,
+      `mode=${options.mode} manifest=${options.taskManifestFileName} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} sequentialStep=${options.sequentialStep ?? false} sequentialStepRequireCorrectness=${options.sequentialStepRequireCorrectness ?? false} taskOrder=${options.taskOrder ?? "manifest"} randomSeed=${options.randomSeed ?? "none"} taskLimit=${options.taskLimit ?? "none"} taskIds=${options.taskIds?.join(",") ?? "none"} difficulty=${options.difficultyFilter?.join(",") ?? "none"}`,
     );
     logBench(
       `capabilities: cursorApiKey=${capabilities.cursorApiKey.available ? "ok" : "no"} nciCli=${capabilities.local.nciCli.available ? "ok" : "no"}`,
@@ -908,24 +916,46 @@ export async function runBenchmarksWithDependencies(
   await writeFile(fullOutputPath, JSON.stringify(fullDataset, null, 2), "utf8");
 
   if (options.sequentialStep && sequentialAdvanceTaskId) {
-    const currentState = await readPilotSequentialStepState(
-      resolvedSequentialStatePath,
+    const recordsForAdvancedTask = runRecords.filter(
+      (record) => record.taskId === sequentialAdvanceTaskId,
     );
-    const nextCompletedTaskIds = syncCompletedIdsWithPilotSet(
-      currentState.completedTaskIds,
-      orderedModeTasks.map((task) => task.id),
-    );
-    if (!nextCompletedTaskIds.includes(sequentialAdvanceTaskId)) {
-      nextCompletedTaskIds.push(sequentialAdvanceTaskId);
-      await writePilotSequentialStepState(resolvedSequentialStatePath, {
-        version: 1,
-        completedTaskIds: nextCompletedTaskIds,
-      });
-      if (options.verbose) {
-        logBench(
-          `sequential step advanced: ${sequentialAdvanceTaskId} (${nextCompletedTaskIds.length}/${orderedModeTasks.length})`,
-        );
+    const requireCorrectness =
+      options.sequentialStepRequireCorrectness === true;
+    const canAdvanceSequentialStep = requireCorrectness
+      ? recordsForAdvancedTask.every(
+          (record) => record.status === "success" && record.isCorrect,
+        )
+      : recordsForAdvancedTask.every((record) => record.status !== "skipped");
+    if (canAdvanceSequentialStep) {
+      const currentState = await readPilotSequentialStepState(
+        resolvedSequentialStatePath,
+      );
+      const nextCompletedTaskIds = syncCompletedIdsWithPilotSet(
+        currentState.completedTaskIds,
+        orderedModeTasks.map((task) => task.id),
+      );
+      if (!nextCompletedTaskIds.includes(sequentialAdvanceTaskId)) {
+        nextCompletedTaskIds.push(sequentialAdvanceTaskId);
+        await writePilotSequentialStepState(resolvedSequentialStatePath, {
+          version: 1,
+          completedTaskIds: nextCompletedTaskIds,
+        });
+        if (options.verbose) {
+          logBench(
+            `sequential step advanced: ${sequentialAdvanceTaskId} (${nextCompletedTaskIds.length}/${orderedModeTasks.length})`,
+          );
+        }
       }
+    } else if (options.verbose) {
+      const failureSummary = recordsForAdvancedTask
+        .filter((record) => record.status !== "success" || !record.isCorrect)
+        .map(
+          (record) =>
+            `${record.strategy}/${record.runtime}: status=${record.status} isCorrect=${record.isCorrect} missing=[${record.missingSubstrings.join(",")}] forbidden=[${record.forbiddenMatches.join(",")}]`,
+        );
+      logBench(
+        `sequential step NOT advanced for ${sequentialAdvanceTaskId} (requireCorrectness=${requireCorrectness}) due to failing records: ${failureSummary.join(" | ")}`,
+      );
     }
   }
 

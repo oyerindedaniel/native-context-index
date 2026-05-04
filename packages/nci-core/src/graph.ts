@@ -24,6 +24,7 @@ import {
   assignParentSymbolIds,
 } from "./parent-symbol.js";
 import { profileLog, profileStat, nciProfileEnabled } from "./nci-log-flags.js";
+import { symbolSourceRowFromEncodedPath } from "./symbol-source-identity.js";
 
 function specifierMatchesDependencyStubRoots(
   specifier: string,
@@ -338,6 +339,14 @@ export function buildPackageGraph(
       ) {
         const prev = existing.filePath;
         existing.filePath = symbolFilePath;
+        const primarySource = symbolSourceRowFromEncodedPath(
+          packageInfo.name,
+          packageInfo.version,
+          existing.filePath,
+        );
+        existing.sourcePackageName = primarySource.sourcePackageName;
+        existing.sourcePackageVersion = primarySource.sourcePackageVersion;
+        existing.sourceFilePath = primarySource.sourceFilePath;
         if (!existing.additionalFiles.includes(prev)) {
           existing.additionalFiles.push(prev);
         }
@@ -479,6 +488,12 @@ export function buildPackageGraph(
       }
       signatureNormsByMergeRow.set(mergeKey, initialNormalizedSignatures);
 
+      const newRowSource = symbolSourceRowFromEncodedPath(
+        packageInfo.name,
+        packageInfo.version,
+        symbolFilePath,
+      );
+
       merged.set(mergeKey, {
         id: "", // Assigned in next step
         name: resolved.name,
@@ -486,6 +501,9 @@ export function buildPackageGraph(
         kindName: resolved.kindName,
         package: packageInfo.name,
         filePath: symbolFilePath,
+        sourcePackageName: newRowSource.sourcePackageName,
+        sourcePackageVersion: newRowSource.sourcePackageVersion,
+        sourceFilePath: newRowSource.sourceFilePath,
         signature: resolved.signature,
         jsDoc: resolved.jsDoc,
         isTypeOnly: resolved.isTypeOnly,

@@ -17,7 +17,7 @@ export function runShellCommand(
     const startedAt = Date.now();
     const processHandle = spawn(command, commandArguments, {
       cwd: cwdPath,
-      shell: true,
+      shell: false,
       windowsHide: true,
     });
 
@@ -30,6 +30,17 @@ export function runShellCommand(
 
     processHandle.stderr.on("data", (chunkValue: Buffer) => {
       stderrOutput += chunkValue.toString("utf8");
+    });
+
+    processHandle.on("error", (errorValue) => {
+      stderrOutput += errorValue.message;
+      resolve({
+        exitCode: 1,
+        output: `${stdoutOutput}\n${stderrOutput}`.trim(),
+        stdout: stdoutOutput,
+        stderr: stderrOutput,
+        durationMs: Date.now() - startedAt,
+      });
     });
 
     processHandle.on("close", (exitCode) => {

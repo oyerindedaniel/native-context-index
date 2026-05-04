@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "merge-provenance-overload-dup",
       "filePath": "one.d.ts",
+      "sourcePackageName": "merge-provenance-overload-dup",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "one.d.ts",
       "additionalFiles": [
         "two.d.ts"
       ],
@@ -38,6 +41,9 @@ expression: "& rust_graph"
       "kindName": "MethodSignature",
       "package": "merge-provenance-overload-dup",
       "filePath": "one.d.ts",
+      "sourcePackageName": "merge-provenance-overload-dup",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "one.d.ts",
       "additionalFiles": [
         "two.d.ts"
       ],
@@ -60,6 +66,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "merge-provenance-overload-dup",
       "filePath": "index.d.ts",
+      "sourcePackageName": "merge-provenance-overload-dup",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "declare const mergeProvenanceOverloadDupRoot: 1",
       "isTypeOnly": false,
       "symbolSpace": "value",

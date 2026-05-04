@@ -1,102 +1,267 @@
 {
-  "version": "2026-05-01",
-  "evaluation_focus": "practical_engineering_design_with_declaration_grounding",
+  "version": "2026-05-03",
+  "evaluation_focus": "practical_engineering_design_with_type_grounding",
   "tasks": [
+
     {
-      "id": "effect-services-errors-environment",
+      "id": "pulumi-aws-output-apply-interpolate",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "@pulumi/aws",
+      "question": "Explain how Pulumi's Output<T> type works and why you cannot synchronously unwrap it outside of apply. Show the type-level difference between Output.apply and pulumi.interpolate, when each is appropriate, and what TypeScript type error fires if you pass an Output<string> directly to a resource property that expects a plain string.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Output", "apply", "pulumi.interpolate", ".d.ts"],
+        "forbidden_substrings": ["synchronous unwrap", "Output.get()", ".toString() directly"]
+      }
+    },
+
+    {
+      "id": "pulumi-aws-defaulttags-tagsall-v7",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "@pulumi/aws",
+      "question": "In @pulumi/aws v7 reading the tags output on a resource no longer includes provider-level defaultTags — you must read tagsAll instead. Explain exactly what changed in the resource output types between v6 and v7, how to correctly access the fully merged tag set in TypeScript, what causes the one-time plan diff that appears immediately after upgrading an existing stack, and why code that reads tags instead of tagsAll silently returns incomplete data rather than a compile error.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["tagsAll", "defaultTags", "ProviderArgs", ".d.ts"],
+        "forbidden_substrings": ["tags and tagsAll are identical", "ignore the upgrade diff"]
+      }
+    },
+
+    {
+      "id": "pulumi-aws-per-resource-region-v7",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "@pulumi/aws",
+      "question": "Pulumi AWS v7 adds an optional region property directly on individual resource args, enabling multi-region deployments from a single provider instance. Ground your answer entirely in the generated SDK interfaces: explain how the region field appears in resource args types, what the precedence rule is when both resource-level region and provider-level region are set, what the initial refresh diff looks like for resources that existed before the upgrade (and why it appears), and what correctness risks exist when mixing per-resource region overrides with explicit multi-provider patterns in the same stack.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["region", "ProviderArgs", "ResourceOptions", ".d.ts"],
+        "forbidden_substrings": ["always use a separate provider per region", "resource-level region is silently ignored"]
+      }
+    },
+
+    {
+      "id": "pulumi-aws-assumeroles-chain-v7",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "@pulumi/aws",
+      "question": "In @pulumi/aws v7 the provider's assumeRole property (a single object) was replaced with assumeRoles (an array) to support IAM role chaining. Grounded in ProviderArgs from the package: show exactly what the type signature change looks like, write a TypeScript provider config that chains two roles for cross-account access, explain the runtime credential resolution order when two entries are present, and describe what a v6-to-v7 migration must change to avoid a deployment that silently uses the wrong identity because the old singular object is now a type error.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["assumeRoles", "ProviderArgs", "roleArn", ".d.ts"],
+        "forbidden_substrings": ["assumeRole remains a single object in v7", "hardcode static credentials in code"]
+      }
+    },
+
+    {
+      "id": "effect-gen-r-accumulation",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "effect",
+      "question": "Show how Effect.gen accumulates the R type parameter as you yield* multiple Effects that each require different services. Explain why the resulting Effect's R is the union of all requirements, how Effect.provide removes specific entries from R at the type level, and what TypeScript error you see when you attempt to run an Effect whose R is not never.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Effect.gen", "yield*", "Effect.provide", ".d.ts"],
+        "forbidden_substrings": ["use async/await instead of gen", "throw instead of Effect.fail"]
+      }
+    },
+
+    {
+      "id": "effect-schema-parseerror-domain-mapping",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "effect",
+      "question": "Explain how Schema.decodeUnknown integrates with the Effect E channel when validating untrusted input at a service boundary. Ground your answer in Schema and Cause definitions from the package: what does ParseError carry in its cause tree (including the AST path to the failing field), how do you map it into a domain-specific TaggedError using Effect.mapError, and why exposing raw ParseError in a public service interface is an API design problem — specifically what it forces every caller to import and handle.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Schema.decodeUnknown", "ParseError", "TaggedError", ".d.ts"],
+        "forbidden_substrings": ["JSON.parse without validation", "cast input as any"]
+      }
+    },
+
+    {
+      "id": "effect-httpapi-endpoint-builder-client",
       "difficulty": "hard",
       "lane": "artifact_only",
       "package_id": "effect",
-      "question": "Recommend how a team should model service dependencies and typed failures with Effect for a non-trivial workflow. Explain how the environment, error, and success type parameters should guide the architecture.",
+      "question": "Using @effect/platform HttpApi modules, design a typed API group with one endpoint that has a Schema-validated path param, a typed JSON request body, and two distinct typed error responses via HttpApiEndpoint.addError. Explain precisely how HttpApiEndpoint, HttpApiGroup, and HttpApi compose at the type level, what TypeScript error fires if HttpApiBuilder.handle returns an Effect whose success type does not match the declared success schema, and how HttpApiClient derives a fully typed client from the same HttpApi definition — including what happens to the client types when you add a second error variant.",
       "verifier": {
         "type": "practical_json_contract",
-        "required_substrings": ["Effect", "Context", "Layer", ".d.ts"],
-        "forbidden_substrings": ["throw untyped errors", "global singleton"]
+        "required_substrings": ["HttpApiEndpoint", "HttpApiGroup", "HttpApiBuilder", ".d.ts"],
+        "forbidden_substrings": ["duplicate schema outside the endpoint definition", "untyped fetch wrapper around the API"]
       }
     },
+
     {
-      "id": "nextjs-app-router-auth-boundaries",
-      "difficulty": "medium",
-      "lane": "architecture_github",
-      "package_id": "nextjs",
-      "question": "For a current Next.js App Router application, recommend the safest practical auth boundary design for route handlers and server components. Explain where session validation should happen, how request/response APIs constrain the design, and what should stay out of client components.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["NextRequest", "NextResponse", "cookies", ".d.ts"],
-        "forbidden_substrings": ["use localStorage for sessions", "client-only auth"]
-      }
-    },
-    {
-      "id": "swr-dashboard-mutation-revalidation",
-      "difficulty": "medium",
-      "lane": "artifact_only",
-      "package_id": "swr",
-      "question": "Design a practical SWR data flow for a dashboard that performs optimistic edits while avoiding stale UI after mutation. Recommend when to use mutate, optimistic data, rollback, and revalidation, grounded in SWR mutation/cache declarations.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["mutate", "optimisticData", "rollbackOnError", ".d.ts"],
-        "forbidden_substrings": ["disable revalidation everywhere", "manual DOM update"]
-      }
-    },
-    {
-      "id": "react-hook-form-reusable-field-types",
-      "difficulty": "medium",
-      "lane": "artifact_only",
-      "package_id": "react-hook-form",
-      "question": "Recommend the best way to build a reusable typed field component with React Hook Form without losing nested path inference. Explain how Control, FieldValues, FieldPath, and controller props constrain the component API.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["Control", "FieldValues", "FieldPath", ".d.ts"],
-        "forbidden_substrings": ["any everywhere", "string name only"]
-      }
-    },
-    {
-      "id": "express5-async-error-middleware",
-      "difficulty": "medium",
-      "lane": "architecture_github",
-      "package_id": "express",
-      "question": "For an Express 5 TypeScript API, recommend a practical async route error-handling pattern. Explain how RequestHandler and error middleware typings affect whether to wrap handlers, throw directly, or call next.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["RequestHandler", "ErrorRequestHandler", "NextFunction", ".d.ts"],
-        "forbidden_substrings": ["swallow errors", "ignore rejected promises"]
-      }
-    },
-    {
-      "id": "typescript-codegen-program-vs-parser",
-      "difficulty": "hard",
-      "lane": "architecture_github",
-      "package_id": "typescript",
-      "question": "For a TypeScript code generation tool, recommend when to use createProgram instead of a lightweight source-file parse. Explain the tradeoff between type-checker accuracy, project config, performance, and the relevant compiler API declarations.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["createProgram", "CompilerOptions", "SourceFile", ".d.ts"],
-        "forbidden_substrings": ["always use regex", "ignore tsconfig"]
-      }
-    },
-    {
-      "id": "pnpm-workspace-command-design",
-      "difficulty": "hard",
-      "lane": "architecture_github",
-      "package_id": "pnpm",
-      "question": "Recommend how to design a workspace-aware command that runs across many pnpm projects without corrupting shared state. Ground the answer in pnpm workspace/recursive command types and explain concurrency, filtering, and state tradeoffs.",
-      "verifier": {
-        "type": "practical_json_contract",
-        "required_substrings": ["workspace", "recursive", "filter", ".d.ts"],
-        "forbidden_substrings": ["mutate all packages blindly", "single package only"]
-      }
-    },
-    {
-      "id": "lodash-path-access-type-safety",
+      "id": "effect-stream-scope-interrupt-finalization",
       "difficulty": "hard",
       "lane": "artifact_only",
-      "package_id": "lodash",
-      "question": "For a TypeScript codebase that relies on lodash get for nested config access, recommend a practical strategy for balancing runtime fallback behavior with compile-time path safety. Explain what lodash declarations can and cannot guarantee.",
+      "package_id": "effect",
+      "question": "Design a Stream pipeline that acquires a scoped resource once per stream execution and guarantees finalization under interruption, upstream error, and normal completion. Ground every claim in Stream, Scope, and Effect types from the package: explain the type-level difference between Stream.acquireRelease and Effect.acquireRelease, show exactly how Scope.Scope enters and leaves R when you use Stream.scoped, describe what the finalization guarantee is when a downstream Stream.runCollect is interrupted mid-collection, and explain why wrapping the acquisition in a plain try/finally block is not semantically equivalent.",
       "verifier": {
         "type": "practical_json_contract",
-        "required_substrings": ["get", "TObject", "TPath", ".d.ts"],
-        "forbidden_substrings": ["trust any string path", "remove validation"]
+        "required_substrings": ["Stream.acquireRelease", "Scope", "Stream.scoped", ".d.ts"],
+        "forbidden_substrings": ["try/finally outside Effect primitives", "ignore stream interruption entirely"]
+      }
+    },
+
+    {
+      "id": "better-auth-infer-session-user",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "better-auth",
+      "question": "Explain how to derive Session and User TypeScript types from a better-auth server instance using the $Infer property, why these types cannot be imported directly from the package, and how $Infer works on the client side via createAuthClient. Also explain what breaks at the type level if the server auth instance is imported as a value vs as a type when used in a separate client project.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["$Infer", "betterAuth", "createAuthClient", ".d.ts"],
+        "forbidden_substrings": ["import Session directly from better-auth", "cast result as any"]
+      }
+    },
+
+    {
+      "id": "better-auth-plugin-schema-field-inference",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "better-auth",
+      "question": "Explain how a better-auth plugin that adds fields to the user table via its schema object causes $Infer.Session.user to gain new typed properties. Walk through how that flows through the plugin API: what does the FieldAttributes type require, what does the input flag control at both the TypeScript and endpoint payload level, and what specifically happens — type error or silent any — when you access a plugin-added field on the session but omit the plugin from the betterAuth plugins array.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["$Infer", "BetterAuthPlugin", "schema", ".d.ts"],
+        "forbidden_substrings": ["cast session as any", "manually extend the Session interface directly"]
+      }
+    },
+
+    {
+      "id": "better-auth-custom-plugin-endpoint-client-surface",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "better-auth",
+      "question": "Design a custom better-auth plugin that adds a field to the user table, exposes a new server endpoint using createAuthEndpoint, and surfaces a typed method on the client SDK via a client plugin. Ground your answer in the BetterAuthPlugin type: what are the required vs optional top-level keys, how does the endpoints object's return type flow through to the client's $Infer surface, what TypeScript error occurs if the client plugin is missing from createAuthClient while the server plugin is present, and how does inferAdditionalFields interact with plugin-added user fields when server and client are in separate packages.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["BetterAuthPlugin", "createAuthEndpoint", "inferAdditionalFields", ".d.ts"],
+        "forbidden_substrings": ["manually patch the database outside the plugin schema", "untyped fetch to the auth endpoint"]
+      }
+    },
+
+    {
+      "id": "better-auth-organization-multitenant-rbac",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "better-auth",
+      "question": "Using better-auth's organization plugin, design a multi-tenant route guard that validates both the session and the caller's membership role within the active organization. Ground your answer in the exported types: how does the organization plugin extend $Infer.Session with activeOrganizationId and member fields, what is the declared shape of member.role and what constrains its literal type, what silently fails at runtime if you only validate the session token without also checking the organization membership record, and what auth.api.listMembers expects at the call site for server-side usage.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["organization", "member", "$Infer", ".d.ts"],
+        "forbidden_substrings": ["store role in JWT claims only", "skip organization membership validation entirely"]
+      }
+    },
+
+    {
+      "id": "expo-camera-permissions-hook-states",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "expo-camera",
+      "question": "Explain the useCameraPermissions hook return tuple type: what the two-element tuple contains, what fields PermissionResponse exposes (granted, canAskAgain, status), how the PermissionStatus union constrains branching logic, and why rendering CameraView before the permission tuple's first element is non-null produces a runtime crash rather than a TypeScript error.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["useCameraPermissions", "PermissionResponse", "PermissionStatus", ".d.ts"],
+        "forbidden_substrings": ["render CameraView before permission resolves", "call requestPermission without checking granted"]
+      }
+    },
+
+    {
+      "id": "expo-camera-ref-methods-mode-constraint",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "expo-camera",
+      "question": "Explain how to obtain a correctly typed ref to CameraView using useRef. Ground your answer in the CameraViewRef type: what imperative methods it exposes (takePictureAsync, recordAsync, stopRecording), how CameraCapturedPicture and CameraRecordingOptions are typed, and what the CameraMode prop constraint means — specifically why calling recordAsync when mode is 'picture' is a misuse that the published types do not catch at compile time and where the failure surfaces instead.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["CameraViewRef", "takePictureAsync", "CameraCapturedPicture", ".d.ts"],
+        "forbidden_substrings": ["cast the ref as any", "ignore the mode prop entirely"]
+      }
+    },
+
+    {
+      "id": "expo-camera-barcode-type-filtering-platform",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "expo-camera",
+      "question": "Design a barcode scanning screen that correctly uses the onBarcodeScanned callback and the BarcodeType union. Ground your answer in the module types: what does BarcodeScannedEvent carry (bounds, data, type), why passing a barcodeTypes array prop to CameraView is the correct filtering mechanism rather than a conditional inside the callback, what the published types say about platform availability differences for scanFromURLAsync between native and web, and what the return type of scanFromURLAsync is versus onBarcodeScanned — explaining why one is async pull and the other is push.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["onBarcodeScanned", "BarcodeType", "BarcodeScannedEvent", ".d.ts"],
+        "forbidden_substrings": ["filter barcode types only inside the callback handler", "call scanFromURLAsync on web without checking platform"]
+      }
+    },
+
+    {
+      "id": "expo-camera-mode-active-microphone-lifecycle",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "expo-camera",
+      "question": "Design a camera screen that switches between CameraMode 'photo' and 'video' at runtime using the mode and active props, handles the single-active-camera constraint across React Navigation screens, and correctly manages microphone permission. Ground every claim in the package types: what does setting active to false do versus unmounting CameraView entirely (and which is safer for navigation blur), what does the useMicrophonePermissions hook return type look like relative to useCameraPermissions, what permission state must be true before entering video mode, and what the mute prop typing implies when microphone permission is denied versus when it is explicitly set to true.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["CameraMode", "active", "useMicrophonePermissions", ".d.ts"],
+        "forbidden_substrings": ["leave camera active on unfocused background screens", "ignore microphone permission before entering video mode"]
+      }
+    },
+
+    {
+      "id": "vitest-defineconfig-inlineconfig-coverage",
+      "difficulty": "easy",
+      "lane": "artifact_only",
+      "package_id": "vitest",
+      "question": "Show how to configure Vitest using defineConfig with the test field and enable V8 coverage with a per-file threshold. Explain what the InlineConfig typing constrains about where test-specific options must live versus top-level Vite config, and explain why coverage.include must now be defined explicitly — ground this in the Vitest v4 removal of coverage.all and how the config surface changed in types.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["defineConfig", "InlineConfig", "coverage", ".d.ts"],
+        "forbidden_substrings": ["place test config at vite root level", "use jest.config directly in vitest"]
+      }
+    },
+
+    {
+      "id": "vitest-reporter-v3-lifecycle-api",
+      "difficulty": "medium",
+      "lane": "artifact_only",
+      "package_id": "vitest",
+      "question": "Vitest v3 removed the onTaskUpdate, onCollected, and onFinished reporter methods and replaced them with a lifecycle-based Reporter interface. Ground your answer in the current vitest/node types: what methods does the new interface expose (onTestModuleStart, onTestCaseResult, onTestModuleEnd), what do the TestModule and TestCase classes carry — specifically how you call testCase.result() to read outcome and what it returns when the test is still pending — and what architectural property of the old onTaskUpdate made it unsafe to rely on for ordered reporting.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["Reporter", "onTestModuleStart", "TestCase", ".d.ts"],
+        "forbidden_substrings": ["use onTaskUpdate in current vitest", "use onCollected in current vitest"]
+      }
+    },
+
+    {
+      "id": "vitest-custom-pool-rpc-teardown",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "vitest",
+      "question": "Design a custom Vitest pool that isolates each test file in a separate worker process with a typed RPC channel. Ground every claim in the vitest/node types: what three methods does the ProcessPool interface require (runTests, collectTests, close), how does createMethodsRPC establish a typed bidirectional channel between the pool and the worker, what does WorkspaceProject provide to the pool factory that lets the pool access config and file lists, and what must close() guarantee about in-flight promises if a worker process is killed mid-run — specifically what the interface typing promises versus what the implementor must enforce.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["ProcessPool", "createMethodsRPC", "WorkspaceProject", ".d.ts"],
+        "forbidden_substrings": ["run tests directly in the main thread pool", "ignore worker process crash mid-run"]
+      }
+    },
+
+    {
+      "id": "vitest-extend-fixture-scope-type-propagation",
+      "difficulty": "hard",
+      "lane": "artifact_only",
+      "package_id": "vitest",
+      "question": "Vitest v4.1 introduced a builder pattern for test.extend where fixture types are inferred from return values rather than requiring explicit generics or a use callback. Ground your answer in the current typings: show how the builder-pattern extend call propagates fixture types into the test callback's argument, explain what TestContext is and how test.extend creates a new typed TestAPI, describe the scope option ('test' vs 'file' vs 'worker') and what the types say about what happens when a test-scoped fixture depends on a file-scoped fixture (and vice versa), and explain what TypeScript error fires if you try to access a fixture that is scoped 'file' inside a test.extend chain that consumes it at test scope.",
+      "verifier": {
+        "type": "practical_json_contract",
+        "required_substrings": ["test.extend", "TestContext", "onCleanup", ".d.ts"],
+        "forbidden_substrings": ["use global variables instead of fixtures", "ignore fixture scope mismatches entirely"]
       }
     }
+
   ]
 }

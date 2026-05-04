@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "traversal-depth-edge",
       "filePath": "d-7.d.ts",
+      "sourcePackageName": "traversal-depth-edge",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "d-7.d.ts",
       "entryVisibility": [
         "index.d.ts"
       ],

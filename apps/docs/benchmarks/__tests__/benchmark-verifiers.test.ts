@@ -3,7 +3,10 @@ import type {
   PromptContract,
   TaskVerifier,
 } from "@repo/benchmark-contract/benchmark-types";
-import { verifyResponse } from "../benchmark-verifiers";
+import {
+  normalizeResponseJsonText,
+  verifyResponse,
+} from "../benchmark-verifiers";
 
 const baselineContract: PromptContract = {
   strategy: "baseline",
@@ -60,6 +63,45 @@ describe("benchmark verifiers", () => {
     const result = verifyResponse("not-json", verifier, baselineContract);
     expect(result.isCorrect).toBe(false);
     expect(result.missingSubstrings).toContain("valid_json");
+  });
+
+  it("normalizes prefixed text to the first valid JSON object", () => {
+    const prefixedResponse = `Here is the required object:\n\n{"declaration_paths":["node_modules/example/index.d.ts"]}`;
+    const normalizedResponse = normalizeResponseJsonText(prefixedResponse);
+    expect(JSON.parse(normalizedResponse)).toEqual({
+      declaration_paths: ["node_modules/example/index.d.ts"],
+    });
+  });
+
+  it("keeps original response when JSON object is incomplete", () => {
+    const invalidResponse = 'prefix {"declaration_paths": ["a"]';
+    expect(normalizeResponseJsonText(invalidResponse)).toBe(invalidResponse);
+  });
+
+  it("handles braces inside JSON strings while extracting object", () => {
+    const prefixedResponse =
+      'prefix text\n{"evidence":"uses {Output.apply} safely","declaration_paths":["node_modules/a.d.ts"]}\ntrailing text';
+    const normalizedResponse = normalizeResponseJsonText(prefixedResponse);
+    expect(JSON.parse(normalizedResponse)).toEqual({
+      evidence: "uses {Output.apply} safely",
+      declaration_paths: ["node_modules/a.d.ts"],
+    });
+  });
+
+  it("applies forbidden substring checks after JSON normalization", () => {
+    const verifier: TaskVerifier = {
+      type: "practical_json_contract",
+      required_substrings: [],
+      forbidden_substrings: ["synchronous unwrap"],
+    };
+    const responseWithPreamble = `Preamble\n{"recommendation":"Avoid synchronous unwrap in deploy code.","tradeoffs":"none","implementation_notes":"notes","declaration_paths":["node_modules/a.d.ts"],"evidence":"e","nci_query_evidence":"","nci_sql_evidence":"","github_evidence":""}`;
+    const result = verifyResponse(
+      responseWithPreamble,
+      verifier,
+      baselineContract,
+    );
+    expect(result.isCorrect).toBe(false);
+    expect(result.forbiddenMatches).toContain("synchronous unwrap");
   });
 
   it("enforces practical json structure and substring gates", () => {

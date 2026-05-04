@@ -445,7 +445,7 @@ describe("crawl", () => {
     );
     expect(task).toBeDefined();
     expect(task!.signature).toBe(
-      "export { Task as RunnerTask } from '@vitest/runner'",
+      "export { Task as RunnerTask } from '@nci-fixture/external-reexport-peer'",
     );
     expect(task!.reExportedFrom).toBeUndefined(); // filePath is index.d.ts, so reExportedFrom should be undefined
 
@@ -454,7 +454,7 @@ describe("crawl", () => {
     );
     expect(file).toBeDefined();
     expect(file!.signature).toBe(
-      "export { File as RunnerFile } from '@vitest/runner'",
+      "export { File as RunnerFile } from '@nci-fixture/external-reexport-peer'",
     );
 
     const internalSymbols = packageGraph.symbols.filter(

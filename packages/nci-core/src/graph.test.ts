@@ -116,6 +116,9 @@ describe("buildPackageGraph", () => {
     expect(symbol!.kindName).toBeTruthy();
     expect(symbol!.package).toBe("simple-export");
     expect(symbol!.filePath).toBeTruthy();
+    expect(symbol!.sourcePackageName).toBe("simple-export");
+    expect(symbol!.sourcePackageVersion).toBe("1.0.0");
+    expect(symbol!.sourceFilePath).toBe(symbol!.filePath);
     expect(typeof symbol!.isTypeOnly).toBe("boolean");
     expect(Array.isArray(symbol!.dependencies)).toBe(true);
   });

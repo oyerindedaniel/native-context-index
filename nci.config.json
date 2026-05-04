@@ -1,7 +1,7 @@
 {
   "database": "C:\\Users\\doyer\\AppData\\Local\\nci\\nci.sqlite",
   "project_root": "apps/docs",
-  "banner": "off",
+  "banner": "on",
   "format": "plain",
   "progress": "auto",
   "max_hops": 10

@@ -59,12 +59,16 @@ CREATE TABLE IF NOT EXISTS symbols (
     enclosing_module_declaration_id TEXT,
     merge_provenance_json TEXT,
     entry_visibility_json TEXT,
+    source_package_name TEXT NOT NULL,
+    source_package_version TEXT,
+    source_file_path TEXT NOT NULL,
     UNIQUE(package_id, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_package ON symbols(package_id);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
+CREATE INDEX IF NOT EXISTS idx_symbols_source_package_name ON symbols(source_package_name);
 
 CREATE INDEX IF NOT EXISTS idx_symbols_since_semver ON symbols(since_major, since_minor, since_patch);
 

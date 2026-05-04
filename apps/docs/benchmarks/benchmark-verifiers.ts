@@ -22,22 +22,83 @@ function requireStringField(
   }
 }
 
+function extractFirstJsonObject(responseText: string): string | undefined {
+  const startIndex = responseText.indexOf("{");
+  if (startIndex < 0) {
+    return undefined;
+  }
+  let depth = 0;
+  let isInsideString = false;
+  let isEscaping = false;
+  for (let index = startIndex; index < responseText.length; index += 1) {
+    const currentCharacter = responseText[index];
+    if (isEscaping) {
+      isEscaping = false;
+      continue;
+    }
+    if (currentCharacter === "\\") {
+      isEscaping = true;
+      continue;
+    }
+    if (currentCharacter === '"') {
+      isInsideString = !isInsideString;
+      continue;
+    }
+    if (isInsideString) {
+      continue;
+    }
+    if (currentCharacter === "{") {
+      depth += 1;
+      continue;
+    }
+    if (currentCharacter === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return responseText.slice(startIndex, index + 1);
+      }
+    }
+  }
+  return undefined;
+}
+
+export function normalizeResponseJsonText(responseText: string): string {
+  if (responseText.trim().length === 0) {
+    return responseText;
+  }
+  try {
+    JSON.parse(responseText);
+    return responseText;
+  } catch {
+    const extractedJson = extractFirstJsonObject(responseText);
+    if (extractedJson === undefined) {
+      return responseText;
+    }
+    try {
+      JSON.parse(extractedJson);
+      return extractedJson;
+    } catch {
+      return responseText;
+    }
+  }
+}
+
 export function verifyResponse(
   responseText: string,
   verifier: TaskVerifier,
   promptContract: PromptContract,
 ): SingleVerifierResult {
+  const normalizedResponseText = normalizeResponseJsonText(responseText);
   const missingSubstrings: string[] = [];
   const forbiddenMatches: string[] = [];
 
   for (const requiredSubstring of verifier.required_substrings) {
-    if (!includesCaseInsensitive(responseText, requiredSubstring)) {
+    if (!includesCaseInsensitive(normalizedResponseText, requiredSubstring)) {
       missingSubstrings.push(requiredSubstring);
     }
   }
 
   for (const forbiddenSubstring of verifier.forbidden_substrings) {
-    if (includesCaseInsensitive(responseText, forbiddenSubstring)) {
+    if (includesCaseInsensitive(normalizedResponseText, forbiddenSubstring)) {
       forbiddenMatches.push(forbiddenSubstring);
     }
   }
@@ -47,7 +108,10 @@ export function verifyResponse(
     verifier.type === "practical_json_contract"
   ) {
     try {
-      const parsedJson = JSON.parse(responseText) as Record<string, unknown> & {
+      const parsedJson = JSON.parse(normalizedResponseText) as Record<
+        string,
+        unknown
+      > & {
         declaration_paths?: unknown;
         nci_query_evidence?: unknown;
         nci_sql_evidence?: unknown;

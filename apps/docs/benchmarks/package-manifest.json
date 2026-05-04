@@ -139,7 +139,7 @@
       "tier": "hard",
       "registry": "npm",
       "package_name": "effect",
-      "package_version": "3.17.14",
+      "package_version": "3.21.2",
       "language_family": "typescript",
       "declaration_source": "bundled",
       "github": {
@@ -147,6 +147,70 @@
         "repo": "effect",
         "default_branch": "main",
         "pinned_sha": "70ce155cd73a3b4cd723fe955454b5837b428f76",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "@pulumi/aws",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "@pulumi/aws",
+      "package_version": "7.8.0",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "pulumi",
+        "repo": "pulumi-aws",
+        "default_branch": "master",
+        "pinned_sha": "16bfec9e1ae6615f25d68003fe0f27d14284d736",
+        "license": "Apache-2.0"
+      }
+    },
+    {
+      "id": "better-auth",
+      "tier": "medium",
+      "registry": "npm",
+      "package_name": "better-auth",
+      "package_version": "1.4.6",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "better-auth",
+        "repo": "better-auth",
+        "default_branch": "main",
+        "pinned_sha": "5ebd3a6856a7767f610dbf61d3cfe48f106a55ec",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "expo-camera",
+      "tier": "medium",
+      "registry": "npm",
+      "package_name": "expo-camera",
+      "package_version": "17.0.9",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "expo",
+        "repo": "expo",
+        "default_branch": "main",
+        "pinned_sha": "1bba12a43e14a442f2cf1c73fe21968e0ef097c1",
+        "license": "MIT"
+      }
+    },
+    {
+      "id": "vitest",
+      "tier": "hard",
+      "registry": "npm",
+      "package_name": "vitest",
+      "package_version": "3.2.4",
+      "language_family": "typescript",
+      "declaration_source": "bundled",
+      "github": {
+        "owner": "vitest-dev",
+        "repo": "vitest",
+        "default_branch": "main",
+        "pinned_sha": "c666d149a4516761bae92ca56ce1336d2fd352c3",
         "license": "MIT"
       }
     }

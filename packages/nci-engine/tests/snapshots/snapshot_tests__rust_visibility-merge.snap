@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "visibility-merge",
       "filePath": "index.d.ts",
+      "sourcePackageName": "visibility-merge",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "mergeProvenance": {
         "kinds": [
           "merge_scope"
@@ -36,6 +39,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "visibility-merge",
       "filePath": "index.d.ts",
+      "sourcePackageName": "visibility-merge",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "a: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -51,6 +57,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "visibility-merge",
       "filePath": "index.d.ts",
+      "sourcePackageName": "visibility-merge",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
       "signature": "b: string;",
       "isTypeOnly": false,
       "symbolSpace": "type",

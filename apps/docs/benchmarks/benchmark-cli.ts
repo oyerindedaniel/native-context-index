@@ -43,6 +43,8 @@ async function main(): Promise<void> {
     sequentialStep: flag(flags, "--sequential-step") === "true",
     sequentialStepStatePath: flag(flags, "--sequential-step-state-path"),
     resetSequentialStep: flag(flags, "--reset-sequential-step") === "true",
+    sequentialStepRequireCorrectness:
+      flag(flags, "--sequential-step-require-correctness") === "true",
     taskLimit: parsePositiveIntFlag(
       flag(flags, "--task-limit"),
       "--task-limit",

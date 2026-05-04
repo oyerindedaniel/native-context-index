@@ -24,6 +24,8 @@ use nci_engine::graph::build_package_graph;
 use nci_engine::resolver::normalize_path;
 use nci_engine::types::{PackageGraph, PackageInfo, SharedString, SharedVec};
 
+const ORACLE_REFRESH_HINT: &str = "Refresh TS oracles first: `cd packages/nci-core && pnpm exec tsx scripts/generate-snapshots.ts`, then rerun `cargo test -p nci-engine --test snapshot_tests`.";
+
 fn fixtures_dir() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
@@ -277,8 +279,8 @@ fn compare_structural_properties(
             Some(oracle_row) => *oracle_row,
             None => {
                 panic!(
-                    "[{fixture_name}] Symbol ID '{}' (name: {}) exists in Rust but not in TS oracle",
-                    rust_sym.id, rust_sym.name
+                    "[{fixture_name}] Symbol ID '{}' (name: {}) exists in Rust but not in TS oracle. {}",
+                    rust_sym.id, rust_sym.name, ORACLE_REFRESH_HINT
                 );
             }
         };
@@ -293,14 +295,14 @@ fn compare_structural_properties(
         ts_keys.sort_unstable();
         assert_eq!(
             rust_keys, ts_keys,
-            "[{fixture_name}] key mismatch for '{}' ({})",
-            rust_sym.name, rust_sym.id
+            "[{fixture_name}] key mismatch for '{}' ({}). {}",
+            rust_sym.name, rust_sym.id, ORACLE_REFRESH_HINT
         );
 
         assert_eq!(
             rust_json, ts_json,
-            "[{fixture_name}] value mismatch for '{}' ({})",
-            rust_sym.name, rust_sym.id
+            "[{fixture_name}] value mismatch for '{}' ({}). {}",
+            rust_sym.name, rust_sym.id, ORACLE_REFRESH_HINT
         );
     }
 }

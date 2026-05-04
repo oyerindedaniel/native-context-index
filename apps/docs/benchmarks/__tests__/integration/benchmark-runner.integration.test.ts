@@ -373,4 +373,218 @@ describe("benchmark runner integration", () => {
     expect(runOutput.records[0]?.taskId).toBe("swr-practical");
     expect(runOutput.records[0]?.prompt).toContain('"recommendation"');
   });
+
+  it("advances sequential step by default even when correctness fails", async () => {
+    const sandboxRoot = await mkdtemp(path.join(tmpdir(), "nci-bench-seq-"));
+    const docsRoot = path.join(sandboxRoot, "apps", "docs");
+    const benchmarkRoot = path.join(docsRoot, "benchmarks");
+    const webDataRoot = path.join(
+      sandboxRoot,
+      "apps",
+      "web",
+      "data",
+      "benchmarks",
+    );
+    await mkdir(benchmarkRoot, { recursive: true });
+    await mkdir(webDataRoot, { recursive: true });
+
+    await writeFile(
+      path.join(benchmarkRoot, "package-manifest.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          selection_policy: "test",
+          packages: [
+            {
+              id: "uuid",
+              tier: "easy",
+              registry: "npm",
+              package_name: "uuid",
+              package_version: "14.0.0",
+              language_family: "typescript",
+              declaration_source: "bundled",
+              github: {
+                owner: "uuidjs",
+                repo: "uuid",
+                default_branch: "main",
+                pinned_sha: "sha",
+                license: "MIT",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.join(benchmarkRoot, "tasks-manifest.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          evaluation_focus: "test",
+          tasks: [
+            {
+              id: "uuid-seq",
+              difficulty: "easy",
+              lane: "artifact_only",
+              package_id: "uuid",
+              question: "Return uuid declaration signature",
+              verifier: {
+                type: "json_contract",
+                required_substrings: [],
+                forbidden_substrings: ["execution_disabled"],
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    await runBenchmarksWithDependencies(
+      {
+        workspaceRoot: sandboxRoot,
+        docsRoot,
+        taskManifestFileName: "tasks-manifest.json",
+        mode: "pilot",
+        protocolVersion: "test",
+        modelId: "composer-2",
+        nciBinaryPath: path.join(sandboxRoot, "target", "debug", "nci.exe"),
+        performExecution: false,
+        includeCloudRuntime: false,
+        sequentialStep: true,
+        sequentialStepStatePath: "benchmarks/.pilot-seq-test.json",
+        outputStem: "dd-test-seq-default",
+      },
+      {
+        runIndexingStage: async (packageEntry: PackageEntry) =>
+          stageResult("indexing_metrics", packageEntry.id),
+        runSqlStage: async (packageEntry: PackageEntry) =>
+          stageResult("sql_validation", packageEntry.id),
+        detectCapabilities: async () => createCapabilities(),
+      },
+    );
+
+    const state = JSON.parse(
+      await readFile(path.join(benchmarkRoot, ".pilot-seq-test.json"), "utf8"),
+    ) as { completedTaskIds: string[] };
+    expect(state.completedTaskIds).toContain("uuid-seq");
+  });
+
+  it("does not advance sequential step when strict correctness mode is enabled", async () => {
+    const sandboxRoot = await mkdtemp(
+      path.join(tmpdir(), "nci-bench-seq-strict-"),
+    );
+    const docsRoot = path.join(sandboxRoot, "apps", "docs");
+    const benchmarkRoot = path.join(docsRoot, "benchmarks");
+    const webDataRoot = path.join(
+      sandboxRoot,
+      "apps",
+      "web",
+      "data",
+      "benchmarks",
+    );
+    await mkdir(benchmarkRoot, { recursive: true });
+    await mkdir(webDataRoot, { recursive: true });
+
+    await writeFile(
+      path.join(benchmarkRoot, "package-manifest.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          selection_policy: "test",
+          packages: [
+            {
+              id: "uuid",
+              tier: "easy",
+              registry: "npm",
+              package_name: "uuid",
+              package_version: "14.0.0",
+              language_family: "typescript",
+              declaration_source: "bundled",
+              github: {
+                owner: "uuidjs",
+                repo: "uuid",
+                default_branch: "main",
+                pinned_sha: "sha",
+                license: "MIT",
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.join(benchmarkRoot, "tasks-manifest.json"),
+      JSON.stringify(
+        {
+          version: "2026-05-01",
+          evaluation_focus: "test",
+          tasks: [
+            {
+              id: "uuid-seq",
+              difficulty: "easy",
+              lane: "artifact_only",
+              package_id: "uuid",
+              question: "Return uuid declaration signature",
+              verifier: {
+                type: "json_contract",
+                required_substrings: [],
+                forbidden_substrings: ["execution_disabled"],
+              },
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    await runBenchmarksWithDependencies(
+      {
+        workspaceRoot: sandboxRoot,
+        docsRoot,
+        taskManifestFileName: "tasks-manifest.json",
+        mode: "pilot",
+        protocolVersion: "test",
+        modelId: "composer-2",
+        nciBinaryPath: path.join(sandboxRoot, "target", "debug", "nci.exe"),
+        performExecution: false,
+        includeCloudRuntime: false,
+        sequentialStep: true,
+        sequentialStepRequireCorrectness: true,
+        sequentialStepStatePath: "benchmarks/.pilot-seq-test.json",
+        outputStem: "ee-test-seq-strict",
+      },
+      {
+        runIndexingStage: async (packageEntry: PackageEntry) =>
+          stageResult("indexing_metrics", packageEntry.id),
+        runSqlStage: async (packageEntry: PackageEntry) =>
+          stageResult("sql_validation", packageEntry.id),
+        detectCapabilities: async () => createCapabilities(),
+      },
+    );
+
+    const statePath = path.join(benchmarkRoot, ".pilot-seq-test.json");
+    let stateContent: string | undefined;
+    try {
+      stateContent = await readFile(statePath, "utf8");
+    } catch {
+      stateContent = undefined;
+    }
+    if (stateContent === undefined) {
+      expect(true).toBe(true);
+    } else {
+      const state = JSON.parse(stateContent) as { completedTaskIds: string[] };
+      expect(state.completedTaskIds).not.toContain("uuid-seq");
+    }
+  });
 });

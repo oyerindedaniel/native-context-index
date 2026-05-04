@@ -13,6 +13,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "entryVisibility": [
         "dist/internal/runtime.d.ts",
         "dist/index.d.ts"
@@ -39,6 +42,9 @@ expression: "& rust_graph"
       "kindName": "VariableStatement",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "entryVisibility": [
         "dist/internal/runtime.d.ts",
         "dist/index.d.ts"
@@ -68,6 +74,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/model.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/model.d.ts",
       "signature": "export interface Entity {\n  id: string;\n  source: \"model\";\n}",
       "isTypeOnly": true,
       "symbolSpace": "type",
@@ -85,6 +94,9 @@ expression: "& rust_graph"
       "kindName": "MethodSignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "signature": "create(id: string): Entity;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -101,6 +113,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/model.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/model.d.ts",
       "additionalFiles": [
         "dist/internal/runtime.d.ts"
       ],
@@ -128,6 +143,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/model.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/model.d.ts",
       "signature": "source: \"model\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -142,6 +160,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "signature": "source: \"runtime\";",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -155,6 +176,9 @@ expression: "& rust_graph"
       "kindName": "TypeAliasDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "entryVisibility": [
         "dist/internal/runtime.d.ts",
         "dist/index.d.ts"
@@ -184,6 +208,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/model.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/model.d.ts",
       "entryVisibility": [
         "dist/internal/model.d.ts",
         "dist/index.d.ts"
@@ -205,6 +232,9 @@ expression: "& rust_graph"
       "kindName": "InterfaceDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/result.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/result.d.ts",
       "entryVisibility": [
         "dist/internal/result.d.ts",
         "dist/index.d.ts"
@@ -234,6 +264,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/result.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/result.d.ts",
       "signature": "entity: Entity;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -250,6 +283,9 @@ expression: "& rust_graph"
       "kindName": "PropertySignature",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/result.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/result.d.ts",
       "signature": "ok: true;",
       "isTypeOnly": false,
       "symbolSpace": "type",
@@ -263,6 +299,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "entryVisibility": [
         "dist/internal/runtime.d.ts",
         "dist/index.d.ts"
@@ -292,6 +331,9 @@ expression: "& rust_graph"
       "kindName": "FunctionDeclaration",
       "package": "wildcard-internal-subpath-collision",
       "filePath": "dist/internal/runtime.d.ts",
+      "sourcePackageName": "wildcard-internal-subpath-collision",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "dist/internal/runtime.d.ts",
       "entryVisibility": [
         "dist/internal/runtime.d.ts",
         "dist/index.d.ts"

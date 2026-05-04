@@ -18,6 +18,7 @@ use crate::resolver::{
     make_relative_to_package, normalize_path, npm_package_root, resolve_module_specifier,
     resolve_types_entry, specifier_is_dependency_stub,
 };
+use crate::symbol_source_identity::symbol_source_row_from_encoded_path;
 use crate::types::{
     MergeProvenance, MergeProvenanceKind, PackageEntry, PackageGraph, PackageInfo, ParsedImport,
     ResolvedSymbol, SharedString, SharedVec, SymbolKind, SymbolNode, SymbolSpace, TypeReference,
@@ -1147,6 +1148,12 @@ pub fn build_package_graph(
                 _ => None,
             };
 
+            let source_row = symbol_source_row_from_encoded_path(
+                package_info.name.as_ref(),
+                package_info.version.as_ref(),
+                symbol_file_path.as_ref(),
+            );
+
             let node = SymbolNode {
                 id: "".into(),
                 name: resolved.name.clone(),
@@ -1159,6 +1166,9 @@ pub fn build_package_graph(
                 kind_name: SharedString::from(resolved.kind.as_str()),
                 package: package_info.name.clone(),
                 file_path: symbol_file_path,
+                source_package_name: SharedString::from(source_row.source_package_name),
+                source_package_version: source_row.source_package_version.map(SharedString::from),
+                source_file_path: SharedString::from(source_row.source_file_path),
                 additional_files: None,
                 entry_visibility: if entry_visibility_paths.is_empty() {
                     None

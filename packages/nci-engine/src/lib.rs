@@ -12,6 +12,7 @@ pub mod resolver;
 pub mod scanner;
 pub mod storage;
 mod storage_migrations;
+mod symbol_source_identity;
 pub mod types;
 
 pub use cache::{NCI_ENGINE_VERSION, index_engine_cache_key, nci_sqlite_path};
