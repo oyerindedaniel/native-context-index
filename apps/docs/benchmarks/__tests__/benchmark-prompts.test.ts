@@ -67,6 +67,7 @@ describe("benchmark prompt builder", () => {
     });
     expect(result.contract.requiresNciCliUsage).toBe(false);
     expect(result.prompt).toContain("Do not run nci commands");
+    expect(result.prompt).not.toContain("NCI/query/snippet");
   });
 
   it("extracts evidence from valid json response", () => {
