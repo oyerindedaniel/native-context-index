@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T15:39:33.595Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 1,
+    "failureCount": 1,
+    "successRate": 0.5
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 0,
+      "medianDurationMs": 57643,
+      "p90DurationMs": 57643,
+      "ci95LowMs": 57643,
+      "ci95HighMs": 57643
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 58356,
+      "p90DurationMs": 58356,
+      "ci95LowMs": 58356,
+      "ci95HighMs": 58356
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "easy",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 57643,
+      "p90DurationMs": 58356,
+      "ci95LowMs": 57505.416207713715,
+      "ci95HighMs": 58493.583792286285
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "pulumi-aws-output-apply-interpolate",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 57643,
+      "p90DurationMs": 58356,
+      "ci95LowMs": 57505.416207713715,
+      "ci95HighMs": 58493.583792286285
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "@pulumi/aws",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 57643,
+      "p90DurationMs": 58356,
+      "ci95LowMs": 57505.416207713715,
+      "ci95HighMs": 58493.583792286285
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "2e4465d5-bcac-4e5a-befd-34517354471e",
+      "taskId": "pulumi-aws-output-apply-interpolate",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 57643,
+      "difficulty": "easy"
+    },
+    {
+      "runId": "53250853-c3f6-439f-9055-06bfa7ef5a20",
+      "taskId": "pulumi-aws-output-apply-interpolate",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 58356,
+      "difficulty": "easy"
+    }
+  ]
+}

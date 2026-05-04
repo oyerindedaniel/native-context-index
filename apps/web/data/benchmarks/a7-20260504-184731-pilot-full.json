@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T18:47:31.371Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 2,
+    "failureCount": 0,
+    "successRate": 1
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 96785,
+      "p90DurationMs": 96785,
+      "ci95LowMs": 96785,
+      "ci95HighMs": 96785
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 42464,
+      "p90DurationMs": 42464,
+      "ci95LowMs": 42464,
+      "ci95HighMs": 42464
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "hard",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 42464,
+      "p90DurationMs": 96785,
+      "ci95LowMs": 31981.967488382244,
+      "ci95HighMs": 107267.03251161776
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "expo-camera-mode-active-microphone-lifecycle",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 42464,
+      "p90DurationMs": 96785,
+      "ci95LowMs": 31981.967488382244,
+      "ci95HighMs": 107267.03251161776
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "expo-camera",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 42464,
+      "p90DurationMs": 96785,
+      "ci95LowMs": 31981.967488382244,
+      "ci95HighMs": 107267.03251161776
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "788ed20d-aef5-4c9a-807f-3b569dc48b14",
+      "taskId": "expo-camera-mode-active-microphone-lifecycle",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 96785,
+      "difficulty": "hard"
+    },
+    {
+      "runId": "f66ffd91-9b9c-45b1-84f7-28b698422440",
+      "taskId": "expo-camera-mode-active-microphone-lifecycle",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 42464,
+      "difficulty": "hard"
+    }
+  ]
+}

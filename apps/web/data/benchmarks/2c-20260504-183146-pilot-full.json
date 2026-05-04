@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T18:31:46.689Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 2,
+    "failureCount": 0,
+    "successRate": 1
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 119351,
+      "p90DurationMs": 119351,
+      "ci95LowMs": 119351,
+      "ci95HighMs": 119351
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 55461,
+      "p90DurationMs": 55461,
+      "ci95LowMs": 55461,
+      "ci95HighMs": 55461
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "easy",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 55461,
+      "p90DurationMs": 119351,
+      "ci95LowMs": 43132.48879499165,
+      "ci95HighMs": 131679.51120500834
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "expo-camera-permissions-hook-states",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 55461,
+      "p90DurationMs": 119351,
+      "ci95LowMs": 43132.48879499165,
+      "ci95HighMs": 131679.51120500834
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "expo-camera",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 55461,
+      "p90DurationMs": 119351,
+      "ci95LowMs": 43132.48879499165,
+      "ci95HighMs": 131679.51120500834
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "9d2ca7a4-a1c1-4b48-9308-bddfce1934c1",
+      "taskId": "expo-camera-permissions-hook-states",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 119351,
+      "difficulty": "easy"
+    },
+    {
+      "runId": "5582f580-2127-44c9-b3c2-0142e5a205c6",
+      "taskId": "expo-camera-permissions-hook-states",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 55461,
+      "difficulty": "easy"
+    }
+  ]
+}

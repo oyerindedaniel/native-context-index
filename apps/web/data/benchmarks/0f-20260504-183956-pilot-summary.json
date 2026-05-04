@@ -1,0 +1,42 @@
+{
+  "generatedAtIso": "2026-05-04T18:39:56.497Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 2,
+    "failureCount": 0,
+    "successRate": 1
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 117108,
+      "p90DurationMs": 117108,
+      "ci95LowMs": 117108,
+      "ci95HighMs": 117108
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 44039,
+      "p90DurationMs": 44039,
+      "ci95LowMs": 44039,
+      "ci95HighMs": 44039
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "hard",
+      "count": 2,
+      "successRate": 1,
+      "medianDurationMs": 44039,
+      "p90DurationMs": 117108,
+      "ci95LowMs": 29939.266313370557,
+      "ci95HighMs": 131207.73368662945
+    }
+  ]
+}

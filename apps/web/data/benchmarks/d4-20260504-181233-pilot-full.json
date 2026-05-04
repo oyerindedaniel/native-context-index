@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T18:12:33.323Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 0,
+    "failureCount": 2,
+    "successRate": 0
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 0,
+      "medianDurationMs": 125109,
+      "p90DurationMs": 125109,
+      "ci95LowMs": 125109,
+      "ci95HighMs": 125109
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 0,
+      "medianDurationMs": 84800,
+      "p90DurationMs": 84800,
+      "ci95LowMs": 84800,
+      "ci95HighMs": 84800
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "easy",
+      "count": 2,
+      "successRate": 0,
+      "medianDurationMs": 84800,
+      "p90DurationMs": 125109,
+      "ci95LowMs": 77021.78810200843,
+      "ci95HighMs": 132887.21189799157
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "better-auth-infer-session-user",
+      "count": 2,
+      "successRate": 0,
+      "medianDurationMs": 84800,
+      "p90DurationMs": 125109,
+      "ci95LowMs": 77021.78810200843,
+      "ci95HighMs": 132887.21189799157
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "better-auth",
+      "count": 2,
+      "successRate": 0,
+      "medianDurationMs": 84800,
+      "p90DurationMs": 125109,
+      "ci95LowMs": 77021.78810200843,
+      "ci95HighMs": 132887.21189799157
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "61046eed-930e-4000-88e8-6b245ee60262",
+      "taskId": "better-auth-infer-session-user",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 125109,
+      "difficulty": "easy"
+    },
+    {
+      "runId": "cca43357-73f1-4b5f-a3dc-4836f124a8be",
+      "taskId": "better-auth-infer-session-user",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 84800,
+      "difficulty": "easy"
+    }
+  ]
+}

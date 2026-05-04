@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T17:27:44.716Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 1,
+    "failureCount": 1,
+    "successRate": 0.5
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 0,
+      "medianDurationMs": 10091,
+      "p90DurationMs": 10091,
+      "ci95LowMs": 10091,
+      "ci95HighMs": 10091
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 73642,
+      "p90DurationMs": 73642,
+      "ci95LowMs": 73642,
+      "ci95HighMs": 73642
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "easy",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 10091,
+      "p90DurationMs": 73642,
+      "ci95LowMs": -2172.0961901625487,
+      "ci95HighMs": 85905.09619016256
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "effect-gen-r-accumulation",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 10091,
+      "p90DurationMs": 73642,
+      "ci95LowMs": -2172.0961901625487,
+      "ci95HighMs": 85905.09619016256
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "effect",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 10091,
+      "p90DurationMs": 73642,
+      "ci95LowMs": -2172.0961901625487,
+      "ci95HighMs": 85905.09619016256
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "adbc49fb-4d24-473b-ac2e-35866c45c899",
+      "taskId": "effect-gen-r-accumulation",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 10091,
+      "difficulty": "easy"
+    },
+    {
+      "runId": "bce0fecc-e4b9-492b-a69d-a85f36e05985",
+      "taskId": "effect-gen-r-accumulation",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 73642,
+      "difficulty": "easy"
+    }
+  ]
+}

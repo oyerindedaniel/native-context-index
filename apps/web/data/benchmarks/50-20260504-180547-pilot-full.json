@@ -1,0 +1,82 @@
+{
+  "generatedAtIso": "2026-05-04T18:05:47.148Z",
+  "protocolVersion": "2026-05-01",
+  "totals": {
+    "runCount": 2,
+    "skippedCount": 0,
+    "successCount": 1,
+    "failureCount": 1,
+    "successRate": 0.5
+  },
+  "byStrategy": [
+    {
+      "groupKey": "baseline",
+      "count": 1,
+      "successRate": 0,
+      "medianDurationMs": 244276,
+      "p90DurationMs": 244276,
+      "ci95LowMs": 244276,
+      "ci95HighMs": 244276
+    },
+    {
+      "groupKey": "nci_first",
+      "count": 1,
+      "successRate": 1,
+      "medianDurationMs": 127600,
+      "p90DurationMs": 127600,
+      "ci95LowMs": 127600,
+      "ci95HighMs": 127600
+    }
+  ],
+  "byDifficulty": [
+    {
+      "groupKey": "hard",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 127600,
+      "p90DurationMs": 244276,
+      "ci95LowMs": 105085.65701431282,
+      "ci95HighMs": 266790.3429856872
+    }
+  ],
+  "byTask": [
+    {
+      "groupKey": "effect-httpapi-endpoint-builder-client",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 127600,
+      "p90DurationMs": 244276,
+      "ci95LowMs": 105085.65701431282,
+      "ci95HighMs": 266790.3429856872
+    }
+  ],
+  "byPackage": [
+    {
+      "groupKey": "effect",
+      "count": 2,
+      "successRate": 0.5,
+      "medianDurationMs": 127600,
+      "p90DurationMs": 244276,
+      "ci95LowMs": 105085.65701431282,
+      "ci95HighMs": 266790.3429856872
+    }
+  ],
+  "ganttSeries": [
+    {
+      "runId": "b5a20e80-943f-49a3-ba86-20b9f8a187a8",
+      "taskId": "effect-httpapi-endpoint-builder-client",
+      "strategy": "baseline",
+      "runtime": "local",
+      "durationMs": 244276,
+      "difficulty": "hard"
+    },
+    {
+      "runId": "2acf8057-2095-477f-907e-1e1015eb6fc7",
+      "taskId": "effect-httpapi-endpoint-builder-client",
+      "strategy": "nci_first",
+      "runtime": "local",
+      "durationMs": 127600,
+      "difficulty": "hard"
+    }
+  ]
+}
