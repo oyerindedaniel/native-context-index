@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
-use nci_engine::filter::FilterConfig;
+use nci_engine::filter::{DepKindFilter, FilterConfig};
 use nci_engine::pipeline::{self, GraphSource, IndexOptions};
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, ScanError};
@@ -266,6 +266,47 @@ struct BulkIndexArgs {
     /// Emit `npm::…` stubs only for this package root (repeatable); union with `nci.config.json` `dependency_stub_packages`.
     #[arg(short = 's', long = "dependency-stub-package", value_name = "PKG")]
     dependency_stub_packages: Vec<String>,
+
+    /// Only index packages listed under `dependencies` (overrides `package_scope` in config).
+    #[arg(
+        long = "only-dependencies",
+        conflicts_with_all = [
+            "include_dev_dependencies",
+            "only_dev_dependencies",
+            "all_installed_packages"
+        ]
+    )]
+    only_dependencies: bool,
+
+    #[arg(
+        long,
+        conflicts_with_all = [
+            "only_dependencies",
+            "only_dev_dependencies",
+            "all_installed_packages"
+        ]
+    )]
+    include_dev_dependencies: bool,
+
+    #[arg(
+        long,
+        conflicts_with_all = [
+            "only_dependencies",
+            "include_dev_dependencies",
+            "all_installed_packages"
+        ]
+    )]
+    only_dev_dependencies: bool,
+
+    #[arg(
+        long,
+        conflicts_with_all = [
+            "only_dependencies",
+            "include_dev_dependencies",
+            "only_dev_dependencies"
+        ]
+    )]
+    all_installed_packages: bool,
 
     #[arg(long)]
     dry_run: bool,
@@ -1142,8 +1183,36 @@ fn confirm_destructive_action(yes: bool, scope: &str, prompt: &str) -> Result<()
     Ok(())
 }
 
-fn build_filter(file: Option<&NciConfigFile>, package_globs_cli: &[String]) -> FilterConfig {
-    let mut filter = FilterConfig::default();
+fn resolve_package_scope(bulk: &BulkIndexArgs, file: Option<&NciConfigFile>) -> DepKindFilter {
+    if bulk.only_dependencies {
+        return DepKindFilter::DependenciesOnly;
+    }
+    if bulk.all_installed_packages {
+        return DepKindFilter::All;
+    }
+    if bulk.only_dev_dependencies {
+        return DepKindFilter::DevDependenciesOnly;
+    }
+    if bulk.include_dev_dependencies {
+        return DepKindFilter::DependenciesAndDevDependencies;
+    }
+    if let Some(file_cfg) = file
+        && let Some(scope) = file_cfg.package_scope
+    {
+        return scope.into();
+    }
+    DepKindFilter::DependenciesOnly
+}
+
+fn build_filter(
+    file: Option<&NciConfigFile>,
+    bulk: &BulkIndexArgs,
+    package_globs_cli: &[String],
+) -> FilterConfig {
+    let mut filter = FilterConfig {
+        dep_kind_filter: resolve_package_scope(bulk, file),
+        ..Default::default()
+    };
     if let Some(file_cfg) = file
         && let Some(package_filters) = &file_cfg.packages
     {
@@ -1377,7 +1446,7 @@ fn build_index_options(
 ) -> Result<IndexOptions, String> {
     let db_path = merge_database_path(cli, file, config_dir);
     let max_hops = max_hops_from_user_value(bulk.max_hops.or(file.and_then(|toml| toml.max_hops)))?;
-    let filter = build_filter(file, &bulk.package_globs);
+    let filter = build_filter(file, bulk, &bulk.package_globs);
 
     let mut stub_list_from_config: Vec<String> = Vec::new();
     if let Some(config_file) = file

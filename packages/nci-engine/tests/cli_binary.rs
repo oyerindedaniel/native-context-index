@@ -172,6 +172,16 @@ fn write_minimal_pkg_at(pkg: &Path, name: &str, version: &str) {
     fs::write(pkg.join("index.d.ts"), "export declare const x: number;\n").unwrap();
 }
 
+fn write_consumer_package_json(proj_root: &Path, dependencies: &str, dev_dependencies: &str) {
+    fs::write(
+        proj_root.join("package.json"),
+        format!(
+            r#"{{"name":"consumer-root","version":"1.0.0","dependencies":{dependencies},"devDependencies":{dev_dependencies}}}"#
+        ),
+    )
+    .unwrap();
+}
+
 fn seed_indexed_package_row(db_path: &Path, package_name: &str, package_version: &str) {
     let connection = Connection::open(db_path).expect("open sqlite");
     connection
@@ -610,6 +620,180 @@ fn index_dry_run_composes_nciignore_with_package_filters() {
     assert!(output_text.contains("\"@scope/keep-me\""));
     assert!(!output_text.contains("\"@scope/drop-by-ignore\""));
     assert!(!output_text.contains("\"not-in-include\""));
+}
+
+#[test]
+fn index_dry_run_defaults_to_dependencies_section_only() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(!text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_include_dev_dependencies_unions_sections() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--include-dev-dependencies",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_only_dev_dependencies_filters_dependencies_section() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--only-dev-dependencies",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(!text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_all_installed_packages_skips_section_filter() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+    write_minimal_pkg(proj.path(), "extra-pkg", "1.0.0");
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--all-installed-packages",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+    assert!(text.contains("\"extra-pkg\""));
+}
+
+#[test]
+fn index_dry_run_package_scope_from_config() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{"package_scope": "all_installed"}"#,
+    )
+    .unwrap();
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_only_dependencies_overrides_package_scope_in_config() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{"package_scope": "dev_dependencies"}"#,
+    )
+    .unwrap();
+
+    let dev_only = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dev_only_text = String::from_utf8(dev_only).unwrap();
+    assert!(!dev_only_text.contains("\"lodash\""));
+    assert!(dev_only_text.contains("\"jest\""));
+
+    let deps_cli = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--only-dependencies",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let deps_text = String::from_utf8(deps_cli).unwrap();
+    assert!(deps_text.contains("\"lodash\""));
+    assert!(!deps_text.contains("\"jest\""));
 }
 
 #[test]

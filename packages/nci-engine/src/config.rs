@@ -4,6 +4,30 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::filter::DepKindFilter;
+
+/// Which `package.json` dependency sections scope indexing when using [`crate::filter::FilterConfig`].
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageScope {
+    #[default]
+    Dependencies,
+    DevDependencies,
+    DepsAndDev,
+    AllInstalled,
+}
+
+impl From<PackageScope> for DepKindFilter {
+    fn from(scope: PackageScope) -> Self {
+        match scope {
+            PackageScope::Dependencies => DepKindFilter::DependenciesOnly,
+            PackageScope::DevDependencies => DepKindFilter::DevDependenciesOnly,
+            PackageScope::DepsAndDev => DepKindFilter::DependenciesAndDevDependencies,
+            PackageScope::AllInstalled => DepKindFilter::All,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct PackageFiltersConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -41,6 +65,10 @@ pub struct NciConfigFile {
     /// Include/exclude package name globs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packages: Option<PackageFiltersConfig>,
+
+    /// Restrict indexing to keys from the consumer `package.json` dependency sections (omit = dependencies only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_scope: Option<PackageScope>,
 
     /// Optional package roots (`npm_package_root` shape) whose dependencies resolve as `npm::…` stubs only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -95,6 +123,29 @@ pub fn discover_config(start_dir: &Path) -> Result<Option<(PathBuf, NciConfigFil
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn roundtrip_package_scope() {
+        let temp = tempfile::tempdir().unwrap();
+        let cfg = NciConfigFile {
+            package_scope: Some(PackageScope::DepsAndDev),
+            ..Default::default()
+        };
+        write_config_file(temp.path(), &cfg).unwrap();
+        let loaded = load_config_file(temp.path())
+            .expect("load ok")
+            .expect("parsed");
+        assert_eq!(loaded.package_scope, Some(PackageScope::DepsAndDev));
+        let raw = fs::read_to_string(temp.path().join(CONFIG_FILENAME)).unwrap();
+        assert!(
+            raw.contains("\"package_scope\""),
+            "serialize uses package_scope: {raw}"
+        );
+        assert!(
+            raw.contains("\"deps_and_dev\""),
+            "serialize uses deps_and_dev value: {raw}"
+        );
+    }
 
     #[test]
     fn roundtrip_minimal_config() {

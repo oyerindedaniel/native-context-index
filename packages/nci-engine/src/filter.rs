@@ -14,10 +14,9 @@ pub enum DepKindFilter {
     /// No dependency-section filter; all scanned packages may pass (subject to ignore patterns).
     #[default]
     All,
-    /// Only packages listed under `dependencies`.
     DependenciesOnly,
-    /// Only packages listed under `devDependencies`.
     DevDependenciesOnly,
+    DependenciesAndDevDependencies,
 }
 
 /// Filtering applied after `scan_packages`, before indexing / cache.
@@ -132,6 +131,10 @@ fn load_allowed_package_names_from_package_json(
             merge_dependency_keys(&value["dependencies"], &mut names);
         }
         DepKindFilter::DevDependenciesOnly => {
+            merge_dependency_keys(&value["devDependencies"], &mut names);
+        }
+        DepKindFilter::DependenciesAndDevDependencies => {
+            merge_dependency_keys(&value["dependencies"], &mut names);
             merge_dependency_keys(&value["devDependencies"], &mut names);
         }
     }
@@ -400,6 +403,29 @@ mod tests {
         .unwrap();
         assert!(allowed.contains("lodash"));
         assert!(!allowed.contains("jest"));
+    }
+
+    #[test]
+    fn load_allowed_dependencies_and_dev_union_both_sections() {
+        let temp = tempfile::tempdir().unwrap();
+        let pkg = serde_json::json!({
+            "dependencies": {"lodash": "^4"},
+            "devDependencies": {"jest": "^29"}
+        });
+        std::fs::write(
+            temp.path().join("package.json"),
+            serde_json::to_string(&pkg).unwrap(),
+        )
+        .unwrap();
+
+        let allowed = load_allowed_package_names_from_package_json(
+            temp.path(),
+            DepKindFilter::DependenciesAndDevDependencies,
+            false,
+        )
+        .unwrap();
+        assert!(allowed.contains("lodash"));
+        assert!(allowed.contains("jest"));
     }
 
     #[test]
