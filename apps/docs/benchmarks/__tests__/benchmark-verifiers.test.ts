@@ -104,6 +104,58 @@ describe("benchmark verifiers", () => {
     expect(result.forbiddenMatches).toContain("synchronous unwrap");
   });
 
+  it("accepts require_declaration_path when only .d.mts paths are cited", () => {
+    const verifier: TaskVerifier = {
+      type: "practical_json_contract",
+      required_substrings: ["BetterAuthPlugin"],
+      forbidden_substrings: [],
+      require_declaration_path: true,
+    };
+    const result = verifyResponse(
+      JSON.stringify({
+        recommendation: "Uses BetterAuthPlugin from dist/types/index.d.mts.",
+        tradeoffs: "t",
+        implementation_notes: "n",
+        declaration_paths: ["node_modules/better-auth/dist/types/index.d.mts"],
+        evidence: "e",
+        nci_query_evidence: "",
+        nci_sql_evidence: "",
+        github_evidence: "",
+      }),
+      verifier,
+      baselineContract,
+    );
+    expect(result.isCorrect).toBe(true);
+    expect(result.missingSubstrings).toHaveLength(0);
+  });
+
+  it("fails require_declaration_path when no declaration suffix appears", () => {
+    const verifier: TaskVerifier = {
+      type: "practical_json_contract",
+      required_substrings: ["BetterAuthPlugin"],
+      forbidden_substrings: [],
+      require_declaration_path: true,
+    };
+    const result = verifyResponse(
+      JSON.stringify({
+        recommendation: "Uses BetterAuthPlugin with no file paths.",
+        tradeoffs: "t",
+        implementation_notes: "n",
+        declaration_paths: ["README.md"],
+        evidence: "e",
+        nci_query_evidence: "",
+        nci_sql_evidence: "",
+        github_evidence: "",
+      }),
+      verifier,
+      baselineContract,
+    );
+    expect(result.isCorrect).toBe(false);
+    expect(result.missingSubstrings).toContain(
+      "declaration_path(.d.ts|.d.mts|.d.cts)",
+    );
+  });
+
   it("enforces practical json structure and substring gates", () => {
     const verifier: TaskVerifier = {
       type: "practical_json_contract",

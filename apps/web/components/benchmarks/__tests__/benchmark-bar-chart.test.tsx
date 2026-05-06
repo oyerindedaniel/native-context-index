@@ -18,6 +18,10 @@ describe("BenchmarkBarChart", () => {
             p90DurationMs: 1800,
             ci95LowMs: 900,
             ci95HighMs: 1200,
+            avgToolCallsStarted: 6,
+            avgToolCallsCompleted: 6,
+            avgToolCallsErrored: 0,
+            avgToolCallDetailCount: 6,
           },
         ]}
       />,

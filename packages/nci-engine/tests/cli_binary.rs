@@ -6,6 +6,7 @@ use std::path::Path;
 use assert_cmd::Command;
 use predicates::prelude::*;
 use rusqlite::Connection;
+use serde_json::Value;
 use tempfile::tempdir;
 
 fn nci_cmd() -> Command {
@@ -941,4 +942,219 @@ fn db_init_keeps_absolute_database_path_from_config() {
         .success();
 
     assert!(proj.path().join("absolute-db.sqlite").is_file());
+}
+
+#[test]
+fn query_active_package_prefers_root_node_modules_then_workspace_json() {
+    let proj = tempdir().unwrap();
+    let apps_docs = proj.path().join("apps").join("docs");
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    fs::create_dir_all(apps_docs.join("node_modules")).unwrap();
+
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("active-pkg.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    // `init -y` writes nci.config.json; merge workspaces so active-package sees workspace node_modules.
+    let config = serde_json::json!({
+        "workspaces": ["apps/*"],
+        "database": db_path,
+    });
+    fs::write(
+        proj.path().join("nci.config.json"),
+        serde_json::to_string_pretty(&config).unwrap(),
+    )
+    .unwrap();
+
+    fs::write(
+        proj.path().join("package-lock.json"),
+        r#"{"lockfileVersion":3}"#,
+    )
+    .unwrap();
+
+    write_minimal_pkg(proj.path(), "vitest", "4.1.0");
+    write_minimal_pkg_at(
+        &apps_docs.join("node_modules").join("vitest"),
+        "vitest",
+        "3.2.4",
+    );
+
+    seed_indexed_package_row(&db_path, "vitest", "3.2.4");
+
+    let assert = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "active-package",
+            "vitest",
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["packageManager"], "npm");
+    let selected = &parsed["data"]["selected"];
+    assert_eq!(selected["packageVersion"], "4.1.0");
+    assert_eq!(selected["indexed"], false);
+    let alternates = parsed["data"]["alternates"]
+        .as_array()
+        .expect("alternates array");
+    assert_eq!(alternates.len(), 1);
+    assert_eq!(alternates[0]["packageVersion"], "3.2.4");
+    assert_eq!(alternates[0]["indexed"], true);
+}
+
+#[test]
+fn query_active_package_package_manager_prefers_package_json_field() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("pm-json.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::write(
+        proj.path().join("package.json"),
+        r#"{"name":"x","packageManager":"pnpm@9.0.0"}"#,
+    )
+    .unwrap();
+    fs::write(
+        proj.path().join("package-lock.json"),
+        r#"{"lockfileVersion":3}"#,
+    )
+    .unwrap();
+
+    write_minimal_pkg(proj.path(), "react", "18.0.0");
+    seed_indexed_package_row(&db_path, "react", "18.0.0");
+
+    let assert = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "active-package",
+            "react",
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["data"]["packageManager"], "pnpm");
+}
+
+#[test]
+fn query_active_package_lockfile_order_prefers_pnpm_over_npm_lock() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("pm-order.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::write(proj.path().join("pnpm-lock.yaml"), "lockfileVersion: 9.0\n").unwrap();
+    fs::write(
+        proj.path().join("package-lock.json"),
+        r#"{"lockfileVersion":3}"#,
+    )
+    .unwrap();
+
+    write_minimal_pkg(proj.path(), "react", "18.0.0");
+    seed_indexed_package_row(&db_path, "react", "18.0.0");
+
+    let assert = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "active-package",
+            "react",
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["data"]["packageManager"], "pnpm");
+}
+
+#[test]
+fn query_active_package_package_manager_finds_lockfile_in_config_ancestor() {
+    let proj = tempdir().unwrap();
+    let apps_docs = proj.path().join("apps").join("docs");
+    fs::create_dir_all(apps_docs.join("node_modules")).unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("pm-ancestor.sqlite");
+
+    fs::write(proj.path().join("pnpm-lock.yaml"), "lockfileVersion: 9.0\n").unwrap();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    let config = serde_json::json!({
+        "database": db_path,
+        "project_root": "apps/docs",
+    });
+    fs::write(
+        proj.path().join("nci.config.json"),
+        serde_json::to_string_pretty(&config).unwrap(),
+    )
+    .unwrap();
+
+    write_minimal_pkg(&apps_docs, "lodash", "4.0.0");
+    seed_indexed_package_row(&db_path, "lodash", "4.0.0");
+
+    let assert = nci_cmd()
+        .current_dir(&apps_docs)
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "active-package",
+            "lodash",
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["data"]["packageManager"], "pnpm");
 }

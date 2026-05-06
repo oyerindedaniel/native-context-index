@@ -4,6 +4,9 @@ import type {
   TaskVerifier,
 } from "@repo/benchmark-contract/benchmark-types";
 
+/** Matches TypeScript declaration file suffixes in cited paths or prose. */
+const DECLARATION_PATH_PATTERN = /\.d\.(ts|mts|cts)\b/i;
+
 function includesCaseInsensitive(haystack: string, needle: string): boolean {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 }
@@ -95,6 +98,15 @@ export function verifyResponse(
     if (!includesCaseInsensitive(normalizedResponseText, requiredSubstring)) {
       missingSubstrings.push(requiredSubstring);
     }
+  }
+
+  if (
+    (verifier.type === "json_contract" ||
+      verifier.type === "practical_json_contract") &&
+    verifier.require_declaration_path &&
+    !DECLARATION_PATH_PATTERN.test(normalizedResponseText)
+  ) {
+    missingSubstrings.push("declaration_path(.d.ts|.d.mts|.d.cts)");
   }
 
   for (const forbiddenSubstring of verifier.forbidden_substrings) {

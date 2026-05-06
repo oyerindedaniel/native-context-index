@@ -79,4 +79,8 @@ _swr-fetch
 
 # Cursor
 .cursor
+nci-report-rust-fix.json
+
+# Benchmark run artifacts (regenerated locally; not the canonical dataset yet)
+apps/web/data/
 

@@ -6,7 +6,11 @@
     "skippedCount": 0,
     "successCount": 1,
     "failureCount": 0,
-    "successRate": 1
+    "successRate": 1,
+    "toolCallsStarted": 3,
+    "toolCallsCompleted": 3,
+    "toolCallsErrored": 0,
+    "toolCallDetailCount": 3
   },
   "byStrategy": [],
   "byDifficulty": [],

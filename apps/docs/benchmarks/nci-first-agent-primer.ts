@@ -1,5 +1,43 @@
-/** SQLite graph semantics + table guide for nci_first runs. Sync to `nci-first-agent-primer.md` via `pnpm run sync:nci-first-agent-primer`. */
-const NCI_FIRST_AGENT_PRIMER_BODY = [
+/** Live nci_first prompt body (compact). Full SQLite graph + table reference: sync `apps/docs/nci-first-agent-primer.md` via `pnpm run sync:nci-first-agent-primer`. */
+
+const NCI_FIRST_AGENT_PRIMER_LIVE = [
+  "You have access to the NCI CLI. NCI indexes TypeScript declarations from `node_modules` into **SQLite** — symbol discovery and relational joins, not a full typechecker.",
+  "",
+  '**Subcommands:** `query` (search/list) and `sql` (read-only `SELECT`). Windows PowerShell: **`& "<path-to-nci.exe>" <subcommand> …args…`** (call operator). **`--max-rows`** applies **only** to `nci sql`. For `query find`, cap hits with **`-n` / `--limit`** (default 20).',
+  "",
+  "**Query-first workflow:**",
+  "1. **`query active-package <packageName>`** — when multiple installs or DB versions may exist; JSON includes **`packageManager`** (best-effort from root `package.json` **`packageManager`** or lockfiles: pnpm / bun / yarn / npm / deno). Use the selected `package_version` to pin `query symbol` / `query find` unless you intend to compare versions.",
+  "2. **`query symbol <Name> --package <IndexedPackage> [--package-version] [--source-package <NpmPackage>] -n 10`** — add **`--source-package`** to restrict rows to symbols whose **owning declaration** is that npm package (matches `source_package_name`: the package that **authored** the `.d.ts`, e.g. a type living in a dependency while the **indexed** package is the app). Omit it when any matching symbol under the index is enough.",
+  "3. **`query find <phrase> --package <Indexed> [--source-package] [--kind <KindName>] [--package-version] -n 10`** — scoped FTS; if a dotted name returns nothing, retry with tokenized terms (`Foo bar` style).",
+  "4. **`query source-packages <IndexedPackage> <packageVersion>`** — list which source packages contribute declaration files under this index (fast dependency-surface check).",
+  '5. **Detail on a row** — use `query show` / `query snippet "<symbols.id>"` for cite-ready text. String ids with **`#2` / `#3`** are separate graph rows; run `snippet` on each before treating them as the same API.',
+  "6. **NodeModules path-first contract (paired rules):** **`package_dir`** from `query active-package` is the **indexed** npm package install root only. Each symbol row carries **`symbols.file_path`** (primary declaration path in the DB), **`source_package_name`**, and **`source_file_path`** (path inside the owning package; **`source_file_path` is NOT NULL in SQLite**—never literally missing as SQL NULL). Think in three layers: (1) which install wins (**`package_dir`** / active-package), (2) which package owns the declaration (**`source_package_name`**), (3) which file inside that install — for **disk** navigation use **`source_file_path`** (and resolved install roots), not raw **`file_path`** when it uses index encoding (see Path encoding below). If **`source_file_path` + install layout still does not yield a file on disk**, treat it as “unusable for disk” and use **`query snippet`** / **`query show`** instead of guessing paths. Map to **one concrete disk directory** (virtual store, hoisted `node_modules`, etc.), then scope `glob`/`grep`/`read_file` **only under that directory**. Do not run ignore-aware `glob`/`grep` over broad `node_modules` trees for discovery; never start with `**/node_modules/**`.",
+  "7. **Extension handling (paired with step 6):** after resolving a concrete declaration directory, inspect that directory once and use actual filenames first. Use `*.d.mts` / `*.d.ts` / `*.d.cts` only as fallback refinement on miss, not as mandatory multi-pass probing.",
+  "8. **Repo file tools** (`read_file` / search) only when `query show` / `query snippet` still lack what the task needs.",
+  "9. **Read-only `sql`:** a **single** well-scoped `SELECT` (see template) is appropriate for set-level work—name collisions, merge rows, dependency fan-out—**when you already know the join and filters**. If table/column names or keys are still fuzzy, use **`sql --schema`** and/or `query` to narrow first; speculative SQL (wide joins, wrong `package_id`) wastes steps the same way repeated blind `query find` does. Match the tool to how sure you are, not a rule that always prefers or avoids SQL.",
+  "10. **Compilation:** do not run ad-hoc `tsc -e` unless the task explicitly requires compile proof; prefer `query` / `snippet` / `sql` declaration evidence.",
+  "",
+  "**One SQL anchor-sweep template** (replace placeholders; keep read-only; use `--max-rows`):",
+  "`nci sql --format json -c \"SELECT s.id, s.name, s.kind_name, s.file_path, s.source_package_name FROM symbols s JOIN packages p ON p.package_id = s.package_id WHERE p.name = '<IndexedPackageName>' AND p.version = '<IndexedPackageVersion>' AND (LOWER(s.name) IN (<lowered_anchor_list>) OR s.name LIKE '%<OneAnchor>%') ORDER BY s.name LIMIT 40\"`",
+  "",
+  "**Path encoding (`symbols.file_path` and `__nci_external__`):** when a declaration sits outside the indexed package root, **`file_path`** can contain `__nci_external__` / `__up__` segments. Those tokens are **canonical index keys for SQLite and `query` ids** — they mean “outside the package” in the graph, **not** a folder path you should concatenate with the repo root and then `glob` or `cd`. **For SQL joins, filtering, and matching symbol ids, treat `file_path` as stored.** **For opening files on disk, do not navigate by splitting `file_path`/`__nci_external__`:** use **`source_package_name` + `source_file_path`** together with **`package_dir`** / install layout to reach the real package directory, then list or read there. **`source_file_path`** is **NOT NULL** in DDL; “absent” in practice means you still cannot resolve a real file—fall back to **`query snippet`** / **`query show`**. Prefer **`query snippet`** whenever you need declaration text without a reliable disk path.",
+  "",
+  "**Graph semantics (read this before interpreting `--schema` rows):**",
+  "- **Join packages to symbols:** `symbols.package_id = packages.package_id`; filter by `packages.name` and `packages.version` for the indexed install.",
+  "- **`symbols.symbol_id` (integer)** — use for SQL joins to dependency tables. **`symbols.id` (string)** — stable symbol handle for `query snippet`; **`symbol_dependencies.to_symbol_id_text`** targets this string form.",
+  '- **`symbol_dependencies`** — resolved **"uses"** edges (what this declaration references). **`symbol_surface_dependencies`** — rolled-up namespace/module surface deps; **do not** treat as interchangeable with **`symbol_dependencies`** on an arbitrary member row.',
+  "- **`parent_symbol_id`** — immediate **lexical containment** (e.g. member under class). **`enclosing_module_declaration_id`** — which **`ModuleDeclaration` / namespace block** encloses the symbol (surrounding module shape); **not** a type-use edge and **not** always the same relationship as `parent_symbol_id`.",
+  "- **`id` suffixes `#2`, `#3`, …** — disambiguate homonyms; compare full **`id`**, not just `name`.",
+  "- **`file_path`** — primary declaration site (package-relative). **`symbol_additional_files`** — **other** declaration files that contributed to **this same merged** symbol row (multi-site merge); non-empty means multiple physical declaration locations.",
+  "- **`entry_visibility_json`** — JSON list of package-relative **entry / barrel** paths through which this symbol is reachable on the **public export surface** (`types` / `exports` traversal). **≠** `file_path` (definition may be internal file while export is via index). **≠** `symbol_additional_files` (those are merge sites, not “which export path surfaced the name”).",
+  "- **`merge_provenance_json`** — when present, describes **how** this row was merged; typical **`kinds`** values: **`merge_scope`** (same merge-key collision), **`identical_fold`** (same name/kind/normalized signature across external files folded into one row), **`overload_key`** (overload-style keys). Pair with **`signature`** / **`kind_name`** when interpreting overloads vs re-exports.",
+  "- **`is_internal`** — export-graph reachability (**`1`** = not on public export path from package entries), **not** “skip this row.” **`is_inherited`** — synthesized inherited member; see **`symbol_inherited_from_sources`** for contributing base symbol ids.",
+  "",
+  "Authoritative column list: run `sql --schema` on the NCI binary when you need exact DDL.",
+].join("\n");
+
+/** Full primer text for documentation (`apps/docs/nci-first-agent-primer.md`); not injected into every benchmark prompt. */
+const NCI_FIRST_AGENT_PRIMER_REFERENCE_DOC = [
   "You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node_modules` and stores a **graph of symbols** in **SQLite**: one database file, read-only from your perspective. The point is fast **symbol discovery** (what exists, where, what it references) and **relational checks** (joins across packages, dependencies, merge metadata)—not a full TypeScript typechecker. The CLI gives you:",
   "- **`query`** — text search / listing over the indexed symbol set (convenient for names and paths).",
   "- **`sql`** — the same data as relations: `SELECT` over `packages`, `symbols`, and the `symbol_*` tables.",
@@ -8,6 +46,11 @@ const NCI_FIRST_AGENT_PRIMER_BODY = [
   "",
   "**Fast path for declaration evidence:**",
   "1. Start with exact symbols when you know the API name:",
+  "   - Resolve active installed package context first when multiple versions may exist in the DB:",
+  "   - `query active-package <IndexedPackageName>`",
+  '   - "example": `query active-package <IndexedPackageName>`',
+  "   - JSON output includes **`packageManager`** (hint from root `package.json` **`packageManager`** or lockfiles).",
+  "   - Use the selected `package_version` from active-package output to pin downstream `query symbol` / `query find` calls unless intentionally comparing versions.",
   "   - `query symbol <ExactSymbolName> --package <IndexedPackageName> -n 10`",
   '   - "example": `query symbol Client --package <IndexedPackageName> -n 10`',
   "   - `query symbol <ExactSymbolName> --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`",
@@ -58,14 +101,14 @@ const NCI_FIRST_AGENT_PRIMER_BODY = [
   "- **`file_path`:** path to the **primary declaration site** for this graph row—package-relative. Merge may fold other sites into the same row; those extra physical files are recorded in **`symbol_additional_files`**, not by repeating them as extra `file_path` columns.",
   "- **`source_package_name`:** npm package that owns the declaration (`packages.name` for in-tree symbols; dependency package id parsed from the first `node_modules/<pkg>/` segment for `__nci_external__` paths). This is the canonical field for `--source-package` filters.",
   "- **`source_package_version`:** semver of the source package **only** when the source package is the indexed package. For external dependency declarations this is usually **NULL** by design; folder names like `@scope+pkg@x.y.z` are install-layout artifacts and are not treated as authoritative source semver.",
-  "- **`source_file_path`:** path relative to `source_package_name` (mirrors `file_path` for in-package symbols; dependency-local path for external symbols). Use this when citing where the declaration lives inside the owning package.",
+  "- **`source_file_path`:** path relative to `source_package_name` (mirrors `file_path` for in-package symbols; dependency-local path for external symbols). DDL stores it **NOT NULL**; use this when citing where the declaration lives inside the owning package. If disk navigation still fails, use **`query snippet`** rather than guessing.",
   "- **`entry_visibility_json` (TEXT, optional):** JSON array text of package-relative paths—**which package entry / barrel files make this symbol reachable on the public export surface** (`types` / `exports` roots and re-export traversal). This is the persisted SQL form of entry-surface visibility metadata. Populated when the symbol’s file (or the file resolved from package entry re-export) is one of the indexed **entry files**. **Not** the same as **`file_path`**: a symbol may be **defined** in `dist/foo.d.ts` but **reachable** only via `dist/index.d.ts`—then `file_path` is `foo`, while **`entry_visibility_json`** lists index/barrel paths that surface it. **Not** the same as **`symbol_additional_files`**: those are **extra declaration merge sites** for the same merged symbol, not “which entry re-exported this name.” If the only entry path equals **`file_path`** alone, the engine often omits the field as redundant—**NULL / absent** does not mean “not exported”; use **`is_internal`** plus this column when present.",
   "- **`signature`:** declaration signature / export text. **After merge,** the engine may **fuse** several normalized-distinct signature bodies into one field (newline-separated blocks), not “first file only.” If two overloads collapse when their normalized signatures match, you will not see duplicate raw text for the same normalized overload key.",
   "- **`js_doc`:** JSDoc when present.",
   "- **`parent_symbol_id`:** the **lexical / containment** parent for member shapes (e.g. a method’s parent class or interface id). This answers “this member lives under which container in the graph.” It is **not** a “this type uses that type” edge. For **use** relationships, use **`symbol_dependencies`** (or the graph’s `dependencies` when not using SQL). **Never** replace dependency reasoning with `parent_symbol_id` or vice versa.",
   "- **`enclosing_module_declaration_id`:** string id of the **enclosing module / namespace declaration** row (`ModuleDeclaration`-like container) for module-scoped symbols—**which module block** this symbol belongs to. **Not** a type-reference edge and **not** the same as `parent_symbol_id` for every kind (parent is often the immediate lexical owner; enclosing module is the surrounding module/namespace declaration id). Use it when you need “inside which module namespace” vs following **`symbol_dependencies`** for references.",
   "- **`merge_provenance_json`:** present when this row **absorbed more than one** declaration. JSON object; typically a `kinds` array whose values describe **how** the row was formed (snake_case labels), for example:",
-  "  - **`merge_scope`:** at least one contribution came from the same **declaration merge key** as another row (for interfaces/types/namespaces/enums: scope + name + kind; for members: overload-style keys—name + kind + normalized signature without file path).",
+  "  - **`merge_scope`:** at least one contribution came from the same **declaration merge key** as another row (same merge scope for declaration kinds, or overload keys for members).",
   "  - **`identical_fold`:** at least one contribution came from **identical cross-file fold**: same `name`, same `kind`, same **normalized** signature across **external** module files, folded into one row. **Row is still one `symbols` entry;** extra physical sites are listed in **`symbol_additional_files`.**",
   "  - **`overload_key`:** the row participates in **overload-style** merging (member overloads / overload rows keyed by normalized signature). Multiple overloads of the same member name may share merge mechanics or remain distinct rows depending on normalization—use **`kind_name`**, **`signature`**, and **`merge_provenance_json`** rather than assuming “one row == one overload.”",
   "  A single row can list **multiple** `kinds` when different mechanisms contributed.",
@@ -101,5 +144,10 @@ const NCI_FIRST_AGENT_PRIMER_BODY = [
 ].join("\n");
 
 export function buildNciFirstAgentPrimer(): string {
-  return NCI_FIRST_AGENT_PRIMER_BODY;
+  return NCI_FIRST_AGENT_PRIMER_LIVE;
+}
+
+/** Reference documentation body (full table guide); written to markdown by the sync script. */
+export function buildNciFirstAgentPrimerReferenceDoc(): string {
+  return NCI_FIRST_AGENT_PRIMER_REFERENCE_DOC;
 }

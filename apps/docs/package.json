@@ -18,6 +18,7 @@
     "bench:full": "dotenv -e .env -- tsx benchmarks/benchmark-cli.ts --mode=full --execute=true --include-cloud=true --model-id=composer-2",
     "bench:full:practical": "dotenv -e .env -- tsx benchmarks/benchmark-cli.ts --mode=full --task-manifest=tasks-manifest.practical.json --execute=true --include-cloud=false --model-id=composer-2",
     "bench:prepare": "dotenv -e .env -- tsx benchmarks/benchmark-cli.ts --mode=pilot --execute=false --include-cloud=false --model-id=composer-2",
+    "bench:runner": "dotenv -e .env -- tsx benchmarks/benchmark-cli.ts",
     "bench:clean": "tsx scripts/benchmark-clean.ts",
     "test:benchmarks": "vitest run benchmarks/__tests__",
     "sync:nci-first-agent-primer": "tsx scripts/sync-nci-first-agent-primer.ts"

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, BufReader, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -9,7 +9,7 @@ use std::time::Instant;
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
 use dialoguer::{Confirm, Input};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
@@ -382,6 +382,10 @@ enum QueryCommands {
     PackageDeps { name: String, version: String },
     #[command(about = "List distinct source packages for one indexed package version")]
     SourcePackages { name: String, version: String },
+    #[command(
+        about = "Resolve active installed package version(s) from project/workspace node_modules roots"
+    )]
+    ActivePackage { name: String },
     #[command(about = "List symbols for a package name/version")]
     Symbols {
         name: String,
@@ -400,6 +404,16 @@ enum QueryCommands {
         )]
         offset: usize,
     },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct ActivePackageCandidate {
+    package_name: String,
+    package_version: String,
+    indexed: bool,
+    node_modules_root: String,
+    package_dir: String,
 }
 
 pub fn run() -> Result<(), String> {
@@ -1177,6 +1191,98 @@ fn expand_workspace_pattern(project_root: &Path, pattern: &str) -> Vec<PathBuf> 
     }
 }
 
+fn try_package_manager_in_directory(dir: &Path) -> Option<String> {
+    const KNOWN_TOOL_IDS: &[&str] = &["pnpm", "yarn", "npm", "bun", "deno"];
+    let package_json_path = dir.join("package.json");
+    if let Ok(package_json_file) = fs::File::open(&package_json_path) {
+        let buffered = BufReader::new(package_json_file);
+        if let Ok(root_object) = serde_json::from_reader::<_, serde_json::Value>(buffered)
+            && let Some(package_manager_spec) = root_object
+                .get("packageManager")
+                .and_then(|field| field.as_str())
+        {
+            let tool_prefix = package_manager_spec.split('@').next().unwrap_or("").trim();
+            if KNOWN_TOOL_IDS.contains(&tool_prefix) {
+                return Some(tool_prefix.to_string());
+            }
+        }
+    }
+
+    const LOCKFILE_TOOL: &[(&str, &str)] = &[
+        ("pnpm-lock.yaml", "pnpm"),
+        ("bun.lock", "bun"),
+        ("bun.lockb", "bun"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+        ("npm-shrinkwrap.json", "npm"),
+        ("deno.lock", "deno"),
+    ];
+    for (lockfile_name, manager_id) in LOCKFILE_TOOL {
+        if dir.join(lockfile_name).is_file() {
+            return Some((*manager_id).to_string());
+        }
+    }
+
+    None
+}
+
+/// Resolve package manager for hints (`npm`, `pnpm`, `yarn`, `bun`, `deno`, or `unknown`).
+/// Checks `project_root`, then walks parents toward `config_discovery_dir` (where `nci.config.json`
+/// was found). Stops at the first directory that yields Corepack `packageManager` or a lockfile.
+fn detect_project_package_manager(
+    project_root: &Path,
+    config_discovery_dir: Option<&Path>,
+) -> String {
+    let mut seen_dirs: HashSet<PathBuf> = HashSet::new();
+
+    let mut try_visit = |path: &Path| -> Option<String> {
+        let key = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        if !seen_dirs.insert(key.clone()) {
+            return None;
+        }
+        try_package_manager_in_directory(&key)
+    };
+
+    if let Some(found) = try_visit(project_root) {
+        return found;
+    }
+
+    if let Some(cfg) = config_discovery_dir {
+        let cfg_canon = fs::canonicalize(cfg).unwrap_or_else(|_| cfg.to_path_buf());
+        let pr_canon =
+            fs::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+
+        if pr_canon != cfg_canon {
+            let mut walk = project_root.to_path_buf();
+            loop {
+                let walk_canon = fs::canonicalize(&walk).unwrap_or_else(|_| walk.clone());
+                if walk_canon == cfg_canon {
+                    break;
+                }
+                let Some(parent) = walk.parent() else {
+                    if let Some(found) = try_visit(cfg) {
+                        return found;
+                    }
+                    break;
+                };
+                walk = parent.to_path_buf();
+                if let Some(found) = try_visit(&walk) {
+                    return found;
+                }
+                let after = fs::canonicalize(&walk).unwrap_or_else(|_| walk.clone());
+                if after == cfg_canon {
+                    break;
+                }
+            }
+        }
+        if let Some(found) = try_visit(cfg) {
+            return found;
+        }
+    }
+
+    "unknown".to_string()
+}
+
 fn collect_node_modules_roots(project_root: &Path, file: Option<&NciConfigFile>) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     roots.push(project_root.join("node_modules"));
@@ -1225,6 +1331,41 @@ fn scan_all_packages_across_roots(
         all_packages.append(&mut found);
     }
     Ok(pipeline::dedupe_packages_by_canonical_dir(all_packages))
+}
+
+fn resolve_active_package_candidates(
+    package_name: &str,
+    node_modules_roots: &[PathBuf],
+    indexed_versions: &HashSet<String>,
+) -> Result<Vec<ActivePackageCandidate>, String> {
+    let mut seen_package_dirs: HashSet<PathBuf> = HashSet::new();
+    let mut candidates: Vec<ActivePackageCandidate> = Vec::new();
+
+    for node_modules_root in node_modules_roots {
+        let scanned_packages = scanner::scan_packages(node_modules_root)
+            .map_err(|scan_error| format!("scan {}: {scan_error}", node_modules_root.display()))?;
+        for package_info in scanned_packages {
+            if package_info.name.as_ref() != package_name {
+                continue;
+            }
+            let package_dir_path = PathBuf::from(package_info.dir.as_ref());
+            let canonical_package_dir =
+                fs::canonicalize(&package_dir_path).unwrap_or(package_dir_path.clone());
+            if !seen_package_dirs.insert(canonical_package_dir) {
+                continue;
+            }
+            let package_version = package_info.version.to_string();
+            candidates.push(ActivePackageCandidate {
+                package_name: package_name.to_string(),
+                indexed: indexed_versions.contains(package_version.as_str()),
+                package_version,
+                node_modules_root: display_path(node_modules_root),
+                package_dir: display_path(&package_dir_path),
+            });
+        }
+    }
+
+    Ok(candidates)
 }
 
 fn build_index_options(
@@ -1829,6 +1970,89 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     print_json(
                         &serde_json::json!({ "ok": true, "data": { "source_packages": source_packages } }),
                     )?;
+                }
+            }
+        }
+        QueryCommands::ActivePackage { name } => {
+            let package_manager = detect_project_package_manager(
+                context.project_root.as_path(),
+                Some(context.config_dir.as_path()),
+            );
+            let node_modules_roots = collect_node_modules_roots(&context.project_root, file);
+            if node_modules_roots.is_empty() {
+                return emit_error(
+                    fmt,
+                    &format!(
+                        "no node_modules directories found under {}",
+                        context.project_root.display()
+                    ),
+                );
+            }
+            let indexed_versions: HashSet<String> = database
+                .list_package_versions(name)
+                .map_err(|err| err.to_string())?
+                .into_iter()
+                .collect();
+            let candidates =
+                resolve_active_package_candidates(name, &node_modules_roots, &indexed_versions)?;
+            let selected = candidates.first().cloned();
+            let alternates = if candidates.len() > 1 {
+                candidates[1..].to_vec()
+            } else {
+                Vec::new()
+            };
+            match fmt {
+                OutputFormat::Plain => {
+                    println!("package_manager: {package_manager}");
+                    if let Some(active) = selected {
+                        emit_ui_line_stdout(
+                            ProgressTone::Summary,
+                            "query active-package",
+                            &format!(
+                                "selected {}@{} (indexed={})",
+                                active.package_name, active.package_version, active.indexed
+                            ),
+                        );
+                        println!("node_modules: {}", active.node_modules_root);
+                        println!("package_dir: {}", active.package_dir);
+                        if !alternates.is_empty() {
+                            emit_ui_line_stdout(
+                                ProgressTone::Note,
+                                "query active-package",
+                                &format!("{} alternate install(s) found", alternates.len()),
+                            );
+                            for alternate in alternates {
+                                println!(
+                                    "{}@{}\tindexed={}\tnode_modules={}\tpackage_dir={}",
+                                    alternate.package_name,
+                                    alternate.package_version,
+                                    alternate.indexed,
+                                    alternate.node_modules_root,
+                                    alternate.package_dir
+                                );
+                            }
+                        }
+                    } else {
+                        emit_ui_line_stdout(
+                            ProgressTone::Note,
+                            "query active-package",
+                            &format!(
+                                "no installed matches for {name}; check project_root/workspaces context"
+                            ),
+                        );
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": {
+                            "name": name,
+                            "packageManager": package_manager,
+                            "selected": selected,
+                            "alternates": alternates,
+                            "count": candidates.len(),
+                        }
+                    }))?;
                 }
             }
         }

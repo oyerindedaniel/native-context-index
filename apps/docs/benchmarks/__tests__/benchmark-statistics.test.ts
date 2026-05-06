@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { BenchmarkRunRecord } from "@repo/benchmark-contract/benchmark-types";
+import type {
+  BenchmarkRunRecord,
+  BenchmarkStrategy,
+} from "@repo/benchmark-contract/benchmark-types";
 import { buildFullDataset, buildSummaryDataset } from "../benchmark-statistics";
 
 function createRecord(
   runId: string,
-  strategy: "baseline" | "nci_first",
+  strategy: BenchmarkStrategy,
   durationMs: number,
   isCorrect: boolean,
+  toolCallsStarted = 0,
+  toolCallsCompleted = 0,
+  toolCallsErrored = 0,
 ): BenchmarkRunRecord {
   return {
     runId,
@@ -32,9 +38,9 @@ function createRecord(
     durationMs,
     isCorrect,
     runtimeMetrics: {
-      toolCallsStarted: 0,
-      toolCallsCompleted: 0,
-      toolCallsErrored: 0,
+      toolCallsStarted,
+      toolCallsCompleted,
+      toolCallsErrored,
     },
     missingSubstrings: [],
     forbiddenMatches: [],
@@ -46,13 +52,20 @@ function createRecord(
 describe("benchmark statistics", () => {
   it("computes totals and grouped metrics", () => {
     const records = [
-      createRecord("1", "baseline", 1000, true),
-      createRecord("2", "baseline", 1500, false),
-      createRecord("3", "nci_first", 900, true),
+      createRecord("1", "baseline", 1000, true, 2, 2, 0),
+      createRecord("2", "baseline", 1500, false, 3, 3, 0),
+      createRecord("3", "nci_first", 900, true, 5, 4, 1),
     ];
     const summary = buildSummaryDataset(records, "v1");
     expect(summary.totals.runCount).toBe(3);
+    expect(summary.totals.toolCallsStarted).toBe(10);
+    expect(summary.totals.toolCallsCompleted).toBe(9);
+    expect(summary.totals.toolCallsErrored).toBe(1);
     expect(summary.byStrategy).toHaveLength(2);
+    const baselineMetrics = summary.byStrategy.find(
+      (metric) => metric.groupKey === "baseline",
+    );
+    expect(baselineMetrics?.avgToolCallsStarted).toBe(2.5);
   });
 
   it("builds gantt series in full dataset", () => {

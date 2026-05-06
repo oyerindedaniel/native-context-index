@@ -39,4 +39,4 @@ next-env.d.ts
 benchmarks/runs/
 benchmarks/.pilot-sequential-step.json
 benchmarks/.pilot-practical-sequential-step.json
-nci-first-agent-primer.md
+benchmarks/.pilot-practical-sequential-step-v1.json

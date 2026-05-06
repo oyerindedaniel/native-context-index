@@ -6,7 +6,11 @@
     "skippedCount": 0,
     "successCount": 2,
     "failureCount": 0,
-    "successRate": 1
+    "successRate": 1,
+    "toolCallsStarted": 12,
+    "toolCallsCompleted": 12,
+    "toolCallsErrored": 0,
+    "toolCallDetailCount": 12
   },
   "byStrategy": [
     {
@@ -16,7 +20,11 @@
       "medianDurationMs": 1200,
       "p90DurationMs": 1200,
       "ci95LowMs": 1200,
-      "ci95HighMs": 1200
+      "ci95HighMs": 1200,
+      "avgToolCallsStarted": 4,
+      "avgToolCallsCompleted": 4,
+      "avgToolCallsErrored": 0,
+      "avgToolCallDetailCount": 4
     },
     {
       "groupKey": "nci_first",
@@ -25,7 +33,11 @@
       "medianDurationMs": 980,
       "p90DurationMs": 980,
       "ci95LowMs": 980,
-      "ci95HighMs": 980
+      "ci95HighMs": 980,
+      "avgToolCallsStarted": 8,
+      "avgToolCallsCompleted": 8,
+      "avgToolCallsErrored": 0,
+      "avgToolCallDetailCount": 8
     }
   ],
   "byDifficulty": []

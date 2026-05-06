@@ -63,6 +63,18 @@ function aggregateGroup(
   records: BenchmarkRunRecord[],
 ): AggregatedMetric {
   const durations = records.map((record) => record.durationMs);
+  const toolCallsStarted = records.map(
+    (record) => record.runtimeMetrics.toolCallsStarted,
+  );
+  const toolCallsCompleted = records.map(
+    (record) => record.runtimeMetrics.toolCallsCompleted,
+  );
+  const toolCallsErrored = records.map(
+    (record) => record.runtimeMetrics.toolCallsErrored,
+  );
+  const toolCallDetailCount = records.map(
+    (record) => record.runtimeMetrics.toolCallDetails?.length ?? 0,
+  );
   const successfulRecords = records.filter((record) => record.isCorrect);
   const confidenceInterval = confidenceInterval95(durations);
   return {
@@ -74,6 +86,10 @@ function aggregateGroup(
     p90DurationMs: percentile(durations, 90),
     ci95LowMs: confidenceInterval.low,
     ci95HighMs: confidenceInterval.high,
+    avgToolCallsStarted: average(toolCallsStarted),
+    avgToolCallsCompleted: average(toolCallsCompleted),
+    avgToolCallsErrored: average(toolCallsErrored),
+    avgToolCallDetailCount: average(toolCallDetailCount),
   };
 }
 
@@ -99,6 +115,7 @@ export function buildSummaryDataset(
   records: BenchmarkRunRecord[],
   protocolVersion: string,
 ): SummaryDataset {
+  const generatedAt = new Date();
   const evaluatedRecords = records.filter(
     (record) => record.status !== "skipped",
   );
@@ -107,8 +124,27 @@ export function buildSummaryDataset(
     (record) => record.isCorrect,
   ).length;
   const failureCount = evaluatedRecords.length - successCount;
+  const totals = evaluatedRecords.reduce(
+    (runningTotals, record) => {
+      runningTotals.toolCallsStarted += record.runtimeMetrics.toolCallsStarted;
+      runningTotals.toolCallsCompleted +=
+        record.runtimeMetrics.toolCallsCompleted;
+      runningTotals.toolCallsErrored += record.runtimeMetrics.toolCallsErrored;
+      runningTotals.toolCallDetailCount +=
+        record.runtimeMetrics.toolCallDetails?.length ?? 0;
+      return runningTotals;
+    },
+    {
+      toolCallsStarted: 0,
+      toolCallsCompleted: 0,
+      toolCallsErrored: 0,
+      toolCallDetailCount: 0,
+    },
+  );
   return {
-    generatedAtIso: new Date().toISOString(),
+    generatedAtIso: generatedAt.toISOString(),
+    generatedAtLocalIso: generatedAt.toString(),
+    generatedAtEpochMs: generatedAt.getTime(),
     protocolVersion,
     totals: {
       runCount: evaluatedRecords.length,
@@ -119,6 +155,10 @@ export function buildSummaryDataset(
         evaluatedRecords.length === 0
           ? 0
           : successCount / evaluatedRecords.length,
+      toolCallsStarted: totals.toolCallsStarted,
+      toolCallsCompleted: totals.toolCallsCompleted,
+      toolCallsErrored: totals.toolCallsErrored,
+      toolCallDetailCount: totals.toolCallDetailCount,
     },
     byStrategy: aggregateByKey(evaluatedRecords, (record) => record.strategy),
     byDifficulty: aggregateByKey(

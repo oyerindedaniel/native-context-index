@@ -47,12 +47,16 @@ export interface JsonContractVerifier {
   type: "json_contract";
   required_substrings: string[];
   forbidden_substrings: string[];
+  /** When true, response must mention a TS declaration path ending in `.d.ts`, `.d.mts`, or `.d.cts`. */
+  require_declaration_path?: boolean;
 }
 
 export interface PracticalJsonContractVerifier {
   type: "practical_json_contract";
   required_substrings: string[];
   forbidden_substrings: string[];
+  /** When true, response must mention a TS declaration path ending in `.d.ts`, `.d.mts`, or `.d.cts`. */
+  require_declaration_path?: boolean;
 }
 
 export type TaskVerifier =
@@ -161,6 +165,8 @@ export interface BenchmarkRunRecord {
 
 export interface BenchmarkRunFile {
   generatedAtIso: string;
+  generatedAtLocalIso?: string;
+  generatedAtEpochMs?: number;
   protocolVersion: string;
   mode: "pilot" | "full";
   /** Output file stem (e.g. `7a-20260501-234438-pilot`) for pairing run + metrics + web exports. */
@@ -178,10 +184,16 @@ export interface AggregatedMetric {
   p90DurationMs: number;
   ci95LowMs: number;
   ci95HighMs: number;
+  avgToolCallsStarted: number;
+  avgToolCallsCompleted: number;
+  avgToolCallsErrored: number;
+  avgToolCallDetailCount: number;
 }
 
 export interface SummaryDataset {
   generatedAtIso: string;
+  generatedAtLocalIso?: string;
+  generatedAtEpochMs?: number;
   protocolVersion: string;
   totals: {
     runCount: number;
@@ -189,6 +201,10 @@ export interface SummaryDataset {
     successCount: number;
     failureCount: number;
     successRate: number;
+    toolCallsStarted: number;
+    toolCallsCompleted: number;
+    toolCallsErrored: number;
+    toolCallDetailCount: number;
   };
   byStrategy: AggregatedMetric[];
   byDifficulty: AggregatedMetric[];

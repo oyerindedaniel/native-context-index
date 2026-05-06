@@ -8,6 +8,11 @@ export const DEFAULT_PILOT_SEQUENTIAL_STEP_FILENAME =
 export interface PilotSequentialStepState {
   version: 1;
   completedTaskIds: string[];
+  /**
+   * Last benchmark output stem (matches `*-run.json` / `*-metrics.json` / web `*-summary.json` prefixes).
+   * Updated when a harness run finishes so this file correlates with artifact filenames.
+   */
+  lastBenchmarkRunStem?: string;
 }
 
 export function syncCompletedIdsWithPilotSet(
@@ -35,7 +40,16 @@ export async function readPilotSequentialStepState(
     if (parsed.version !== 1 || !Array.isArray(parsed.completedTaskIds)) {
       return { version: 1, completedTaskIds: [] };
     }
-    return { version: 1, completedTaskIds: [...parsed.completedTaskIds] };
+    const lastBenchmarkRunStem =
+      typeof parsed.lastBenchmarkRunStem === "string" &&
+      parsed.lastBenchmarkRunStem.length > 0
+        ? parsed.lastBenchmarkRunStem
+        : undefined;
+    return {
+      version: 1,
+      completedTaskIds: [...parsed.completedTaskIds],
+      ...(lastBenchmarkRunStem !== undefined ? { lastBenchmarkRunStem } : {}),
+    };
   } catch {
     return { version: 1, completedTaskIds: [] };
   }

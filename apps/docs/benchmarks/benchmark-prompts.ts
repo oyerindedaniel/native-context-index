@@ -48,7 +48,7 @@ function buildArtifactInstruction(packageEntry: PackageEntry): string {
 
 function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
   const workspaceMutationGuardrail =
-    "Do not run package managers (`npm install`, `pnpm install`, `yarn install`), do not create temporary dependency projects, and do not create/delete files to repair environment issues during this benchmark. If declarations appear missing, continue with available evidence and report the gap.";
+    "Do not run package managers (`npm install`, `pnpm install`, `yarn install`, `bun install`), do not create temporary dependency projects, and do not create/delete files to repair environment issues during this benchmark. If declarations appear missing, continue with available evidence and report the gap.";
   const nciCompilationGuardrail =
     "Do not attempt `tsc -e` or ad-hoc compile probes during benchmark runs; use declaration evidence from NCI/query/snippet directly unless compilation is explicitly required by the task.";
   const baselineCompilationGuardrail =
@@ -59,6 +59,7 @@ function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
       "Prefer **query** for discovery; use read-only **sql** for relational facts from the tables above.",
       'On **Windows PowerShell**, invoke NCI as **`& "<path-to-nci.exe>" <subcommand> …`** so `sql` / `query` are real arguments (never `"…nci.exe" sql …` without `&`).',
       "Cap **`query find`** rows with **`-n` / `--limit`** (default 20). **`--max-rows` is only for `nci sql`**, not `query find`.",
+      "Follow the **NodeModules path-first contract** in the NCI primer above (workflow steps **6–7**).",
       "Use grep/read_file only when NCI output is insufficient.",
       workspaceMutationGuardrail,
       nciCompilationGuardrail,
@@ -97,7 +98,7 @@ function buildRequiredJsonSchema(verifier: TaskVerifier): string {
       '  "recommendation": "specific recommendation that answers the engineering question",',
       '  "tradeoffs": "important tradeoffs, risks, and rejected alternatives",',
       '  "implementation_notes": "implementation steps or constraints a developer can act on",',
-      '  "declaration_paths": ["path1.d.ts"],',
+      '  "declaration_paths": ["node_modules/pkg/dist/index.d.mts"],',
       '  "evidence": "how cited declarations/source evidence support the recommendation",',
       '  "nci_query_evidence": "required for nci_first, otherwise empty string",',
       '  "nci_sql_evidence": "required for nci_first, otherwise empty string",',
@@ -109,7 +110,7 @@ function buildRequiredJsonSchema(verifier: TaskVerifier): string {
   return [
     "{",
     '  "answer": "short factual answer",',
-    '  "declaration_paths": ["path1.d.ts"],',
+    '  "declaration_paths": ["node_modules/pkg/dist/index.d.mts"],',
     '  "nci_query_evidence": "required for nci_first, otherwise empty string",',
     '  "nci_sql_evidence": "required for nci_first, otherwise empty string",',
     '  "github_evidence": "required for non-artifact lanes, otherwise empty string"',
@@ -129,6 +130,7 @@ export function buildBenchmarkPrompt(
     ...(input.strategy === "nci_first"
       ? [
           buildNciFirstAgentPrimer(),
+          // buildNciFirstAgentPrimerReferenceDoc(),
           buildNciFirstBinarySection(input.nciBinaryPath),
           buildStrategyInstruction(input.strategy),
         ]

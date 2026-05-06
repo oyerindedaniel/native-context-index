@@ -42,14 +42,20 @@ describe("benchmark prompt builder", () => {
     expect(result.contract.requiresSqlEvidence).toBe(true);
     expect(result.prompt).toContain("target/debug/nci.exe");
     expect(result.prompt).toContain("Authoritative column list:");
+    expect(result.prompt).toContain("One SQL anchor-sweep template");
+    expect(result.prompt).toContain("Graph semantics");
     expect(result.prompt).toContain("symbol_dependencies");
-    expect(result.prompt).toContain("entry_visibility_json");
+    expect(result.prompt).toContain("parent_symbol_id");
     expect(result.prompt).toContain("sql --schema");
     expect(result.prompt).toContain('query find "<phrase>"');
     expect(result.prompt).toContain("__nci_external__");
     expect(result.prompt).toContain('& "<path-to-nci.exe>"');
     expect(result.prompt).toContain("-n` / `--limit`");
     expect(result.prompt).toContain("`--max-rows` is only for `nci sql`");
+    expect(result.prompt).toContain("NodeModules path-first contract");
+    expect(result.prompt).toContain("primer above");
+    expect(result.prompt).toContain("source_file_path");
+    expect(result.prompt).toContain("**/node_modules/**");
   });
 
   it("disables nci usage for baseline strategy", () => {

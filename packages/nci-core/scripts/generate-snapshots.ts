@@ -40,8 +40,8 @@ if (fixtures.length === 0) {
 }
 
 function normaliseGraph(graph: PackageGraph, fixtureDir: string): PackageGraph {
-  const normalise = (p: string): string => {
-    const forward = p.replace(/\\/g, "/");
+  const normalise = (absolutePath: string): string => {
+    const forward = absolutePath.replace(/\\/g, "/");
     const base = fixtureDir.replace(/\\/g, "/");
     if (forward.startsWith(base)) {
       const rel = forward.slice(base.length);

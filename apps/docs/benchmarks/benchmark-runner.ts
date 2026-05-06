@@ -32,6 +32,7 @@ import {
   pickNextPilotTask,
   readPilotSequentialStepState,
   syncCompletedIdsWithPilotSet,
+  type PilotSequentialStepState,
   writePilotSequentialStepState,
 } from "./benchmark-sequential-step";
 import { shuffleArray } from "./benchmark-task-order";
@@ -372,7 +373,7 @@ async function executeSingleRun(
   runName: string,
   modelId: string,
   runtime: BenchmarkRuntime,
-  workspaceRoot: string,
+  localCwd: string,
   performExecution: boolean,
   progress?: AgentRunProgress,
 ): Promise<ExecutionResult> {
@@ -402,7 +403,7 @@ async function executeSingleRun(
   const runtimeOptions =
     runtime === "cloud"
       ? { cloud: { env: { type: "cloud" as const } } }
-      : { local: { cwd: workspaceRoot } };
+      : { local: { cwd: localCwd } };
 
   const heartbeatMs = 30_000;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -568,7 +569,7 @@ export async function runBenchmarksWithDependencies(
         : path.join(options.docsRoot, options.sequentialStepStatePath);
 
   if (options.resetSequentialStep) {
-    const emptyState: { version: 1; completedTaskIds: never[] } = {
+    const emptyState: PilotSequentialStepState = {
       version: 1,
       completedTaskIds: [],
     };
@@ -697,6 +698,8 @@ export async function runBenchmarksWithDependencies(
     strategies,
   );
 
+  const runStem = options.outputStem ?? buildRunOutputStem(options.mode);
+
   if (options.verbose) {
     logBench(
       `tasks in this run: ${selectedTasks.length} (${selectedTasks.map((t) => t.id).join(", ") || "none"})`,
@@ -766,7 +769,7 @@ export async function runBenchmarksWithDependencies(
       `nci-benchmark-${task.id}-${runtime}-${strategy}`,
       options.modelId,
       runtime,
-      options.workspaceRoot,
+      options.docsRoot,
       options.performExecution,
     );
     const evidence = parseEvidenceFromResponse(executionResult.responseText);
@@ -807,10 +810,11 @@ export async function runBenchmarksWithDependencies(
     );
   }
 
-  const runStem = options.outputStem ?? buildRunOutputStem(options.mode);
-
+  const generatedAt = new Date();
   const runFile: BenchmarkRunFile = {
-    generatedAtIso: new Date().toISOString(),
+    generatedAtIso: generatedAt.toISOString(),
+    generatedAtLocalIso: generatedAt.toString(),
+    generatedAtEpochMs: generatedAt.getTime(),
     protocolVersion: options.protocolVersion,
     mode: options.mode,
     runStem,
@@ -870,6 +874,8 @@ export async function runBenchmarksWithDependencies(
   const metricsFile = {
     runStem,
     generatedAtIso: runFile.generatedAtIso,
+    generatedAtLocalIso: runFile.generatedAtLocalIso,
+    generatedAtEpochMs: runFile.generatedAtEpochMs,
     mode: runFile.mode,
     protocolVersion: runFile.protocolVersion,
     pairedFromRepoRoot,
@@ -957,6 +963,21 @@ export async function runBenchmarksWithDependencies(
         `sequential step NOT advanced for ${sequentialAdvanceTaskId} (requireCorrectness=${requireCorrectness}) due to failing records: ${failureSummary.join(" | ")}`,
       );
     }
+  }
+
+  if (options.mode === "pilot" || options.sequentialStep === true) {
+    const pilotStepForArtifacts = await readPilotSequentialStepState(
+      resolvedSequentialStatePath,
+    );
+    const pilotStepWithStem: PilotSequentialStepState = {
+      version: 1,
+      completedTaskIds: pilotStepForArtifacts.completedTaskIds,
+      lastBenchmarkRunStem: runStem,
+    };
+    await writePilotSequentialStepState(
+      resolvedSequentialStatePath,
+      pilotStepWithStem,
+    );
   }
 
   if (options.verbose) {
