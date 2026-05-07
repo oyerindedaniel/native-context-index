@@ -12,6 +12,7 @@ You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node
    - `query active-package <IndexedPackageName>`
    - "example": `query active-package <IndexedPackageName>`
    - JSON output includes **`packageManager`** (hint from root `package.json` **`packageManager`** or lockfiles).
+   - With **`index_root_workspace: false`** and non-empty **`workspaces`** in `nci.config.json`, repo-root **`node_modules`** is excluded from active-package candidate roots (config only for `query`; not overridden by `nci index --skip-root-workspace`).
    - Use the selected `package_version` from active-package output to pin downstream `query symbol` / `query find` calls unless intentionally comparing versions.
    - `query symbol <ExactSymbolName> --package <IndexedPackageName> -n 10`
    - "example": `query symbol Client --package <IndexedPackageName> -n 10`

@@ -250,6 +250,133 @@ fn index_dry_run_scans_workspace_node_modules_from_config() {
 }
 
 #[test]
+fn index_errors_when_omitting_root_without_workspaces_config() {
+    let proj = tempdir().unwrap();
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{"index_root_workspace": false}"#,
+    )
+    .unwrap();
+    nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("workspaces"));
+}
+
+#[test]
+fn index_errors_when_skip_root_workspace_cli_without_workspaces() {
+    let proj = tempdir().unwrap();
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--skip-root-workspace",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("workspaces"));
+}
+
+#[test]
+fn index_dry_run_skip_root_workspace_excludes_root_node_modules() {
+    let proj = tempdir().unwrap();
+    let workspace_dir = proj.path().join("packages").join("app-skip");
+    fs::create_dir_all(workspace_dir.join("node_modules")).unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+
+    write_minimal_pkg(proj.path(), "root-only", "1.0.0");
+    write_minimal_pkg_at(
+        &workspace_dir.join("node_modules").join("workspace-only"),
+        "workspace-only",
+        "1.0.0",
+    );
+
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{
+  "workspaces": ["packages/*"],
+  "index_root_workspace": false
+}"#,
+    )
+    .unwrap();
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("valid json");
+    let roots = parsed["data"]["node_modules_roots"]
+        .as_array()
+        .expect("node_modules_roots array");
+    assert!(
+        roots.len() == 1,
+        "expected single workspace node_modules root, got {roots:?}"
+    );
+    let root_path = roots[0].as_str().unwrap();
+    assert!(
+        root_path
+            .replace('\\', "/")
+            .contains("packages/app-skip/node_modules"),
+        "unexpected root path {root_path:?}"
+    );
+
+    let packages_text = String::from_utf8(output).unwrap();
+    assert!(packages_text.contains("\"workspace-only\""));
+    assert!(!packages_text.contains("\"root-only\""));
+}
+
+#[test]
+fn index_dry_run_skip_root_workspace_cli_overrides_config_true() {
+    let proj = tempdir().unwrap();
+    let workspace_dir = proj.path().join("packages").join("app-cli");
+    fs::create_dir_all(workspace_dir.join("node_modules")).unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+
+    write_minimal_pkg(proj.path(), "root-cli", "1.0.0");
+    write_minimal_pkg_at(
+        &workspace_dir.join("node_modules").join("ws-cli"),
+        "ws-cli",
+        "1.0.0",
+    );
+
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{
+  "workspaces": ["packages/*"],
+  "index_root_workspace": true
+}"#,
+    )
+    .unwrap();
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--skip-root-workspace",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let packages_text = String::from_utf8(output).unwrap();
+    assert!(packages_text.contains("\"ws-cli\""));
+    assert!(!packages_text.contains("\"root-cli\""));
+}
+
+#[test]
 fn query_package_versions_lists_versions_for_name() {
     let proj = tempdir().unwrap();
     let cache = tempdir().unwrap();

@@ -77,6 +77,11 @@ pub struct NciConfigFile {
     /// Optional workspace directory globs under `project_root` (e.g. `apps/*`, `packages/*`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspaces: Option<Vec<String>>,
+
+    /// When `false`, `<project_root>/node_modules` is not scanned as an install root. Requires at least
+    /// one entry in `workspaces` so at least one `…/node_modules` root remains (omit = scan root).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_root_workspace: Option<bool>,
 }
 
 pub const CONFIG_FILENAME: &str = "nci.config.json";
@@ -145,6 +150,28 @@ mod tests {
             raw.contains("\"deps_and_dev\""),
             "serialize uses deps_and_dev value: {raw}"
         );
+    }
+
+    #[test]
+    fn roundtrip_index_root_workspace() {
+        let temp = tempfile::tempdir().unwrap();
+        let cfg = NciConfigFile {
+            workspaces: Some(vec!["packages/*".into()]),
+            index_root_workspace: Some(false),
+            ..Default::default()
+        };
+        write_config_file(temp.path(), &cfg).unwrap();
+        let loaded = load_config_file(temp.path())
+            .expect("load ok")
+            .expect("parsed");
+        assert_eq!(loaded.workspaces.as_ref().unwrap().len(), 1);
+        assert_eq!(loaded.index_root_workspace, Some(false));
+        let raw = fs::read_to_string(temp.path().join(CONFIG_FILENAME)).unwrap();
+        assert!(
+            raw.contains("\"index_root_workspace\""),
+            "serialize uses index_root_workspace: {raw}"
+        );
+        assert!(raw.contains("false"), "serialize writes false: {raw}");
     }
 
     #[test]

@@ -308,6 +308,20 @@ struct BulkIndexArgs {
     )]
     all_installed_packages: bool,
 
+    /// Do not scan `<project_root>/node_modules`. Overrides `index_root_workspace` in config; requires `workspaces` in config.
+    #[arg(
+        long = "skip-root-workspace",
+        conflicts_with_all = ["include_root_workspace"]
+    )]
+    skip_root_workspace: bool,
+
+    /// Scan `<project_root>/node_modules` (overrides `index_root_workspace` in config).
+    #[arg(
+        long = "include-root-workspace",
+        conflicts_with_all = ["skip_root_workspace"]
+    )]
+    include_root_workspace: bool,
+
     #[arg(long)]
     dry_run: bool,
 }
@@ -1188,6 +1202,52 @@ fn confirm_destructive_action(yes: bool, scope: &str, prompt: &str) -> Result<()
     Ok(())
 }
 
+fn resolve_index_root_workspace(bulk: &BulkIndexArgs, file: Option<&NciConfigFile>) -> bool {
+    if bulk.skip_root_workspace {
+        return false;
+    }
+    if bulk.include_root_workspace {
+        return true;
+    }
+    if let Some(file_cfg) = file
+        && let Some(flag) = file_cfg.index_root_workspace
+    {
+        return flag;
+    }
+    true
+}
+
+/// Same precedence as [`resolve_index_root_workspace`] without CLI flags (for `query` paths).
+fn resolve_index_root_workspace_config_only(file: Option<&NciConfigFile>) -> bool {
+    if let Some(file_cfg) = file
+        && let Some(flag) = file_cfg.index_root_workspace
+    {
+        flag
+    } else {
+        true
+    }
+}
+
+/// `index_root_workspace: false` or `--skip-root-workspace` requires non-empty `workspaces` in config.
+fn ensure_index_root_workspace_valid(
+    file: Option<&NciConfigFile>,
+    include_root: bool,
+) -> Result<(), String> {
+    if include_root {
+        return Ok(());
+    }
+    let has_workspaces = file
+        .and_then(|cfg| cfg.workspaces.as_ref())
+        .is_some_and(|patterns| !patterns.is_empty());
+    if !has_workspaces {
+        return Err(
+            "omitting the root node_modules install root requires `workspaces` in nci.config.json (non-empty array)"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 fn resolve_package_scope(bulk: &BulkIndexArgs, file: Option<&NciConfigFile>) -> DepKindFilter {
     if bulk.only_dependencies {
         return DepKindFilter::DependenciesOnly;
@@ -1357,9 +1417,15 @@ fn detect_project_package_manager(
     "unknown".to_string()
 }
 
-fn collect_node_modules_roots(project_root: &Path, file: Option<&NciConfigFile>) -> Vec<PathBuf> {
+fn collect_node_modules_roots(
+    project_root: &Path,
+    file: Option<&NciConfigFile>,
+    include_root_workspace: bool,
+) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
-    roots.push(project_root.join("node_modules"));
+    if include_root_workspace {
+        roots.push(project_root.join("node_modules"));
+    }
     if let Some(file_cfg) = file
         && let Some(workspaces) = &file_cfg.workspaces
     {
@@ -1527,7 +1593,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
     let project_root = context.project_root.clone();
     let fmt = envelope_output_format(effective_format(cli, file)?);
     let show_progress = should_print_progress(fmt, file)?;
-    let node_modules_roots = collect_node_modules_roots(&project_root, file);
+    let include_root_workspace = resolve_index_root_workspace(bulk, file);
+    ensure_index_root_workspace_valid(file, include_root_workspace)?;
+    let node_modules_roots =
+        collect_node_modules_roots(&project_root, file, include_root_workspace);
     if node_modules_roots.is_empty() {
         return emit_error(
             fmt,
@@ -1570,6 +1639,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 }
             }
             OutputFormat::Json | OutputFormat::Jsonl => {
+                let roots_json: Vec<String> = node_modules_roots
+                    .iter()
+                    .map(|root_path| root_path.display().to_string())
+                    .collect();
                 let rows: Vec<_> = filtered
                     .iter()
                     .map(|pkg| {
@@ -1579,7 +1652,13 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                         })
                     })
                     .collect();
-                print_json(&serde_json::json!({ "ok": true, "data": { "packages": rows } }))?;
+                print_json(&serde_json::json!({
+                    "ok": true,
+                    "data": {
+                        "node_modules_roots": roots_json,
+                        "packages": rows
+                    }
+                }))?;
             }
         }
         return Ok(());
@@ -2080,7 +2159,10 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                 context.project_root.as_path(),
                 Some(context.config_dir.as_path()),
             );
-            let node_modules_roots = collect_node_modules_roots(&context.project_root, file);
+            let include_root_workspace = resolve_index_root_workspace_config_only(file);
+            ensure_index_root_workspace_valid(file, include_root_workspace)?;
+            let node_modules_roots =
+                collect_node_modules_roots(&context.project_root, file, include_root_workspace);
             if node_modules_roots.is_empty() {
                 return emit_error(
                     fmt,
