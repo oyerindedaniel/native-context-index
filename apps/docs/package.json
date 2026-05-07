@@ -26,6 +26,7 @@
   "dependencies": {
     "@cursor/sdk": "^1.0.12",
     "@repo/benchmark-contract": "workspace:*",
+    "@repo/nci-agent-primer": "workspace:*",
     "@repo/ui": "workspace:*",
     "next": "16.1.5",
     "react": "^19.2.0",

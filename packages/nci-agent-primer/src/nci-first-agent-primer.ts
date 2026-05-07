@@ -1,4 +1,12 @@
-/** Live nci_first prompt body (compact). Full SQLite graph + table reference: sync `apps/docs/nci-first-agent-primer.md` via `pnpm run sync:nci-first-agent-primer`. */
+/**
+ * Shared NCI-first agent primer.
+ *
+ * - `buildNciFirstAgentPrimer()` returns the compact prompt body (used by benchmarks and the `nci-mcp` server).
+ * - `buildNciFirstAgentPrimerReferenceDoc()` returns the longer SQLite/table reference used as a doc resource.
+ *
+ * The docs site syncs the reference doc to `apps/docs/nci-first-agent-primer.md` via
+ * `pnpm --filter docs run sync:nci-first-agent-primer`.
+ */
 
 const NCI_FIRST_AGENT_PRIMER_LIVE = [
   "You have access to the NCI CLI. NCI indexes TypeScript declarations from `node_modules` into **SQLite** — symbol discovery and relational joins, not a full typechecker.",
@@ -36,7 +44,7 @@ const NCI_FIRST_AGENT_PRIMER_LIVE = [
   "Authoritative column list: run `sql --schema` on the NCI binary when you need exact DDL.",
 ].join("\n");
 
-/** Full primer text for documentation (`apps/docs/nci-first-agent-primer.md`); not injected into every benchmark prompt. */
+/** Longer reference doc (SQLite tables, example joins). Synced into `apps/docs/nci-first-agent-primer.md`. */
 const NCI_FIRST_AGENT_PRIMER_REFERENCE_DOC = [
   "You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node_modules` and stores a **graph of symbols** in **SQLite**: one database file, read-only from your perspective. The point is fast **symbol discovery** (what exists, where, what it references) and **relational checks** (joins across packages, dependencies, merge metadata)—not a full TypeScript typechecker. The CLI gives you:",
   "- **`query`** — text search / listing over the indexed symbol set (convenient for names and paths).",

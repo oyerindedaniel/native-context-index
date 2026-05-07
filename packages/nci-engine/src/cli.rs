@@ -308,14 +308,12 @@ struct BulkIndexArgs {
     )]
     all_installed_packages: bool,
 
-    /// Do not scan `<project_root>/node_modules`. Overrides `index_root_workspace` in config; requires `workspaces` in config.
     #[arg(
         long = "skip-root-workspace",
         conflicts_with_all = ["include_root_workspace"]
     )]
     skip_root_workspace: bool,
 
-    /// Scan `<project_root>/node_modules` (overrides `index_root_workspace` in config).
     #[arg(
         long = "include-root-workspace",
         conflicts_with_all = ["skip_root_workspace"]

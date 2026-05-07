@@ -4,6 +4,7 @@ import type {
   FullDataset,
   SummaryDataset,
 } from "@repo/benchmark-contract/benchmark-types";
+import { resolvedToolCallsUnfinished } from "./runtime-metrics-finalize";
 
 function sorted(values: number[]): number[] {
   return [...values].sort(
@@ -72,6 +73,9 @@ function aggregateGroup(
   const toolCallsErrored = records.map(
     (record) => record.runtimeMetrics.toolCallsErrored,
   );
+  const toolCallsUnfinished = records.map((record) =>
+    resolvedToolCallsUnfinished(record.runtimeMetrics),
+  );
   const toolCallDetailCount = records.map(
     (record) => record.runtimeMetrics.toolCallDetails?.length ?? 0,
   );
@@ -89,6 +93,7 @@ function aggregateGroup(
     avgToolCallsStarted: average(toolCallsStarted),
     avgToolCallsCompleted: average(toolCallsCompleted),
     avgToolCallsErrored: average(toolCallsErrored),
+    avgToolCallsUnfinished: average(toolCallsUnfinished),
     avgToolCallDetailCount: average(toolCallDetailCount),
   };
 }
@@ -130,6 +135,9 @@ export function buildSummaryDataset(
       runningTotals.toolCallsCompleted +=
         record.runtimeMetrics.toolCallsCompleted;
       runningTotals.toolCallsErrored += record.runtimeMetrics.toolCallsErrored;
+      runningTotals.toolCallsUnfinished += resolvedToolCallsUnfinished(
+        record.runtimeMetrics,
+      );
       runningTotals.toolCallDetailCount +=
         record.runtimeMetrics.toolCallDetails?.length ?? 0;
       return runningTotals;
@@ -138,6 +146,7 @@ export function buildSummaryDataset(
       toolCallsStarted: 0,
       toolCallsCompleted: 0,
       toolCallsErrored: 0,
+      toolCallsUnfinished: 0,
       toolCallDetailCount: 0,
     },
   );
@@ -158,6 +167,7 @@ export function buildSummaryDataset(
       toolCallsStarted: totals.toolCallsStarted,
       toolCallsCompleted: totals.toolCallsCompleted,
       toolCallsErrored: totals.toolCallsErrored,
+      toolCallsUnfinished: totals.toolCallsUnfinished,
       toolCallDetailCount: totals.toolCallDetailCount,
     },
     byStrategy: aggregateByKey(evaluatedRecords, (record) => record.strategy),

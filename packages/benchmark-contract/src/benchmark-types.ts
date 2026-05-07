@@ -113,6 +113,8 @@ export interface AgentRuntimeMetrics {
   toolCallsStarted: number;
   toolCallsCompleted: number;
   toolCallsErrored: number;
+  /** Tool calls that started but never reached `completed`/`error` on the SDK stream (see finalize step). */
+  toolCallsUnfinished?: number;
   totalTokenCount?: number;
   inputTokenCount?: number;
   outputTokenCount?: number;
@@ -187,6 +189,7 @@ export interface AggregatedMetric {
   avgToolCallsStarted: number;
   avgToolCallsCompleted: number;
   avgToolCallsErrored: number;
+  avgToolCallsUnfinished: number;
   avgToolCallDetailCount: number;
 }
 
@@ -204,6 +207,7 @@ export interface SummaryDataset {
     toolCallsStarted: number;
     toolCallsCompleted: number;
     toolCallsErrored: number;
+    toolCallsUnfinished: number;
     toolCallDetailCount: number;
   };
   byStrategy: AggregatedMetric[];

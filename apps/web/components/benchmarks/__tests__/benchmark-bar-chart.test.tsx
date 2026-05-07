@@ -21,6 +21,7 @@ describe("BenchmarkBarChart", () => {
             avgToolCallsStarted: 6,
             avgToolCallsCompleted: 6,
             avgToolCallsErrored: 0,
+            avgToolCallsUnfinished: 0,
             avgToolCallDetailCount: 6,
           },
         ]}

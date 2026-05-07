@@ -10,6 +10,7 @@
     "toolCallsStarted": 12,
     "toolCallsCompleted": 12,
     "toolCallsErrored": 0,
+    "toolCallsUnfinished": 0,
     "toolCallDetailCount": 12
   },
   "byStrategy": [
@@ -37,6 +38,7 @@
       "avgToolCallsStarted": 8,
       "avgToolCallsCompleted": 8,
       "avgToolCallsErrored": 0,
+      "avgToolCallsUnfinished": 0,
       "avgToolCallDetailCount": 8
     }
   ],

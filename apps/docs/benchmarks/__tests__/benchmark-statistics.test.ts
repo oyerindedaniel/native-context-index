@@ -41,6 +41,7 @@ function createRecord(
       toolCallsStarted,
       toolCallsCompleted,
       toolCallsErrored,
+      toolCallsUnfinished: 0,
     },
     missingSubstrings: [],
     forbiddenMatches: [],
@@ -61,6 +62,7 @@ describe("benchmark statistics", () => {
     expect(summary.totals.toolCallsStarted).toBe(10);
     expect(summary.totals.toolCallsCompleted).toBe(9);
     expect(summary.totals.toolCallsErrored).toBe(1);
+    expect(summary.totals.toolCallsUnfinished).toBe(0);
     expect(summary.byStrategy).toHaveLength(2);
     const baselineMetrics = summary.byStrategy.find(
       (metric) => metric.groupKey === "baseline",

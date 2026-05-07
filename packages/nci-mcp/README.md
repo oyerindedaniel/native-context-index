@@ -12,6 +12,14 @@ Stdio MCP server for the Native Context Index CLI (`nci`). Exposes two tools tha
 - **`nci_sql`** with `format: json` (default): stdout from `nci` is a **raw JSON array** of row objects (no `{"ok":…}` wrapper).
 - **`nci_query`** (always JSON): same envelope as the CLI: `{"ok":true,"data":…}` or `{"ok":false,…}`.
 
+## Optional `database` on tools
+
+There is **no MCP-specific environment variable** for the SQLite path. Behavior matches the CLI:
+
+- **Omit `database`** on `nci_sql` / `nci_query` so `nci` uses the database it already resolves from **NCI config**, `--database` defaults, and the **process working directory** (same as running `nci sql` / `nci query` in a shell without `--database`).
+- **Pass `database`** only when you need to **override** which file is used for that single tool call (multiple DBs, scripts, or debugging).
+- To **discover** the resolved path from inside MCP, read the **`nci://database/active`** resource (stdout of `nci db status --format json`). No extra MCP wiring is required beyond normal `nci` setup.
+
 ## Requirements
 
 - Node.js 18+
@@ -85,6 +93,8 @@ On Windows, use a Windows path for `NCI_BINARY`, e.g. `C:\\path\\to\\nci.exe`.
 
 ### Monorepo / dev: `node` + built `dist/index.js`
 
+A ready-to-paste sample lives at **[`mcp.local.sample.json`](./mcp.local.sample.json)** — copy it into your IDE's MCP config (Cursor: `~/.cursor/mcp.json` or `<repo>/.cursor/mcp.json`) and adjust the two absolute paths to match your machine.
+
 ```json
 {
   "mcpServers": {
@@ -94,14 +104,14 @@ On Windows, use a Windows path for `NCI_BINARY`, e.g. `C:\\path\\to\\nci.exe`.
         "C:/path/to/native-context-modules/packages/nci-mcp/dist/index.js"
       ],
       "env": {
-        "NCI_BINARY": "C:/path/to/native-context-modules/packages/nci/vendor/nci.exe"
+        "NCI_BINARY": "C:/path/to/native-context-modules/target/debug/nci.exe"
       }
     }
   }
 }
 ```
 
-Use absolute paths. After `pnpm --filter nci-mcp build`, `dist/index.js` is the entrypoint.
+Both paths must be **absolute** — the MCP host launches the process from its own working directory, so relative paths will not resolve. Run `pnpm --filter nci-mcp build` first so `dist/index.js` exists, and build the Rust crate (e.g. `cargo build -p nci-engine`) so `target/debug/nci.exe` exists.
 
 ### `npx` (optional)
 

@@ -20,6 +20,7 @@ describe("BenchmarkGanttChart", () => {
             toolCallsStarted: 2,
             toolCallsCompleted: 2,
             toolCallsErrored: 0,
+            toolCallsUnfinished: 0,
             toolCallDetailCount: 2,
           },
           byStrategy: [],

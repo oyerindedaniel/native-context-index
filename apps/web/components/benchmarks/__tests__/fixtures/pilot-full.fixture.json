@@ -10,6 +10,7 @@
     "toolCallsStarted": 3,
     "toolCallsCompleted": 3,
     "toolCallsErrored": 0,
+    "toolCallsUnfinished": 0,
     "toolCallDetailCount": 3
   },
   "byStrategy": [],

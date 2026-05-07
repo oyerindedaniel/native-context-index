@@ -1,0 +1,15 @@
+{
+  "$schema": "https://cursor.com/mcp.schema.json",
+  "_comment": "Local-dev MCP config for nci-mcp. Copy into your IDE's MCP config (Cursor: ~/.cursor/mcp.json or .cursor/mcp.json). Uses the LOCAL monorepo build of nci-mcp (dist/index.js) and the LOCAL debug build of the nci binary. Both paths must be ABSOLUTE — relative paths will not work because the MCP host launches the process from its own working directory. Run `pnpm --filter nci-mcp run build` first to produce dist/index.js, and build the Rust crate (e.g. `cargo build -p nci-engine`) so target/debug/nci.exe exists.",
+  "mcpServers": {
+    "nci": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\doyer\\native-context-modules\\packages\\nci-mcp\\dist\\index.js"
+      ],
+      "env": {
+        "NCI_BINARY": "C:\\Users\\doyer\\native-context-modules\\target\\debug\\nci.exe"
+      }
+    }
+  }
+}

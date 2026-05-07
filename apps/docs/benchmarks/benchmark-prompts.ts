@@ -6,7 +6,7 @@ import type {
   TaskVerifier,
 } from "@repo/benchmark-contract/benchmark-types";
 
-import { buildNciFirstAgentPrimer } from "./nci-first-agent-primer";
+import { buildNciFirstAgentPrimer } from "@repo/nci-agent-primer/nci-first-agent-primer";
 import { normalizeResponseJsonText } from "./benchmark-verifiers";
 
 interface PromptBuildInput {

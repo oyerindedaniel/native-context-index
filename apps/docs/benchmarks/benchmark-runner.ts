@@ -28,6 +28,10 @@ import { resolveNciBinaryPath } from "./benchmark-runtime";
 import { runSqlValidationStage } from "./benchmark-sql-validation";
 import { verifyResponse } from "./benchmark-verifiers";
 import {
+  finalizeRuntimeMetrics,
+  resolvedToolCallsUnfinished,
+} from "./runtime-metrics-finalize";
+import {
   DEFAULT_PILOT_SEQUENTIAL_STEP_FILENAME,
   pickNextPilotTask,
   readPilotSequentialStepState,
@@ -147,6 +151,7 @@ function createEmptyRuntimeMetrics(): AgentRuntimeMetrics {
     toolCallsStarted: 0,
     toolCallsCompleted: 0,
     toolCallsErrored: 0,
+    toolCallsUnfinished: 0,
   };
 }
 
@@ -392,6 +397,7 @@ async function executeSingleRun(
       null,
       2,
     );
+    finalizeRuntimeMetrics(runtimeMetrics);
     return {
       responseText,
       durationMs: 0,
@@ -443,6 +449,7 @@ async function executeSingleRun(
     const runResult = await run.wait();
     const responseText = runResult.result ?? "";
     const durationMs = Date.now() - startedAt;
+    finalizeRuntimeMetrics(runtimeMetrics);
     if (progress?.verbose && performExecution) {
       logBench(
         `${progress.label} finished in ${durationMs}ms (sdk ${runResult.durationMs ?? "?"}ms, status=${runResult.status})`,
@@ -457,6 +464,7 @@ async function executeSingleRun(
   } catch (errorValue) {
     const errorMessage =
       errorValue instanceof Error ? errorValue.message : String(errorValue);
+    finalizeRuntimeMetrics(runtimeMetrics);
     if (progress?.verbose && performExecution) {
       logBench(
         `${progress.label} failed after ${Date.now() - startedAt}ms: ${errorMessage}`,
@@ -890,6 +898,9 @@ export async function runBenchmarksWithDependencies(
       toolCallsStarted: record.runtimeMetrics.toolCallsStarted,
       toolCallsCompleted: record.runtimeMetrics.toolCallsCompleted,
       toolCallsErrored: record.runtimeMetrics.toolCallsErrored,
+      toolCallsUnfinished:
+        record.runtimeMetrics.toolCallsUnfinished ??
+        resolvedToolCallsUnfinished(record.runtimeMetrics),
       toolCallDetailCount: record.runtimeMetrics.toolCallDetails?.length ?? 0,
       missingSubstrings: record.missingSubstrings,
       forbiddenMatches: record.forbiddenMatches,

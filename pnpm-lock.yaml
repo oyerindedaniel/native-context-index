@@ -48,6 +48,9 @@ importers:
       '@repo/benchmark-contract':
         specifier: workspace:*
         version: link:../../packages/benchmark-contract
+      '@repo/nci-agent-primer':
+        specifier: workspace:*
+        version: link:../../packages/nci-agent-primer
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -253,6 +256,21 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  packages/nci-agent-primer:
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../../tooling/typescript-config
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1(jiti@2.6.1)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   packages/nci-core:
     devDependencies:
       '@anthropic-ai/claude-agent-sdk':
@@ -315,6 +333,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.3.5)
+      '@repo/nci-agent-primer':
+        specifier: workspace:*
+        version: link:../nci-agent-primer
       zod:
         specifier: ^4.3.5
         version: 4.3.5

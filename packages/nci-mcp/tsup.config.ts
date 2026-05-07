@@ -9,4 +9,5 @@ export default defineConfig({
   outExtension: () => ({ js: ".js" }),
   platform: "node",
   shims: false,
+  noExternal: ["@repo/nci-agent-primer"],
 });
