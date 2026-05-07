@@ -415,6 +415,11 @@ enum QueryCommands {
     Show { id: String },
     #[command(about = "Print cite-ready signature snippet for a stable symbol id")]
     Snippet { id: String },
+    #[command(
+        about = "List overload siblings for a stable symbol id (same package, name, parent)",
+        long_about = "Returns all sibling overload rows for one symbol id (same `package_id`, `name`, and `parent_symbol_id`). Useful when a query hit on `pick` should be reasoned about together with `pick#2`, etc. The input id is included in the output. Empty result when the id is not indexed."
+    )]
+    Overloads { id: String },
     #[command(about = "List packages currently indexed in the database")]
     Packages,
     #[command(about = "List indexed versions for a package name")]
@@ -1903,6 +1908,34 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(
                         &serde_json::json!({ "ok": true, "data": { "symbol": search_hit } }),
+                    )?;
+                }
+            }
+        }
+        QueryCommands::Overloads { id } => {
+            let siblings = database
+                .find_overload_siblings_by_stable_id(id)
+                .map_err(|err| err.to_string())?;
+            match fmt {
+                OutputFormat::Plain => {
+                    if siblings.is_empty() {
+                        emit_ui_line_stdout(
+                            ProgressTone::Note,
+                            "query overloads",
+                            &format!("no symbol indexed with id {id}"),
+                        );
+                    } else {
+                        emit_ui_line_stdout(
+                            ProgressTone::Summary,
+                            "query overloads",
+                            &format!("{} sibling row(s)", siblings.len()),
+                        );
+                        print_symbol_search_hits_plain(&siblings);
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(
+                        &serde_json::json!({ "ok": true, "data": { "symbols": siblings } }),
                     )?;
                 }
             }

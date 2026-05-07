@@ -392,6 +392,110 @@ fn query_package_deps_lists_declared_package_dependencies() {
         .stdout(predicate::str::contains("react"));
 }
 
+fn write_pkg_with_overloaded_method(root: &Path, name: &str, version: &str) {
+    let pkg = root.join("node_modules").join(name);
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(
+        pkg.join("package.json"),
+        format!(r#"{{"name":"{name}","version":"{version}","types":"./index.d.ts"}}"#),
+    )
+    .unwrap();
+    fs::write(
+        pkg.join("index.d.ts"),
+        "export interface Dual {\n  pick(): void;\n  pick(n: number): void;\n}\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn query_overloads_returns_sibling_overload_rows_for_member_signature() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("overloads.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_pkg_with_overloaded_method(proj.path(), "ovl-pkg", "1.0.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "ovl-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    let stable_id = "ovl-pkg@1.0.0::Dual.pick";
+
+    let json_output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "overloads",
+            stable_id,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&json_output).expect("valid json");
+    let symbols = parsed["data"]["symbols"]
+        .as_array()
+        .expect("symbols array")
+        .clone();
+    assert_eq!(
+        symbols.len(),
+        2,
+        "expected two overload rows, got {symbols:?}"
+    );
+    let returned_ids: Vec<String> = symbols
+        .iter()
+        .map(|symbol| symbol["id"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        returned_ids.iter().any(|id| id == stable_id),
+        "input id missing from overload siblings: {returned_ids:?}"
+    );
+    assert!(
+        returned_ids
+            .iter()
+            .any(|id| id == &format!("{stable_id}#2")),
+        "second overload missing from overload siblings: {returned_ids:?}"
+    );
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "overloads",
+            "ovl-pkg@1.0.0::Dual.nope",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"symbols\": []"));
+}
+
 #[test]
 fn index_dry_run_applies_config_include_and_exclude_filters() {
     let proj = tempdir().unwrap();

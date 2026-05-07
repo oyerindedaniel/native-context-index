@@ -1189,6 +1189,55 @@ impl NciDatabase {
         }
     }
 
+    /// Sibling overload rows for `stable_symbol_id`: rows in the same `package_id` whose
+    /// `name` matches and whose `parent_symbol_id` matches the input row's `parent_symbol_id`
+    /// (both NULL when the input has no parent).
+    pub fn find_overload_siblings_by_stable_id(
+        &self,
+        stable_symbol_id: &str,
+    ) -> StorageResult<Vec<SymbolSearchHit>> {
+        let lookup = self
+            .connection
+            .query_row(
+                "SELECT package_id, name, parent_symbol_id
+                 FROM symbols WHERE id = ?1 ORDER BY symbol_id LIMIT 1",
+                [stable_symbol_id],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((package_id, name_text, parent_symbol_id_opt)) = lookup else {
+            return Ok(Vec::new());
+        };
+
+        let mut statement = self.connection.prepare(
+            "SELECT symbol_id FROM symbols
+             WHERE package_id = ?1
+               AND name = ?2
+               AND ((?3 IS NULL AND parent_symbol_id IS NULL)
+                    OR parent_symbol_id = ?3)
+             ORDER BY symbol_id",
+        )?;
+        let row_ids = statement.query_map(
+            rusqlite::params![package_id, name_text, parent_symbol_id_opt.as_deref()],
+            |row| row.get::<_, i64>(0),
+        )?;
+
+        let mut output = Vec::new();
+        for row_id_result in row_ids {
+            let symbol_row_id = row_id_result?;
+            if let Some(hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
+                output.push(hit);
+            }
+        }
+        Ok(output)
+    }
+
     pub fn load_symbol_snippet_by_stable_id(
         &self,
         stable_symbol_id: &str,
