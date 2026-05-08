@@ -32,6 +32,22 @@ use style::{
     init_prompt_theme, print_banner,
 };
 
+/// Exit code when `query show`, `query snippet`, or `query overloads` finds no row for the stable id.
+pub const EXIT_QUERY_NOT_FOUND: i32 = 2;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum CliExit {
+    Success,
+    /// Stable id not found for `query show` / `query snippet`, or unknown id for `query overloads`.
+    QueryNotFound,
+}
+
+fn not_found_hint(id: &str) -> String {
+    format!(
+        "no symbol indexed with id `{id}` — try `query find` or `query symbol` to recover the right id"
+    )
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum BannerMode {
     Auto,
@@ -462,6 +478,67 @@ enum QueryCommands {
         )]
         offset: usize,
     },
+    #[command(
+        about = "Bundled evidence: exact symbol hits + FTS fallback + batched snippets in ONE call",
+        long_about = "Returns answer-ready declaration evidence in a single CLI invocation: exact-name hits for each `--symbol`, FTS hits for each `--phrase`, deduplicated, plus batched signature/JSDoc snippets for the top hits — all from a single SQLite open. Truncation marker: when more results existed than fit, the last entry of `data.symbols` is a sentinel hit whose `id`, `name`, and `kind_name` are the literal string `<truncated>` (no new envelope key). Use the same `--package`, `--package-version`, `--source-package`, `--kind` filter semantics as `query symbol` / `query find`."
+    )]
+    Evidence {
+        #[arg(
+            long = "package",
+            value_name = "NAME",
+            required = true,
+            help = "Indexed package name to scope all hits"
+        )]
+        package_name: String,
+        #[arg(
+            long = "package-version",
+            value_name = "VERSION",
+            help = "Restrict to one indexed package version"
+        )]
+        package_version: Option<String>,
+        #[arg(
+            long = "source-package",
+            value_name = "NAME",
+            help = "Filter hits to declarations from this source package"
+        )]
+        source_package_name: Option<String>,
+        #[arg(
+            long = "symbol",
+            value_name = "NAME",
+            help = "Exact symbol name to look up (repeatable)"
+        )]
+        symbols: Vec<String>,
+        #[arg(
+            long = "phrase",
+            value_name = "TEXT",
+            help = "FTS phrase fallback (repeatable); used when exact returns nothing for an anchor"
+        )]
+        phrases: Vec<String>,
+        #[arg(
+            long = "kind",
+            value_name = "KIND",
+            help = "Filter hits to a kind_name such as InterfaceDeclaration"
+        )]
+        kind_name: Option<String>,
+        #[arg(
+            long,
+            help = "Hide symbols marked internal to the package export surface"
+        )]
+        public_only: bool,
+        #[arg(
+            short = 'n',
+            long,
+            default_value_t = 10,
+            help = "Max symbol hits returned across all anchors after dedupe"
+        )]
+        limit: usize,
+        #[arg(
+            long = "snippet-limit",
+            value_name = "N",
+            help = "Max signature/JSDoc snippets to attach (default: same as --limit)"
+        )]
+        snippet_limit: Option<usize>,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -474,31 +551,36 @@ struct ActivePackageCandidate {
     package_dir: String,
 }
 
-pub fn run() -> Result<(), String> {
+pub fn run() -> Result<CliExit, String> {
     let raw_args: Vec<String> = std::env::args().collect();
     if is_top_level_help_request(&raw_args) {
-        return run_top_level_help();
+        run_top_level_help()?;
+        return Ok(CliExit::Success);
     }
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Init { defaults } => run_init(*defaults, cli.database.clone()),
-        Commands::Db { command } => run_db(&cli, command),
-        Commands::Index { target, args } => run_index(&cli, target.as_ref(), args),
+        Commands::Init { defaults } => {
+            run_init(*defaults, cli.database.clone()).map(|_| CliExit::Success)
+        }
+        Commands::Db { command } => run_db(&cli, command).map(|_| CliExit::Success),
+        Commands::Index { target, args } => {
+            run_index(&cli, target.as_ref(), args).map(|_| CliExit::Success)
+        }
         Commands::Query { command } => run_query(&cli, command),
         Commands::Sql {
             schema,
             sql,
             max_rows,
             sql_parts,
-        } => run_sql(&cli, *schema, sql.clone(), sql_parts, *max_rows),
+        } => run_sql(&cli, *schema, sql.clone(), sql_parts, *max_rows).map(|_| CliExit::Success),
         Commands::Completions { shell } => {
             let mut cmd = Cli::command();
             let bin_name = cmd.get_name().to_string();
             generate(*shell, &mut cmd, bin_name, &mut io::stdout());
-            Ok(())
+            Ok(CliExit::Success)
         }
-        Commands::BinaryPath => run_binary_path(),
+        Commands::BinaryPath => run_binary_path().map(|_| CliExit::Success),
     }
 }
 
@@ -1874,14 +1956,14 @@ fn print_no_symbol_hits_message(
     );
 }
 
-fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
+fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
     let context = resolve_command_context(None)?;
     let file = context.file.as_ref();
     let config_dir = context.config_dir.as_path();
     let fmt = envelope_output_format(effective_format(cli, file)?);
     let (_, database) = open_database(cli, file, config_dir)?;
 
-    match command {
+    let exit = match command {
         QueryCommands::Find {
             limit,
             package_name,
@@ -1931,6 +2013,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     )?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::Symbol {
             name,
@@ -1971,36 +2054,52 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     )?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::Show { id } => {
             let search_hit = database
                 .load_symbol_search_hit_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
+            let miss = search_hit.is_none();
+            let hint_text = not_found_hint(id);
             match fmt {
                 OutputFormat::Plain => {
-                    if let Some(search_hit) = search_hit {
-                        print_symbol_search_hits_plain(std::slice::from_ref(&search_hit));
+                    if let Some(ref hit) = search_hit {
+                        print_symbol_search_hits_plain(std::slice::from_ref(hit));
+                    } else {
+                        emit_ui_line_stdout(ProgressTone::Note, "query show", &hint_text);
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(
-                        &serde_json::json!({ "ok": true, "data": { "symbol": search_hit } }),
-                    )?;
+                    if miss {
+                        print_json(&serde_json::json!({
+                            "ok": true,
+                            "data": { "symbol": serde_json::Value::Null },
+                            "hint": hint_text,
+                        }))?;
+                    } else {
+                        print_json(
+                            &serde_json::json!({ "ok": true, "data": { "symbol": search_hit } }),
+                        )?;
+                    }
                 }
+            }
+            if miss {
+                CliExit::QueryNotFound
+            } else {
+                CliExit::Success
             }
         }
         QueryCommands::Overloads { id } => {
             let siblings = database
                 .find_overload_siblings_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
+            let miss = siblings.is_empty();
+            let hint_text = not_found_hint(id);
             match fmt {
                 OutputFormat::Plain => {
-                    if siblings.is_empty() {
-                        emit_ui_line_stdout(
-                            ProgressTone::Note,
-                            "query overloads",
-                            &format!("no symbol indexed with id {id}"),
-                        );
+                    if miss {
+                        emit_ui_line_stdout(ProgressTone::Note, "query overloads", &hint_text);
                     } else {
                         emit_ui_line_stdout(
                             ProgressTone::Summary,
@@ -2011,23 +2110,38 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(
-                        &serde_json::json!({ "ok": true, "data": { "symbols": siblings } }),
-                    )?;
+                    if miss {
+                        print_json(&serde_json::json!({
+                            "ok": true,
+                            "data": { "symbols": siblings },
+                            "hint": hint_text,
+                        }))?;
+                    } else {
+                        print_json(
+                            &serde_json::json!({ "ok": true, "data": { "symbols": siblings } }),
+                        )?;
+                    }
                 }
+            }
+            if miss {
+                CliExit::QueryNotFound
+            } else {
+                CliExit::Success
             }
         }
         QueryCommands::Snippet { id } => {
             let snippet = database
                 .load_symbol_snippet_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
+            let miss = snippet.is_none();
+            let hint_text = not_found_hint(id);
             match fmt {
-                OutputFormat::Plain => {
-                    if let Some(snippet) = snippet {
-                        if let Some(signature_text) = snippet.signature {
+                OutputFormat::Plain => match snippet.as_ref() {
+                    Some(snippet_row) => {
+                        if let Some(signature_text) = &snippet_row.signature {
                             println!("{signature_text}");
                         }
-                        if let Some(js_doc_text) = snippet.js_doc
+                        if let Some(js_doc_text) = &snippet_row.js_doc
                             && !js_doc_text.trim().is_empty()
                         {
                             if io::stdout().is_terminal() {
@@ -2036,13 +2150,29 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                             println!("{js_doc_text}");
                         }
                     }
-                }
+                    None => {
+                        emit_ui_line_stdout(ProgressTone::Note, "query snippet", &hint_text);
+                    }
+                },
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({
-                        "ok": true,
-                        "data": { "snippet": snippet }
-                    }))?;
+                    if miss {
+                        print_json(&serde_json::json!({
+                            "ok": true,
+                            "data": { "snippet": serde_json::Value::Null },
+                            "hint": hint_text,
+                        }))?;
+                    } else {
+                        print_json(&serde_json::json!({
+                            "ok": true,
+                            "data": { "snippet": snippet }
+                        }))?;
+                    }
                 }
+            }
+            if miss {
+                CliExit::QueryNotFound
+            } else {
+                CliExit::Success
             }
         }
         QueryCommands::Packages => {
@@ -2065,6 +2195,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     print_json(&serde_json::json!({ "ok": true, "data": { "packages": list } }))?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::PackageVersions { name } => {
             let versions = database
@@ -2096,6 +2227,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     }))?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::PackageDeps { name, version } => {
             let dependency_names = database
@@ -2134,6 +2266,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     }))?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::SourcePackages { name, version } => {
             let source_packages = database
@@ -2151,6 +2284,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     )?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::ActivePackage { name } => {
             let package_manager = detect_project_package_manager(
@@ -2168,7 +2302,8 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                         "no node_modules directories found under {}",
                         context.project_root.display()
                     ),
-                );
+                )
+                .map(|_| CliExit::Success);
             }
             let indexed_versions: HashSet<String> = database
                 .list_package_versions(name)
@@ -2237,6 +2372,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     }))?;
                 }
             }
+            CliExit::Success
         }
         QueryCommands::Symbols {
             name,
@@ -2278,9 +2414,296 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<(), String> {
                     }))?;
                 }
             }
+            CliExit::Success
+        }
+        QueryCommands::Evidence {
+            package_name,
+            package_version,
+            source_package_name,
+            symbols,
+            phrases,
+            kind_name,
+            public_only,
+            limit,
+            snippet_limit,
+        } => {
+            run_query_evidence(
+                &database,
+                fmt,
+                EvidenceQueryRequest {
+                    package_name,
+                    package_version: package_version.as_deref(),
+                    source_package_name: source_package_name.as_deref(),
+                    symbols,
+                    phrases,
+                    kind_name: kind_name.as_deref(),
+                    public_only: *public_only,
+                    limit: *limit,
+                    snippet_limit: *snippet_limit,
+                },
+            )?;
+            CliExit::Success
+        }
+    };
+    Ok(exit)
+}
+
+struct EvidenceQueryRequest<'a> {
+    package_name: &'a str,
+    package_version: Option<&'a str>,
+    source_package_name: Option<&'a str>,
+    symbols: &'a [String],
+    phrases: &'a [String],
+    kind_name: Option<&'a str>,
+    public_only: bool,
+    limit: usize,
+    snippet_limit: Option<usize>,
+}
+
+/// Sentinel marker placed as the trailing element of `data.symbols` when the combined
+/// search produced more hits than `--limit`. The agent / consumer detects truncation by
+/// looking for `kind_name == "<truncated>"` in the last hit — no new envelope key.
+const EVIDENCE_TRUNCATED_MARKER: &str = "<truncated>";
+
+fn build_evidence_filters(request: &EvidenceQueryRequest<'_>) -> SymbolSearchFilters {
+    SymbolSearchFilters {
+        package_name: Some(request.package_name.to_string()),
+        package_version: request.package_version.map(|version| version.to_string()),
+        source_package_name: request
+            .source_package_name
+            .map(|source_package| source_package.to_string()),
+        kind_name: request.kind_name.map(|kind| kind.to_string()),
+        file_path_contains: None,
+        include_internal: !request.public_only,
+    }
+}
+
+/// Sentinel hit appended to the symbols array when results were truncated.
+/// Empty/zero everywhere except the three fields that carry the marker.
+fn build_evidence_truncation_sentinel() -> SymbolSearchHit {
+    SymbolSearchHit {
+        symbol_row_id: 0,
+        id: EVIDENCE_TRUNCATED_MARKER.to_string(),
+        name: EVIDENCE_TRUNCATED_MARKER.to_string(),
+        kind_name: EVIDENCE_TRUNCATED_MARKER.to_string(),
+        package_name: String::new(),
+        package_version: String::new(),
+        source: nci_engine::storage::SymbolSourceIdentity {
+            package_name: String::new(),
+            package_version: None,
+            file_path: String::new(),
+        },
+        file_path: String::new(),
+        signature_snippet: None,
+        is_internal: false,
+    }
+}
+
+fn run_query_evidence(
+    database: &NciDatabase,
+    fmt: OutputFormat,
+    request: EvidenceQueryRequest<'_>,
+) -> Result<(), String> {
+    if request.limit == 0 {
+        return emit_error(fmt, "evidence: --limit must be at least 1");
+    }
+    if request.symbols.is_empty() && request.phrases.is_empty() {
+        return emit_error(
+            fmt,
+            "evidence: provide at least one --symbol or --phrase anchor",
+        );
+    }
+
+    let filters = build_evidence_filters(&request);
+    // Over-fetch by 1 per anchor so we can detect truncation without a count query.
+    let per_anchor_cap = request.limit.saturating_add(1);
+
+    let mut combined_hits: Vec<SymbolSearchHit> = Vec::new();
+    let mut seen_stable_ids: HashSet<String> = HashSet::new();
+    let mut anchor_summaries: Vec<serde_json::Value> = Vec::new();
+    let mut empty_anchors: Vec<String> = Vec::new();
+
+    for symbol_anchor in request.symbols {
+        let exact_hits = database
+            .find_symbol_hits_exact_name(symbol_anchor, &filters, per_anchor_cap)
+            .map_err(|err| err.to_string())?;
+        anchor_summaries.push(serde_json::json!({
+            "anchor": symbol_anchor,
+            "match": "exact",
+            "hits": exact_hits.len(),
+        }));
+        if exact_hits.is_empty() {
+            empty_anchors.push(format!("symbol:{symbol_anchor}"));
+        }
+        push_unique_hits(&mut combined_hits, &mut seen_stable_ids, exact_hits);
+    }
+
+    for phrase_anchor in request.phrases {
+        let mut fts_hits = match database.find_symbol_hits_fts(
+            phrase_anchor,
+            &filters,
+            per_anchor_cap,
+        ) {
+            Ok(hits) => hits,
+            Err(storage_error) => {
+                let error_text = storage_error.to_string();
+                if is_fts_syntax_error(&error_text) {
+                    if let Some(sanitized_query) = sanitize_fts_query(phrase_anchor) {
+                        database
+                                .find_symbol_hits_fts(&sanitized_query, &filters, per_anchor_cap)
+                                .map_err(|err| {
+                                    format!(
+                                        "{error_text} (fallback query `{sanitized_query}` failed: {err})"
+                                    )
+                                })?
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    return Err(error_text);
+                }
+            }
+        };
+        anchor_summaries.push(serde_json::json!({
+            "anchor": phrase_anchor,
+            "match": "fts",
+            "hits": fts_hits.len(),
+        }));
+        if fts_hits.is_empty() {
+            empty_anchors.push(format!("phrase:{phrase_anchor}"));
+        }
+        // Move into `push_unique_hits` to avoid an extra clone.
+        let drained: Vec<SymbolSearchHit> = std::mem::take(&mut fts_hits);
+        push_unique_hits(&mut combined_hits, &mut seen_stable_ids, drained);
+    }
+
+    let total_unique_hits = combined_hits.len();
+    let truncated = total_unique_hits > request.limit;
+    if truncated {
+        combined_hits.truncate(request.limit);
+    }
+
+    let snippet_cap = request
+        .snippet_limit
+        .map(|cap| cap.min(combined_hits.len()))
+        .unwrap_or(combined_hits.len());
+    let snippet_ids: Vec<String> = combined_hits
+        .iter()
+        .take(snippet_cap)
+        .map(|hit| hit.id.clone())
+        .collect();
+    let snippets_map = database
+        .load_symbol_snippets_by_stable_ids(&snippet_ids)
+        .map_err(|err| err.to_string())?;
+
+    if truncated {
+        combined_hits.push(build_evidence_truncation_sentinel());
+    }
+
+    match fmt {
+        OutputFormat::Plain => {
+            emit_ui_line_stdout(
+                ProgressTone::Summary,
+                "query evidence",
+                &format!(
+                    "{} hit(s){}{} (snippets: {})",
+                    if truncated {
+                        combined_hits.len() - 1
+                    } else {
+                        combined_hits.len()
+                    },
+                    if truncated {
+                        format!(" of >{} (truncated)", request.limit)
+                    } else {
+                        String::new()
+                    },
+                    if !empty_anchors.is_empty() {
+                        format!(", empty anchors: {}", empty_anchors.join(", "))
+                    } else {
+                        String::new()
+                    },
+                    snippet_ids
+                        .iter()
+                        .filter(|id| snippets_map.contains_key(*id))
+                        .count(),
+                ),
+            );
+            for hit in &combined_hits {
+                if hit.kind_name == EVIDENCE_TRUNCATED_MARKER {
+                    println!(
+                        "{marker}\t(more results exist; raise --limit or narrow filters)",
+                        marker = EVIDENCE_TRUNCATED_MARKER,
+                    );
+                    continue;
+                }
+                let source_version = hit
+                    .source
+                    .package_version
+                    .as_deref()
+                    .map(|version| format!("@{version}"))
+                    .unwrap_or_default();
+                println!(
+                    "{name} [{kind}] {pkg}@{ver} source={src}{src_ver} file={file} id={id}",
+                    name = hit.name,
+                    kind = hit.kind_name,
+                    pkg = hit.package_name,
+                    ver = hit.package_version,
+                    src = hit.source.package_name,
+                    src_ver = source_version,
+                    file = hit.source.file_path,
+                    id = hit.id,
+                );
+                if let Some(snippet) = snippets_map.get(&hit.id) {
+                    if let Some(signature_text) = &snippet.signature {
+                        println!("  signature: {signature_text}");
+                    }
+                    if let Some(js_doc_text) = &snippet.js_doc
+                        && !js_doc_text.trim().is_empty()
+                    {
+                        println!("  jsdoc: {js_doc_text}");
+                    }
+                }
+            }
+        }
+        OutputFormat::Json | OutputFormat::Jsonl => {
+            let snippets_json = serde_json::Map::from_iter(snippet_ids.iter().filter_map(|id| {
+                snippets_map.get(id).map(|snippet| {
+                    (
+                        id.clone(),
+                        serde_json::to_value(snippet).unwrap_or_default(),
+                    )
+                })
+            }));
+            print_json(&serde_json::json!({
+                "ok": true,
+                "data": {
+                    "package": {
+                        "name": request.package_name,
+                        "version": request.package_version,
+                        "sourcePackage": request.source_package_name,
+                    },
+                    "limit": request.limit,
+                    "anchors": anchor_summaries,
+                    "emptyAnchors": empty_anchors,
+                    "symbols": combined_hits,
+                    "snippets": snippets_json,
+                }
+            }))?;
         }
     }
     Ok(())
+}
+
+fn push_unique_hits(
+    combined: &mut Vec<SymbolSearchHit>,
+    seen_stable_ids: &mut HashSet<String>,
+    new_hits: Vec<SymbolSearchHit>,
+) {
+    for hit in new_hits {
+        if seen_stable_ids.insert(hit.id.clone()) {
+            combined.push(hit);
+        }
+    }
 }
 
 fn tsv_cell(value: &Value) -> String {

@@ -2,7 +2,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Agent } from "@cursor/sdk";
-import type { SDKMessage, SDKToolUseMessage } from "@cursor/sdk";
+import type {
+  AgentOptions,
+  RunResult,
+  SDKMessage,
+  SDKToolUseMessage,
+} from "@cursor/sdk";
 import type {
   AgentEvidence,
   AgentRuntimeMetrics,
@@ -14,12 +19,14 @@ import type {
   CapabilityMatrix,
   NciStageResult,
   PackageManifest,
+  PairwiseJudgmentRecord,
   PromptContract,
   TaskManifest,
 } from "@repo/benchmark-contract/benchmark-types";
 import { detectCapabilities } from "./benchmark-capabilities";
 import { buildFullDataset, buildSummaryDataset } from "./benchmark-statistics";
 import { runIndexingMetricsStage } from "./benchmark-nci";
+import { computePairwiseJudgment } from "./benchmark-pairwise-judge";
 import {
   buildBenchmarkPrompt,
   parseEvidenceFromResponse,
@@ -83,16 +90,21 @@ export interface RunnerOptions {
   /** Clear sequential-step progress before running (or exit after clear if `sequentialStep` is false). */
   resetSequentialStep?: boolean;
   /**
-   * When true, sequential step advances only if every record for the selected task is success + correct.
-   * Default false preserves "always advance after running the task" behavior.
+   * Strict mode for sequential step. When true, advance only if every non-skipped record for the
+   * selected task fully ran the prompt + agent pipeline: `status === "success"`, no `errorMessage`,
+   * non-empty `responseText`, and a real `durationMs > 0` (i.e. execution actually happened).
    */
-  sequentialStepRequireCorrectness?: boolean;
+  sequentialStepStrict?: boolean;
   /** Limit how many tasks run after mode selection (manifest order). Omit for no limit. */
   taskLimit?: number;
   /** Log progress to the console (tool lines and periodic heartbeats during agent runs). */
   verbose?: boolean;
   /** Fixed stem for output filenames (tests). If omitted, `{2hex}-{UTC date}-{UTC time}-{mode}` is generated. */
   outputStem?: string;
+  /** Run pairwise LLM judge after baseline + nci_first for each (task, runtime). Requires `--execute=true`. */
+  pairwiseJudge?: boolean;
+  /** Model for pairwise judge; defaults to `modelId`. */
+  pairwiseJudgeModel?: string;
 }
 
 function buildRunOutputStem(mode: "pilot" | "full"): string {
@@ -133,25 +145,22 @@ interface RunnerDependencies {
   runIndexingStage: typeof runIndexingMetricsStage;
   runSqlStage: typeof runSqlValidationStage;
   detectCapabilities: typeof detectCapabilities;
+  /** Test-only: substitute `Agent.prompt` for pairwise judging. */
+  pairwisePromptAgent?: (
+    message: string,
+    options?: AgentOptions,
+  ) => Promise<RunResult>;
 }
 
 type TaskDefinition = TaskManifest["tasks"][number];
 
 type PackageEntry = PackageManifest["packages"][number];
 
-interface RunCombination {
-  task: TaskDefinition;
-  packageEntry: PackageEntry;
-  runtime: BenchmarkRuntime;
-  strategy: BenchmarkStrategy;
-}
-
 function createEmptyRuntimeMetrics(): AgentRuntimeMetrics {
   return {
     toolCallsStarted: 0,
     toolCallsCompleted: 0,
     toolCallsErrored: 0,
-    toolCallsUnfinished: 0,
   };
 }
 
@@ -521,27 +530,6 @@ function shouldSkipRun(
   return undefined;
 }
 
-function createRunCombinations(
-  selectedTasks: TaskDefinition[],
-  packageById: Map<string, PackageManifest["packages"][number]>,
-  runtimes: BenchmarkRuntime[],
-  strategies: BenchmarkStrategy[],
-): RunCombination[] {
-  const combinations: RunCombination[] = [];
-  for (const task of selectedTasks) {
-    const packageEntry = packageById.get(task.package_id);
-    if (!packageEntry) {
-      continue;
-    }
-    for (const runtime of runtimes) {
-      for (const strategy of strategies) {
-        combinations.push({ task, packageEntry, runtime, strategy });
-      }
-    }
-  }
-  return combinations;
-}
-
 export async function runBenchmarksWithDependencies(
   options: RunnerOptions,
   dependencies: RunnerDependencies,
@@ -593,7 +581,7 @@ export async function runBenchmarksWithDependencies(
 
   if (options.verbose) {
     logBench(
-      `mode=${options.mode} manifest=${options.taskManifestFileName} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} sequentialStep=${options.sequentialStep ?? false} sequentialStepRequireCorrectness=${options.sequentialStepRequireCorrectness ?? false} taskOrder=${options.taskOrder ?? "manifest"} randomSeed=${options.randomSeed ?? "none"} taskLimit=${options.taskLimit ?? "none"} taskIds=${options.taskIds?.join(",") ?? "none"} difficulty=${options.difficultyFilter?.join(",") ?? "none"}`,
+      `mode=${options.mode} manifest=${options.taskManifestFileName} model=${options.modelId} execute=${options.performExecution} cloud=${options.includeCloudRuntime} pairwiseJudge=${options.pairwiseJudge === true} pairwiseJudgeModel=${options.pairwiseJudgeModel ?? options.modelId} sequentialStep=${options.sequentialStep ?? false} sequentialStepStrict=${options.sequentialStepStrict ?? false} taskOrder=${options.taskOrder ?? "manifest"} randomSeed=${options.randomSeed ?? "none"} taskLimit=${options.taskLimit ?? "none"} taskIds=${options.taskIds?.join(",") ?? "none"} difficulty=${options.difficultyFilter?.join(",") ?? "none"}`,
     );
     logBench(
       `capabilities: cursorApiKey=${capabilities.cursorApiKey.available ? "ok" : "no"} nciCli=${capabilities.local.nciCli.available ? "ok" : "no"}`,
@@ -695,16 +683,15 @@ export async function runBenchmarksWithDependencies(
   );
 
   const runRecords: BenchmarkRunRecord[] = [];
+  const pairwiseJudgments: PairwiseJudgmentRecord[] = [];
   const runtimes: BenchmarkRuntime[] = options.includeCloudRuntime
     ? ["local", "cloud"]
     : ["local"];
-  const strategies: BenchmarkStrategy[] = ["baseline", "nci_first"];
-  const runCombinations = createRunCombinations(
-    selectedTasks,
-    packageById,
-    runtimes,
-    strategies,
+
+  const runnableTasks = selectedTasks.filter((task) =>
+    packageById.has(task.package_id),
   );
+  const pairTotal = runnableTasks.length * runtimes.length;
 
   const runStem = options.outputStem ?? buildRunOutputStem(options.mode);
 
@@ -713,109 +700,220 @@ export async function runBenchmarksWithDependencies(
       `tasks in this run: ${selectedTasks.length} (${selectedTasks.map((t) => t.id).join(", ") || "none"})`,
     );
     logBench(
-      `run matrix: ${runCombinations.length} combination(s) (runtimes × strategies × tasks)`,
+      `run matrix: ${pairTotal} pair(s) (tasks × runtimes; each pair runs baseline then nci_first${options.pairwiseJudge === true ? " then pairwise judge" : ""})`,
     );
   }
 
-  for (
-    let combinationIndex = 0;
-    combinationIndex < runCombinations.length;
-    combinationIndex += 1
-  ) {
-    const runCombination = runCombinations[combinationIndex]!;
-    const { task, packageEntry, runtime, strategy } = runCombination;
-    const progressLabel = `[${combinationIndex + 1}/${runCombinations.length}] ${task.id} ${runtime} ${strategy}`;
-    const promptBuildResult = buildBenchmarkPrompt({
-      strategy,
-      lane: task.lane,
-      packageEntry,
-      taskQuestion: task.question,
-      taskVerifier: task.verifier,
-      nciBinaryPath,
-    });
-    const skippedReason = shouldSkipRun(
-      runtime,
-      strategy,
-      task.lane,
-      capabilities,
-    );
-    const indexingStage = indexingByPackageId.get(packageEntry.id);
+  let pairIndex = 0;
+  for (const task of selectedTasks) {
+    const packageEntry = packageById.get(task.package_id);
+    if (!packageEntry) {
+      continue;
+    }
 
-    if (skippedReason) {
-      if (options.verbose) {
-        logBench(`${progressLabel} skipped (${skippedReason})`);
-      }
-      runRecords.push(
-        buildBenchmarkRunRecord(
+    for (const runtime of runtimes) {
+      pairIndex += 1;
+      const progressPair = `[pair ${pairIndex}/${pairTotal}]`;
+
+      const baselinePromptBuild = buildBenchmarkPrompt({
+        strategy: "baseline",
+        lane: task.lane,
+        packageEntry,
+        taskQuestion: task.question,
+        taskVerifier: task.verifier,
+        nciBinaryPath,
+      });
+      const baselineSkippedReason = shouldSkipRun(
+        runtime,
+        "baseline",
+        task.lane,
+        capabilities,
+      );
+      const indexingStage = indexingByPackageId.get(packageEntry.id);
+
+      let baselineRecord: BenchmarkRunRecord;
+      if (baselineSkippedReason) {
+        if (options.verbose) {
+          logBench(
+            `${progressPair} ${task.id} ${runtime} baseline skipped (${baselineSkippedReason})`,
+          );
+        }
+        baselineRecord = buildBenchmarkRunRecord(
           {
             task,
             packageEntry,
             runtime,
-            strategy,
-            prompt: promptBuildResult.prompt,
-            promptContract: promptBuildResult.contract,
+            strategy: "baseline",
+            prompt: baselinePromptBuild.prompt,
+            promptContract: baselinePromptBuild.contract,
             modelId: options.modelId,
             indexingStage,
           },
-          { kind: "skipped", skippedReason },
-        ),
-      );
-      continue;
-    }
-
-    const sqlValidationResult =
-      strategy === "nci_first"
-        ? await dependencies.runSqlStage(
+          { kind: "skipped", skippedReason: baselineSkippedReason },
+        );
+      } else {
+        const baselineExecution = await executeSingleRun(
+          baselinePromptBuild.prompt,
+          `nci-benchmark-${task.id}-${runtime}-baseline`,
+          options.modelId,
+          runtime,
+          options.docsRoot,
+          options.performExecution,
+          options.verbose
+            ? {
+                verbose: true,
+                label: `${progressPair} ${task.id} ${runtime} baseline`,
+              }
+            : undefined,
+        );
+        const baselineEvidence = parseEvidenceFromResponse(
+          baselineExecution.responseText,
+        );
+        const baselineVerifier = verifyResponse(
+          baselineExecution.responseText,
+          task.verifier,
+          baselinePromptBuild.contract,
+        );
+        baselineRecord = buildBenchmarkRunRecord(
+          {
+            task,
             packageEntry,
-            options.workspaceRoot,
-            nciBinaryPath,
-          )
-        : undefined;
+            runtime,
+            strategy: "baseline",
+            prompt: baselinePromptBuild.prompt,
+            promptContract: baselinePromptBuild.contract,
+            modelId: options.modelId,
+            indexingStage,
+          },
+          {
+            kind: "executed",
+            responseText: baselineExecution.responseText,
+            evidence: baselineEvidence,
+            durationMs: baselineExecution.durationMs,
+            sdkDurationMs: baselineExecution.sdkDurationMs,
+            runtimeMetrics: baselineExecution.runtimeMetrics,
+            isCorrect: baselineVerifier.isCorrect,
+            missingSubstrings: baselineVerifier.missingSubstrings,
+            forbiddenMatches: baselineVerifier.forbiddenMatches,
+            status: baselineExecution.errorMessage ? "failure" : "success",
+            errorMessage: baselineExecution.errorMessage,
+          },
+        );
+      }
+      runRecords.push(baselineRecord);
 
-    const executionResult = await executeSingleRun(
-      promptBuildResult.prompt,
-      `nci-benchmark-${task.id}-${runtime}-${strategy}`,
-      options.modelId,
-      runtime,
-      options.docsRoot,
-      options.performExecution,
-    );
-    const evidence = parseEvidenceFromResponse(executionResult.responseText);
+      const nciPromptBuild = buildBenchmarkPrompt({
+        strategy: "nci_first",
+        lane: task.lane,
+        packageEntry,
+        taskQuestion: task.question,
+        taskVerifier: task.verifier,
+        nciBinaryPath,
+      });
+      const nciSkippedReason = shouldSkipRun(
+        runtime,
+        "nci_first",
+        task.lane,
+        capabilities,
+      );
 
-    const verifierResult = verifyResponse(
-      executionResult.responseText,
-      task.verifier,
-      promptBuildResult.contract,
-    );
+      let nciRecord: BenchmarkRunRecord;
+      if (nciSkippedReason) {
+        if (options.verbose) {
+          logBench(
+            `${progressPair} ${task.id} ${runtime} nci_first skipped (${nciSkippedReason})`,
+          );
+        }
+        nciRecord = buildBenchmarkRunRecord(
+          {
+            task,
+            packageEntry,
+            runtime,
+            strategy: "nci_first",
+            prompt: nciPromptBuild.prompt,
+            promptContract: nciPromptBuild.contract,
+            modelId: options.modelId,
+            indexingStage,
+          },
+          { kind: "skipped", skippedReason: nciSkippedReason },
+        );
+      } else {
+        const sqlValidationResult = await dependencies.runSqlStage(
+          packageEntry,
+          options.workspaceRoot,
+          nciBinaryPath,
+        );
+        const nciExecution = await executeSingleRun(
+          nciPromptBuild.prompt,
+          `nci-benchmark-${task.id}-${runtime}-nci_first`,
+          options.modelId,
+          runtime,
+          options.docsRoot,
+          options.performExecution,
+          options.verbose
+            ? {
+                verbose: true,
+                label: `${progressPair} ${task.id} ${runtime} nci_first`,
+              }
+            : undefined,
+        );
+        const nciEvidence = parseEvidenceFromResponse(
+          nciExecution.responseText,
+        );
+        const nciVerifier = verifyResponse(
+          nciExecution.responseText,
+          task.verifier,
+          nciPromptBuild.contract,
+        );
+        nciRecord = buildBenchmarkRunRecord(
+          {
+            task,
+            packageEntry,
+            runtime,
+            strategy: "nci_first",
+            prompt: nciPromptBuild.prompt,
+            promptContract: nciPromptBuild.contract,
+            modelId: options.modelId,
+            indexingStage,
+          },
+          {
+            kind: "executed",
+            responseText: nciExecution.responseText,
+            evidence: nciEvidence,
+            durationMs: nciExecution.durationMs,
+            sdkDurationMs: nciExecution.sdkDurationMs,
+            runtimeMetrics: nciExecution.runtimeMetrics,
+            isCorrect: nciVerifier.isCorrect,
+            missingSubstrings: nciVerifier.missingSubstrings,
+            forbiddenMatches: nciVerifier.forbiddenMatches,
+            status: nciExecution.errorMessage ? "failure" : "success",
+            errorMessage: nciExecution.errorMessage,
+            sqlValidationStage: sqlValidationResult,
+          },
+        );
+      }
+      runRecords.push(nciRecord);
 
-    runRecords.push(
-      buildBenchmarkRunRecord(
-        {
+      if (options.pairwiseJudge === true && options.performExecution) {
+        const judgment = await computePairwiseJudgment({
           task,
           packageEntry,
           runtime,
-          strategy,
-          prompt: promptBuildResult.prompt,
-          promptContract: promptBuildResult.contract,
-          modelId: options.modelId,
-          indexingStage,
-        },
-        {
-          kind: "executed",
-          responseText: executionResult.responseText,
-          evidence,
-          durationMs: executionResult.durationMs,
-          sdkDurationMs: executionResult.sdkDurationMs,
-          runtimeMetrics: executionResult.runtimeMetrics,
-          isCorrect: verifierResult.isCorrect,
-          missingSubstrings: verifierResult.missingSubstrings,
-          forbiddenMatches: verifierResult.forbiddenMatches,
-          status: executionResult.errorMessage ? "failure" : "success",
-          errorMessage: executionResult.errorMessage,
-          sqlValidationStage: sqlValidationResult,
-        },
-      ),
-    );
+          baselineRecord,
+          nciRecord,
+          judgeModelId: options.pairwiseJudgeModel ?? options.modelId,
+          docsRoot: options.docsRoot,
+          performExecution: options.performExecution,
+          promptAgent: dependencies.pairwisePromptAgent,
+        });
+        pairwiseJudgments.push(judgment);
+        if (options.verbose) {
+          logBench(
+            `${progressPair} pairwise judge ${judgment.status}${judgment.skippedReason ? ` (${judgment.skippedReason})` : ""}`,
+          );
+        }
+      }
+    }
   }
 
   const generatedAt = new Date();
@@ -829,13 +927,19 @@ export async function runBenchmarksWithDependencies(
     capabilities,
     indexingMetrics,
     records: runRecords,
+    ...(pairwiseJudgments.length > 0 ? { pairwiseJudgments } : {}),
   };
 
   const summaryDataset = buildSummaryDataset(
     runRecords,
     options.protocolVersion,
+    pairwiseJudgments.length > 0 ? pairwiseJudgments : undefined,
   );
-  const fullDataset = buildFullDataset(runRecords, options.protocolVersion);
+  const fullDataset = buildFullDataset(
+    runRecords,
+    options.protocolVersion,
+    pairwiseJudgments.length > 0 ? pairwiseJudgments : undefined,
+  );
 
   const runsOutputPath = path.join(
     benchmarkRoot,
@@ -907,6 +1011,34 @@ export async function runBenchmarksWithDependencies(
       skippedReason: record.skippedReason,
       harnessSqlProbeSuccess: record.sqlValidationStage?.success,
     })),
+    ...(pairwiseJudgments.length > 0
+      ? {
+          pairwiseJudgments: pairwiseJudgments.map((judgment) => ({
+            taskId: judgment.taskId,
+            packageId: judgment.packageId,
+            runtime: judgment.runtime,
+            status: judgment.status,
+            skippedReason: judgment.skippedReason,
+            baselineRunId: judgment.baselineRunId,
+            nciRunId: judgment.nciRunId,
+            judge:
+              judgment.judge === undefined
+                ? undefined
+                : {
+                    modelId: judgment.judge.modelId,
+                    baselineCorrectness: judgment.judge.baselineCorrectness,
+                    baselineActionability: judgment.judge.baselineActionability,
+                    nciFirstCorrectness: judgment.judge.nciFirstCorrectness,
+                    nciFirstActionability: judgment.judge.nciFirstActionability,
+                    preferred: judgment.judge.preferred,
+                    confidence: judgment.judge.confidence,
+                    durationMs: judgment.judge.durationMs,
+                    judgePromptDigest: judgment.judge.judgePromptDigest,
+                    comparisonNotes: judgment.judge.comparisonNotes,
+                  },
+          })),
+        }
+      : {}),
   };
 
   await ensureParentDirectory(runsOutputPath);
@@ -936,11 +1068,14 @@ export async function runBenchmarksWithDependencies(
     const recordsForAdvancedTask = runRecords.filter(
       (record) => record.taskId === sequentialAdvanceTaskId,
     );
-    const requireCorrectness =
-      options.sequentialStepRequireCorrectness === true;
-    const canAdvanceSequentialStep = requireCorrectness
+    const sequentialStepStrict = options.sequentialStepStrict === true;
+    const canAdvanceSequentialStep = sequentialStepStrict
       ? recordsForAdvancedTask.every(
-          (record) => record.status === "success" && record.isCorrect,
+          (record) =>
+            record.status === "success" &&
+            !record.errorMessage &&
+            record.responseText.trim().length > 0 &&
+            record.durationMs > 0,
         )
       : recordsForAdvancedTask.every((record) => record.status !== "skipped");
     if (canAdvanceSequentialStep) {
@@ -965,13 +1100,19 @@ export async function runBenchmarksWithDependencies(
       }
     } else if (options.verbose) {
       const failureSummary = recordsForAdvancedTask
-        .filter((record) => record.status !== "success" || !record.isCorrect)
+        .filter(
+          (record) =>
+            record.status !== "success" ||
+            record.errorMessage ||
+            record.responseText.trim().length === 0 ||
+            record.durationMs <= 0,
+        )
         .map(
           (record) =>
-            `${record.strategy}/${record.runtime}: status=${record.status} isCorrect=${record.isCorrect} missing=[${record.missingSubstrings.join(",")}] forbidden=[${record.forbiddenMatches.join(",")}]`,
+            `${record.strategy}/${record.runtime}: status=${record.status} error=${record.errorMessage ?? "none"} responseTextLen=${record.responseText.length} durationMs=${record.durationMs}`,
         );
       logBench(
-        `sequential step NOT advanced for ${sequentialAdvanceTaskId} (requireCorrectness=${requireCorrectness}) due to failing records: ${failureSummary.join(" | ")}`,
+        `sequential step NOT advanced for ${sequentialAdvanceTaskId} (strict=${sequentialStepStrict}) due to incomplete pipeline runs: ${failureSummary.join(" | ")}`,
       );
     }
   }

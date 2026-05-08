@@ -8,7 +8,8 @@ fn main() {
     let _ = enable_ansi_support::enable_ansi_support();
 
     std::process::exit(match cli::run() {
-        Ok(()) => 0,
+        Ok(cli::CliExit::Success) => 0,
+        Ok(cli::CliExit::QueryNotFound) => cli::EXIT_QUERY_NOT_FOUND,
         Err(message) => {
             if !message.is_empty() {
                 eprintln!("{message}");

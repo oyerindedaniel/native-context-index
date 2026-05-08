@@ -619,8 +619,250 @@ fn query_overloads_returns_sibling_overload_rows_for_member_signature() {
             "ovl-pkg@1.0.0::Dual.nope",
         ])
         .assert()
-        .success()
+        .code(2)
         .stdout(predicate::str::contains("\"symbols\": []"));
+}
+
+fn write_pkg_with_evidence_surface(root: &Path, name: &str, version: &str) {
+    let pkg = root.join("node_modules").join(name);
+    fs::create_dir_all(&pkg).unwrap();
+    fs::write(
+        pkg.join("package.json"),
+        format!(r#"{{"name":"{name}","version":"{version}","types":"./index.d.ts"}}"#),
+    )
+    .unwrap();
+    fs::write(
+        pkg.join("index.d.ts"),
+        "/**\n * Evidence sample fn\n */\nexport declare function evidenceFn(input: string): string;\n\
+         export interface EvidenceShape { token: string; }\n\
+         export declare function evidenceMatchA(): void;\n\
+         export declare function evidenceMatchB(): void;\n\
+         export declare function evidenceMatchC(): void;\n\
+         export declare function evidenceMatchD(): void;\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn query_evidence_returns_symbols_and_snippets_in_one_call() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("evidence.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_pkg_with_evidence_surface(proj.path(), "evid-pkg", "1.0.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "evid-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    let json_output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "evidence",
+            "--package",
+            "evid-pkg",
+            "--symbol",
+            "evidenceFn",
+            "--phrase",
+            "EvidenceShape",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let parsed: Value = serde_json::from_slice(&json_output).expect("valid json envelope");
+    assert_eq!(parsed["ok"], serde_json::Value::Bool(true));
+
+    let symbols = parsed["data"]["symbols"]
+        .as_array()
+        .expect("symbols array")
+        .clone();
+    assert!(
+        symbols.iter().any(
+            |hit| hit["id"] == "evid-pkg@1.0.0::evidenceFn" && hit["kindName"] != "<truncated>"
+        ),
+        "exact-name anchor produced no usable hit: {symbols:?}"
+    );
+    assert!(
+        symbols.iter().any(|hit| hit["name"] == "EvidenceShape"),
+        "FTS phrase anchor produced no usable hit: {symbols:?}"
+    );
+
+    let snippets = parsed["data"]["snippets"]
+        .as_object()
+        .expect("snippets object");
+    let snippet_for_fn = snippets
+        .get("evid-pkg@1.0.0::evidenceFn")
+        .expect("snippet for evidenceFn included");
+    assert!(
+        snippet_for_fn["signature"]
+            .as_str()
+            .map(|signature| signature.contains("evidenceFn"))
+            .unwrap_or(false),
+        "snippet signature missing evidenceFn: {snippet_for_fn:?}"
+    );
+
+    let anchor_summary = parsed["data"]["anchors"].as_array().expect("anchors array");
+    assert!(
+        anchor_summary
+            .iter()
+            .any(|entry| entry["match"] == "exact" && entry["anchor"] == "evidenceFn"),
+        "exact anchor summary missing: {anchor_summary:?}"
+    );
+    assert!(
+        anchor_summary
+            .iter()
+            .any(|entry| entry["match"] == "fts" && entry["anchor"] == "EvidenceShape"),
+        "fts anchor summary missing: {anchor_summary:?}"
+    );
+
+    // No truncation expected at default limit.
+    assert!(
+        symbols.iter().all(|hit| hit["kindName"] != "<truncated>"),
+        "did not expect truncation marker yet: {symbols:?}"
+    );
+}
+
+#[test]
+fn query_evidence_appends_truncation_sentinel_when_limit_exceeded() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("evidence-trunc.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_pkg_with_evidence_surface(proj.path(), "evid-trunc", "1.0.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "evid-trunc",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    // Use exact-name anchors against four distinct fixture symbols so we exceed `-n 2` and
+    // force the sentinel to be appended.
+    let json_output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "evidence",
+            "--package",
+            "evid-trunc",
+            "--symbol",
+            "evidenceMatchA",
+            "--symbol",
+            "evidenceMatchB",
+            "--symbol",
+            "evidenceMatchC",
+            "--symbol",
+            "evidenceMatchD",
+            "-n",
+            "2",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let parsed: Value = serde_json::from_slice(&json_output).expect("valid json envelope");
+    let symbols = parsed["data"]["symbols"]
+        .as_array()
+        .expect("symbols array")
+        .clone();
+
+    let last_hit = symbols.last().expect("at least one symbol");
+    assert_eq!(
+        last_hit["kindName"], "<truncated>",
+        "expected sentinel marker as last entry; got {last_hit:?}"
+    );
+    assert_eq!(last_hit["id"], "<truncated>");
+    assert_eq!(last_hit["name"], "<truncated>");
+
+    let real_hits: Vec<&Value> = symbols
+        .iter()
+        .filter(|hit| hit["kindName"] != "<truncated>")
+        .collect();
+    assert_eq!(
+        real_hits.len(),
+        2,
+        "expected exactly two real hits before sentinel; got {real_hits:?}"
+    );
+}
+
+#[test]
+fn query_evidence_requires_at_least_one_anchor() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("evidence-empty.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "evidence",
+            "--package",
+            "anything",
+        ])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("\"ok\": false"))
+        .stdout(predicate::str::contains("--symbol or --phrase"));
 }
 
 #[test]
@@ -1572,4 +1814,167 @@ fn query_active_package_package_manager_finds_lockfile_in_config_ancestor() {
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
     let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["data"]["packageManager"], "pnpm");
+}
+
+fn init_db_with_evidence_pkg(proj: &Path, cache: &Path) -> std::path::PathBuf {
+    let db_path = cache.join("snippet_nf.sqlite");
+    nci_cmd()
+        .current_dir(proj)
+        .env("NCI_CACHE_DIR", cache)
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+    fs::create_dir_all(proj.join("node_modules")).unwrap();
+    write_pkg_with_evidence_surface(proj, "evid-pkg", "1.0.0");
+    nci_cmd()
+        .current_dir(proj)
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "evid-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+    db_path
+}
+
+#[test]
+fn query_snippet_unknown_stable_id_json_exit_2_hint_and_null_envelope() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_with_evidence_pkg(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "snippet",
+            "evid-pkg@1.0.0::noSuchSymbol",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert!(parsed["data"]["snippet"].is_null());
+    assert!(parsed["hint"].as_str().unwrap().contains("query find"));
+}
+
+#[test]
+fn query_show_unknown_stable_id_json_exit_2_hint_and_null_envelope() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_with_evidence_pkg(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "show",
+            "evid-pkg@1.0.0::noSuchSymbol",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert!(parsed["data"]["symbol"].is_null());
+    assert!(parsed["hint"].as_str().unwrap().contains("query symbol"));
+}
+
+#[test]
+fn query_overloads_unknown_stable_id_json_exit_2_hint_and_empty_symbols() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_with_evidence_pkg(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "overloads",
+            "evid-pkg@1.0.0::noSuchSymbol",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["symbols"].as_array().unwrap().len(), 0);
+    assert!(parsed["hint"].as_str().unwrap().contains("recover"));
+}
+
+#[test]
+fn query_snippet_resolved_stable_id_json_exit_0() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_with_evidence_pkg(proj.path(), cache.path());
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "snippet",
+            "evid-pkg@1.0.0::evidenceFn",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"ok\": true"))
+        .stdout(predicate::str::contains("evidenceFn"));
+}
+
+#[test]
+fn query_snippet_unknown_stable_id_plain_stdout_hint_line() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_with_evidence_pkg(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "snippet",
+            "evid-pkg@1.0.0::noSuchSymbol",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("query snippet"),
+        "expected ui label in stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("noSuchSymbol") && stdout.contains("query find"),
+        "expected recovery hint: {stdout}"
+    );
 }

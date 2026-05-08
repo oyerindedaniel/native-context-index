@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PackageEntry } from "@repo/benchmark-contract/benchmark-types";
 import {
   buildBenchmarkPrompt,
+  extractPrimaryRecommendation,
   parseEvidenceFromResponse,
 } from "../benchmark-prompts";
 
@@ -56,6 +57,11 @@ describe("benchmark prompt builder", () => {
     expect(result.prompt).toContain("primer above");
     expect(result.prompt).toContain("source_file_path");
     expect(result.prompt).toContain("**/node_modules/**");
+    expect(result.prompt).toContain("query evidence --package");
+    expect(result.prompt).toContain("Stop condition:");
+    expect(result.prompt).toContain('"<truncated>"');
+    expect(result.prompt).toContain("Truncation marker (no new envelope key)");
+    expect(result.prompt).toContain("preferred first two NCI calls");
   });
 
   it("disables nci usage for baseline strategy", () => {
@@ -107,5 +113,49 @@ describe("benchmark prompt builder", () => {
     expect(result.prompt).toContain('"implementation_notes"');
     expect(result.prompt).toContain('"evidence"');
     expect(result.prompt).not.toContain('"answer"');
+  });
+
+  it("extractPrimaryRecommendation reads recommendation or answer by verifier", () => {
+    expect(
+      extractPrimaryRecommendation(
+        JSON.stringify({
+          answer: " ok ",
+          declaration_paths: [],
+          nci_query_evidence: "",
+          nci_sql_evidence: "",
+          github_evidence: "",
+        }),
+        {
+          type: "json_contract",
+          required_substrings: [],
+          forbidden_substrings: [],
+        },
+      ),
+    ).toBe("ok");
+
+    expect(
+      extractPrimaryRecommendation(
+        JSON.stringify({
+          recommendation: "do X",
+          declaration_paths: [],
+          nci_query_evidence: "",
+          nci_sql_evidence: "",
+          github_evidence: "",
+        }),
+        {
+          type: "practical_json_contract",
+          required_substrings: [],
+          forbidden_substrings: [],
+        },
+      ),
+    ).toBe("do X");
+
+    expect(
+      extractPrimaryRecommendation("plain text answer", {
+        type: "contains_all",
+        required_substrings: [],
+        forbidden_substrings: [],
+      }),
+    ).toBe("plain text answer");
   });
 });

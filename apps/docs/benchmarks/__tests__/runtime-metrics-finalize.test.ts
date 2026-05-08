@@ -37,4 +37,15 @@ describe("finalizeRuntimeMetrics", () => {
     finalizeRuntimeMetrics(metrics);
     expect(metrics.toolCallsUnfinished).toBe(1);
   });
+
+  it("recomputes unfinished even if the runner pre-initialized it to 0 (16-vs-15 regression)", () => {
+    const metrics: AgentRuntimeMetrics = {
+      toolCallsStarted: 16,
+      toolCallsCompleted: 15,
+      toolCallsErrored: 0,
+      toolCallsUnfinished: 0,
+    };
+    finalizeRuntimeMetrics(metrics);
+    expect(metrics.toolCallsUnfinished).toBe(1);
+  });
 });

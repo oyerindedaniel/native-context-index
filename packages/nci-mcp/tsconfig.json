@@ -5,5 +5,5 @@
     "lib": ["ES2022"],
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "tsup.config.ts"]
+  "include": ["src/**/*.ts", "__tests__/**/*.ts", "tsup.config.ts", "vitest.config.ts"]
 }

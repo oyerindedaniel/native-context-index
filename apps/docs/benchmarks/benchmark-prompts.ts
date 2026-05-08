@@ -6,8 +6,44 @@ import type {
   TaskVerifier,
 } from "@repo/benchmark-contract/benchmark-types";
 
-import { buildNciFirstAgentPrimer } from "@repo/nci-agent-primer/nci-first-agent-primer";
+import { buildNciFirstAgentPrimerCompact } from "@repo/nci-agent-primer/nci-first-agent-primer";
 import { normalizeResponseJsonText } from "./benchmark-verifiers";
+
+/**
+ * Returns the primary judged content for pairwise evaluation: `recommendation` for
+ * `practical_json_contract`, else `answer` for JSON contract tasks. For `contains_all`,
+ * any non-empty trimmed response counts.
+ */
+export function extractPrimaryRecommendation(
+  responseText: string,
+  taskVerifier: TaskVerifier,
+): string | undefined {
+  const trimmed = responseText.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (taskVerifier.type === "contains_all") {
+    return trimmed;
+  }
+  const normalized = normalizeResponseJsonText(trimmed);
+  try {
+    const parsedJson = JSON.parse(normalized) as Record<string, unknown>;
+    if (taskVerifier.type === "practical_json_contract") {
+      const recommendation = parsedJson.recommendation;
+      if (typeof recommendation === "string" && recommendation.trim()) {
+        return recommendation.trim();
+      }
+      return undefined;
+    }
+    const answer = parsedJson.answer;
+    if (typeof answer === "string" && answer.trim()) {
+      return answer.trim();
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 interface PromptBuildInput {
   strategy: BenchmarkStrategy;
@@ -59,7 +95,7 @@ function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
       "Prefer **query** for discovery; use read-only **sql** for relational facts from the tables above.",
       'On **Windows PowerShell**, invoke NCI as **`& "<path-to-nci.exe>" <subcommand> …`** so `sql` / `query` are real arguments (never `"…nci.exe" sql …` without `&`).',
       "Cap **`query find`** rows with **`-n` / `--limit`** (default 20). **`--max-rows` is only for `nci sql`**, not `query find`.",
-      "Follow the **NodeModules path-first contract** in the NCI primer above (workflow steps **6–7**).",
+      "Follow the **NodeModules path-first contract** in the NCI primer above (narrowing-tools steps **5–6**).",
       "Use grep/read_file only when NCI output is insufficient.",
       workspaceMutationGuardrail,
       nciCompilationGuardrail,
@@ -76,7 +112,7 @@ function buildStrategyInstruction(strategy: BenchmarkStrategy): string {
 function buildNciFirstBinarySection(nciBinaryPath: string): string {
   return [
     `NCI binary: ${nciBinaryPath}`,
-    'Subcommands (same executable): **`sql --schema`** prints DDL; **`query find "<phrase>"`** for FTS discovery (row cap: **`-n` / `--limit`**, not `--max-rows`); **`sql --format json -c`** with your own read-only `SELECT` (row cap: **`--max-rows`**).',
+    'Subcommands (same executable): **`sql --schema`** prints DDL; **`query find "<phrase>"`** for FTS discovery (row cap: **`-n` / `--limit`**, not `--max-rows`); **`sql --format json -c`** with your own read-only `SELECT` (row cap: **`--max-rows`**). See the primer above for **`query evidence`** (preferred bundled-evidence first call), the stop condition, and the `"<truncated>"` sentinel marker.',
     "Put representative stdout (or a clear empty/error note) in **`nci_query_evidence`** and **`nci_sql_evidence`**.",
   ].join("\n");
 }
@@ -129,7 +165,7 @@ export function buildBenchmarkPrompt(
     buildArtifactInstruction(input.packageEntry),
     ...(input.strategy === "nci_first"
       ? [
-          buildNciFirstAgentPrimer(),
+          buildNciFirstAgentPrimerCompact(),
           // buildNciFirstAgentPrimerReferenceDoc(),
           buildNciFirstBinarySection(input.nciBinaryPath),
           buildStrategyInstruction(input.strategy),

@@ -3,7 +3,11 @@ import type {
   BenchmarkRunRecord,
   BenchmarkStrategy,
 } from "@repo/benchmark-contract/benchmark-types";
-import { buildFullDataset, buildSummaryDataset } from "../benchmark-statistics";
+import {
+  buildFullDataset,
+  buildPairwiseAggregates,
+  buildSummaryDataset,
+} from "../benchmark-statistics";
 
 function createRecord(
   runId: string,
@@ -76,5 +80,37 @@ describe("benchmark statistics", () => {
     expect(fullDataset.ganttSeries).toHaveLength(1);
     const firstEntry = fullDataset.ganttSeries.at(0);
     expect(firstEntry?.durationMs).toBe(1000);
+  });
+
+  it("aggregates pairwise judgments into summary.full when provided", () => {
+    const records = [createRecord("1", "baseline", 1000, true)];
+    const pairwise = [
+      {
+        taskId: "t1",
+        packageId: "pkg",
+        runtime: "local" as const,
+        baselineRunId: "b1",
+        nciRunId: "n1",
+        status: "completed" as const,
+        judge: {
+          modelId: "m",
+          baselineCorrectness: 5,
+          baselineActionability: 5,
+          nciFirstCorrectness: 7,
+          nciFirstActionability: 8,
+          comparisonNotes: "notes",
+          preferred: "nci_first" as const,
+          confidence: "high" as const,
+        },
+      },
+    ];
+    const summary = buildSummaryDataset(records, "v1", pairwise);
+    expect(summary.pairwise?.completedPairCount).toBe(1);
+    expect(summary.pairwise?.meanDeltaCorrectness).toBe(2);
+    expect(summary.pairwise?.meanDeltaActionability).toBe(3);
+
+    const aggregates = buildPairwiseAggregates(pairwise);
+    expect(aggregates.preferredCounts.nci_first).toBe(1);
+    expect(aggregates.correctnessWinCounts.nci_first).toBe(1);
   });
 });

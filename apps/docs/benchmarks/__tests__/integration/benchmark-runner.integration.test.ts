@@ -475,7 +475,7 @@ describe("benchmark runner integration", () => {
     expect(state.completedTaskIds).toContain("uuid-seq");
   });
 
-  it("does not advance sequential step when strict correctness mode is enabled", async () => {
+  it("does not advance sequential step in strict mode when the agent pipeline did not fully run", async () => {
     const sandboxRoot = await mkdtemp(
       path.join(tmpdir(), "nci-bench-seq-strict-"),
     );
@@ -560,7 +560,7 @@ describe("benchmark runner integration", () => {
         performExecution: false,
         includeCloudRuntime: false,
         sequentialStep: true,
-        sequentialStepRequireCorrectness: true,
+        sequentialStepStrict: true,
         sequentialStepStatePath: "benchmarks/.pilot-seq-test.json",
         outputStem: "ee-test-seq-strict",
       },

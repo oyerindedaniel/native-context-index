@@ -25,5 +25,15 @@ export function resolvedToolCallsUnfinished(
 
 /** Mutates `metrics` and sets `toolCallsUnfinished` at end-of-run. */
 export function finalizeRuntimeMetrics(metrics: AgentRuntimeMetrics): void {
-  metrics.toolCallsUnfinished = resolvedToolCallsUnfinished(metrics);
+  const details = metrics.toolCallDetails ?? [];
+  const runningFromDetails = details.filter(
+    (detail) => detail.status === "running",
+  ).length;
+  const fromCounters = Math.max(
+    0,
+    metrics.toolCallsStarted -
+      metrics.toolCallsCompleted -
+      metrics.toolCallsErrored,
+  );
+  metrics.toolCallsUnfinished = Math.max(runningFromDetails, fromCounters);
 }

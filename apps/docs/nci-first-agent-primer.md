@@ -37,6 +37,7 @@ You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node
    - `query snippet "<symbol-id>"`
    - "example": `query snippet "<symbol-id-from-query-find-or-symbol>"`
    - "example": if you see ids like `...::Client#2` / `...::Client#3`, treat each `#` id as a distinct disambiguated symbol row (not overload-only) and run `query snippet` on each id before concluding equivalence.
+   - `query snippet` accepts a **single positional `<symbol-id>`** (no flags). For many snippets in one CLI process, use `query evidence` — the JSON envelope returns `data.snippets` as an object keyed by `symbols.id`, and `--snippet-limit` defaults to `--limit`.
 4. Use file tools only after `query show` / `query snippet` lacks the declaration text needed for the final answer. `query` search/show rows carry a signature preview (currently capped), while `query snippet` returns stored full signature/JSDoc text from SQLite for the selected symbol id.
 5. Avoid ad-hoc compile probes unless the task explicitly requires compilation evidence. "example": do not run `tsc -e`; rely on `query`/`snippet` declaration evidence first.
 

@@ -176,6 +176,58 @@ export interface BenchmarkRunFile {
   capabilities: CapabilityMatrix;
   indexingMetrics: NciStageResult[];
   records: BenchmarkRunRecord[];
+  /** Optional per-pair LLM judgments (baseline vs nci_first). Present only when `--pairwise-judge=true`. */
+  pairwiseJudgments?: PairwiseJudgmentRecord[];
+}
+
+/**
+ * Independent dimension scores per arm, plus holistic preference. Two-dimension design (correctness vs
+ * actionability) lets summaries attribute NCI's contribution rather than blending it into a single
+ * overall score (see plan: `pairwise_judge_benchmark_*.plan.md`).
+ */
+export interface PairwiseJudgeResult {
+  modelId: string;
+  baselineCorrectness: number;
+  baselineActionability: number;
+  nciFirstCorrectness: number;
+  nciFirstActionability: number;
+  comparisonNotes: string;
+  preferred: "baseline" | "nci_first" | "tie";
+  confidence: "high" | "medium" | "low";
+  durationMs?: number;
+  judgePromptDigest?: string;
+}
+
+export interface PairwiseJudgmentRecord {
+  taskId: string;
+  packageId: string;
+  runtime: BenchmarkRuntime;
+  baselineRunId?: string;
+  nciRunId?: string;
+  status: "completed" | "skipped";
+  skippedReason?: string;
+  judge?: PairwiseJudgeResult;
+}
+
+/**
+ * Pairwise aggregates for the summary/full datasets. Dimension-level deltas are the source of truth
+ * for proving NCI's contribution; holistic `preferred` counts are auxiliary.
+ */
+export interface PairwiseAggregates {
+  attemptedPairCount: number;
+  completedPairCount: number;
+  skippedPairCount: number;
+  skippedReasonCounts: Record<string, number>;
+  meanDeltaCorrectness: number;
+  meanDeltaActionability: number;
+  correctnessWinCounts: { nci_first: number; baseline: number; tie: number };
+  actionabilityWinCounts: { nci_first: number; baseline: number; tie: number };
+  preferredCounts: { nci_first: number; baseline: number; tie: number };
+  confidenceCounts: { high: number; medium: number; low: number };
+  meanBaselineCorrectness: number;
+  meanBaselineActionability: number;
+  meanNciFirstCorrectness: number;
+  meanNciFirstActionability: number;
 }
 
 export interface AggregatedMetric {
@@ -212,6 +264,8 @@ export interface SummaryDataset {
   };
   byStrategy: AggregatedMetric[];
   byDifficulty: AggregatedMetric[];
+  /** Optional pairwise aggregates; present only when the run produced `pairwiseJudgments`. */
+  pairwise?: PairwiseAggregates;
 }
 
 export interface FullDataset extends SummaryDataset {
@@ -225,4 +279,5 @@ export interface FullDataset extends SummaryDataset {
     durationMs: number;
     difficulty: BenchmarkDifficulty;
   }>;
+  pairwiseJudgments?: PairwiseJudgmentRecord[];
 }

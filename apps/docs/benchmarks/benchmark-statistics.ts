@@ -2,6 +2,9 @@ import type {
   AggregatedMetric,
   BenchmarkRunRecord,
   FullDataset,
+  PairwiseAggregates,
+  PairwiseJudgeResult,
+  PairwiseJudgmentRecord,
   SummaryDataset,
 } from "@repo/benchmark-contract/benchmark-types";
 import { resolvedToolCallsUnfinished } from "./runtime-metrics-finalize";
@@ -116,9 +119,115 @@ function aggregateByKey(
     );
 }
 
+function countDimensionWins(
+  judges: PairwiseJudgeResult[],
+  dimension: "correctness" | "actionability",
+): { nci_first: number; baseline: number; tie: number } {
+  const wins = { nci_first: 0, baseline: 0, tie: 0 };
+  for (const judge of judges) {
+    const nciScore =
+      dimension === "correctness"
+        ? judge.nciFirstCorrectness
+        : judge.nciFirstActionability;
+    const baselineScore =
+      dimension === "correctness"
+        ? judge.baselineCorrectness
+        : judge.baselineActionability;
+    if (nciScore > baselineScore) {
+      wins.nci_first += 1;
+    } else if (nciScore < baselineScore) {
+      wins.baseline += 1;
+    } else {
+      wins.tie += 1;
+    }
+  }
+  return wins;
+}
+
+export function buildPairwiseAggregates(
+  pairwiseJudgments: PairwiseJudgmentRecord[],
+): PairwiseAggregates {
+  const attemptedPairCount = pairwiseJudgments.length;
+  const completedJudgments = pairwiseJudgments.filter(
+    (judgment) =>
+      judgment.status === "completed" && judgment.judge !== undefined,
+  );
+  const skippedJudgments = pairwiseJudgments.filter(
+    (judgment) => judgment.status === "skipped",
+  );
+  const skippedReasonCounts: Record<string, number> = {};
+  for (const judgment of skippedJudgments) {
+    const reasonKey = judgment.skippedReason ?? "unknown";
+    skippedReasonCounts[reasonKey] = (skippedReasonCounts[reasonKey] ?? 0) + 1;
+  }
+  const judges = completedJudgments
+    .map((judgment) => judgment.judge)
+    .filter((judge): judge is PairwiseJudgeResult => judge !== undefined);
+  const completedPairCount = judges.length;
+  const skippedPairCount = skippedJudgments.length;
+
+  const meanDeltaCorrectness =
+    completedPairCount === 0
+      ? 0
+      : average(
+          judges.map(
+            (judge) => judge.nciFirstCorrectness - judge.baselineCorrectness,
+          ),
+        );
+  const meanDeltaActionability =
+    completedPairCount === 0
+      ? 0
+      : average(
+          judges.map(
+            (judge) =>
+              judge.nciFirstActionability - judge.baselineActionability,
+          ),
+        );
+
+  const correctnessWinCounts = countDimensionWins(judges, "correctness");
+  const actionabilityWinCounts = countDimensionWins(judges, "actionability");
+
+  const preferredCounts = { nci_first: 0, baseline: 0, tie: 0 };
+  const confidenceCounts = { high: 0, medium: 0, low: 0 };
+  for (const judge of judges) {
+    preferredCounts[judge.preferred] += 1;
+    confidenceCounts[judge.confidence] += 1;
+  }
+
+  return {
+    attemptedPairCount,
+    completedPairCount,
+    skippedPairCount,
+    skippedReasonCounts,
+    meanDeltaCorrectness,
+    meanDeltaActionability,
+    correctnessWinCounts,
+    actionabilityWinCounts,
+    preferredCounts,
+    confidenceCounts,
+    meanBaselineCorrectness:
+      completedPairCount === 0
+        ? 0
+        : average(judges.map((judge) => judge.baselineCorrectness)),
+    meanBaselineActionability:
+      completedPairCount === 0
+        ? 0
+        : average(judges.map((judge) => judge.baselineActionability)),
+    meanNciFirstCorrectness:
+      completedPairCount === 0
+        ? 0
+        : average(judges.map((judge) => judge.nciFirstCorrectness)),
+    meanNciFirstActionability:
+      completedPairCount === 0
+        ? 0
+        : average(judges.map((judge) => judge.nciFirstActionability)),
+  };
+}
+
 export function buildSummaryDataset(
   records: BenchmarkRunRecord[],
   protocolVersion: string,
+  pairwiseJudgments?: PairwiseJudgmentRecord[],
 ): SummaryDataset {
   const generatedAt = new Date();
   const evaluatedRecords = records.filter(
@@ -150,7 +259,7 @@ export function buildSummaryDataset(
       toolCallDetailCount: 0,
     },
   );
-  return {
+  const summary: SummaryDataset = {
     generatedAtIso: generatedAt.toISOString(),
     generatedAtLocalIso: generatedAt.toString(),
     generatedAtEpochMs: generatedAt.getTime(),
@@ -176,14 +285,25 @@ export function buildSummaryDataset(
       (record) => record.difficulty,
     ),
   };
+
+  if (pairwiseJudgments !== undefined && pairwiseJudgments.length > 0) {
+    summary.pairwise = buildPairwiseAggregates(pairwiseJudgments);
+  }
+
+  return summary;
 }
 
 export function buildFullDataset(
   records: BenchmarkRunRecord[],
   protocolVersion: string,
+  pairwiseJudgments?: PairwiseJudgmentRecord[],
 ): FullDataset {
-  const summaryDataset = buildSummaryDataset(records, protocolVersion);
-  return {
+  const summaryDataset = buildSummaryDataset(
+    records,
+    protocolVersion,
+    pairwiseJudgments,
+  );
+  const dataset: FullDataset = {
     ...summaryDataset,
     byTask: aggregateByKey(records, (record) => record.taskId),
     byPackage: aggregateByKey(records, (record) => record.packageId),
@@ -196,4 +316,10 @@ export function buildFullDataset(
       difficulty: record.difficulty,
     })),
   };
+
+  if (pairwiseJudgments !== undefined && pairwiseJudgments.length > 0) {
+    dataset.pairwiseJudgments = pairwiseJudgments;
+  }
+
+  return dataset;
 }

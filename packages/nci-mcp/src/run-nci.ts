@@ -23,7 +23,7 @@ export function runNciSync(executable: string, args: string[]): CallToolResult {
   const status = outcome.status;
   const stdout = outcome.stdout ?? "";
   const stderr = outcome.stderr ?? "";
-  if (status !== 0 && status !== null) {
+  if (status !== 0 && status !== 2 && status !== null) {
     const parts = [stderr.trimEnd(), stdout.trimEnd()].filter(Boolean);
     return {
       content: [

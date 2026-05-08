@@ -242,6 +242,59 @@ fn contains_like_pattern(input_text: Option<&str>) -> Option<String> {
     input_text.map(|value| format!("%{value}%"))
 }
 
+/// Maximum number of host parameters bound per chunk in
+/// [`NciDatabase::load_symbol_snippets_by_stable_ids`]. Stays well under the SQLite
+/// `SQLITE_LIMIT_VARIABLE_NUMBER` default (999) so it works on every common build.
+const SNIPPET_BATCH_BIND_LIMIT: usize = 500;
+
+/// Column projection shared by every [`SymbolSearchHit`] producing query.
+///
+/// Order **must** match [`read_symbol_search_hit_row`].
+const SYMBOL_SEARCH_HIT_SELECT_COLS: &str = "indexed_symbol.symbol_id,
+            package_info.name,
+            package_info.version,
+            indexed_symbol.id,
+            indexed_symbol.name,
+            indexed_symbol.kind_name,
+            indexed_symbol.file_path,
+            indexed_symbol.signature,
+            indexed_symbol.is_internal,
+            indexed_symbol.source_package_name,
+            indexed_symbol.source_package_version,
+            indexed_symbol.source_file_path";
+
+/// Maps a row produced by [`SYMBOL_SEARCH_HIT_SELECT_COLS`] to a [`SymbolSearchHit`].
+fn read_symbol_search_hit_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SymbolSearchHit> {
+    let symbol_row_id: i64 = row.get(0)?;
+    let package_name: String = row.get(1)?;
+    let package_version: String = row.get(2)?;
+    let symbol_id: String = row.get(3)?;
+    let symbol_name: String = row.get(4)?;
+    let kind_name: String = row.get(5)?;
+    let file_path: String = row.get(6)?;
+    let signature: Option<String> = row.get(7)?;
+    let is_internal_int: i64 = row.get(8)?;
+    let source_package_name: String = row.get(9)?;
+    let source_package_version: Option<String> = row.get(10)?;
+    let source_file_path: String = row.get(11)?;
+    Ok(SymbolSearchHit {
+        symbol_row_id,
+        id: symbol_id,
+        name: symbol_name,
+        kind_name,
+        package_name,
+        package_version,
+        source: SymbolSourceIdentity {
+            package_name: source_package_name,
+            package_version: source_package_version,
+            file_path: source_file_path,
+        },
+        file_path,
+        signature_snippet: signature_snippet(signature.as_deref()),
+        is_internal: is_internal_int != 0,
+    })
+}
+
 impl NciDatabase {
     pub fn open(path: impl AsRef<Path>) -> StorageResult<Self> {
         let path_ref = path.as_ref();
@@ -1073,8 +1126,8 @@ impl NciDatabase {
             0_i64
         };
         let name_prefix_like = format!("{fts_match_query}%");
-        let mut statement = self.connection.prepare(
-            "SELECT indexed_symbol.symbol_id
+        let sql = format!(
+            "SELECT {select_cols}
              FROM symbols_fts
              JOIN symbols AS indexed_symbol ON indexed_symbol.symbol_id = symbols_fts.rowid
              JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
@@ -1094,8 +1147,10 @@ impl NciDatabase {
                indexed_symbol.is_internal,
                indexed_symbol.symbol_id
              LIMIT ?10",
-        )?;
-        let symbol_id_rows = statement.query_map(
+            select_cols = SYMBOL_SEARCH_HIT_SELECT_COLS,
+        );
+        let mut statement = self.connection.prepare(&sql)?;
+        let rows = statement.query_map(
             rusqlite::params![
                 fts_match_query,
                 filters.package_name.as_deref(),
@@ -1108,15 +1163,12 @@ impl NciDatabase {
                 name_prefix_like,
                 limit as i64,
             ],
-            |match_row| match_row.get::<_, i64>(0),
+            read_symbol_search_hit_row,
         )?;
 
         let mut output = Vec::new();
-        for symbol_id_result in symbol_id_rows {
-            let symbol_row_id = symbol_id_result?;
-            if let Some(search_hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
-                output.push(search_hit);
-            }
+        for hit_result in rows {
+            output.push(hit_result?);
         }
         Ok(output)
     }
@@ -1133,8 +1185,8 @@ impl NciDatabase {
         } else {
             0_i64
         };
-        let mut statement = self.connection.prepare(
-            "SELECT indexed_symbol.symbol_id
+        let sql = format!(
+            "SELECT {select_cols}
              FROM symbols AS indexed_symbol
              JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
              WHERE indexed_symbol.name = ?1
@@ -1146,8 +1198,10 @@ impl NciDatabase {
                AND (?7 != 0 OR indexed_symbol.is_internal = 0)
              ORDER BY indexed_symbol.is_internal, indexed_symbol.symbol_id
              LIMIT ?8",
-        )?;
-        let symbol_id_rows = statement.query_map(
+            select_cols = SYMBOL_SEARCH_HIT_SELECT_COLS,
+        );
+        let mut statement = self.connection.prepare(&sql)?;
+        let rows = statement.query_map(
             rusqlite::params![
                 symbol_name,
                 filters.package_name.as_deref(),
@@ -1158,15 +1212,12 @@ impl NciDatabase {
                 include_internal,
                 limit as i64,
             ],
-            |match_row| match_row.get::<_, i64>(0),
+            read_symbol_search_hit_row,
         )?;
 
         let mut output = Vec::new();
-        for symbol_id_result in symbol_id_rows {
-            let symbol_row_id = symbol_id_result?;
-            if let Some(search_hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
-                output.push(search_hit);
-            }
+        for hit_result in rows {
+            output.push(hit_result?);
         }
         Ok(output)
     }
@@ -1175,18 +1226,19 @@ impl NciDatabase {
         &self,
         stable_symbol_id: &str,
     ) -> StorageResult<Option<SymbolSearchHit>> {
-        let symbol_row_id = self
-            .connection
-            .query_row(
-                "SELECT symbol_id FROM symbols WHERE id = ?1 ORDER BY symbol_id LIMIT 1",
-                [stable_symbol_id],
-                |symbol_row| symbol_row.get::<_, i64>(0),
-            )
-            .optional()?;
-        match symbol_row_id {
-            Some(row_id) => self.load_symbol_search_hit_by_row_id(row_id),
-            None => Ok(None),
-        }
+        let sql = format!(
+            "SELECT {select_cols}
+             FROM symbols AS indexed_symbol
+             JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+             WHERE indexed_symbol.id = ?1
+             ORDER BY indexed_symbol.symbol_id
+             LIMIT 1",
+            select_cols = SYMBOL_SEARCH_HIT_SELECT_COLS,
+        );
+        self.connection
+            .query_row(&sql, [stable_symbol_id], read_symbol_search_hit_row)
+            .optional()
+            .map_err(Into::into)
     }
 
     /// Sibling overload rows for `stable_symbol_id`: rows in the same `package_id` whose
@@ -1215,25 +1267,26 @@ impl NciDatabase {
             return Ok(Vec::new());
         };
 
-        let mut statement = self.connection.prepare(
-            "SELECT symbol_id FROM symbols
-             WHERE package_id = ?1
-               AND name = ?2
-               AND ((?3 IS NULL AND parent_symbol_id IS NULL)
-                    OR parent_symbol_id = ?3)
-             ORDER BY symbol_id",
-        )?;
-        let row_ids = statement.query_map(
+        let sql = format!(
+            "SELECT {select_cols}
+             FROM symbols AS indexed_symbol
+             JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
+             WHERE indexed_symbol.package_id = ?1
+               AND indexed_symbol.name = ?2
+               AND ((?3 IS NULL AND indexed_symbol.parent_symbol_id IS NULL)
+                    OR indexed_symbol.parent_symbol_id = ?3)
+             ORDER BY indexed_symbol.symbol_id",
+            select_cols = SYMBOL_SEARCH_HIT_SELECT_COLS,
+        );
+        let mut statement = self.connection.prepare(&sql)?;
+        let rows = statement.query_map(
             rusqlite::params![package_id, name_text, parent_symbol_id_opt.as_deref()],
-            |row| row.get::<_, i64>(0),
+            read_symbol_search_hit_row,
         )?;
 
         let mut output = Vec::new();
-        for row_id_result in row_ids {
-            let symbol_row_id = row_id_result?;
-            if let Some(hit) = self.load_symbol_search_hit_by_row_id(symbol_row_id)? {
-                output.push(hit);
-            }
+        for hit_result in rows {
+            output.push(hit_result?);
         }
         Ok(output)
     }
@@ -1262,75 +1315,41 @@ impl NciDatabase {
             .map_err(Into::into)
     }
 
-    fn load_symbol_search_hit_by_row_id(
+    /// Batched snippet lookup. Returns a map id -> snippet for every id that resolved.
+    /// Missing ids simply have no entry.
+    ///
+    /// Chunks at [`SNIPPET_BATCH_BIND_LIMIT`] to stay safely under SQLite's host parameter
+    /// limit even on builds where the default ceiling is low.
+    pub fn load_symbol_snippets_by_stable_ids(
         &self,
-        symbol_row_id: i64,
-    ) -> StorageResult<Option<SymbolSearchHit>> {
-        let row_opt = self
-            .connection
-            .query_row(
-                "SELECT package_info.name, package_info.version, indexed_symbol.id,
-                        indexed_symbol.name, indexed_symbol.kind_name, indexed_symbol.file_path,
-                        indexed_symbol.signature, indexed_symbol.is_internal,
-                        indexed_symbol.source_package_name, indexed_symbol.source_package_version,
-                        indexed_symbol.source_file_path
-                 FROM symbols AS indexed_symbol
-                 JOIN packages AS package_info ON package_info.package_id = indexed_symbol.package_id
-                 WHERE indexed_symbol.symbol_id = ?1",
-                [symbol_row_id],
-                |symbol_row| {
-                    Ok((
-                        symbol_row.get::<_, String>(0)?,
-                        symbol_row.get::<_, String>(1)?,
-                        symbol_row.get::<_, String>(2)?,
-                        symbol_row.get::<_, String>(3)?,
-                        symbol_row.get::<_, String>(4)?,
-                        symbol_row.get::<_, String>(5)?,
-                        symbol_row.get::<_, Option<String>>(6)?,
-                        symbol_row.get::<_, i64>(7)?,
-                        symbol_row.get::<_, String>(8)?,
-                        symbol_row.get::<_, Option<String>>(9)?,
-                        symbol_row.get::<_, String>(10)?,
-                    ))
-                },
-            )
-            .optional()?;
-
-        let Some((
-            package_name,
-            package_version,
-            symbol_id,
-            symbol_name,
-            kind_name,
-            file_path,
-            signature,
-            is_internal_int,
-            source_package_name,
-            source_package_version,
-            source_file_path,
-        )) = row_opt
-        else {
-            return Ok(None);
-        };
-
-        let source = SymbolSourceIdentity {
-            package_name: source_package_name,
-            package_version: source_package_version,
-            file_path: source_file_path,
-        };
-
-        Ok(Some(SymbolSearchHit {
-            symbol_row_id,
-            id: symbol_id,
-            name: symbol_name,
-            kind_name,
-            package_name,
-            package_version,
-            source,
-            file_path,
-            signature_snippet: signature_snippet(signature.as_deref()),
-            is_internal: is_internal_int != 0,
-        }))
+        stable_symbol_ids: &[String],
+    ) -> StorageResult<HashMap<String, SymbolSnippet>> {
+        let mut output: HashMap<String, SymbolSnippet> = HashMap::new();
+        if stable_symbol_ids.is_empty() {
+            return Ok(output);
+        }
+        for chunk in stable_symbol_ids.chunks(SNIPPET_BATCH_BIND_LIMIT) {
+            let placeholders = std::iter::repeat_n("?", chunk.len())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sql =
+                format!("SELECT id, signature, js_doc FROM symbols WHERE id IN ({placeholders})",);
+            let mut statement = self.connection.prepare(&sql)?;
+            let bound_params: Vec<&dyn rusqlite::ToSql> =
+                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+            let rows = statement.query_map(bound_params.as_slice(), |snippet_row| {
+                Ok(SymbolSnippet {
+                    id: snippet_row.get::<_, String>(0)?,
+                    signature: snippet_row.get::<_, Option<String>>(1)?,
+                    js_doc: snippet_row.get::<_, Option<String>>(2)?,
+                })
+            })?;
+            for row_result in rows {
+                let snippet = row_result?;
+                output.insert(snippet.id.clone(), snippet);
+            }
+        }
+        Ok(output)
     }
 
     fn load_symbol_row_by_id(&self, symbol_row_id: i64) -> StorageResult<Option<SymbolNode>> {
@@ -2546,6 +2565,73 @@ mod tests {
         assert_eq!(hits[0].source.package_name, "lodash");
         assert_eq!(hits[0].source.file_path, "add.d.ts");
         assert_eq!(hits[0].source.package_version, None);
+    }
+
+    #[test]
+    fn batched_snippet_loader_returns_one_row_per_id_in_one_call() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp.path().join("batch-snippets.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("batch-pkg"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/batch-pkg"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let mut alpha = minimal_symbol("batch-pkg@1.0.0::alpha", "alpha");
+        alpha.signature = Some(SharedString::from("declare function alpha(): void"));
+        alpha.js_doc = Some(SharedString::from("Alpha doc."));
+        let mut beta = minimal_symbol("batch-pkg@1.0.0::beta", "beta");
+        beta.signature = Some(SharedString::from("declare function beta(): void"));
+        beta.js_doc = Some(SharedString::from("Beta doc."));
+        let mut gamma = minimal_symbol("batch-pkg@1.0.0::gamma", "gamma");
+        gamma.signature = Some(SharedString::from("declare function gamma(): void"));
+        gamma.js_doc = None;
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![alpha, beta, gamma],
+            total_symbols: 3,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        database
+            .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
+            .expect("save");
+
+        let requested_ids = vec![
+            "batch-pkg@1.0.0::alpha".to_string(),
+            "batch-pkg@1.0.0::beta".to_string(),
+            "batch-pkg@1.0.0::gamma".to_string(),
+            "batch-pkg@1.0.0::missing".to_string(),
+        ];
+
+        let snippets = database
+            .load_symbol_snippets_by_stable_ids(&requested_ids)
+            .expect("batched snippets");
+
+        assert_eq!(
+            snippets.len(),
+            3,
+            "missing ids must be skipped: {snippets:?}"
+        );
+        let alpha_snippet = snippets
+            .get("batch-pkg@1.0.0::alpha")
+            .expect("alpha snippet present");
+        assert_eq!(
+            alpha_snippet.signature.as_deref(),
+            Some("declare function alpha(): void")
+        );
+        assert_eq!(alpha_snippet.js_doc.as_deref(), Some("Alpha doc."));
+        assert!(!snippets.contains_key("batch-pkg@1.0.0::missing"));
+
+        // Empty input must return an empty map without touching SQLite.
+        let empty = database
+            .load_symbol_snippets_by_stable_ids(&[])
+            .expect("empty batch");
+        assert!(empty.is_empty());
     }
 
     #[test]

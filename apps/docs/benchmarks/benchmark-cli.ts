@@ -31,11 +31,13 @@ async function main(): Promise<void> {
     taskManifestFileName:
       flag(flags, "--task-manifest") ?? DEFAULT_TASK_MANIFEST_FILE_NAME,
     mode: flag(flags, "--mode") === "full" ? "full" : "pilot",
-    protocolVersion: flag(flags, "--protocol-version") ?? "2026-05-01",
+    protocolVersion: flag(flags, "--protocol-version") ?? "2026-05-07",
     modelId: flag(flags, "--model-id") ?? "composer-2",
     nciBinaryPath: flag(flags, "--nci-binary-path"),
     performExecution: flag(flags, "--execute") === "true",
     includeCloudRuntime: flag(flags, "--include-cloud") === "true",
+    pairwiseJudge: flag(flags, "--pairwise-judge") === "true",
+    pairwiseJudgeModel: flag(flags, "--pairwise-judge-model"),
     taskIds: splitCommaList(flag(flags, "--task-ids")),
     difficultyFilter: parseDifficultyList(flag(flags, "--difficulty")),
     taskOrder: taskOrderRaw === "random" ? "random" : "manifest",
@@ -43,8 +45,7 @@ async function main(): Promise<void> {
     sequentialStep: flag(flags, "--sequential-step") === "true",
     sequentialStepStatePath: flag(flags, "--sequential-step-state-path"),
     resetSequentialStep: flag(flags, "--reset-sequential-step") === "true",
-    sequentialStepRequireCorrectness:
-      flag(flags, "--sequential-step-require-correctness") === "true",
+    sequentialStepStrict: flag(flags, "--sequential-step-strict") === "true",
     taskLimit: parsePositiveIntFlag(
       flag(flags, "--task-limit"),
       "--task-limit",
