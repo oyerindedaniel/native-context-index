@@ -7,13 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@pulumi/aws':
-        specifier: ^7.8.0
-        version: 7.24.0(ts-node@10.9.2(@types/node@22.15.3)(typescript@5.9.2))(typescript@5.9.2)
-      '@pulumi/pulumi':
-        specifier: ^3.159.0
-        version: 3.159.0(ts-node@10.9.2(@types/node@22.15.3)(typescript@5.9.2))(typescript@5.9.2)
     devDependencies:
       '@types/node':
         specifier: ^22.15.3

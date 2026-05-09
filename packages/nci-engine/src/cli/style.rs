@@ -117,8 +117,14 @@ pub(crate) fn emit_progress_line(scope: &str, tone: ProgressTone, message: &str)
     } else {
         progress_tag(tone).to_string()
     };
-    eprintln!("{tag} {scope}: {message}");
-    let _ = io::stderr().flush();
+    let stderr_is_tty = io::stderr().is_terminal();
+    let stderr = io::stderr();
+    let mut handle = stderr.lock();
+    if stderr_is_tty {
+        let _ignored = write!(handle, "{ERASE_LINE}");
+    }
+    let _ignored = writeln!(handle, "{tag} {scope}: {message}");
+    let _ignored = handle.flush();
 }
 
 pub(crate) struct TtyProgressSpinner {

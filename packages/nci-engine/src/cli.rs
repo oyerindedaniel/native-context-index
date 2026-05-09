@@ -1497,24 +1497,49 @@ fn detect_project_package_manager(
     "unknown".to_string()
 }
 
-fn collect_node_modules_roots(
+fn collect_unique_workspace_dirs(
     project_root: &Path,
     file: Option<&NciConfigFile>,
+) -> Vec<PathBuf> {
+    let Some(file_cfg) = file else {
+        return Vec::new();
+    };
+    let Some(workspaces) = &file_cfg.workspaces else {
+        return Vec::new();
+    };
+    let mut seen_canonical: HashSet<PathBuf> = HashSet::new();
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for pattern in workspaces {
+        for workspace_dir in expand_workspace_pattern(project_root, pattern) {
+            let canonical =
+                fs::canonicalize(&workspace_dir).unwrap_or_else(|_| workspace_dir.clone());
+            if seen_canonical.insert(canonical) {
+                dirs.push(workspace_dir);
+            }
+        }
+    }
+    dirs
+}
+
+fn collect_workspace_manifest_dirs(workspace_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    workspace_dirs
+        .iter()
+        .filter(|dir| dir.join("package.json").is_file())
+        .cloned()
+        .collect()
+}
+
+fn collect_node_modules_roots(
+    project_root: &Path,
+    workspace_dirs: &[PathBuf],
     include_root_workspace: bool,
 ) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if include_root_workspace {
         roots.push(project_root.join("node_modules"));
     }
-    if let Some(file_cfg) = file
-        && let Some(workspaces) = &file_cfg.workspaces
-    {
-        for pattern in workspaces {
-            let workspace_dirs = expand_workspace_pattern(project_root, pattern);
-            for workspace_dir in workspace_dirs {
-                roots.push(workspace_dir.join("node_modules"));
-            }
-        }
+    for workspace_dir in workspace_dirs {
+        roots.push(workspace_dir.join("node_modules"));
     }
     let mut seen_canonical: HashSet<PathBuf> = HashSet::new();
     let mut deduped: Vec<PathBuf> = Vec::new();
@@ -1675,8 +1700,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
     let show_progress = should_print_progress(fmt, file)?;
     let include_root_workspace = resolve_index_root_workspace(bulk, file);
     ensure_index_root_workspace_valid(file, include_root_workspace)?;
+    let workspace_dirs = collect_unique_workspace_dirs(&project_root, file);
+    let workspace_manifest_dirs = collect_workspace_manifest_dirs(&workspace_dirs);
     let node_modules_roots =
-        collect_node_modules_roots(&project_root, file, include_root_workspace);
+        collect_node_modules_roots(&project_root, &workspace_dirs, include_root_workspace);
     if node_modules_roots.is_empty() {
         return emit_error(
             fmt,
@@ -1693,7 +1720,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
             emit_progress_line("index dry-run", ProgressTone::Step, "scanning packages");
         }
         let mut opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
-        opts.filter = opts.filter.with_nciignore_file(&config_dir);
+        opts.filter = opts
+            .filter
+            .with_nciignore_file(&config_dir)
+            .with_workspace_manifest_dirs(workspace_manifest_dirs.clone());
         let filtered = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
             .map_err(|scan_err: ScanError| scan_err.to_string())?;
         if show_progress {
@@ -1770,7 +1800,15 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
             }
             let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
             let opts = with_plain_index_progress(opts, 1, show_progress);
+            let index_tail_spinner = if show_progress {
+                TtyProgressSpinner::try_start()
+            } else {
+                None
+            };
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
+            if let Some(spinner_handle) = index_tail_spinner {
+                spinner_handle.finish();
+            }
             print_index_summary(fmt, &out)?;
         }
         None => {
@@ -1783,7 +1821,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 );
             }
             let mut opts = build_index_options(cli, file, &config_dir, project_root, bulk)?;
-            opts.filter = opts.filter.with_nciignore_file(&config_dir);
+            opts.filter = opts
+                .filter
+                .with_nciignore_file(&config_dir)
+                .with_workspace_manifest_dirs(workspace_manifest_dirs.clone());
             let packages = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
                 .map_err(|scan_err: ScanError| scan_err.to_string())?;
             if packages.is_empty() {
@@ -1824,7 +1865,15 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 );
             }
             let opts = with_plain_index_progress(opts, packages.len(), show_progress);
+            let index_tail_spinner = if show_progress {
+                TtyProgressSpinner::try_start()
+            } else {
+                None
+            };
             let indexed = pipeline::index_packages(&packages, Some(opts));
+            if let Some(spinner_handle) = index_tail_spinner {
+                spinner_handle.finish();
+            }
             print_index_summary(fmt, &indexed)?;
         }
     }
@@ -2293,8 +2342,12 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             );
             let include_root_workspace = resolve_index_root_workspace_config_only(file);
             ensure_index_root_workspace_valid(file, include_root_workspace)?;
-            let node_modules_roots =
-                collect_node_modules_roots(&context.project_root, file, include_root_workspace);
+            let workspace_dirs = collect_unique_workspace_dirs(&context.project_root, file);
+            let node_modules_roots = collect_node_modules_roots(
+                &context.project_root,
+                &workspace_dirs,
+                include_root_workspace,
+            );
             if node_modules_roots.is_empty() {
                 return emit_error(
                     fmt,

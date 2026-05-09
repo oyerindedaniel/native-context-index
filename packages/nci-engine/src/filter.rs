@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
@@ -23,7 +23,7 @@ pub enum DepKindFilter {
 #[derive(Debug, Clone, Default)]
 pub struct FilterConfig {
     /// Root directory to resolve `.nciignore` and consumer `package.json` from.
-    pub project_root: Option<std::path::PathBuf>,
+    pub project_root: Option<PathBuf>,
     /// Patterns from `.nciignore` (gitignore-style last-match wins).
     pub nciignore_rules: Vec<IgnoreRule>,
     /// Restrict to names appearing in the given sections of `package.json`.
@@ -38,6 +38,9 @@ pub struct FilterConfig {
     /// When non-empty, only packages whose names match at least one of these globs are kept
     /// (e.g. repeatable CLI `--package` or `nci.config.json` `packages.include`).
     pub include_globs: Vec<String>,
+
+    /// Extra manifest directories unioned with `project_root` for the dep-kind allow-list.
+    pub workspace_manifest_dirs: Vec<PathBuf>,
 }
 
 /// One line from `.nciignore`: positive pattern ignores; `negated` means "do not ignore".
@@ -55,18 +58,42 @@ impl FilterConfig {
         self
     }
 
+    /// Register monorepo workspace directories whose `package.json` extends the
+    /// `dep_kind_filter` allow-list. Each `dir` is the workspace folder itself
+    pub fn with_workspace_manifest_dirs(mut self, dirs: Vec<PathBuf>) -> Self {
+        self.workspace_manifest_dirs = dirs;
+        self
+    }
+
     pub fn apply(self, packages: Vec<PackageInfo>) -> Vec<PackageInfo> {
         let allowed_by_package_json: Option<HashSet<String>> =
             if self.dep_kind_filter == DepKindFilter::All {
                 None
             } else {
-                self.project_root.as_ref().and_then(|root| {
-                    load_allowed_package_names_from_package_json(
-                        root,
+                let mut manifest_dirs: Vec<&Path> = Vec::new();
+                if let Some(root) = self.project_root.as_ref() {
+                    manifest_dirs.push(root.as_path());
+                }
+                for workspace_dir in &self.workspace_manifest_dirs {
+                    manifest_dirs.push(workspace_dir.as_path());
+                }
+                let mut union: HashSet<String> = HashSet::new();
+                let mut found_any_manifest = false;
+                for manifest_dir in manifest_dirs {
+                    if let Some(names) = load_allowed_package_names_from_package_json(
+                        manifest_dir,
                         self.dep_kind_filter,
                         self.include_peer_dependencies,
-                    )
-                })
+                    ) {
+                        union.extend(names);
+                        found_any_manifest = true;
+                    }
+                }
+                if found_any_manifest {
+                    Some(union)
+                } else {
+                    None
+                }
             };
 
         packages
@@ -686,6 +713,52 @@ mod tests {
         assert!(
             out.is_empty(),
             "no dependencies key -> empty allow set -> everything filtered out"
+        );
+    }
+
+    #[test]
+    fn apply_dep_filter_unions_root_and_workspace_manifests() {
+        let temp = tempfile::tempdir().unwrap();
+        let root_dir = temp.path().join("repo");
+        let workspace_dir = root_dir.join("apps").join("web");
+        std::fs::create_dir_all(&workspace_dir).unwrap();
+
+        let root_pkg = serde_json::json!({
+            "dependencies": {"lodash": "^4"}
+        });
+        std::fs::write(
+            root_dir.join("package.json"),
+            serde_json::to_string(&root_pkg).unwrap(),
+        )
+        .unwrap();
+
+        let workspace_pkg = serde_json::json!({
+            "dependencies": {"react": "^18"}
+        });
+        std::fs::write(
+            workspace_dir.join("package.json"),
+            serde_json::to_string(&workspace_pkg).unwrap(),
+        )
+        .unwrap();
+
+        let out = FilterConfig {
+            project_root: Some(root_dir.clone()),
+            dep_kind_filter: DepKindFilter::DependenciesOnly,
+            workspace_manifest_dirs: vec![workspace_dir.clone()],
+            ..Default::default()
+        }
+        .apply(vec![
+            sample_package("lodash"),
+            sample_package("react"),
+            sample_package("missing"),
+        ]);
+
+        let names: Vec<_> = out.iter().map(|pkg| pkg.name.as_ref()).collect();
+        assert!(names.contains(&"lodash"), "root manifest dep retained");
+        assert!(names.contains(&"react"), "workspace manifest dep retained");
+        assert!(
+            !names.contains(&"missing"),
+            "names absent from both manifests still dropped"
         );
     }
 
