@@ -735,11 +735,12 @@ impl CrawlSession {
                     | SymbolKind::ExportDeclaration
                     | SymbolKind::ImportEquals
             ) {
-                let assignment_results = resolve_local_assignment(
+                let assignment_results = self.resolve_local_assignment(
                     export_entry,
                     &local_index,
                     local_keys_sorted.as_slice(),
                     &normalized_path,
+                    depth,
                     name_prefix,
                 );
                 results.extend(assignment_results);
@@ -906,10 +907,125 @@ impl CrawlSession {
 
         results
     }
+
+    /// Local-assignment exports (`export { x as y }` / `export default x` / `import x = require`).
+    /// On `local_index` miss, falls back to ES import bindings via a synthesized re-export so
+    /// the two-statement `import { X }; export { X };` form lands on the public surface.
+    fn resolve_local_assignment(
+        &mut self,
+        export_entry: &ParsedExport,
+        local_index: &HashMap<SharedString, Vec<ParsedExport>>,
+        local_keys_sorted: &[SharedString],
+        current_file: &SharedString,
+        depth: usize,
+        name_prefix: &str,
+    ) -> Vec<ResolvedSymbol> {
+        let target_name = export_entry
+            .original_name
+            .as_deref()
+            .unwrap_or(export_entry.name.as_ref());
+
+        if let Some(targets) = local_index.get(target_name) {
+            // Same statement can list the same binding twice (e.g. `Foo as Bar` and `Foo`).
+            // The clause currently being resolved is skipped; forwarding rows stay in play.
+            let actual_targets: Vec<&ParsedExport> = targets
+                .iter()
+                .filter(|target| !is_same_export_clause_row(target, export_entry))
+                .collect();
+
+            if !actual_targets.is_empty() {
+                let mut results: Vec<ResolvedSymbol> = Vec::new();
+                let full_name = if name_prefix.is_empty() {
+                    export_entry.name.clone()
+                } else {
+                    SharedString::from(
+                        format!("{}.{}", name_prefix, export_entry.name.as_ref()).as_ref(),
+                    )
+                };
+
+                for target in &actual_targets {
+                    let is_internal = target.kind == SymbolKind::ExportAssignment
+                        && full_name.as_ref() == "default";
+                    results.push(ResolvedSymbol {
+                        name: full_name.clone(),
+                        is_internal,
+                        ..ResolvedSymbol::from_export(target, current_file.clone())
+                    });
+                }
+
+                for target in &actual_targets {
+                    let member_prefix = format!("{}.", target.name.as_ref());
+                    let mut matching_members: Vec<&ParsedExport> = Vec::new();
+                    for member_name in local_keys_sorted {
+                        if member_name.as_ref().starts_with(&member_prefix) {
+                            matching_members.extend(local_index[member_name].iter());
+                        }
+                    }
+                    for member in &matching_members {
+                        let local_member_name = &member.name.as_ref()[member_prefix.len()..];
+                        let new_name = if name_prefix.is_empty() {
+                            format!("{}.{}", export_entry.name.as_ref(), local_member_name)
+                        } else {
+                            format!(
+                                "{}.{}.{}",
+                                name_prefix,
+                                export_entry.name.as_ref(),
+                                local_member_name
+                            )
+                        };
+                        results.push(ResolvedSymbol {
+                            name: SharedString::from(new_name.as_ref()),
+                            ..ResolvedSymbol::from_export(member, current_file.clone())
+                        });
+                    }
+                }
+
+                return results;
+            }
+        }
+
+        // Only runs when local_index missed.
+        let import_match = self
+            .raw_imports
+            .get(current_file)
+            .and_then(|imports_for_file| {
+                imports_for_file
+                    .iter()
+                    .find(|import_entry| import_entry.name.as_ref() == target_name)
+                    .cloned()
+            });
+
+        let parsed_import = match import_match {
+            Some(parsed_import) => parsed_import,
+            None => return Vec::new(),
+        };
+
+        let foreign_name: SharedString = parsed_import.original_name.clone().unwrap_or_else(|| {
+            if parsed_import.is_default {
+                SharedString::from("default")
+            } else {
+                parsed_import.name.clone()
+            }
+        });
+
+        let synthetic = ParsedExport {
+            name: export_entry.name.clone(),
+            kind: SymbolKind::ExportDeclaration,
+            source: Some(parsed_import.source.clone()),
+            original_name: if foreign_name == export_entry.name {
+                None
+            } else {
+                Some(foreign_name)
+            },
+            is_namespace_export: parsed_import.is_namespace,
+            is_explicit_export: true,
+            ..ParsedExport::new(export_entry.name.clone(), SymbolKind::ExportDeclaration)
+        };
+
+        self.resolve_re_export(&synthetic, current_file, depth, name_prefix)
+    }
 }
 
-/// Whether `target` is the same export-clause element as `export_entry`.
-/// The index stores clones, so identity uses these fields instead of pointer equality.
 fn is_same_export_clause_row(target: &ParsedExport, export_entry: &ParsedExport) -> bool {
     target.name == export_entry.name
         && target.kind == export_entry.kind
@@ -918,87 +1034,6 @@ fn is_same_export_clause_row(target: &ParsedExport, export_entry: &ParsedExport)
         && target.is_wildcard == export_entry.is_wildcard
         && target.is_namespace_export == export_entry.is_namespace_export
         && target.signature == export_entry.signature
-}
-
-/// Resolves symbols that are locally assigned (e.g., `export { x as y }`
-/// or `export default x`).
-fn resolve_local_assignment(
-    export_entry: &ParsedExport,
-    local_index: &HashMap<SharedString, Vec<ParsedExport>>,
-    local_keys_sorted: &[SharedString],
-    current_file: &SharedString,
-    name_prefix: &str,
-) -> Vec<ResolvedSymbol> {
-    let target_name = export_entry
-        .original_name
-        .as_deref()
-        .unwrap_or(export_entry.name.as_ref());
-
-    let targets = match local_index.get(target_name) {
-        Some(targets) => targets,
-        None => return Vec::new(),
-    };
-
-    // One statement can list the same local binding twice (e.g. `Foo as Bar` and `Foo`). Resolving
-    // `Bar` looks up `Foo` and finds both the declaration and any other export rows for `Foo`;
-    // forwarding rows stay in play—only the clause currently being resolved is skipped.
-    let actual_targets: Vec<&ParsedExport> = targets
-        .iter()
-        .filter(|target| !is_same_export_clause_row(target, export_entry))
-        .collect();
-
-    if actual_targets.is_empty() {
-        return Vec::new();
-    }
-
-    let mut results: Vec<ResolvedSymbol> = Vec::new();
-    let full_name = if name_prefix.is_empty() {
-        export_entry.name.clone()
-    } else {
-        SharedString::from(format!("{}.{}", name_prefix, export_entry.name.as_ref()).as_ref())
-    };
-
-    for target in &actual_targets {
-        let is_internal =
-            target.kind == SymbolKind::ExportAssignment && full_name.as_ref() == "default";
-        results.push(ResolvedSymbol {
-            name: full_name.clone(),
-            is_internal,
-            ..ResolvedSymbol::from_export(target, current_file.clone())
-        });
-    }
-
-    for target in &actual_targets {
-        let member_prefix = format!("{}.", target.name.as_ref());
-        let mut matching_members: Vec<&ParsedExport> = Vec::new();
-
-        for member_name in local_keys_sorted {
-            if member_name.as_ref().starts_with(&member_prefix) {
-                matching_members.extend(local_index[member_name].iter());
-            }
-        }
-
-        for member in &matching_members {
-            let local_member_name = &member.name.as_ref()[member_prefix.len()..];
-            let new_name = if name_prefix.is_empty() {
-                format!("{}.{}", export_entry.name.as_ref(), local_member_name)
-            } else {
-                format!(
-                    "{}.{}.{}",
-                    name_prefix,
-                    export_entry.name.as_ref(),
-                    local_member_name
-                )
-            };
-
-            results.push(ResolvedSymbol {
-                name: SharedString::from(new_name.as_ref()),
-                ..ResolvedSymbol::from_export(member, current_file.clone())
-            });
-        }
-    }
-
-    results
 }
 
 #[cfg(test)]
@@ -1380,6 +1415,39 @@ mod tests {
                 .map(|symbol| (symbol.name.as_ref(), symbol.kind))
                 .collect::<Vec<_>>()
         );
+    }
+
+    /// Two-statement `import { X }; export { X };` and its alias/default/namespace
+    /// variants land on the public surface (is_internal = false).
+    #[test]
+    fn crawl_local_import_reexport_promotes_imported_bindings_to_surface() {
+        let entry = fixture_entry_absolute("local-import-reexport", "index.d.ts");
+
+        let result = crawl(&[entry], None);
+
+        let find_named = |name: &str| {
+            result
+                .exports
+                .iter()
+                .find(|symbol| symbol.name.as_ref() == name)
+        };
+
+        for surface_name in ["Random", "Renamed", "defaultThing", "ns"] {
+            let resolved = find_named(surface_name).unwrap_or_else(|| {
+                panic!(
+                    "expected {surface_name} on public surface; got {:?}",
+                    result
+                        .exports
+                        .iter()
+                        .map(|symbol| symbol.name.as_ref())
+                        .collect::<Vec<_>>()
+                )
+            });
+            assert!(
+                !resolved.is_internal,
+                "{surface_name} should land on public surface, got is_internal=true"
+            );
+        }
     }
 
     /// Duplicate local names in one export list (`X as Alias` and `X`) yield `Alias` as both the

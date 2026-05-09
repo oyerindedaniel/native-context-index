@@ -463,6 +463,26 @@ describe("crawl", () => {
     expect(internalSymbols).toHaveLength(0);
   });
 
+  it("promotes two-statement `import { X }; export { X }` (and alias/default/namespace variants) to the public surface", () => {
+    const result = crawl(
+      path.join(FIXTURES_DIR, "local-import-reexport", "index.d.ts"),
+    );
+
+    for (const surfaceName of ["Random", "Renamed", "defaultThing", "ns"]) {
+      const symbol = result.exports.find(
+        (exportEntry) => exportEntry.name === surfaceName,
+      );
+      expect(
+        symbol,
+        `${surfaceName} missing from public surface`,
+      ).toBeDefined();
+      expect(
+        symbol!.isInternal,
+        `${surfaceName} should be on public surface (isInternal=false)`,
+      ).toBeFalsy();
+    }
+  });
+
   it("handles broken triple-slash references gracefully", () => {
     const result = crawl(
       path.join(FIXTURES_DIR, "broken-triple-slash", "index.d.ts"),

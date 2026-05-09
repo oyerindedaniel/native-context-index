@@ -3130,10 +3130,10 @@ fn extract_heritage_from_interface(
 }
 
 fn dedupe_shared_strings_preserve_order(values: Vec<SharedString>) -> Vec<SharedString> {
-    let mut seen: HashSet<SharedString> = HashSet::new();
     let mut result: Vec<SharedString> = Vec::with_capacity(values.len());
     for value in values {
-        if seen.insert(value.clone()) {
+        let duplicate = result.iter().any(|existing| existing == &value);
+        if !duplicate {
             result.push(value);
         }
     }

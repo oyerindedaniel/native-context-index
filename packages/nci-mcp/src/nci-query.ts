@@ -93,7 +93,7 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Max hits to return (CLI: `-n` / `--limit`; default 20)."),
+        .describe("Max hits to return (CLI: `--limit`; default 20)."),
       ...symbolFilterShape,
     }),
     z.object({
@@ -107,7 +107,7 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Max hits to return (CLI: `-n`; default 20)."),
+        .describe("Max hits to return (CLI: `--limit`; default 20)."),
       ...symbolFilterShape,
     }),
     z.object({
@@ -191,7 +191,7 @@ export const nciQueryInputSchema = z.preprocess(
       subcommand: z
         .literal("symbols")
         .describe(
-          "Paginated symbol listing for one indexed package@version (uses --offset/-n, not max-rows).",
+          "Paginated symbol listing for one indexed package@version (uses --offset/--limit, not max-rows).",
         ),
       database: databaseField,
       name: z.string().describe("Indexed npm package name."),
@@ -201,7 +201,7 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Page size (CLI: `-n`; default 100)."),
+        .describe("Page size (CLI: `--limit`; default 100)."),
       offset: z
         .number()
         .int()
@@ -283,7 +283,7 @@ export const nciQueryDescription =
   "Query the NCI index for symbols, packages, and source packages (CLI equivalent: `nci query <subcommand>`). " +
   "Subcommands: evidence (bundled exact + FTS hits + batched snippets in ONE call — preferred for 'find these symbols and cite them'), find (FTS), symbol (exact), show, snippet, overloads, packages, package_versions, package_deps, source_packages, active_package, symbols (paginated). " +
   'JSON output uses the CLI envelope: `{"ok":true,"data":...}` on success, `{"ok":false,...}` on error. ' +
-  "Use `nci_sql` for relational joins. Use `-n` / `limit` to cap result counts (NOT `max_rows`).";
+  "Use `nci_sql` for relational joins. Use `--limit` to cap result counts (NOT `max_rows`).";
 
 type SymbolFilterInput = {
   package_name?: string;
@@ -330,7 +330,7 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
     case "find": {
       argv.push("find");
       if (input.limit != null) {
-        argv.push("-n", String(input.limit));
+        argv.push("--limit", String(input.limit));
       }
       appendSymbolFilters(argv, input);
       argv.push(input.fts_query);
@@ -339,7 +339,7 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
     case "symbol": {
       argv.push("symbol", input.name);
       if (input.limit != null) {
-        argv.push("-n", String(input.limit));
+        argv.push("--limit", String(input.limit));
       }
       appendSymbolFilters(argv, input);
       return argv;
@@ -371,7 +371,7 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
     case "symbols": {
       argv.push("symbols", input.name, input.version);
       if (input.limit != null) {
-        argv.push("-n", String(input.limit));
+        argv.push("--limit", String(input.limit));
       }
       if (input.offset != null && input.offset > 0) {
         argv.push("--offset", String(input.offset));
@@ -403,7 +403,7 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
         argv.push("--public-only");
       }
       if (input.limit != null) {
-        argv.push("-n", String(input.limit));
+        argv.push("--limit", String(input.limit));
       }
       if (input.snippet_limit != null) {
         argv.push("--snippet-limit", String(input.snippet_limit));

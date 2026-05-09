@@ -522,6 +522,7 @@ export function crawl(
             exportEntry,
             localIndex,
             normalizedPath,
+            depth,
             namePrefix,
           ),
         );
@@ -680,84 +681,116 @@ export function crawl(
     return results;
   }
 
-  /** Resolve symbols that are assigned locally. */
+  /**
+   * Local-assignment exports (`export { x as y }` / `export default x` / `import x = require`).
+   * On `localIndex` miss, falls back to ES import bindings via a synthesized re-export so
+   * the two-statement `import { X }; export { X };` form lands on the public surface.
+   */
   function resolveLocalAssignment(
     exportEntry: ParsedExport,
     localIndex: Map<string, ParsedExport[]>,
     currentFile: string,
+    depth: number,
     namePrefix: string,
   ): ResolvedSymbol[] {
     const targetName = exportEntry.originalName ?? exportEntry.name;
-    const targets = localIndex.get(targetName) || [];
-
+    const targets = localIndex.get(targetName) ?? [];
     const actualTargets = targets.filter((target) => target !== exportEntry);
 
-    if (actualTargets.length === 0) return [];
+    if (actualTargets.length > 0) {
+      const results: ResolvedSymbol[] = [];
+      const fullName = namePrefix
+        ? `${namePrefix}.${exportEntry.name}`
+        : exportEntry.name;
 
-    const results: ResolvedSymbol[] = [];
-    const fullName = namePrefix
-      ? `${namePrefix}.${exportEntry.name}`
-      : exportEntry.name;
-
-    for (const target of actualTargets) {
-      results.push({
-        name: fullName,
-        kind: target.kind,
-        kindName: target.kindName,
-        isTypeOnly: target.isTypeOnly,
-        symbolSpace: target.symbolSpace,
-        signature: target.signature,
-        jsDoc: target.jsDoc,
-        definedIn: currentFile,
-        dependencies: target.dependencies,
-        deprecated: target.deprecated,
-        visibility: target.visibility,
-        since: target.since,
-        heritage: target.heritage,
-        decorators: target.decorators,
-        modifiers: target.modifiers,
-        isGlobalAugmentation: target.isGlobalAugmentation,
-        enclosingModuleDeclarationName: target.enclosingModuleDeclarationName,
-      });
-    }
-
-    // Expand namespace members using prefix matching for each target
-    for (const target of actualTargets) {
-      const memberPrefix = target.name + ".";
-      const matchingMembers: ParsedExport[] = [];
-      for (const [memberName, members] of localIndex) {
-        if (memberName.startsWith(memberPrefix)) {
-          matchingMembers.push(...members);
-        }
-      }
-      for (const member of matchingMembers) {
-        const localMemberName = member.name.slice(memberPrefix.length);
-        const newName = namePrefix
-          ? `${namePrefix}.${exportEntry.name}.${localMemberName}`
-          : `${exportEntry.name}.${localMemberName}`;
+      for (const target of actualTargets) {
         results.push({
-          name: newName,
-          kind: member.kind,
-          kindName: member.kindName,
-          isTypeOnly: member.isTypeOnly,
-          symbolSpace: member.symbolSpace,
-          signature: member.signature,
-          jsDoc: member.jsDoc,
+          name: fullName,
+          kind: target.kind,
+          kindName: target.kindName,
+          isTypeOnly: target.isTypeOnly,
+          symbolSpace: target.symbolSpace,
+          signature: target.signature,
+          jsDoc: target.jsDoc,
           definedIn: currentFile,
-          dependencies: member.dependencies,
-          deprecated: member.deprecated,
-          visibility: member.visibility,
-          since: member.since,
-          heritage: member.heritage,
-          decorators: member.decorators,
-          modifiers: member.modifiers,
-          isGlobalAugmentation: member.isGlobalAugmentation,
-          enclosingModuleDeclarationName: member.enclosingModuleDeclarationName,
+          dependencies: target.dependencies,
+          deprecated: target.deprecated,
+          visibility: target.visibility,
+          since: target.since,
+          heritage: target.heritage,
+          decorators: target.decorators,
+          modifiers: target.modifiers,
+          isGlobalAugmentation: target.isGlobalAugmentation,
+          enclosingModuleDeclarationName: target.enclosingModuleDeclarationName,
         });
       }
+
+      // Expand namespace members using prefix matching for each target
+      for (const target of actualTargets) {
+        const memberPrefix = target.name + ".";
+        const matchingMembers: ParsedExport[] = [];
+        for (const [memberName, members] of localIndex) {
+          if (memberName.startsWith(memberPrefix)) {
+            matchingMembers.push(...members);
+          }
+        }
+        for (const member of matchingMembers) {
+          const localMemberName = member.name.slice(memberPrefix.length);
+          const newName = namePrefix
+            ? `${namePrefix}.${exportEntry.name}.${localMemberName}`
+            : `${exportEntry.name}.${localMemberName}`;
+          results.push({
+            name: newName,
+            kind: member.kind,
+            kindName: member.kindName,
+            isTypeOnly: member.isTypeOnly,
+            symbolSpace: member.symbolSpace,
+            signature: member.signature,
+            jsDoc: member.jsDoc,
+            definedIn: currentFile,
+            dependencies: member.dependencies,
+            deprecated: member.deprecated,
+            visibility: member.visibility,
+            since: member.since,
+            heritage: member.heritage,
+            decorators: member.decorators,
+            modifiers: member.modifiers,
+            isGlobalAugmentation: member.isGlobalAugmentation,
+            enclosingModuleDeclarationName:
+              member.enclosingModuleDeclarationName,
+          });
+        }
+      }
+
+      return results;
     }
 
-    return results;
+    // Only runs when localIndex missed.
+    const importsForFile = allRawImports.get(currentFile);
+    if (!importsForFile) return [];
+
+    const parsedImport = importsForFile.find(
+      (importEntry) => importEntry.name === targetName,
+    );
+    if (!parsedImport) return [];
+
+    const foreignName: string =
+      parsedImport.originalName ??
+      (parsedImport.isDefault ? "default" : parsedImport.name);
+
+    const synthetic: ParsedExport = {
+      name: exportEntry.name,
+      kind: ts.SyntaxKind.ExportDeclaration,
+      kindName: "ExportDeclaration",
+      source: parsedImport.source,
+      originalName: foreignName === exportEntry.name ? undefined : foreignName,
+      isNamespaceExport: parsedImport.isNamespace ?? false,
+      isExplicitExport: true,
+      isTypeOnly: false,
+      symbolSpace: exportEntry.symbolSpace,
+    };
+
+    return resolveReExport(synthetic, currentFile, depth, namePrefix);
   }
 
   const visitedFiles = [...visited].sort((a, b) =>

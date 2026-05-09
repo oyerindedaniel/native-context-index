@@ -368,6 +368,7 @@ snapshot_test!(snapshot_string_exports, "string-exports");
 snapshot_test!(snapshot_namespace_reexport, "namespace-reexport");
 snapshot_test!(snapshot_multi_star_exports, "multi-star-exports");
 snapshot_test!(snapshot_local_reexport, "local-reexport");
+snapshot_test!(snapshot_local_import_reexport, "local-import-reexport");
 snapshot_test!(snapshot_local_export, "local-export");
 snapshot_test!(snapshot_nested_prefix, "nested-prefix");
 snapshot_test!(snapshot_import_cases, "import-cases");

@@ -303,7 +303,7 @@ fn merge_resolved_into_node(
     entry_visibility_paths: &[SharedString],
     merged_index: usize,
     additional_files_seen: &mut HashMap<usize, HashSet<SharedString>>,
-    signature_norm_seen: &mut [HashSet<String>],
+    signature_norm_seen: &mut [Vec<String>],
     contribution_path: ContributionMergePath,
 ) {
     upsert_merge_provenance(existing, contribution_path, resolved);
@@ -340,10 +340,13 @@ fn merge_resolved_into_node(
         false
     } else {
         let normalized_signatures_for_row = &mut signature_norm_seen[merged_index];
-        if normalized_signatures_for_row.contains(&normalized_incoming_signature) {
+        if normalized_signatures_for_row
+            .iter()
+            .any(|already_seen| already_seen == &normalized_incoming_signature)
+        {
             true
         } else {
-            normalized_signatures_for_row.insert(normalized_incoming_signature);
+            normalized_signatures_for_row.push(normalized_incoming_signature);
             false
         }
     };
@@ -1025,7 +1028,7 @@ pub fn build_package_graph(
     let mut merge_index: HashMap<SharedString, usize> =
         HashMap::with_capacity(all_symbols.len().min(65536));
     let mut additional_files_seen: HashMap<usize, HashSet<SharedString>> = HashMap::new();
-    let mut signature_norm_seen: Vec<HashSet<String>> = Vec::new();
+    let mut signature_norm_seen: Vec<Vec<String>> = Vec::new();
     // External-module Interface / TypeAlias: fold files when kind + name + normalized signature match.
     let mut module_identical_fold: HashMap<(SharedString, u32, String), usize> =
         HashMap::with_capacity(all_symbols.len().min(4096));
@@ -1209,10 +1212,10 @@ pub fn build_package_graph(
                     index,
                 );
             }
-            let mut initial_normalized_signatures_for_row = HashSet::with_capacity(4);
+            let mut initial_normalized_signatures_for_row = Vec::with_capacity(2);
             let normalized_signature_initial = normalize_signature(resolved.signature.as_deref());
             if !normalized_signature_initial.is_empty() {
-                initial_normalized_signatures_for_row.insert(normalized_signature_initial);
+                initial_normalized_signatures_for_row.push(normalized_signature_initial);
             }
             signature_norm_seen.push(initial_normalized_signatures_for_row);
             merged.push((SharedString::from(""), node));

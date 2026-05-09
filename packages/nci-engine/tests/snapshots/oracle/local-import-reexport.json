@@ -1,0 +1,287 @@
+{
+  "package": "local-import-reexport",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "local-import-reexport@1.0.0::Random",
+      "name": "Random",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export interface Random {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "local-import-reexport@1.0.0::Renamed",
+      "name": "Renamed",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export interface Tag {\n  label: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "local-import-reexport@1.0.0::defaultThing",
+      "name": "defaultThing",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ]
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns",
+      "name": "ns",
+      "kind": 279,
+      "kindName": "ExportDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "index.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
+      "signature": "namespace ns { 5 symbols }",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns.Random",
+      "name": "ns.Random",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export interface Random {\n  id: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "local-import-reexport@1.0.0::ns"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns.Random.id",
+      "name": "ns.Random.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "local-import-reexport@1.0.0::ns.Random"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns.Tag",
+      "name": "ns.Tag",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export interface Tag {\n  label: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "export"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "local-import-reexport@1.0.0::ns"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns.Tag.label",
+      "name": "ns.Tag.label",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "label: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "local-import-reexport@1.0.0::ns.Tag"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::ns.defaultThing",
+      "name": "ns.defaultThing",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "declare function defaultThing(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "reExportedFrom": "index.d.ts",
+      "modifiers": [
+        "declare"
+      ],
+      "entryVisibility": [
+        "index.d.ts"
+      ],
+      "parentSymbolId": "local-import-reexport@1.0.0::ns"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::external.d.ts::Random.id",
+      "name": "Random.id",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "id: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "local-import-reexport@1.0.0::Random"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::external.d.ts::Tag",
+      "name": "Tag",
+      "kind": 265,
+      "kindName": "InterfaceDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export interface Tag {\n  label: string;\n}",
+      "isTypeOnly": true,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "local-import-reexport@1.0.0::external.d.ts::Tag.label",
+      "name": "Tag.label",
+      "kind": 172,
+      "kindName": "PropertySignature",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "label: string;",
+      "isTypeOnly": false,
+      "symbolSpace": "type",
+      "dependencies": [],
+      "isInternal": true,
+      "parentSymbolId": "local-import-reexport@1.0.0::external.d.ts::Tag"
+    },
+    {
+      "id": "local-import-reexport@1.0.0::external.d.ts::defaultThing",
+      "name": "defaultThing",
+      "kind": 263,
+      "kindName": "FunctionDeclaration",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "declare function defaultThing(): void;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    },
+    {
+      "id": "local-import-reexport@1.0.0::external.d.ts::defaultThing#2",
+      "name": "defaultThing",
+      "kind": 278,
+      "kindName": "ExportAssignment",
+      "package": "local-import-reexport",
+      "filePath": "external.d.ts",
+      "sourcePackageName": "local-import-reexport",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "external.d.ts",
+      "signature": "export default defaultThing;",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": true
+    }
+  ],
+  "totalSymbols": 14,
+  "totalFiles": 2,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

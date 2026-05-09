@@ -1,8 +1,13 @@
 {
   "database": "C:\\Users\\doyer\\AppData\\Local\\nci\\nci.sqlite",
-  "project_root": "apps/docs",
+  "project_root": ".",
   "banner": "on",
   "format": "plain",
   "progress": "auto",
-  "max_hops": 10
+  "package_scope": "deps_and_dev",
+  "max_hops": 10,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
