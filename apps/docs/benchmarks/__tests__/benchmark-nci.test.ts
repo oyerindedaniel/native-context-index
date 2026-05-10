@@ -30,7 +30,7 @@ const externalTypesEntry: PackageEntry = {
 };
 
 describe("runIndexingMetricsStage", () => {
-  it("invokes nci index with --all-installed-packages so default package_scope=dependencies does not drop benchmark selectors", async () => {
+  it("invokes nci index with --package-scope all-installed so default package_scope=[dependencies] does not drop benchmark selectors", async () => {
     const runShellCommandSpy = vi
       .spyOn(benchmarkShell, "runShellCommand")
       .mockResolvedValueOnce({
@@ -49,8 +49,14 @@ describe("runIndexingMetricsStage", () => {
 
     expect(runShellCommandSpy).toHaveBeenCalledTimes(1);
     const [, args] = runShellCommandSpy.mock.calls[0]!;
-    expect(args).toEqual(["index", "-p", "uuid", "--all-installed-packages"]);
-    expect(result.command).toContain("--all-installed-packages");
+    expect(args).toEqual([
+      "index",
+      "-p",
+      "uuid",
+      "--package-scope",
+      "all-installed",
+    ]);
+    expect(result.command).toContain("--package-scope all-installed");
     expect(result.success).toBe(true);
   });
 
@@ -73,7 +79,8 @@ describe("runIndexingMetricsStage", () => {
 
     const [, args] = runShellCommandSpy.mock.calls[0]!;
     expect(args[2]).toBe("@types/express");
-    expect(args).toContain("--all-installed-packages");
+    expect(args).toContain("--package-scope");
+    expect(args).toContain("all-installed");
   });
 
   it("propagates non-zero exit codes as success: false", async () => {

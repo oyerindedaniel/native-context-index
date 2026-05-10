@@ -6,25 +6,67 @@ use serde::{Deserialize, Serialize};
 
 use crate::filter::DepKindFilter;
 
-/// Which `package.json` dependency sections scope indexing when using [`crate::filter::FilterConfig`].
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PackageScope {
-    #[default]
+pub enum DependencySection {
     Dependencies,
     DevDependencies,
-    DepsAndDev,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageScopeSentinel {
     AllInstalled,
 }
 
-impl From<PackageScope> for DepKindFilter {
-    fn from(scope: PackageScope) -> Self {
-        match scope {
-            PackageScope::Dependencies => DepKindFilter::DependenciesOnly,
-            PackageScope::DevDependencies => DepKindFilter::DevDependenciesOnly,
-            PackageScope::DepsAndDev => DepKindFilter::DependenciesAndDevDependencies,
-            PackageScope::AllInstalled => DepKindFilter::All,
+/// Either a non-empty list of `package.json` sections (`["dependencies"]`,
+/// `["dev_dependencies"]`, or both) or the `"all_installed"` sentinel (no manifest gate).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum PackageScope {
+    Sections(Vec<DependencySection>),
+    Sentinel(PackageScopeSentinel),
+}
+
+impl<'de> Deserialize<'de> for PackageScope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Sections(Vec<DependencySection>),
+            Sentinel(PackageScopeSentinel),
         }
+
+        match Raw::deserialize(deserializer)? {
+            Raw::Sections(sections) if sections.is_empty() => Err(serde::de::Error::custom(
+                "package_scope must list at least one section (\"dependencies\" or \"dev_dependencies\"), or use the \"all_installed\" sentinel",
+            )),
+            Raw::Sections(sections) => Ok(PackageScope::Sections(sections)),
+            Raw::Sentinel(sentinel) => Ok(PackageScope::Sentinel(sentinel)),
+        }
+    }
+}
+
+impl From<&PackageScope> for DepKindFilter {
+    fn from(scope: &PackageScope) -> Self {
+        match scope {
+            PackageScope::Sentinel(PackageScopeSentinel::AllInstalled) => DepKindFilter::All,
+            PackageScope::Sections(sections) => dep_kind_for_sections(sections),
+        }
+    }
+}
+
+fn dep_kind_for_sections(sections: &[DependencySection]) -> DepKindFilter {
+    let has_runtime = sections.contains(&DependencySection::Dependencies);
+    let has_dev = sections.contains(&DependencySection::DevDependencies);
+    match (has_runtime, has_dev) {
+        (true, true) => DepKindFilter::DependenciesAndDevDependencies,
+        (true, false) => DepKindFilter::DependenciesOnly,
+        (false, true) => DepKindFilter::DevDependenciesOnly,
+        (false, false) => DepKindFilter::All,
     }
 }
 
@@ -66,7 +108,9 @@ pub struct NciConfigFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packages: Option<PackageFiltersConfig>,
 
-    /// Restrict indexing to keys from the consumer `package.json` dependency sections (omit = dependencies only).
+    /// Sections of the consumer `package.json` whose names gate indexing. Either a non-empty list
+    /// like `["dependencies"]`, `["dev_dependencies"]`, or `["dependencies", "dev_dependencies"]`,
+    /// or the sentinel `"all_installed"` to disable the manifest gate. Omit = `["dependencies"]`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package_scope: Option<PackageScope>,
 
@@ -130,26 +174,95 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn roundtrip_package_scope() {
+    fn roundtrip_package_scope_sections_runtime_and_dev() {
         let temp = tempfile::tempdir().unwrap();
         let cfg = NciConfigFile {
-            package_scope: Some(PackageScope::DepsAndDev),
+            package_scope: Some(PackageScope::Sections(vec![
+                DependencySection::Dependencies,
+                DependencySection::DevDependencies,
+            ])),
             ..Default::default()
         };
         write_config_file(temp.path(), &cfg).unwrap();
         let loaded = load_config_file(temp.path())
             .expect("load ok")
             .expect("parsed");
-        assert_eq!(loaded.package_scope, Some(PackageScope::DepsAndDev));
+        assert_eq!(
+            loaded.package_scope,
+            Some(PackageScope::Sections(vec![
+                DependencySection::Dependencies,
+                DependencySection::DevDependencies,
+            ]))
+        );
+        let raw = fs::read_to_string(temp.path().join(CONFIG_FILENAME)).unwrap();
+        assert!(raw.contains("\"package_scope\""), "key present: {raw}");
+        assert!(raw.contains("\"dependencies\""), "runtime listed: {raw}");
+        assert!(raw.contains("\"dev_dependencies\""), "dev listed: {raw}");
+    }
+
+    #[test]
+    fn roundtrip_package_scope_sentinel_all_installed() {
+        let temp = tempfile::tempdir().unwrap();
+        let cfg = NciConfigFile {
+            package_scope: Some(PackageScope::Sentinel(PackageScopeSentinel::AllInstalled)),
+            ..Default::default()
+        };
+        write_config_file(temp.path(), &cfg).unwrap();
+        let loaded = load_config_file(temp.path())
+            .expect("load ok")
+            .expect("parsed");
+        assert_eq!(
+            loaded.package_scope,
+            Some(PackageScope::Sentinel(PackageScopeSentinel::AllInstalled))
+        );
         let raw = fs::read_to_string(temp.path().join(CONFIG_FILENAME)).unwrap();
         assert!(
-            raw.contains("\"package_scope\""),
-            "serialize uses package_scope: {raw}"
+            raw.contains("\"all_installed\""),
+            "sentinel serialized: {raw}"
         );
+    }
+
+    #[test]
+    fn package_scope_rejects_empty_sections_array() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(
+            temp.path().join(CONFIG_FILENAME),
+            r#"{"package_scope": []}"#,
+        )
+        .unwrap();
+        let err = load_config_file(temp.path())
+            .expect_err("empty array must be rejected at deserialization");
         assert!(
-            raw.contains("\"deps_and_dev\""),
-            "serialize uses deps_and_dev value: {raw}"
+            err.contains("at least one section"),
+            "error wording surfaces section guidance: {err}"
         );
+    }
+
+    #[test]
+    fn package_scope_sections_map_to_dep_kind_filter() {
+        let runtime_only = PackageScope::Sections(vec![DependencySection::Dependencies]);
+        assert_eq!(
+            DepKindFilter::from(&runtime_only),
+            DepKindFilter::DependenciesOnly
+        );
+
+        let dev_only = PackageScope::Sections(vec![DependencySection::DevDependencies]);
+        assert_eq!(
+            DepKindFilter::from(&dev_only),
+            DepKindFilter::DevDependenciesOnly
+        );
+
+        let both = PackageScope::Sections(vec![
+            DependencySection::Dependencies,
+            DependencySection::DevDependencies,
+        ]);
+        assert_eq!(
+            DepKindFilter::from(&both),
+            DepKindFilter::DependenciesAndDevDependencies
+        );
+
+        let all_installed = PackageScope::Sentinel(PackageScopeSentinel::AllInstalled);
+        assert_eq!(DepKindFilter::from(&all_installed), DepKindFilter::All);
     }
 
     #[test]

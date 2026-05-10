@@ -48,15 +48,16 @@ export async function runIndexingMetricsStage(
 ): Promise<NciStageResult> {
   const packageSelector = resolvePackageSelector(packageEntry);
   // The benchmark indexes a specific package by name regardless of the consumer
-  // `package.json` dependency-section scope. Pass `--all-installed-packages` so
-  // the default `package_scope: dependencies` filter does not drop selectors
-  // (devDeps, types packages, tooling, etc.) that are not in the consumer's
-  // `dependencies` map under the resolved `project_root`.
+  // `package.json` dependency-section scope. Pass `--package-scope all-installed`
+  // so the default `package_scope: ["dependencies"]` filter does not drop
+  // selectors (devDeps, types packages, tooling, etc.) that are not in the
+  // consumer's `dependencies` map under the resolved `project_root`.
   const indexArguments = [
     "index",
     "-p",
     packageSelector,
-    "--all-installed-packages",
+    "--package-scope",
+    "all-installed",
   ];
   const command = `"${nciBinaryPath}" ${indexArguments
     .map((argumentText) =>

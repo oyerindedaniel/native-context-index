@@ -1117,7 +1117,7 @@ fn index_dry_run_defaults_to_dependencies_section_only() {
 }
 
 #[test]
-fn index_dry_run_include_dev_dependencies_unions_sections() {
+fn index_dry_run_package_scope_runtime_and_dev_unions_sections() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();
     write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
@@ -1131,7 +1131,8 @@ fn index_dry_run_include_dev_dependencies_unions_sections() {
             "--dry-run",
             "--format",
             "json",
-            "--include-dev-dependencies",
+            "--package-scope",
+            "dependencies,dev-dependencies",
         ])
         .assert()
         .success()
@@ -1144,7 +1145,7 @@ fn index_dry_run_include_dev_dependencies_unions_sections() {
 }
 
 #[test]
-fn index_dry_run_only_dev_dependencies_filters_dependencies_section() {
+fn index_dry_run_package_scope_repeated_flag_unions_sections() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();
     write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
@@ -1158,7 +1159,38 @@ fn index_dry_run_only_dev_dependencies_filters_dependencies_section() {
             "--dry-run",
             "--format",
             "json",
-            "--only-dev-dependencies",
+            "--package-scope",
+            "dependencies",
+            "--package-scope",
+            "dev-dependencies",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_package_scope_dev_only_filters_dependencies_section() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "json",
+            "--package-scope",
+            "dev-dependencies",
         ])
         .assert()
         .success()
@@ -1171,7 +1203,7 @@ fn index_dry_run_only_dev_dependencies_filters_dependencies_section() {
 }
 
 #[test]
-fn index_dry_run_all_installed_packages_skips_section_filter() {
+fn index_dry_run_package_scope_all_installed_skips_section_filter() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();
     write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
@@ -1186,7 +1218,8 @@ fn index_dry_run_all_installed_packages_skips_section_filter() {
             "--dry-run",
             "--format",
             "json",
-            "--all-installed-packages",
+            "--package-scope",
+            "all-installed",
         ])
         .assert()
         .success()
@@ -1200,7 +1233,35 @@ fn index_dry_run_all_installed_packages_skips_section_filter() {
 }
 
 #[test]
-fn index_dry_run_package_scope_from_config() {
+fn index_dry_run_package_scope_all_installed_with_section_is_rejected() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+
+    let stderr = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--dry-run",
+            "--format",
+            "plain",
+            "--package-scope",
+            "all-installed,dependencies",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let stderr_text = String::from_utf8(stderr).unwrap();
+    assert!(
+        stderr_text.contains("all-installed cannot be combined with section names"),
+        "expected sentinel-mixed error, got: {stderr_text}"
+    );
+}
+
+#[test]
+fn index_dry_run_package_scope_from_config_sentinel() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();
     write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
@@ -1226,7 +1287,7 @@ fn index_dry_run_package_scope_from_config() {
 }
 
 #[test]
-fn index_dry_run_only_dependencies_overrides_package_scope_in_config() {
+fn index_dry_run_package_scope_from_config_sections_array() {
     let proj = tempdir().unwrap();
     fs::create_dir_all(proj.path().join("node_modules")).unwrap();
     write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
@@ -1234,7 +1295,33 @@ fn index_dry_run_only_dependencies_overrides_package_scope_in_config() {
     write_minimal_pkg(proj.path(), "jest", "29.0.0");
     fs::write(
         proj.path().join("nci.config.json"),
-        r#"{"package_scope": "dev_dependencies"}"#,
+        r#"{"package_scope": ["dependencies", "dev_dependencies"]}"#,
+    )
+    .unwrap();
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args(["index", "--dry-run", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).unwrap();
+    assert!(text.contains("\"lodash\""));
+    assert!(text.contains("\"jest\""));
+}
+
+#[test]
+fn index_dry_run_package_scope_cli_overrides_config() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_consumer_package_json(proj.path(), r#"{"lodash":"^4"}"#, r#"{"jest":"^29"}"#);
+    write_minimal_pkg(proj.path(), "lodash", "4.17.21");
+    write_minimal_pkg(proj.path(), "jest", "29.0.0");
+    fs::write(
+        proj.path().join("nci.config.json"),
+        r#"{"package_scope": ["dev_dependencies"]}"#,
     )
     .unwrap();
 
@@ -1257,7 +1344,8 @@ fn index_dry_run_only_dependencies_overrides_package_scope_in_config() {
             "--dry-run",
             "--format",
             "json",
-            "--only-dependencies",
+            "--package-scope",
+            "dependencies",
         ])
         .assert()
         .success()

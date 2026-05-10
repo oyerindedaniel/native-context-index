@@ -4,7 +4,7 @@
   "banner": "on",
   "format": "plain",
   "progress": "auto",
-  "package_scope": "deps_and_dev",
+  "package_scope": ["dependencies", "dev_dependencies"],
   "max_hops": 10,
   "workspaces": [
     "apps/*",

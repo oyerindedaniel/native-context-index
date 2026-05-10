@@ -104,6 +104,14 @@ impl OutputFormat {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+enum PackageScopeArg {
+    Dependencies,
+    DevDependencies,
+    AllInstalled,
+}
+
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 enum SqlRowsFormat {
     Plain,
@@ -283,46 +291,16 @@ struct BulkIndexArgs {
     #[arg(short = 's', long = "dependency-stub-package", value_name = "PKG")]
     dependency_stub_packages: Vec<String>,
 
-    /// Only index packages listed under `dependencies` (overrides `package_scope` in config).
+    /// `package.json` sections to gate indexing. Repeatable or comma-separated; values:
+    /// `dependencies`, `dev-dependencies`, `all-installed` (sentinel — used alone disables the gate).
+    /// Overrides `package_scope` in `nci.config.json`.
     #[arg(
-        long = "only-dependencies",
-        conflicts_with_all = [
-            "include_dev_dependencies",
-            "only_dev_dependencies",
-            "all_installed_packages"
-        ]
+        long = "package-scope",
+        value_name = "SECTION",
+        value_delimiter = ',',
+        num_args = 1..,
     )]
-    only_dependencies: bool,
-
-    #[arg(
-        long,
-        conflicts_with_all = [
-            "only_dependencies",
-            "only_dev_dependencies",
-            "all_installed_packages"
-        ]
-    )]
-    include_dev_dependencies: bool,
-
-    #[arg(
-        long,
-        conflicts_with_all = [
-            "only_dependencies",
-            "include_dev_dependencies",
-            "all_installed_packages"
-        ]
-    )]
-    only_dev_dependencies: bool,
-
-    #[arg(
-        long,
-        conflicts_with_all = [
-            "only_dependencies",
-            "include_dev_dependencies",
-            "only_dev_dependencies"
-        ]
-    )]
-    all_installed_packages: bool,
+    package_scope: Vec<PackageScopeArg>,
 
     #[arg(
         long = "skip-root-workspace",
@@ -1328,34 +1306,58 @@ fn ensure_index_root_workspace_valid(
     Ok(())
 }
 
-fn resolve_package_scope(bulk: &BulkIndexArgs, file: Option<&NciConfigFile>) -> DepKindFilter {
-    if bulk.only_dependencies {
-        return DepKindFilter::DependenciesOnly;
-    }
-    if bulk.all_installed_packages {
-        return DepKindFilter::All;
-    }
-    if bulk.only_dev_dependencies {
-        return DepKindFilter::DevDependenciesOnly;
-    }
-    if bulk.include_dev_dependencies {
-        return DepKindFilter::DependenciesAndDevDependencies;
+fn resolve_package_scope(
+    bulk: &BulkIndexArgs,
+    file: Option<&NciConfigFile>,
+) -> Result<DepKindFilter, String> {
+    if !bulk.package_scope.is_empty() {
+        return dep_kind_for_cli_package_scope(&bulk.package_scope);
     }
     if let Some(file_cfg) = file
-        && let Some(scope) = file_cfg.package_scope
+        && let Some(scope) = &file_cfg.package_scope
     {
-        return scope.into();
+        return Ok(scope.into());
     }
-    DepKindFilter::DependenciesOnly
+    Ok(DepKindFilter::DependenciesOnly)
+}
+
+fn dep_kind_for_cli_package_scope(values: &[PackageScopeArg]) -> Result<DepKindFilter, String> {
+    let has_all_installed = values
+        .iter()
+        .any(|value| matches!(value, PackageScopeArg::AllInstalled));
+    let has_section = values
+        .iter()
+        .any(|value| !matches!(value, PackageScopeArg::AllInstalled));
+    if has_all_installed && has_section {
+        return Err(
+            "--package-scope=all-installed cannot be combined with section names; use it on its own"
+                .into(),
+        );
+    }
+    if has_all_installed {
+        return Ok(DepKindFilter::All);
+    }
+    let has_runtime = values
+        .iter()
+        .any(|value| matches!(value, PackageScopeArg::Dependencies));
+    let has_dev = values
+        .iter()
+        .any(|value| matches!(value, PackageScopeArg::DevDependencies));
+    Ok(match (has_runtime, has_dev) {
+        (true, true) => DepKindFilter::DependenciesAndDevDependencies,
+        (true, false) => DepKindFilter::DependenciesOnly,
+        (false, true) => DepKindFilter::DevDependenciesOnly,
+        (false, false) => unreachable!("clap num_args=1.. guarantees at least one value"),
+    })
 }
 
 fn build_filter(
     file: Option<&NciConfigFile>,
     bulk: &BulkIndexArgs,
     package_globs_cli: &[String],
-) -> FilterConfig {
+) -> Result<FilterConfig, String> {
     let mut filter = FilterConfig {
-        dep_kind_filter: resolve_package_scope(bulk, file),
+        dep_kind_filter: resolve_package_scope(bulk, file)?,
         ..Default::default()
     };
     if let Some(file_cfg) = file
@@ -1375,7 +1377,7 @@ fn build_filter(
     filter
         .include_globs
         .extend(package_globs_cli.iter().cloned());
-    filter
+    Ok(filter)
 }
 
 fn expand_workspace_pattern(project_root: &Path, pattern: &str) -> Vec<PathBuf> {
@@ -1622,7 +1624,7 @@ fn build_index_options(
 ) -> Result<IndexOptions, String> {
     let db_path = merge_database_path(cli, file, config_dir);
     let max_hops = max_hops_from_user_value(bulk.max_hops.or(file.and_then(|toml| toml.max_hops)))?;
-    let filter = build_filter(file, bulk, &bulk.package_globs);
+    let filter = build_filter(file, bulk, &bulk.package_globs)?;
 
     let mut stub_list_from_config: Vec<String> = Vec::new();
     if let Some(config_file) = file
