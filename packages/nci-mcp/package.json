@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/native-context-modules/native-context-modules.git"
+    "url": "https://github.com/oyerindedaniel/native-context-index.git"
   },
   "type": "commonjs",
   "bin": {

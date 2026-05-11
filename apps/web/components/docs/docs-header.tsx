@@ -14,8 +14,7 @@ interface DocsHeaderProps {
   className?: string;
 }
 
-const GITHUB_URL =
-  "https://github.com/native-context-modules/native-context-modules";
+const GITHUB_URL = "https://github.com/oyerindedaniel/native-context-index";
 
 function openGithub() {
   window.open(GITHUB_URL, "_blank", "noopener,noreferrer");

@@ -371,11 +371,12 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-2xl border border-border bg-[#0F1116] p-4 text-[#E8ECF4] shadow-[inset_0_1px_#ffffff10]",
+        "flex flex-col overflow-hidden rounded-2xl border border-border bg-[#0F1116] text-[#E8ECF4] shadow-[inset_0_1px_#ffffff10]",
+        "lg:sticky lg:self-start lg:top-[calc(var(--spacing-docs-chrome)+1rem)] lg:max-h-[calc(100dvh-var(--spacing-docs-chrome)-2rem)]",
         className,
       )}
     >
-      <header className="flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/5 bg-[#0F1116] px-4 py-3">
         <span className="text-[0.7rem] font-medium uppercase tracking-[0.11em] text-white/65">
           nci.config.json
         </span>
@@ -390,30 +391,32 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
           <StatusIcon className="h-4 w-4" aria-hidden="true" />
         </button>
       </header>
-      <pre className="overflow-x-auto whitespace-pre font-mono text-[0.78rem] leading-relaxed text-white/90">
-        {json}
-      </pre>
-      {errorIssues.length > 0 ? (
-        <ul className="flex flex-col gap-1 rounded-xl bg-amber-200/10 p-3 text-[0.78rem] text-amber-200">
-          {errorIssues.map((issue) => (
-            <li
-              key={`${issue.fieldPath}-${issue.message}`}
-              className="flex items-start gap-2"
-            >
-              <ExclamationTriangleIcon
-                className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                aria-hidden="true"
-              />
-              <span>
-                <span className="font-mono text-amber-100">
-                  {issue.fieldPath}
-                </span>{" "}
-                — {issue.message}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+        <pre className="overflow-x-auto whitespace-pre font-mono text-[0.78rem] leading-relaxed text-white/90">
+          {json}
+        </pre>
+        {errorIssues.length > 0 ? (
+          <ul className="flex flex-col gap-1 rounded-xl bg-amber-200/10 p-3 text-[0.78rem] text-amber-200">
+            {errorIssues.map((issue) => (
+              <li
+                key={`${issue.fieldPath}-${issue.message}`}
+                className="flex items-start gap-2"
+              >
+                <ExclamationTriangleIcon
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                <span>
+                  <span className="font-mono text-amber-100">
+                    {issue.fieldPath}
+                  </span>{" "}
+                  — {issue.message}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </div>
   );
 }
