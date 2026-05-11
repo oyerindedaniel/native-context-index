@@ -1,0 +1,110 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Cookbook · Monorepo</PageEyebrow>
+
+# Index a pnpm / nx / turbo monorepo
+
+<PageLede>
+  One database, one CLI, one MCP server. Multiple workspaces. Here is the recipe that keeps every package indexable while staying fast on subsequent runs.
+</PageLede>
+
+## Layout
+
+```
+my-monorepo/
+  apps/
+    web/
+    cli/
+  packages/
+    shared/
+    ui/
+  pnpm-workspace.yaml
+  package.json
+  nci.config.json
+```
+
+## `nci.config.json`
+
+```json
+{
+  "project_root": ".",
+  "workspaces": ["apps/*", "packages/*"],
+  "package_scope": ["dependencies", "dev_dependencies"],
+  "max_hops": 10
+}
+```
+
+That config does three things:
+
+1. Scans the root `node_modules` plus every workspace&rsquo;s `node_modules`.
+2. Includes both `dependencies` and `dev_dependencies` so test/build types are indexed too.
+3. Lets you query across the whole tree from any package.
+
+## Index incrementally
+
+<TerminalRoot cwd="my-monorepo">
+  <TerminalCommand>nci index --package "@my-org/*"</TerminalCommand>
+</TerminalRoot>
+
+`--package` is repeatable and accepts SQLite-style globs. Use it to re-index only the workspace packages you control after a refactor — third-party dependencies stay cached.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>One database for the whole repo.</CalloutTitle>
+  <CalloutBody>
+    Don&rsquo;t spawn an `nci.sqlite` per workspace. Re-exports cross workspace boundaries (a re-export from `packages/shared` shows up under `apps/web`) — keep them in one index so the agent sees the whole graph.
+  </CalloutBody>
+</CalloutRoot>
+
+## Skip the root install
+
+If your monorepo hoists everything into `node_modules` at the workspaces but keeps the root empty:
+
+<TerminalRoot cwd="my-monorepo">
+  <TerminalCommand>nci index --skip-root-workspace</TerminalCommand>
+</TerminalRoot>
+
+That tells the scanner to ignore `<project_root>/node_modules` and only walk the listed workspaces. Conflicts with `--include-root-workspace` (the override that forces the root in even when `nci.config.json` excluded it).
+
+## Stub heavy transitive dependencies
+
+Some packages drag in a forest. `firebase` re-exports a dozen sub-modules (auth, firestore, functions, storage…), each with its own `.d.ts` and its own transitive declarations. If `apps/web` only calls `initializeApp` and `getAuth`, fully indexing every Firestore field type is pure overhead — and it slows the first index, bloats `nci.sqlite`, and makes `find` noisier.
+
+Tell NCI to keep `firebase`&rsquo;s **own** declarations but record its dependencies as `npm::…` stubs:
+
+<TerminalRoot cwd="my-monorepo">
+  <TerminalCommand>{`nci index \\
+  --dependency-stub-package firebase \\
+  --dependency-stub-package @aws-sdk/client-s3`}</TerminalCommand>
+</TerminalRoot>
+
+The flag (short: `-s`) is repeatable and accepts bare package names or specifiers like `@scope/pkg`. NCI parses the listed package itself, but emits `npm::firebase-auth@…` style stub edges for everything it pulls in — fast to write, queryable as evidence, never parsed.
+
+Make it sticky by setting `dependency_stub_packages` in `nci.config.json`:
+
+```json
+{
+  "project_root": ".",
+  "workspaces": ["apps/*", "packages/*"],
+  "package_scope": ["dependencies", "dev_dependencies"],
+  "dependency_stub_packages": [
+    "firebase",
+    "@aws-sdk/client-s3",
+    "googleapis"
+  ]
+}
+```
+
+The CLI value is **unioned** with the config — CI can add more stubs without rewriting the file. Drop a name from the config and the next index re-parses it in full.
+
+<CalloutRoot variant="tip">
+  <CalloutTitle>Start narrow, stub later.</CalloutTitle>
+  <CalloutBody>
+    Run a normal `nci index` first. If `nci db status` shows one package with a much larger symbol count than the rest (or your `find` queries return too many matches from the same library), add it to `dependency_stub_packages` and re-index. You keep the public API queryable through stubs and shed the deep internal types.
+  </CalloutBody>
+</CalloutRoot>
+
+## Wire up the agent
+
+Pair this recipe with any of the client cookbooks — [Claude](/docs/cookbook/claude), [Cursor](/docs/cookbook/cursor), [Antigravity](/docs/cookbook/antigravity), or [OpenCode](/docs/cookbook/opencode). The MCP server reads the same `nci.config.json` and resolves to the same `nci.sqlite` regardless of client.

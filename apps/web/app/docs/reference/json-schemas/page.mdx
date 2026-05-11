@@ -1,0 +1,115 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Reference · JSON output</PageEyebrow>
+
+# JSON envelopes
+
+<PageLede>
+  `nci --format json` returns the same envelope on every `nci query` subcommand. `nci sql --format json` returns a raw row array with no envelope — it&rsquo;s closer to the `sqlite3` CLI&rsquo;s output mode. This page documents both shapes, plus the `data` payload by subcommand.
+</PageLede>
+
+## The `nci query` envelope
+
+```typescript
+type QueryEnvelope<TData> =
+  | { ok: true;  data: TData }
+  | { ok: false; error: string };
+```
+
+- `ok: true` — non-empty `data` payload below. Exit code `0`.
+- `ok: false` — non-zero exit code. `error` is one human-readable string (stderr usually repeats the same text for plain mode).
+
+Some subcommands return `data` shapes whose &ldquo;not found&rdquo; case is `null`-valued rather than the failure envelope. `query show`, `query snippet`, and `query overloads` exit with `EXIT_QUERY_NOT_FOUND = 2` and return `{ ok: true, data: { symbol: null } }` (or the equivalent for `snippet` / `symbols: []` for `overloads`). Read [Exit codes](/docs/reference/exit-codes) for the matrix.
+
+## `data` shapes by subcommand
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Subcommand</TableHeaderCell>
+      <TableHeaderCell>`data` payload</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>find</code></TableCell>
+      <TableCell><code>{`{ symbols: SymbolHit[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol</code></TableCell>
+      <TableCell><code>{`{ symbols: SymbolHit[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>show</code></TableCell>
+      <TableCell><code>{`{ symbol: SymbolRow | null }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>snippet</code></TableCell>
+      <TableCell><code>{`{ snippet: SnippetRow | null }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>overloads</code></TableCell>
+      <TableCell><code>{`{ symbols: SymbolHit[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>packages</code></TableCell>
+      <TableCell><code>{`{ packages: PackageRow[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>package_versions</code></TableCell>
+      <TableCell><code>{`{ versions: string[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>package_deps</code></TableCell>
+      <TableCell><code>{`{ dependencies: string[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>source_packages</code></TableCell>
+      <TableCell><code>{`{ source_packages: string[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>active_package</code></TableCell>
+      <TableCell><code>{`{ resolutions: ActivePackageRow[] }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbols</code></TableCell>
+      <TableCell><code>{`{ symbols: SymbolRow[], page: { offset, limit, returned } }`}</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>evidence</code></TableCell>
+      <TableCell><code>{`{ symbols: SymbolHit[], snippets: Record<string, string> }`}</code></TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+`SymbolHit`, `SymbolRow`, and `SnippetRow` carry the columns documented at [Symbol graph model](/docs/architecture/symbol-graph) — `id`, `name`, `kind_name`, `signature`, `js_doc`, `source_package_name`, etc. The exact field set per subcommand is what `nci query <sub> --format json` prints; treat that output as the source of truth.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>`evidence` truncation marker.</CalloutTitle>
+  <CalloutBody>
+    When `query evidence` would return more hits than `--limit`, the **last** entry of `data.symbols` is a sentinel hit whose `id`, `name`, and `kind_name` are the literal string <code>&lt;truncated&gt;</code>. There is no separate envelope key — the marker is in-band so the snippet keys stay aligned with the hit list.
+  </CalloutBody>
+</CalloutRoot>
+
+## `nci sql` output
+
+`nci sql --format json` returns a raw JSON array of row objects:
+
+```json
+[
+  { "name": "zod", "version": "3.23.8" },
+  { "name": "react", "version": "19.0.0" }
+]
+```
+
+`--format jsonl` returns one row object per line. `--format plain` returns tab-separated values. There is **no** `ok` / `data` envelope on `nci sql` — the row array (or empty array) is the entire payload.
+
+`--max-rows N` causes the command to fail (exit `1`) if the result set would exceed `N`. It applies to `nci sql` only, never to `nci query`.
+
+## Where each shape lives
+
+- The `nci query` envelope is generated in `packages/nci-engine/src/cli.rs`.
+- The `--format json` SQL output uses `serde_json::Value` mapping per row.
+- The MCP server (`packages/nci-mcp`) forwards both shapes verbatim — `nci_query` returns the envelope, `nci_sql` returns the row array.

@@ -1,0 +1,111 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  PipelineRoot,
+  PipelineStage,
+  PipelineStagePanel,
+  PipelineStageNote,
+  PipelineMaxHopsToggle,
+  PipelineHopsResult,
+} from "@/components/docs/widgets/pipeline";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+
+<PageEyebrow>Deep Indexing</PageEyebrow>
+
+# What `nci index` actually does
+
+<PageLede>
+  Indexing is one fixed pipeline driven by `nci index`. Stage names below match the engine&rsquo;s internal modules (`scanner`, `filter`, `parser`, `crawler`, `resolver`, `dedupe`, `storage`). The CLI is the public surface — the modules are documented for orientation, not as configuration knobs.
+</PageLede>
+
+## The shape
+
+A `grep` over `node_modules` returns lines. NCI returns symbols — merged graph rows with `signature`, `js_doc`, `kind_name`, `parent_symbol_id`, `source_package_name`, `is_internal`, plus a stable `id`. That difference is what makes the index queryable in milliseconds and what lets agents call `nci query` without re-parsing.
+
+<PipelineRoot defaultMaxHops={10}>
+  <PipelineStage stageId="scan" index={1} eyebrow="Stage 1" title="Scanner — discover install roots">
+    <PipelineStagePanel side="input" label="Input">
+      `project_root` plus each `workspaces` entry — every directory that contributes a `node_modules`.
+    </PipelineStagePanel>
+    <PipelineStagePanel side="output" label="Output">
+      One package row per discovered install: name, version, install path, source dir, manifest path.
+    </PipelineStagePanel>
+    <PipelineStageNote>
+      The configuration that drives this stage is `project_root`, `workspaces`, and `index_root_workspace` in `nci.config.json` — overridable with `-r`, `--skip-root-workspace`, and `--include-root-workspace`.
+    </PipelineStageNote>
+  </PipelineStage>
+
+  <PipelineStage stageId="filter" index={2} eyebrow="Stage 2" title="Filter — apply package_scope">
+    <PipelineStagePanel side="input" label="Input">
+      Every discovered install.
+    </PipelineStagePanel>
+    <PipelineStagePanel side="output" label="Output">
+      The packages whose names appear in the union of every consumer manifest&rsquo;s `dependencies` / `dev_dependencies` — or every install when `package_scope` is `"all_installed"`.
+    </PipelineStagePanel>
+    <PipelineStageNote>
+      `--package-scope dependencies,dev-dependencies` matches `package_scope: ["dependencies", "dev_dependencies"]`. `packages.include` / `packages.exclude` globs filter on top.
+    </PipelineStageNote>
+  </PipelineStage>
+
+  <PipelineStage stageId="parse" index={3} eyebrow="Stage 3" title="Parser + Crawler — read .d.ts">
+    <PipelineStagePanel side="input" label="Input">
+      Each filtered package&rsquo;s entry `.d.ts` resolved from `exports` / `types` / `typings`, falling back to `index.d.ts`.
+    </PipelineStagePanel>
+    <PipelineStagePanel side="output" label="Output">
+      Parsed declarations + parsed imports for every reached file.
+    </PipelineStagePanel>
+    <PipelineStageNote>
+      Parsing produces declarations; the crawler decides which other files to fetch. Splitting them lets `--max-hops` change without re-parsing already-loaded files.
+    </PipelineStageNote>
+  </PipelineStage>
+
+  <PipelineStage stageId="resolve" index={4} eyebrow="Stage 4" title="Resolver — promote re-exports">
+    <PipelineStagePanel side="input" label="Input">
+      The parsed declarations plus the per-package module graph.
+    </PipelineStagePanel>
+    <PipelineStagePanel side="output" label="Output">
+      Every public symbol promoted to its terminal declaration. `import X from "./x"; export { X }` becomes `X`, never a placeholder. Dependency edges follow `nci-dep-v1`.
+    </PipelineStagePanel>
+    <PipelineMaxHopsToggle />
+    <PipelineHopsResult
+      results={{
+        0: "0 → entry-only; only what the entry file itself declares is indexed.",
+        10: "10 → default; covers every common library, including barrel-heavy ones.",
+        [-1]: "-1 → unlimited; useful only for diagnostics. Most libraries saturate well before this.",
+      }}
+    />
+  </PipelineStage>
+
+  <PipelineStage stageId="store" index={5} eyebrow="Stage 5" title="Dedupe + Storage — write to SQLite">
+    <PipelineStagePanel side="input" label="Input">
+      Resolved declarations from every package.
+    </PipelineStagePanel>
+    <PipelineStagePanel side="output" label="Output">
+      Rows in `packages`, `symbols`, `symbol_dependencies`, plus FTS5 (`symbols_fts`). Each `symbols` row gets `signature`, `kind_name`, `parent_symbol_id`, and either fused or distinct overloads, recorded in `merge_provenance_json`.
+    </PipelineStagePanel>
+    <PipelineStageNote>
+      Everything lands in one `nci.sqlite` file under the OS cache dir (override with `NCI_CACHE_DIR`). `nci query` and `nci sql` both read this file with no further parsing — that is why responses are sub-millisecond once the index exists.
+    </PipelineStageNote>
+  </PipelineStage>
+</PipelineRoot>
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Why the stages are split.</CalloutTitle>
+  <CalloutBody>
+    Splitting parser from crawler caches parses across `--max-hops` changes. Splitting resolver from dedupe records exactly which mechanism merged a row in `merge_provenance_json`. Splitting storage from everything else lets the writer commit on its own thread without holding any AST in memory.
+  </CalloutBody>
+</CalloutRoot>
+
+## Re-running
+
+<TerminalRoot>
+  <TerminalCommand>nci index --dry-run</TerminalCommand>
+</TerminalRoot>
+
+`--dry-run` walks scan + filter only and stops. Use it as a CI sanity gate: if the count drops, your `package_scope` or filters regressed.
+
+<TerminalRoot>
+  <TerminalCommand>nci index --package "@my-org/*"</TerminalCommand>
+</TerminalRoot>
+
+`--package` accepts globs and is repeatable. Combine with `--dependency-stub-package` to keep huge transitive trees as `npm::…` stubs without parsing them.

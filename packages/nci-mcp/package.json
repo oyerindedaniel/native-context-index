@@ -1,5 +1,5 @@
 {
-  "name": "nci-mcp",
+  "name": "@nativecontextindex/mcp",
   "version": "0.1.0",
   "description": "Model Context Protocol (stdio) server for the Native Context Index (nci)",
   "license": "MIT",

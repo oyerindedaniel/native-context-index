@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "../lib/utils";
@@ -8,6 +8,12 @@ import Script from "next/script";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -48,6 +54,7 @@ export default function RootLayout({
       lang="en"
       className={cn(
         inter.variable,
+        geistMono.variable,
         interTight.variable,
         instrumentSerif.variable,
       )}
@@ -55,9 +62,9 @@ export default function RootLayout({
       <body className="font-sans">
         {process.env.NODE_ENV === "development" && (
           <Script
-            src="https://unpkg.com/@oyerinde/caliper/dist/index.global.min.js"
+            src="https://unpkg.com/@oyerinde/caliper/dist/index.global.js"
             data-config={JSON.stringify({
-              theme: { primary: "#AC2323" },
+              bridge: { enabled: true },
             })}
             strategy="afterInteractive"
           />

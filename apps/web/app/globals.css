@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+
+@custom-variant hover (&:hover);
+
 :root {
   --nci-color-primary: #5a3cf0;
   --nci-color-dark: #4429c6;
@@ -12,10 +15,25 @@
   --nci-color-surface: #f7f8fc;
   --nci-color-surface-hover: #eef1f9;
   --nci-color-elevated: #ffffff;
+
+  --nci-z-command-overlay: 100;
+
+  --nci-shadow-button-primary:
+    0 1px 2px rgb(0 0 0 / 0.08),
+    0 3px 10px -2px rgb(0 0 0 / 0.14),
+    inset 0 -2px rgb(0 0 0 / 0.12),
+    inset 0 1px rgb(255 255 255 / 0.38);
+  --nci-shadow-button-accent:
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 3px 10px -2px rgb(0 0 0 / 0.18),
+    inset 0 -2px rgb(0 0 0 / 0.14),
+    inset 0 1px rgb(255 255 255 / 0.38);
 }
 
 @theme {
   --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular,
+    "JetBrains Mono", Menlo, Consolas, monospace;
   --font-inter-tight: var(--font-inter-tight);
   --font-instrument-serif: var(--font-instrument-serif);
 
@@ -33,6 +51,11 @@
   --color-surface: var(--nci-color-surface);
   --color-surface-hover: var(--nci-color-surface-hover);
   --color-elevated: var(--nci-color-elevated);
+
+  --spacing-docs-chrome: 3.5rem;
+  --spacing-docs-sidebar: 16rem;
+  --spacing-docs-content: 50rem;
+  --spacing-docs-shell: 80rem;
 }
 
 @layer base {
@@ -43,14 +66,115 @@
   html,
   body {
     max-width: 100vw;
-    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  html {
+    scrollbar-gutter: stable;
+    scrollbar-color: var(--nci-color-border) transparent;
+    scrollbar-width: thin;
   }
 
   body {
-
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
- 
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in srgb, var(--nci-color-border) 80%, transparent);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+    transition: background-color 150ms ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--nci-color-muted) 65%, transparent);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  html.nci-scroll-locked,
+  html.nci-scroll-locked body {
+    overflow: hidden;
+  }
+  html.nci-scroll-locked::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  html.nci-scroll-locked {
+    scrollbar-width: none;
+  }
+
+  :where(h1, h2, h3, h4, h5, h6) .nci-code-chip {
+    padding-block: 0;
+    font-size: 0.82em;
+    vertical-align: baseline;
+  }
+}
+
+@layer components {
+  .nci-code-chip {
+    display: inline;
+    box-decoration-break: clone;
+    padding-inline: 0.28em;
+    padding-block: 0.12em;
+    border-radius: 0.35rem;
+    border: 1px solid color-mix(in srgb, var(--nci-color-border) 92%, var(--nci-color-primary));
+    background-color: color-mix(in srgb, var(--nci-color-surface) 88%, var(--nci-color-primary));
+    color: var(--nci-color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    font-weight: 450;
+    letter-spacing: -0.015em;
+    vertical-align: baseline;
+    box-shadow: none;
+  }
+
+  .nci-panel-stack {
+    border-radius: 0;
+    border: 1px solid var(--nci-color-border);
+    background-color: var(--nci-color-elevated);
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .nci-panel-stack-inner {
+    border-radius: 0;
+    background-color: var(--nci-color-surface);
+    min-height: 0;
+  }
+
+  .nci-shadow-btn-primary {
+    box-shadow: var(--nci-shadow-button-primary);
+  }
+
+  .nci-shadow-btn-accent {
+    box-shadow: var(--nci-shadow-button-accent);
+  }
+
+  /* Shiki (`AgentLoopCode`) — outer panel supplies #0F1116 */
+  .nci-agent-loop-code pre.shiki {
+    margin: 0;
+    padding: 0;
+    background-color: transparent !important;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+
+  .nci-agent-loop-code pre.shiki code {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    background: transparent !important;
+  }
 }

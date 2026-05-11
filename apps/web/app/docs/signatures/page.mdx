@@ -1,0 +1,137 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  SideBySideRoot,
+  SideBySideDetailSlider,
+  SideBySidePanel,
+  SideBySideHighlight,
+  SideBySideReveal,
+} from "@/components/docs/widgets/side-by-side";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+
+<PageEyebrow>Signatures</PageEyebrow>
+
+# Extract, don&rsquo;t paraphrase
+
+<PageLede>
+  NCI doesn&rsquo;t summarize TypeScript declarations — it extracts them. The exact `signature` text and the verbatim `/** */` JSDoc go straight into the index, with bodies, plain comments, and whitespace stripped. Everything an agent quotes is the declaration as written.
+</PageLede>
+
+## Side-by-side
+
+There is **one** `signature` string per symbol, kept verbatim. What changes between queries is the **CLI surface** you ask for: a list hit, the cite-ready snippet, or the full stored row. Toggle between them below; the left column always shows the same raw `.d.ts` source.
+
+<SideBySideRoot defaultDetail="snippet">
+  <SideBySideDetailSlider />
+
+  <SideBySidePanel title="Source" subtitle="zod 3.23.8 · lib/types.d.ts" variant="source">
+    <SideBySideHighlight highlightId="object">
+```ts
+declare class ZodObject<
+  T extends ZodRawShape,
+  UnknownKeys extends UnknownKeysParam = UnknownKeysParam,
+  Catchall extends ZodTypeAny = ZodTypeAny,
+> extends ZodType<
+  Output<T, UnknownKeys, Catchall>,
+  ZodObjectDef<T, UnknownKeys, Catchall>,
+  Input<T, UnknownKeys, Catchall>
+> {
+  /** Removes a key from the schema. */
+  omit<Mask extends { [k in keyof T]?: true }>(
+    mask: Mask,
+  ): ZodObject<Omit<T, keyof Mask>, UnknownKeys, Catchall>;
+}
+```
+    </SideBySideHighlight>
+  </SideBySidePanel>
+
+  <SideBySidePanel title="What NCI returns" subtitle="from the selected query" variant="index">
+    <SideBySideHighlight highlightId="object">
+      <SideBySideReveal show="find">
+```json
+{
+  "id": "zod@3.23.8::ZodObject",
+  "name": "ZodObject",
+  "kind_name": "class",
+  "package_name": "zod",
+  "package_version": "3.23.8",
+  "file_path": "lib/types.d.ts",
+  "is_internal": false,
+  "signature_snippet": "declare class ZodObject<T extends ZodRawShape, UnknownKeys extends UnknownKeysParam = UnknownKeysParam, Catchall extends ZodTypeAny = ZodTypeAny> extends ZodType<Output<T, UnknownKeys, Catchall>, ZodObjectDef<T, UnknownKeys, Catchall>, Input<T, UnknownKeys, Catchall..."
+}
+```
+The `signature_snippet` is the **only** thing NCI shortens: the full `signature` truncated at 320 characters with a trailing `...`. Used so list responses stay small when an agent fetches many candidates.
+      </SideBySideReveal>
+      <SideBySideReveal show="snippet">
+```json
+{
+  "id": "zod@3.23.8::ZodObject",
+  "signature": "declare class ZodObject<\n  T extends ZodRawShape,\n  UnknownKeys extends UnknownKeysParam = UnknownKeysParam,\n  Catchall extends ZodTypeAny = ZodTypeAny,\n> extends ZodType<\n  Output<T, UnknownKeys, Catchall>,\n  …\n> {\n  omit<Mask extends { [k in keyof T]?: true }>(\n    mask: Mask,\n  ): ZodObject<Omit<T, keyof Mask>, UnknownKeys, Catchall>;\n}",
+  "js_doc": "/** Removes a key from the schema. */"
+}
+```
+The cite-ready surface. `signature` is **verbatim** (generics, `extends`, defaults, overloads); `js_doc` is the `/** */` block as written. Nothing is paraphrased.
+      </SideBySideReveal>
+      <SideBySideReveal show="show">
+```json
+{
+  "id": "zod@3.23.8::ZodObject",
+  "name": "ZodObject",
+  "kind_name": "class",
+  "parent_symbol_id": null,
+  "is_internal": false,
+  "is_type_only": true,
+  "visibility": "public",
+  "source_package_name": "zod",
+  "source_package_version": "3.23.8",
+  "source_file_path": "lib/types.d.ts",
+  "heritage": ["extends ZodType<Output<T, UnknownKeys, Catchall>, …>"],
+  "modifiers": ["declare"],
+  "signature": "declare class ZodObject<…> { … }",
+  "js_doc": "/** Removes a key from the schema. */"
+}
+```
+The full stored row: every field NCI persisted for this symbol. `parent_symbol_id` is a foreign key — `omit` would point its row back at this class&rsquo;s id, not append text to the parent&rsquo;s signature.
+      </SideBySideReveal>
+    </SideBySideHighlight>
+  </SideBySidePanel>
+</SideBySideRoot>
+
+<CalloutRoot variant="tip">
+  <CalloutTitle>The signature is one string, kept whole.</CalloutTitle>
+  <CalloutBody>
+    NCI stores the declaration text as-written — generics, `extends`, defaults, overloads, and the `/** */` JSDoc block all included. The three surfaces above just expose **different fields** of the same row; they aren&rsquo;t progressively longer renderings of the signature itself.
+  </CalloutBody>
+</CalloutRoot>
+
+## What stays in the row
+
+- The full declaration `signature` text — generics, `extends` / `implements`, defaults, overloads.
+- The verbatim `/** */` JSDoc block in `js_doc`.
+- `kind_name` so the agent knows whether it&rsquo;s reasoning about an interface, a class member, or a type alias.
+- `parent_symbol_id` so a method always points back to its class or namespace.
+- `source_package_name` and `source_file_path` so the agent can cite the owning package, even when the declaration was authored elsewhere (e.g. types in `@types/foo`).
+
+## What never lands in the row
+
+- Plain `//` implementation comments — they describe how the code works, not how to call it.
+- Bodies of value declarations. Only the contract is stored.
+- Whitespace trivia and repeated empty lines.
+
+`is_internal = 1` rows are kept on disk; they just sit off the public export surface. `--public-only` (and the equivalent zod field on `nci_query`) is the way to filter them out at query time.
+
+## How the agent reaches it
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci query symbol ZodObject --package zod --package-version 3.23.8 -n 1 --format json</TerminalCommand>
+</TerminalRoot>
+
+Take the `id` from that envelope and feed it into `nci query snippet`:
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci query snippet "zod@3.23.8::ZodObject"</TerminalCommand>
+</TerminalRoot>
+
+`snippet` returns the cite-ready signature — `signature` + JSDoc — without any of the surrounding file. That is the one the agent quotes back to the user.
+
+For the bundled flow — exact-name + FTS hits + batched snippets in one call — use `nci query evidence --package zod --package-version 3.23.8 --symbol ZodObject`. That is what an agent should reach for first; chained `find` + `symbol` + `snippet` is the fallback.

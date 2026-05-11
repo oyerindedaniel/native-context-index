@@ -1,0 +1,104 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  TerminalRoot,
+  TerminalCommand,
+  TerminalOutput,
+} from "@/components/docs/widgets/terminal";
+import {
+  FlagTableRoot,
+  FlagTableSearch,
+  FlagTableSubcommandFilter,
+  FlagTableBody,
+} from "@/components/docs/widgets/flag-table";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { cliFlags, cliSubcommands } from "@/lib/docs/cli-flags";
+
+<PageEyebrow>CLI API</PageEyebrow>
+
+# Every flag, in one searchable table
+
+<PageLede>
+  `nci` is the source of truth — `nci-mcp` and the Node shim both call it. The reference below mirrors `nci --help` and is grouped by subcommand.
+</PageLede>
+
+## Top-level shape
+
+<TerminalRoot>
+  <TerminalCommand>nci --help</TerminalCommand>
+  <TerminalOutput tone="muted">{`Usage: nci [OPTIONS] <COMMAND>
+
+Commands:
+  init           Interactive setup (or -y): create nci.config.json and open the database
+  db             Database maintenance and lifecycle commands
+  index          Scan node_modules and update the index
+  query          Search and inspect indexed package data
+  sql            Run SQL that only reads the index (no writes)
+  completions    Print shell completions
+  binary-path    Print the absolute path of the running nci executable [aliases: which]
+  help           Print this message or the help of the given subcommand(s)
+
+Options:
+      --database <PATH>     Path to nci.sqlite (overrides nci.config.json)
+      --format   <FORMAT>   Output format for supported commands [possible values: plain, json, jsonl]
+  -h, --help                Print help
+  -V, --version             Print version`}</TerminalOutput>
+</TerminalRoot>
+
+## Subcommand tree
+
+<TerminalRoot>
+  <TerminalCommand>nci db --help</TerminalCommand>
+  <TerminalOutput tone="muted">{`Commands:
+  init            Open the database and run migrations (non-interactive)
+  status          Database path/size and health checks (optional)
+  clear           Delete all indexed package rows (prompts unless -y)
+  remove          Remove one package from the index (prompts unless -y)
+  remove-glob     Remove packages whose name matches a SQLite GLOB
+  destroy         Delete the SQLite file on disk (requires --force)
+  vacuum          Run VACUUM
+  wal-checkpoint  PRAGMA wal_checkpoint(TRUNCATE)`}</TerminalOutput>
+</TerminalRoot>
+
+<TerminalRoot>
+  <TerminalCommand>nci query --help</TerminalCommand>
+  <TerminalOutput tone="muted">{`Commands:
+  find              Full-text search symbols by query text
+  symbol            Exact symbol-name search with package/source filters
+  show              Show one symbol by stable symbol id
+  snippet           Print cite-ready signature snippet for a stable symbol id
+  overloads         List overload siblings for a stable symbol id
+  packages          List packages currently indexed in the database
+  package-versions  List indexed versions for a package name
+  package-deps      List declared package dependencies for a package name/version
+  source-packages   List distinct source packages for one indexed package version
+  active-package    Resolve active installed package version(s) from project/workspace node_modules roots
+  symbols           List symbols for a package name/version
+  evidence          Bundled evidence: exact symbol hits + FTS fallback + batched snippets in ONE call`}</TerminalOutput>
+</TerminalRoot>
+
+## Reference
+
+<FlagTableRoot>
+  <FlagTableSearch />
+  <FlagTableSubcommandFilter subcommands={[...cliSubcommands]} />
+  <FlagTableBody flags={cliFlags} />
+</FlagTableRoot>
+
+<CalloutRoot variant="info">
+  <CalloutTitle>`evidence` is the preferred first call.</CalloutTitle>
+  <CalloutBody>
+    `query evidence` runs exact-name + FTS lookups *and* batched signature snippets from a single SQLite open. It replaces chained `query find` / `query symbol` / `query snippet` for the standard &ldquo;find these symbols and cite them&rdquo; workflow.
+  </CalloutBody>
+</CalloutRoot>
+
+## Shell completion
+
+<TerminalRoot>
+  <TerminalCommand>nci completions zsh &gt; ~/.zsh/completions/_nci</TerminalCommand>
+</TerminalRoot>
+
+`bash`, `fish`, `powershell`, and `elvish` are also accepted.
+
+- Exit codes are at [Exit codes](/docs/reference/exit-codes).
+- Environment variables that affect the CLI are at [Environment variables](/docs/reference/env-vars).
+- The JSON envelope `--format json` produces is at [JSON output schemas](/docs/reference/json-schemas).

@@ -1,0 +1,168 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  ConfigBuilderRoot,
+  ConfigBuilderGroupSection,
+  ConfigBuilderTextField,
+  ConfigBuilderNumberField,
+  ConfigBuilderSelectField,
+  ConfigBuilderPackageScopeField,
+  ConfigBuilderValidationBadge,
+  ConfigBuilderPreview,
+} from "@/components/docs/widgets/config-builder";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import {
+  TerminalRoot,
+  TerminalCommand,
+  TerminalOutput,
+} from "@/components/docs/widgets/terminal";
+
+<PageEyebrow>Configuration</PageEyebrow>
+
+# `nci.config.json`, end to end
+
+<PageLede>
+  Every flag the CLI accepts has a config-file equivalent. Build a config interactively below — the JSON on the right updates live and stays valid against the engine&rsquo;s schema.
+</PageLede>
+
+## Build it
+
+<ConfigBuilderRoot>
+  <div className="flex flex-col gap-4">
+    <ConfigBuilderGroupSection
+      title="Project"
+      description="Where does the index live, and where does it scan?"
+    >
+      <ConfigBuilderTextField
+        fieldKey="project_root"
+        label="project_root"
+        placeholder="."
+        description="The directory that contains your package.json. Defaults to the directory you ran nci from."
+      />
+      <ConfigBuilderTextField
+        fieldKey="database"
+        label="database"
+        placeholder="nci.sqlite"
+        description="Custom path for the SQLite file. Useful when you keep tooling out of the repo root."
+      />
+    </ConfigBuilderGroupSection>
+
+    <ConfigBuilderGroupSection
+      title="Output"
+      description="Defaults for commands that print to stdout."
+    >
+      <ConfigBuilderSelectField
+        fieldKey="format"
+        label="format"
+        options={[
+          { id: "plain", label: "plain" },
+          { id: "json", label: "json" },
+          { id: "jsonl", label: "jsonl" },
+        ]}
+        description="The default for query commands. CLI flags still override per-call."
+      />
+      <ConfigBuilderSelectField
+        fieldKey="banner"
+        label="banner"
+        options={[
+          { id: "auto", label: "auto" },
+          { id: "on", label: "on" },
+          { id: "off", label: "off" },
+        ]}
+      />
+      <ConfigBuilderSelectField
+        fieldKey="progress"
+        label="progress"
+        options={[
+          { id: "auto", label: "auto" },
+          { id: "on", label: "on" },
+          { id: "off", label: "off" },
+        ]}
+      />
+    </ConfigBuilderGroupSection>
+
+    <ConfigBuilderGroupSection
+      title="Indexing scope"
+      description="Whose dependencies are read, and how deeply re-exports are followed."
+    >
+      <ConfigBuilderPackageScopeField />
+      <ConfigBuilderNumberField
+        fieldKey="max_hops"
+        label="max_hops"
+        description="0 = entry only. -1 = unlimited. Default = 10."
+        min={-1}
+      />
+    </ConfigBuilderGroupSection>
+
+    <ConfigBuilderValidationBadge />
+  </div>
+
+  <ConfigBuilderPreview />
+</ConfigBuilderRoot>
+
+<CalloutRoot variant="info">
+  <CalloutTitle>The CLI always wins.</CalloutTitle>
+  <CalloutBody>
+    Merge order is <code>defaults → nci.config.json → CLI flags</code>. A flag like `--max-hops 0` overrides the file&rsquo;s value for that one run.
+  </CalloutBody>
+</CalloutRoot>
+
+## Field deep-dives
+
+### project_root
+
+The directory whose `package.json` and `node_modules` are scanned. Relative paths resolve against the file containing the config — not against `cwd`. If you run `nci index` from a workspace, the file&rsquo;s `project_root` still wins unless `--project-root` is passed.
+
+### package_scope
+
+Either an array of sections or the sentinel.
+
+```json
+{
+  "package_scope": ["dependencies"]
+}
+```
+
+Indexes packages listed in the consumer manifest&rsquo;s `dependencies`. Add `"dev_dependencies"` to include build tools.
+
+```json
+{
+  "package_scope": "all_installed"
+}
+```
+
+Disables the manifest gate. Every installed package is indexed regardless of how it got there. Use sparingly — large transitive trees are not free.
+
+### max_hops
+
+The depth of re-export resolution.
+
+| Value | Behaviour                                      |
+| ----- | ---------------------------------------------- |
+| `0`   | Index entry-file declarations only             |
+| `1`   | Follow one level (entry → re-exported file)    |
+| `10`  | Default — covers practically every real lib    |
+| `-1`  | Unlimited — only useful for diagnostics        |
+
+### workspaces
+
+Glob list, relative to `project_root`. Each entry contributes its own `node_modules` install root.
+
+```json
+{
+  "workspaces": ["apps/*", "packages/*"]
+}
+```
+
+### dependency_stub_packages
+
+Names a package whose dependencies should be persisted as `npm::…` stub edges only. Set this when one of your dependencies pulls in a heavy AI/SDK tree that you do not want walked. The stub keeps the import edge in the graph without loading any of its `.d.ts`.
+
+## Verify
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci index --dry-run</TerminalCommand>
+  <TerminalOutput tone="muted">{`would index 78 packages
+would write 13.4 MiB to nci.sqlite`}</TerminalOutput>
+</TerminalRoot>
+
+If the package count surprises you, narrow `package_scope`, add `packages.exclude` globs, or turn on `--skip-root-workspace`.

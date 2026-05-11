@@ -1,0 +1,81 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Reference · MCP methods</PageEyebrow>
+
+# MCP method registry
+
+<PageLede>
+  `nci-mcp` registers exactly two tools and three resources. There are no other methods, no admin tools, no hidden helpers — the table below is the complete surface.
+</PageLede>
+
+## Tools
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Tool</TableHeaderCell>
+      <TableHeaderCell>Schema</TableHeaderCell>
+      <TableHeaderCell>Returns</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>nci_query</code></TableCell>
+      <TableCell>
+        Discriminated union over <code>subcommand</code>: <code>find</code>, <code>symbol</code>, <code>show</code>, <code>snippet</code>, <code>overloads</code>, <code>packages</code>, <code>package_versions</code>, <code>package_deps</code>, <code>source_packages</code>, <code>active_package</code>, <code>symbols</code>, <code>evidence</code>. Optional <code>database</code> overrides the resolved DB path.
+      </TableCell>
+      <TableCell>CLI envelope <code>&#123;ok:true, data:…&#125;</code> on success, <code>&#123;ok:false, error:…&#125;</code> on failure.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci_sql</code></TableCell>
+      <TableCell>
+        Optional <code>database</code>, <code>schema</code>, <code>command</code>, <code>sql_parts</code>, <code>max_rows</code>, <code>format</code> (<code>json</code> default, <code>jsonl</code>, <code>plain</code>). At least one of <code>schema:true</code>, <code>command</code>, or <code>sql_parts</code> is required.
+      </TableCell>
+      <TableCell>Raw row array (no envelope). <code>--max-rows</code> failures surface as MCP errors.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+The full input schemas live in `packages/nci-mcp/src/nci-query.ts` and `nci-sql.ts` and are exported as zod schemas — read those files when a client wants the canonical shape.
+
+## Resources
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>URI</TableHeaderCell>
+      <TableHeaderCell>Mime</TableHeaderCell>
+      <TableHeaderCell>What it returns</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>nci://primer/agent</code></TableCell>
+      <TableCell><code>text/markdown</code></TableCell>
+      <TableCell>Compact NCI-first workflow primer. Same text shown at <a href="/docs/primer">/docs/primer</a>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci://primer/reference</code></TableCell>
+      <TableCell><code>text/markdown</code></TableCell>
+      <TableCell>Tabular schema reference: tables, columns, joins, edge cases.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci://database/active</code></TableCell>
+      <TableCell><code>application/json</code></TableCell>
+      <TableCell>Read-only snapshot from <code>nci db status --format json</code> — resolved path and index counts. Strictly informational.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+<CalloutRoot variant="warning">
+  <CalloutTitle>Don&rsquo;t act on the database path.</CalloutTitle>
+  <CalloutBody>
+    The path returned by <code>nci://database/active</code> is for diagnosis only. Do not delete, vacuum, reindex, or modify it from the agent loop — `nci_query` and `nci_sql` already operate against the same database without needing it. If a tool call appears to use the wrong DB, pass <code>database</code> on the next call instead of mutating files.
+  </CalloutBody>
+</CalloutRoot>
+
+## Server identity
+
+The MCP server announces itself as `name: "nci-mcp"` with a version that matches its npm package version. The server&rsquo;s instructions string (set in `packages/nci-mcp/src/index.ts`) tells the agent to read `nci://primer/agent` first — the same advice rendered at [Agent primer](/docs/primer).

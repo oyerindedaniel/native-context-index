@@ -1,0 +1,154 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Cookbook · Claude</PageEyebrow>
+
+# Wire NCI into Claude
+
+<PageLede>
+  Claude has two first-class clients that speak MCP: **Claude Desktop** (the GUI) and **Claude Code** (the CLI). The `nci-mcp` server runs the same way in both — only the wiring differs. Pick the section that matches how you use Claude; both can coexist.
+</PageLede>
+
+## Claude Desktop
+
+The GUI app loads MCP servers from a single JSON file at launch.
+
+### Locate the config
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>OS</TableHeaderCell>
+      <TableHeaderCell>Path</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>macOS</TableCell>
+      <TableCell><code>~/Library/Application Support/Claude/claude_desktop_config.json</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Windows</TableCell>
+      <TableCell><code>%APPDATA%\Claude\claude_desktop_config.json</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Linux</TableCell>
+      <TableCell><code>~/.config/Claude/claude_desktop_config.json</code></TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+If the file doesn&rsquo;t exist, create it. On macOS you can shortcut to it via <MenuPathRoot ariaLabel="Claude Desktop edit config menu"><MenuPathSegment>Settings</MenuPathSegment><MenuPathSegment>Developer</MenuPathSegment><MenuPathSegment current>Edit Config</MenuPathSegment></MenuPathRoot>.
+
+### Drop in the entry
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+That is the whole entry. `nci-mcp` resolves its working directory from the launcher and reads `nci.config.json` the same way the CLI does — there is no `NCI_PROJECT_ROOT` env var.
+
+### When you need `NCI_BINARY`
+
+If `nci` isn&rsquo;t on the launcher&rsquo;s `PATH` (common on macOS GUI apps), point at the binary explicitly:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"],
+      "env": {
+        "NCI_BINARY": "/absolute/path/to/nci"
+      }
+    }
+  }
+}
+```
+
+Find the absolute path with:
+
+<TerminalRoot>
+  <TerminalCommand>nci binary-path</TerminalCommand>
+</TerminalRoot>
+
+### Reload Claude Desktop
+
+Quit fully — `⌘Q` on macOS, or right-click the **system tray** icon and choose **Quit** on Windows — then relaunch. The config is read **only at startup** and changes are not hot-reloaded; closing the window or starting a new conversation is not enough. After relaunch, open the connected tools panel — `nci` should appear with two tools (`nci_query`, `nci_sql`) and three resources (`nci://primer/agent`, `nci://primer/reference`, `nci://database/active`).
+
+## Claude Code
+
+The CLI uses a `claude mcp` subcommand to register servers; you don&rsquo;t hand-edit JSON.
+
+### Add the server
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>claude mcp add --transport stdio --scope user nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+The `--` (double dash) separates Claude&rsquo;s flags from the command Claude Code spawns for the server. `--scope user` stores it under `~/.claude.json` so it&rsquo;s available across every repo.
+
+If you want the server scoped to one repo (and checked into version control for teammates), use `--scope project` — Claude writes the entry to `.mcp.json` in the repo root:
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>claude mcp add --transport stdio --scope project nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+### When you need `NCI_BINARY`
+
+Pass it through with `--env`:
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>{`claude mcp add --transport stdio --scope user --env NCI_BINARY=$(nci binary-path) nci -- npx -y @nativecontextindex/mcp`}</TerminalCommand>
+</TerminalRoot>
+
+(All flags must appear **before** the server name; the command after `--` is what Claude spawns.)
+
+### Verify
+
+<TerminalRoot>
+  <TerminalCommand>claude mcp list</TerminalCommand>
+</TerminalRoot>
+
+<TerminalRoot>
+  <TerminalCommand>claude mcp get nci</TerminalCommand>
+</TerminalRoot>
+
+The first shows every registered server; the second prints the resolved command, args, env, and scope for `nci`. Restart your Claude Code session after adding so the tool catalog refreshes.
+
+## First call (both clients)
+
+The agent should read `nci://primer/agent` first — that resource is the operating manual the MCP server&rsquo;s `instructions` field points it to. Then ask something like:
+
+> What overloads of `useState` does my installed React expose?
+
+Claude routes to `nci_query` with `subcommand: "evidence"` (or `overloads` once it has an id) and quotes the signature back verbatim.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Index before you ask.</CalloutTitle>
+  <CalloutBody>
+    NCI&rsquo;s tools read the database — they do not build it. Run `nci index` once in the project before your first chat. The MCP server inherits NCI&rsquo;s config-driven DB resolution, so an indexed repo elsewhere won&rsquo;t help.
+  </CalloutBody>
+</CalloutRoot>
+
+## Troubleshooting
+
+<TerminalRoot>
+  <TerminalCommand>npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+The server speaks JSON-RPC over stdio with no startup banner — it sits silent waiting for a `tools/list` from the client. If Claude says &ldquo;tool unavailable&rdquo;:
+
+- `nci` is not on `PATH` and `NCI_BINARY` is unset. Set it.
+- The repo hasn&rsquo;t been indexed yet. Run `nci index`.
+- Two MCP entries conflict on the name `nci`. Rename one (e.g. `nci-monorepo`).
+- Claude Code only: `claude mcp list` shows the entry but a `tools/list` is empty — the binary couldn&rsquo;t spawn. Run `claude mcp get nci` to inspect the resolved command, then try the command directly in a shell.

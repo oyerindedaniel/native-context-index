@@ -1,0 +1,58 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { IntegrationAgentLoopDemo } from "./agent-loop-demo";
+
+<PageEyebrow>Agent Integration</PageEyebrow>
+
+# Drop NCI into the loop
+
+<PageLede>
+  An agent loop is small: think, call a tool, read the result, respond. NCI is the tool you wire in for type-aware questions about the user&rsquo;s actual installed packages. The MCP server (`nci-mcp`) exposes exactly two tools — `nci_query` and `nci_sql` — and three resources.
+</PageLede>
+
+## A single tick of the loop
+
+<IntegrationAgentLoopDemo />
+
+The model deliberates for a tick, calls `nci_query` with a discriminated `subcommand`, reads the JSON envelope, then keeps going. NCI&rsquo;s job is to make that one structured call return a useful answer fast.
+
+## What the agent calls
+
+There is no general-purpose &ldquo;ask&rdquo; tool. `nci_query` is a discriminated union — every shape is one CLI subcommand:
+
+- `subcommand: "active_package"` — resolve which installed version is live in the project tree.
+- `subcommand: "evidence"` — exact-name hits + FTS phrase fallback + batched `signature` / `js_doc` snippets, all in one round-trip.
+- `subcommand: "find" | "symbol"` — narrower fall-backs for a single anchor.
+- `subcommand: "show" | "snippet" | "overloads"` — drill in on a specific `symbols.id`.
+- `subcommand: "packages" | "package_versions" | "package_deps" | "source_packages" | "symbols"` — listings for orientation.
+
+`nci_sql` is the escape hatch for read-only relational checks. Mutating SQL is rejected before it reaches the database.
+
+## The agent primer
+
+`nci-mcp` advertises three resources. The first, `nci://primer/agent`, is the operating manual a fresh agent reads before its first call. You can read it directly at [Agent primer](/docs/primer).
+
+## Why this beats RAG for code
+
+<TerminalRoot>
+  <TerminalCommand>nci query snippet "zod@3.23.8::ZodObject"</TerminalCommand>
+</TerminalRoot>
+
+That output is exact. There is no embedding, no nearest-neighbour, no top-k tradeoff: you asked for one symbol id, you got that symbol&rsquo;s stored `signature` and `js_doc`. The full comparison is at [Local index vs. RAG](/docs/architecture/local-vs-rag).
+
+## Wiring up
+
+- [MCP Protocol](/docs/mcp) — full `nci_query` / `nci_sql` schemas.
+- [Claude Cookbook](/docs/cookbook/claude) — Claude Desktop **and** Claude Code in one page.
+- [Cursor Cookbook](/docs/cookbook/cursor) — drop-in `~/.cursor/mcp.json` entry.
+- [Antigravity Cookbook](/docs/cookbook/antigravity) — Google Antigravity (`~/.gemini/antigravity/mcp_config.json`).
+- [OpenCode Cookbook](/docs/cookbook/opencode) — `opencode.json` or shared `.mcp.json`.
+- [NCI Skills](/docs/cookbook/skills) — the deterministic answer-quality protocol.
+
+<CalloutRoot variant="tip">
+  <CalloutTitle>Pin versions through `active_package`.</CalloutTitle>
+  <CalloutBody>
+    The `nci.sqlite` file is **designed** to hold many packages and many versions per package — the schema enforces `UNIQUE(name, version)`, and every stable id (`zod@3.23.8::ZodObject`) carries the version. The agent&rsquo;s job is to call `nci_query` with `subcommand: "active_package"` first, take the returned `package_version`, and pin every follow-up `evidence` / `symbol` / `snippet` call to it. The thing to keep aligned is the **`nci-mcp` server&rsquo;s `project_root`** so `active_package` walks the right `node_modules`; the cache itself can hold more than one repo&rsquo;s worth of indexed packages.
+  </CalloutBody>
+</CalloutRoot>

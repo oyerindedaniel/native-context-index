@@ -36,16 +36,10 @@ export function HeroSection() {
             aria-label="Primary"
           >
             <Link
-              href="/search"
+              href="/why-nci"
               className="text-base font-semibold text-ink/75 transition-colors hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
             >
-              Search
-            </Link>
-            <Link
-              href="/benchmark"
-              className="text-base font-semibold text-ink/75 transition-colors hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            >
-              Benchmark
+              Why NCI
             </Link>
             <Link
               href="/docs"

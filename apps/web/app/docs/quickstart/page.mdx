@@ -1,0 +1,68 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  InstallPickerRoot,
+  InstallPickerControl,
+  defaultManagers,
+} from "@/components/docs/widgets/install-picker";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Quickstart</PageEyebrow>
+
+# Five minutes from zero
+
+<PageLede>
+  Install the CLI, initialise the project, index, and query. By the end of this page you have an indexed `nci.sqlite` your agent can read through MCP.
+</PageLede>
+
+## 1. Install the CLI
+
+<InstallPickerRoot managers={defaultManagers} storageKey="quickstart" defaultId="pnpm">
+  <InstallPickerControl />
+</InstallPickerRoot>
+
+The CLI is published as `@nativecontextindex/cli`. Pick your package manager — the page remembers your choice next time.
+
+## 2. Initialise the project
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci init -y</TerminalCommand>
+</TerminalRoot>
+
+`nci init` writes `nci.config.json` next to your `package.json` and opens the database (running pending migrations). The interactive form drops the `-y` and prompts you for each field. Everything is overridable from the CLI later — see [Configuration](/docs/config) for the full schema.
+
+## 3. Index your dependencies
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci index</TerminalCommand>
+</TerminalRoot>
+
+The progress display can be controlled with `NCI_PROGRESS=auto|on|off`. Subsequent runs only re-process changed packages — the first index is the slow one.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Want to see the plan before writing?</CalloutTitle>
+  <CalloutBody>
+    `nci index --dry-run` walks scan + filter and stops without writing to SQLite. Useful as a CI sanity gate or when tuning `package_scope`.
+  </CalloutBody>
+</CalloutRoot>
+
+## 4. Query the index
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci query find "useState" --limit 3</TerminalCommand>
+</TerminalRoot>
+
+`query find` is FTS over the symbol graph. For a known name, `query symbol useState` is the exact-match path. For listings, `query symbols <name> <version>` paginates with `--offset`/`--limit`. Add `--format json` whenever you need the structured envelope:
+
+<TerminalRoot cwd="my-repo">
+  <TerminalCommand>nci --format json query evidence --package zod --package-version 3.23.8 --symbol ZodObject</TerminalCommand>
+</TerminalRoot>
+
+`evidence` is the bundled call: exact-name + FTS hits + batched signature snippets in one round-trip. It is what an agent should reach for first.
+
+## 5. What now?
+
+- Wire NCI into your agent — see [MCP Protocol](/docs/mcp).
+- Tune for monorepos — see [Monorepo indexing](/docs/cookbook/monorepo).
+- Browse every flag — see [CLI API](/docs/cli).
+- Read the same primer your agent reads — [Agent primer](/docs/primer).

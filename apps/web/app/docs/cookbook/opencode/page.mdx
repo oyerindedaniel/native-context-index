@@ -1,0 +1,114 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Cookbook · OpenCode</PageEyebrow>
+
+# Wire NCI into OpenCode
+
+<PageLede>
+  OpenCode reads MCP servers from `opencode.json`. Add one block under `mcp` and the agent gets type-aware access to your installed packages in every session that opens this project.
+</PageLede>
+
+## Pick the config scope
+
+OpenCode merges configs from several locations (later sources override earlier ones on conflicting keys — your settings are added together, not replaced):
+
+- `~/.config/opencode/opencode.json` — user-scoped, applies to every project.
+- `$OPENCODE_CONFIG` — optional custom path for CI or sandbox setups.
+- `./opencode.json` at the project root — checked into version control.
+- `./.opencode/opencode.json` — same precedence as the project root file, useful when you already have a `.opencode/` directory for agents and plugins.
+
+Every one of those paths also accepts the `.jsonc` extension — `opencode.jsonc`, `.opencode/opencode.jsonc` — and OpenCode parses JSONC (comments and trailing commas). The bundled `$schema` advertises `allowComments` / `allowTrailingCommas` so VS Code, Cursor, and Neovim treat the file correctly.
+
+If you also want to share the entry with a team that uses Claude Code, you can keep it in `.mcp.json` at the repo root instead — OpenCode reads that file too, and the JSON shape is the Claude Code one.
+
+## Drop in the entry — `opencode.json`
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "nci": {
+      "type": "local",
+      "command": ["npx", "-y", "@nativecontextindex/mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+OpenCode&rsquo;s schema for local MCP servers:
+
+- **`type`** is `"local"` for stdio servers like `nci-mcp` (remote SSE/HTTP servers use `"remote"`).
+- **`command`** is an **array** — first element is the executable, the rest are args. The array form avoids shell-injection footguns and tolerates spaces in paths.
+- **`enabled`** can flip the server off without removing the block.
+- **`environment`** (object) carries env vars merged on top of the OpenCode process env. Use it for `NCI_BINARY` when the bundled binary is not on `PATH`:
+
+```json
+{
+  "mcp": {
+    "nci": {
+      "type": "local",
+      "command": ["npx", "-y", "@nativecontextindex/mcp"],
+      "enabled": true,
+      "environment": {
+        "NCI_BINARY": "{file:./bin/nci}"
+      }
+    }
+  }
+}
+```
+
+`{env:VAR}` and `{file:path}` substitutions are honored, which is the right way to keep absolute paths out of a checked-in config.
+
+## Drop in the entry — `.mcp.json` (team-share form)
+
+Same server, Claude Code-compatible shape, sitting at the repo root:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+OpenCode picks this up automatically; Claude Code with `--scope project` writes to the same file. One entry, two clients.
+
+## Apply MCP changes
+
+OpenCode hot-reloads configuration — you do **not** need to quit and reopen the app for routine edits. After changing `opencode.json`, `opencode.jsonc`, or `.mcp.json`, run the **`/reload`** slash command (aliases **`/restart`**, **`/refresh`**). That rebuilds the backend while keeping the UI session alive; if a model turn is in flight, reload waits until it finishes.
+
+Verify with **`/mcps`** or **`/status`** that `nci` appears with two tools (`nci_query`, `nci_sql`) and three resources (`nci://primer/agent`, `nci://primer/reference`, `nci://database/active`). This matches the Cursor / Antigravity story (save config → refresh / reload — full IDE restart is only for stuck states).
+
+## First call
+
+The agent should read `nci://primer/agent` first — that resource is the operating manual the MCP server&rsquo;s `instructions` field points it to. Then ask something like:
+
+> Pin to the installed version of zod and quote `ZodObject.omit` before you write the schema.
+
+OpenCode routes to `nci_query` with `subcommand: "evidence"` and cites the stored `signature` + `js_doc` back. The [agent primer](/docs/primer) covers the prompt habits worth keeping.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Index before you ask.</CalloutTitle>
+  <CalloutBody>
+    NCI&rsquo;s tools read the database; they do not build it. Run `nci index` once in the project before your first prompt. The MCP server inherits NCI&rsquo;s config-driven DB resolution.
+  </CalloutBody>
+</CalloutRoot>
+
+## Troubleshooting
+
+<TerminalRoot>
+  <TerminalCommand>npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+The server speaks JSON-RPC over stdio with no startup banner — it sits silent waiting for a `tools/list`. If OpenCode reports the server as down or empty:
+
+- `nci` is not on `PATH` and `NCI_BINARY` is unset. Set it via `environment` (or a `{file:…}` substitution).
+- The repo has not been indexed yet. Run `nci index`.
+- `command` was given as a single string instead of an array. OpenCode requires the array form for `type: "local"`.
+- Two MCP entries share the key `nci`. Rename one (e.g. `nci-monorepo`).

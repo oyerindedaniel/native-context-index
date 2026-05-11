@@ -1,0 +1,220 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import {
+  InstallTabsRoot,
+  InstallTabsList,
+  InstallTabsTrigger,
+  InstallTabsPanel,
+} from "@/components/docs/widgets/install-tabs";
+
+<PageEyebrow>MCP Protocol</PageEyebrow>
+
+# Two tools, three resources
+
+<PageLede>
+  The MCP server (`nci-mcp`) is a thin adapter on top of the CLI. It exposes exactly two tools and three resources. The agent does the deciding; the server only forwards calls to `nci`.
+</PageLede>
+
+## Tools
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Tool</TableHeaderCell>
+      <TableHeaderCell>Maps to</TableHeaderCell>
+      <TableHeaderCell>Returns</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>nci_query</code></TableCell>
+      <TableCell><code>nci query &lt;subcommand&gt; --format json</code></TableCell>
+      <TableCell>
+        CLI envelope: <code>&#123;&quot;ok&quot;:true,&quot;data&quot;:…&#125;</code> on success, <code>&#123;&quot;ok&quot;:false,…&#125;</code> on error.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci_sql</code></TableCell>
+      <TableCell><code>nci sql --format json -c &quot;…&quot;</code></TableCell>
+      <TableCell>Raw JSON array of row objects (no envelope). <code>--max-rows</code> applies here, not on <code>nci_query</code>.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+`nci_query` is a discriminated union over `subcommand`:
+
+- `evidence` — exact-name + FTS hits + batched snippets in one call. Preferred first call.
+- `active_package` — resolve which installed version is live for a name.
+- `find` / `symbol` — narrower lookups for a single anchor.
+- `show` / `snippet` / `overloads` — drill in on one `symbols.id`.
+- `packages` / `package_versions` / `package_deps` / `source_packages` / `symbols` — listings.
+
+## Resources
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>URI</TableHeaderCell>
+      <TableHeaderCell>MIME</TableHeaderCell>
+      <TableHeaderCell>What it returns</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>nci://primer/agent</code></TableCell>
+      <TableCell><code>text/markdown</code></TableCell>
+      <TableCell>Compact NCI-first workflow primer. Read first.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci://primer/reference</code></TableCell>
+      <TableCell><code>text/markdown</code></TableCell>
+      <TableCell>Tabular reference: schema columns, joins, edge cases.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>nci://database/active</code></TableCell>
+      <TableCell><code>application/json</code></TableCell>
+      <TableCell>Strictly read-only status snapshot from <code>nci db status --format json</code>.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+The full primer text is rendered at [Agent primer](/docs/primer).
+
+## Wire it up
+
+<InstallTabsRoot storageKey="mcp-clients" defaultKey="cursor">
+  <InstallTabsList ariaLabel="MCP clients">
+    <InstallTabsTrigger tabKey="cursor">Cursor</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="claude-desktop">Claude Desktop</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="claude-code">Claude Code</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="antigravity">Antigravity</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="opencode">OpenCode</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="other">Other clients</InstallTabsTrigger>
+  </InstallTabsList>
+
+  <InstallTabsPanel tabKey="cursor">
+    Drop this into `~/.cursor/mcp.json`, or open <MenuPathRoot ariaLabel="Cursor MCP settings"><MenuPathSegment>Cursor</MenuPathSegment><MenuPathSegment>Settings</MenuPathSegment><MenuPathSegment current>MCP</MenuPathSegment></MenuPathRoot>:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+    Cursor opens the server in the workspace it launched in; the server inherits NCI&rsquo;s working-directory-aware config resolution (the same logic `nci` uses for `nci.config.json`). Full setup at the [Cursor cookbook](/docs/cookbook/cursor).
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="claude-desktop">
+    Drop this into `claude_desktop_config.json` (path varies by OS — see the [Claude cookbook](/docs/cookbook/claude)):
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"],
+      "env": {
+        "NCI_BINARY": "/absolute/path/to/nci"
+      }
+    }
+  }
+}
+```
+
+    `NCI_BINARY` is only required when the bundled binary is not on `PATH`. The config is read at launch — fully quit and reopen Claude Desktop after editing.
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="claude-code">
+    Claude Code registers servers via its CLI. Use `--scope user` for personal use across every repo, or `--scope project` to write to `.mcp.json` at the repo root for team sharing:
+
+    <TerminalRoot cwd="my-repo">
+      <TerminalCommand>claude mcp add --transport stdio --scope user nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
+    </TerminalRoot>
+
+    Flags go **before** the server name; the command after `--` is what Claude spawns. Verify with `claude mcp list` and `claude mcp get nci`. Full setup at the [Claude cookbook](/docs/cookbook/claude).
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="antigravity">
+    Edit `~/.gemini/antigravity/mcp_config.json` (Windows: `%UserProfile%\.gemini\antigravity\mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+    Restart Antigravity (or end and restart the Agent session) — the config is read at IDE startup. Full setup at the [Antigravity cookbook](/docs/cookbook/antigravity).
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="opencode">
+    OpenCode reads `opencode.json` (user or project scope). Local stdio servers use the array form for `command`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "nci": {
+      "type": "local",
+      "command": ["npx", "-y", "@nativecontextindex/mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+    A `.mcp.json` at the repo root (Claude Code-compatible shape) is also picked up. Full setup at the [OpenCode cookbook](/docs/cookbook/opencode).
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="other">
+    Any MCP-compliant client can use the server. Launch it directly:
+
+    <TerminalRoot>
+      <TerminalCommand>npx -y @nativecontextindex/mcp</TerminalCommand>
+    </TerminalRoot>
+
+    The server speaks MCP&rsquo;s JSON-RPC 2.0 framing over stdio (same wire format as other MCP servers).
+  </InstallTabsPanel>
+</InstallTabsRoot>
+
+## A round-trip
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) transport is **JSON-RPC 2.0** over stdio (see the spec’s base protocol). `nci-mcp` is built on `@modelcontextprotocol/sdk`, which implements that framing — you do not hand-roll JSON-RPC in application code; clients send requests like:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "nci_query",
+    "arguments": {
+      "subcommand": "evidence",
+      "package_name": "zod",
+      "package_version": "3.23.8",
+      "symbols": ["ZodObject"]
+    }
+  }
+}
+```
+
+The MCP SDK wraps that stdout as a tool result (`content[].text`). Parsing it yields the same JSON object you would see from `nci query --format json` in the terminal — including `{ "ok": false, "error": "…" }` on failures or `{ "ok": true, "data": … }` on success (for `evidence`, `data.symbols` / `data.snippets` as usual).
+
+<CalloutRoot variant="tip">
+  <CalloutTitle>Bind a server to one `project_root`, not one DB.</CalloutTitle>
+  <CalloutBody>
+    The `nci.sqlite` cache is multi-version by design (`UNIQUE(name, version)` on `packages`, stable ids carry the version). What an `nci-mcp` instance must own is **one `project_root`** so `subcommand: "active_package"` walks the correct `node_modules` and resolves the live version. Versions inside the cache don&rsquo;t collide; mismatched `project_root` is what produces wrong answers.
+  </CalloutBody>
+</CalloutRoot>
+
+## Best-practice prompts
+
+- Pin `package_name` + `package_version` whenever both are known. The primer pushes this hard for a reason.
+- Prefer `evidence` over chained `find` + `symbol` + `snippet` calls. It is the batched single-process path.
+- Use `nci_sql` only when a structured `nci_query` subcommand will not answer.

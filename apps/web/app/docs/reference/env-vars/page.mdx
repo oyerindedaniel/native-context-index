@@ -1,0 +1,92 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Reference · Env vars</PageEyebrow>
+
+# Environment variables
+
+<PageLede>
+  Every environment variable the CLI, MCP server, or postinstall script honours. Values shown here come straight from the engine source — there are no &ldquo;hidden&rdquo; toggles outside this list.
+</PageLede>
+
+## CLI runtime
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Variable</TableHeaderCell>
+      <TableHeaderCell>Read by</TableHeaderCell>
+      <TableHeaderCell>Effect</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>NCI_CACHE_DIR</code></TableCell>
+      <TableCell><code>nci</code></TableCell>
+      <TableCell>Override the OS cache directory under which NCI resolves the default SQLite path. Used as a fallback when `database` in `nci.config.json` and `--database` are both absent.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_BANNER</code></TableCell>
+      <TableCell><code>nci</code></TableCell>
+      <TableCell>Controls the boot banner. Accepts <code>auto</code>, <code>on</code>, <code>off</code>. Invalid values are rejected with a CLI error.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_PROGRESS</code></TableCell>
+      <TableCell><code>nci</code></TableCell>
+      <TableCell>Controls the progress display during indexing. Same values as <code>NCI_BANNER</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_PROFILE</code></TableCell>
+      <TableCell><code>nci</code> (when built with <code>phase-profile</code> feature)</TableCell>
+      <TableCell><code>1</code> emits crawl phase timings to stderr. Off by default and unavailable in standard release builds.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## MCP / Node shim
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Variable</TableHeaderCell>
+      <TableHeaderCell>Read by</TableHeaderCell>
+      <TableHeaderCell>Effect</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>NCI_BINARY</code></TableCell>
+      <TableCell><code>nci-mcp</code> · <code>@nativecontextindex/cli</code></TableCell>
+      <TableCell>Absolute path to the native <code>nci</code> binary the shim should call. Highest-priority resolver step — wins over bundled and on-PATH binaries. Find a real path with <code>nci binary-path</code>.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## Postinstall (Node package only)
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Variable</TableHeaderCell>
+      <TableHeaderCell>Effect</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>NCI_SKIP_DOWNLOAD</code></TableCell>
+      <TableCell><code>1</code> tells the postinstall script not to download the prebuilt binary. Useful in offline CI or when you ship your own build.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_DOWNLOAD_BASE_URL</code></TableCell>
+      <TableCell>Override the GitHub release base URL used to fetch the prebuilt binary. The script falls back to <code>repository.url</code> in <code>package.json</code> when this is unset.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Where these are wired.</CalloutTitle>
+  <CalloutBody>
+    `NCI_CACHE_DIR`, `NCI_BANNER`, `NCI_PROGRESS` are read by the Rust CLI in `packages/nci-engine`. `NCI_BINARY` is read by the Node shim in `packages/nci-mcp` and `packages/nci`. `NCI_SKIP_DOWNLOAD` and `NCI_DOWNLOAD_BASE_URL` are read by `packages/nci/scripts/postinstall.cjs`. There are no other NCI environment variables in the codebase.
+  </CalloutBody>
+</CalloutRoot>

@@ -1,0 +1,103 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Architecture · SQLite schema</PageEyebrow>
+
+# The on-disk schema
+
+<PageLede>
+  The index is one SQLite file. Get the canonical DDL with `nci sql --schema`. The tables below are the public surface that `query` and `sql` read from — column names match what the live database exposes.
+</PageLede>
+
+## The authoritative source
+
+<TerminalRoot>
+  <TerminalCommand>nci sql --schema</TerminalCommand>
+</TerminalRoot>
+
+That command prints the live `CREATE TABLE` statements straight from the open database. Everything below summarises those statements; if anything here disagrees with `--schema`, **trust `--schema`**.
+
+## Tables on the public surface
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Table</TableHeaderCell>
+      <TableHeaderCell>What it stores</TableHeaderCell>
+      <TableHeaderCell>Primary join</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>packages</code></TableCell>
+      <TableCell>One row per indexed package install: <code>name</code>, <code>version</code>, install root, timestamps.</TableCell>
+      <TableCell><code>symbols.package_id = packages.package_id</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbols</code></TableCell>
+      <TableCell>One row per merged graph symbol — declarations, signatures, JSDoc, source-package ownership, internal/global flags.</TableCell>
+      <TableCell>Filter by <code>package_id</code> first, then by <code>name</code> / <code>kind_name</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_additional_files</code></TableCell>
+      <TableCell>Extra declaration files folded into the same merged symbol row.</TableCell>
+      <TableCell><code>symbol_id = symbols.symbol_id</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_dependencies</code></TableCell>
+      <TableCell>Resolved &ldquo;uses&rdquo; edges between symbols, after graph resolution (<code>nci-dep-v1</code>).</TableCell>
+      <TableCell><code>from_symbol_id</code> + <code>to_symbol_id_text</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_surface_dependencies</code></TableCell>
+      <TableCell>Rolled-up namespace/module-surface deps. Not interchangeable with <code>symbol_dependencies</code> on member rows.</TableCell>
+      <TableCell>Same id shape as <code>symbol_dependencies</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_inherited_from_sources</code></TableCell>
+      <TableCell>For synthesised inherited members, the base/source symbols that contributed.</TableCell>
+      <TableCell><code>symbol_id</code> + <code>source_symbol_id_text</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_heritage</code></TableCell>
+      <TableCell>Verbatim <code>extends</code> / <code>implements</code> clause text per symbol.</TableCell>
+      <TableCell><code>symbol_id</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbol_modifiers</code>, <code>symbol_decorators</code></TableCell>
+      <TableCell>Structured modifiers (<code>declare</code>, <code>readonly</code>, …) and decorators per symbol.</TableCell>
+      <TableCell><code>symbol_id</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>package_dependencies</code></TableCell>
+      <TableCell>Declared npm dependency names per indexed package — package-level, not symbol-level.</TableCell>
+      <TableCell><code>package_id</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>symbols_fts</code> (FTS5)</TableCell>
+      <TableCell>Full-text index over symbol name / signature / JSDoc. Backs <code>nci query find</code> and <code>nci query evidence</code>.</TableCell>
+      <TableCell>External content table over <code>symbols</code></TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## Inspecting it
+
+<TerminalRoot>
+  <TerminalCommand>nci sql --format jsonl -c "SELECT name, version FROM packages ORDER BY name LIMIT 5"</TerminalCommand>
+</TerminalRoot>
+
+`nci sql` only accepts read-only statements. Mutating SQL (`INSERT`, `UPDATE`, `DELETE`, `DROP`) is rejected before it ever touches the database.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Two id shapes on `symbols`.</CalloutTitle>
+  <CalloutBody>
+    <code>symbols.symbol_id</code> is the integer row id used by the dependency tables (<code>symbol_dependencies.from_symbol_id</code>, etc.). <code>symbols.id</code> is the stable string handle used by <code>nci query show</code> / <code>snippet</code> / <code>overloads</code> and by <code>symbol_dependencies.to_symbol_id_text</code>. Pick the right one for the join.
+  </CalloutBody>
+</CalloutRoot>
+
+## Migrations and journaling
+
+The CLI applies pending migrations on `nci db init` and on the first `nci index`. Use `nci db status --check` for a quick `PRAGMA quick_check`, `--deep` for the full integrity check, and `nci db wal-checkpoint` to truncate the WAL after a long indexing run.

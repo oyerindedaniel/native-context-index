@@ -1,0 +1,107 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+
+<PageEyebrow>Reference · SQL recipes</PageEyebrow>
+
+# SQL recipes
+
+<PageLede>
+  `nci sql` is plain SQLite — no custom views, no helper functions, no extensions loaded. The recipes below are queries that come up often enough to be worth keeping in the docs. Get the live DDL with `nci sql --schema`; treat that as authoritative if anything here drifts.
+</PageLede>
+
+## What you have to work with
+
+`nci sql --schema` prints every `CREATE TABLE` / `CREATE INDEX` statement for the live database. The public tables are documented at [SQLite schema](/docs/architecture/sqlite-schema). Mutating SQL is rejected before SQLite sees it.
+
+## Find a class&rsquo;s declared members
+
+```sql
+SELECT m.name, m.kind_name, m.signature
+FROM symbols m
+JOIN symbols c ON c.symbol_id = m.parent_symbol_id
+JOIN packages p ON p.package_id = c.package_id
+WHERE p.name = 'zod'
+  AND p.version = '3.23.8'
+  AND c.name = 'ZodObject'
+  AND c.kind_name = 'ClassDeclaration'
+ORDER BY m.name;
+```
+
+`parent_symbol_id` is the **lexical containment** parent. It is the right join for class members, namespace members, and `declare module { … }` blocks — it is not a type-use edge.
+
+## Walk resolved &ldquo;uses&rdquo; edges
+
+```sql
+SELECT s2.id, s2.kind_name, s2.signature
+FROM symbols s1
+JOIN symbol_dependencies dep ON dep.from_symbol_id = s1.symbol_id
+JOIN symbols s2 ON s2.id = dep.to_symbol_id_text
+WHERE s1.id = 'zod@3.23.8::ZodObject';
+```
+
+Notice the join columns: `symbol_dependencies.from_symbol_id` (int) joins to `symbols.symbol_id` (int), and `symbol_dependencies.to_symbol_id_text` (string) joins to `symbols.id` (string). Both id shapes exist on `symbols`, but they are not interchangeable — pick the one that matches the column you started from.
+
+## Public surface only
+
+```sql
+SELECT id, name, kind_name
+FROM symbols
+WHERE package_id = (
+        SELECT package_id FROM packages
+         WHERE name = 'zod' AND version = '3.23.8'
+      )
+  AND is_internal = 0
+ORDER BY name;
+```
+
+`is_internal = 1` means &ldquo;not on the public export path from package entries&rdquo;. It is **not** the JSDoc `@internal` tag — that one lives in `visibility`. Use `is_internal = 0` to mirror what `--public-only` does on `nci query find`.
+
+## Resolve overload siblings
+
+`nci query overloads <id>` already does this in one call, but the SQL is:
+
+```sql
+SELECT id, name, signature
+FROM symbols
+WHERE package_id = (
+        SELECT package_id FROM symbols WHERE id = ?
+      )
+  AND name = (
+        SELECT name FROM symbols WHERE id = ?
+      )
+  AND COALESCE(parent_symbol_id, -1) = (
+        SELECT COALESCE(parent_symbol_id, -1) FROM symbols WHERE id = ?
+      )
+ORDER BY id;
+```
+
+## Inspect inherited members
+
+```sql
+SELECT m.name, src.source_symbol_id_text
+FROM symbols m
+JOIN symbol_inherited_from_sources src
+  ON src.symbol_id = m.symbol_id
+WHERE m.is_inherited = 1
+  AND m.parent_symbol_id = (
+        SELECT symbol_id FROM symbols WHERE id = ?
+      );
+```
+
+`symbol_inherited_from_sources` records the contributing base/source symbols when the dedupe stage synthesised an inherited member.
+
+## Use `--max-rows` as a guard
+
+<TerminalRoot>
+  <TerminalCommand>nci sql --max-rows 500 -c "SELECT name, version FROM packages"</TerminalCommand>
+</TerminalRoot>
+
+`--max-rows N` makes the command exit non-zero (code `1`) if the query would return more than `N` rows. Treat it as an assertion in scripts — far better than running a query that silently scans the whole graph.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Use `nci sql` for joins, `nci query` for everything else.</CalloutTitle>
+  <CalloutBody>
+    `nci query` covers single-anchor lookups, listings, and the bundled `evidence` flow. Drop into `nci sql` only for joins that span multiple tables — that is what the SQL surface exists for.
+  </CalloutBody>
+</CalloutRoot>

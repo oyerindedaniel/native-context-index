@@ -1,0 +1,110 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Cookbook · Antigravity</PageEyebrow>
+
+# Wire NCI into Antigravity
+
+<PageLede>
+  Google&rsquo;s Antigravity is an agent-first IDE; the agent inside it (Gemini) reads tools from MCP servers listed in `mcp_config.json`. One entry is all it takes to give the agent type-aware access to your installed packages.
+</PageLede>
+
+## Locate `mcp_config.json`
+
+Antigravity reads MCP servers from a single user-scoped file:
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>OS</TableHeaderCell>
+      <TableHeaderCell>Path</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>macOS / Linux</TableCell>
+      <TableCell><code>~/.gemini/antigravity/mcp_config.json</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Windows</TableCell>
+      <TableCell><code>%UserProfile%\.gemini\antigravity\mcp_config.json</code></TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+Launch Antigravity at least once so the `~/.gemini/antigravity/` directory exists, then create or open `mcp_config.json`.
+
+## Drop in the entry
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+That is the whole entry. `nci-mcp` walks the agent&rsquo;s working directory the same way the CLI does, so opening a repo in Antigravity is enough — there is no `NCI_PROJECT_ROOT` env var.
+
+## When you need `NCI_BINARY`
+
+If `nci` isn&rsquo;t on Antigravity&rsquo;s `PATH`, point at the binary explicitly:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"],
+      "env": {
+        "NCI_BINARY": "/absolute/path/to/nci"
+      }
+    }
+  }
+}
+```
+
+Find the absolute path with:
+
+<TerminalRoot>
+  <TerminalCommand>nci binary-path</TerminalCommand>
+</TerminalRoot>
+
+## Reload the agent
+
+Antigravity watches `mcp_config.json` and rebuilds the server list when it changes — no IDE restart needed. After saving the file, open the Agent panel and either end the current agent session and start a new one, or use the `…` menu and pick <MenuPathRoot ariaLabel="Antigravity MCP servers menu"><MenuPathSegment>…</MenuPathSegment><MenuPathSegment current>MCP Servers</MenuPathSegment></MenuPathRoot> to refresh. `nci` should show up with two tools and three resources.
+
+If the refresh button doesn&rsquo;t pick up the change (rare — usually only on stale binaries), use the command palette and run **Developer: Reload Window**. A full Antigravity restart is almost never necessary.
+
+<CalloutRoot variant="tip">
+  <CalloutTitle>UI alternative.</CalloutTitle>
+  <CalloutBody>
+    Antigravity also exposes an **MCP Store** under the Agent panel `…` menu. If a future `nci` entry lands in the store, the GUI route writes the same `mcp_config.json` for you. The hand-edited JSON above stays valid either way.
+  </CalloutBody>
+</CalloutRoot>
+
+## First call
+
+The agent should read `nci://primer/agent` first — that resource is the operating manual the MCP server&rsquo;s `instructions` field tells it to load. Then ask:
+
+> List the public exports of zod&rsquo;s installed version so we can wire a schema.
+
+Gemini routes to `nci_query` with `subcommand: "evidence"` (or `symbols` if it wants the package surface) and quotes signatures back verbatim. Pin `package_name` and `package_version` in the prompt when you want exact answers fast — see the [agent primer](/docs/primer) for why.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Index before you ask.</CalloutTitle>
+  <CalloutBody>
+    NCI&rsquo;s tools read the database; they do not build it. Run `nci index` once in the project before your first prompt. The MCP server inherits NCI&rsquo;s config-driven DB resolution, so an indexed repo elsewhere won&rsquo;t help.
+  </CalloutBody>
+</CalloutRoot>
+
+## Troubleshooting
+
+- The Agent panel shows `nci` but tool calls fail → run `nci binary-path`, set `NCI_BINARY` to that path in the env block, then refresh from <MenuPathRoot ariaLabel="Antigravity MCP servers menu"><MenuPathSegment>…</MenuPathSegment><MenuPathSegment current>MCP Servers</MenuPathSegment></MenuPathRoot>.
+- &ldquo;Tool unavailable&rdquo; on first message → the repo wasn&rsquo;t indexed yet. Open a terminal in Antigravity, run `nci index`, retry.
+- Two MCP entries collide on the name `nci` → rename one (e.g. `nci-monorepo`); Antigravity dedupes by key, not by command.

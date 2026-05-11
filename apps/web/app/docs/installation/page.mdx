@@ -1,0 +1,100 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import {
+  InstallTabsRoot,
+  InstallTabsList,
+  InstallTabsTrigger,
+  InstallTabsPanel,
+} from "@/components/docs/widgets/install-tabs";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Installation</PageEyebrow>
+
+# Install NCI
+
+<PageLede>
+  Two install paths cover everything: the Node package (`@nativecontextindex/cli`) for app and library work, and a `cargo install` from source for hacking on the engine itself. Both leave you with one binary called `nci`.
+</PageLede>
+
+## Node package (recommended)
+
+<InstallTabsRoot storageKey="install-page-node" defaultKey="pnpm">
+  <InstallTabsList ariaLabel="Node package manager">
+    <InstallTabsTrigger tabKey="pnpm">pnpm</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="npm">npm</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="yarn">yarn</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="bun">bun</InstallTabsTrigger>
+  </InstallTabsList>
+
+  <InstallTabsPanel tabKey="pnpm">
+    <TerminalRoot>
+      <TerminalCommand>pnpm add -g @nativecontextindex/cli</TerminalCommand>
+    </TerminalRoot>
+    `nci` is meant to live on your `PATH`, not in any one project. Install once, use everywhere.
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="npm">
+    <TerminalRoot>
+      <TerminalCommand>npm install -g @nativecontextindex/cli</TerminalCommand>
+    </TerminalRoot>
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="yarn">
+    <TerminalRoot>
+      <TerminalCommand>yarn global add @nativecontextindex/cli</TerminalCommand>
+    </TerminalRoot>
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="bun">
+    <TerminalRoot>
+      <TerminalCommand>bun install -g @nativecontextindex/cli</TerminalCommand>
+    </TerminalRoot>
+  </InstallTabsPanel>
+</InstallTabsRoot>
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Why global, not `-D`?</CalloutTitle>
+  <CalloutBody>
+    `nci` is a CLI you run against any tree, the same way you run `git` or `node`. `-g` puts the binary on `PATH` once. `-D` (`--save-dev`) is for *libraries* a project imports at build time; it pins a copy per repo and forces every contributor to re-install. The two flags are orthogonal: when you use `-g` you do **not** add `-D`. If you genuinely want a project-pinned copy (CI runners, locked monorepo tooling), drop the `-g` and use your package manager&rsquo;s normal install — but for everyday use, global is the path the rest of the docs assume.
+  </CalloutBody>
+</CalloutRoot>
+
+The Node package ships a postinstall script (`packages/nci/scripts/postinstall.cjs`) that downloads a prebuilt binary from the GitHub release matching the package version. The downloaded binary lives under `node_modules/@nativecontextindex/cli/vendor/`.
+
+### Postinstall escape hatches
+
+- `NCI_SKIP_DOWNLOAD=1` — skip the download (use the binary already on `PATH`, or your own build).
+- `NCI_DOWNLOAD_BASE_URL=<url>` — override the GitHub release base URL (mirrors, internal proxies).
+- `NCI_BINARY=/abs/path/to/nci` — make the Node shim and `nci-mcp` defer to a specific binary at runtime.
+
+See [Environment variables](/docs/reference/env-vars) for the complete list.
+
+## From source (Cargo)
+
+<TerminalRoot>
+  <TerminalCommand>cargo install --git https://github.com/native-context-modules/native-context-modules nci-engine</TerminalCommand>
+</TerminalRoot>
+
+The Rust crate is `nci-engine`; the resulting binary is `nci`. After install, point the Node shim at the local build:
+
+<TerminalRoot>
+  <TerminalCommand>NCI_BINARY=$(which nci) npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+## Verify
+
+<TerminalRoot>
+  <TerminalCommand>nci --version</TerminalCommand>
+</TerminalRoot>
+
+<TerminalRoot>
+  <TerminalCommand>nci binary-path</TerminalCommand>
+</TerminalRoot>
+
+`binary-path` (alias `which`) prints the absolute path of the running `nci` executable. That value is exactly what to paste into `NCI_BINARY` when wiring up `nci-mcp`.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>One CLI, two delivery surfaces.</CalloutTitle>
+  <CalloutBody>
+    `@nativecontextindex/cli` is the Node-package delivery; the MCP shim `@nativecontextindex/mcp` is a thin wrapper that calls the same binary. Both resolve `nci` the same way: explicit `NCI_BINARY` first, then bundled vendor binary, then the system `PATH`.
+  </CalloutBody>
+</CalloutRoot>
+
+If both verify steps succeed, jump to [Quickstart](/docs/quickstart).

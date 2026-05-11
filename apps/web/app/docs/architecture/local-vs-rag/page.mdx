@@ -1,0 +1,88 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Architecture · Local index vs. RAG</PageEyebrow>
+
+# Why a local index, not a vector store
+
+<PageLede>
+  RAG is a great default for prose. It is a poor default for code. Every NCI design decision falls out of choosing structure over similarity for the part of an agent&rsquo;s context that is type-aware.
+</PageLede>
+
+## Side-by-side
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Concern</TableHeaderCell>
+      <TableHeaderCell>RAG over `node_modules`</TableHeaderCell>
+      <TableHeaderCell>NCI&rsquo;s local index</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>Granularity</TableCell>
+      <TableCell>Chunks</TableCell>
+      <TableCell>Symbols</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Retrieval shape</TableCell>
+      <TableCell>top-k similarity</TableCell>
+      <TableCell>Exact match by <code>(package, version, name)</code> + FTS5 fallback</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Latency</TableCell>
+      <TableCell>Network + vector search</TableCell>
+      <TableCell>Local SQLite open</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Determinism</TableCell>
+      <TableCell>Depends on embedding model</TableCell>
+      <TableCell>Byte-stable</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Privacy</TableCell>
+      <TableCell>Embeddings leave the machine</TableCell>
+      <TableCell>Nothing leaves the disk</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Versioning</TableCell>
+      <TableCell>Tied to embedder</TableCell>
+      <TableCell>Tied to your lockfile</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Update cost</TableCell>
+      <TableCell>Re-embed</TableCell>
+      <TableCell>Incremental re-index — only changed packages</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## When RAG still helps
+
+NCI is not a replacement for everything an agent needs. RAG is still the right tool for:
+
+- The user&rsquo;s own documentation, READMEs, design docs.
+- Long-form code (think handlers, business logic) that has no public API.
+- Search across history (PRs, issues) where similarity is the goal.
+
+The right shape is &ldquo;NCI for type-aware questions about libraries, RAG for prose-aware questions about your project&rdquo;. They sit side-by-side in the agent&rsquo;s tool catalog, not in competition.
+
+## What this buys the agent
+
+- The agent never re-asks the same question.
+- It never paraphrases a signature wrong.
+- It never invents a method that does not exist.
+- It can answer &ldquo;is `useState` part of the public API of the version of React I have?&rdquo; with one tool call.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>The local index *is* the agent&rsquo;s memory of dependencies.</CalloutTitle>
+  <CalloutBody>
+    Every previous answer the agent gave that started with &ldquo;I&rsquo;ll guess based on what `useState` usually looks like&rdquo; can now be replaced with a fact. That is the bar.
+  </CalloutBody>
+</CalloutRoot>
+
+## Where the size argument breaks
+
+The same symbols compress dramatically when stored as structured rows: one `signature` text + one `js_doc` text per declaration, indexed by FTS5 for free-text fallback. There is no separate vector store — the FTS index lives in the same SQLite file as `symbols` and ships at no additional cost.

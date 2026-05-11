@@ -1,0 +1,139 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+
+<PageEyebrow>Architecture · Symbol Graph</PageEyebrow>
+
+# What &ldquo;symbol&rdquo; means in NCI
+
+<PageLede>
+  A symbol is one merged graph row — one declaration in the model the agent queries. Classes own their members. Overloads can either fuse into one row or stay as separate rows, depending on how their normalised signatures collide. The columns below are the public ones you can read with `nci query` and `nci sql`.
+</PageLede>
+
+## Anatomy
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Column</TableHeaderCell>
+      <TableHeaderCell>What it stores</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>symbol_id</code></TableCell>
+      <TableCell>Integer row id. Use it for SQL joins to dependency tables.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>id</code></TableCell>
+      <TableCell>Stable string handle, scoped to the indexed package version. The handle <code>nci query show</code> / <code>snippet</code> / <code>overloads</code> takes; matched by <code>symbol_dependencies.to_symbol_id_text</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>package_id</code></TableCell>
+      <TableCell>Indexed package install this symbol belongs to.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>name</code></TableCell>
+      <TableCell>Short symbol name. Nested members may carry dotted segments — do not infer the lexical parent from the string when <code>parent_symbol_id</code> is set.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>kind</code> / <code>kind_name</code></TableCell>
+      <TableCell>Numeric and string AST kinds (<code>FunctionDeclaration</code>, <code>InterfaceDeclaration</code>, <code>MethodSignature</code>, <code>ExportDeclaration</code>, …). <code>declare const … = …</code> is <code>VariableStatement</code>, not <code>TypeAliasDeclaration</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>signature</code></TableCell>
+      <TableCell>Declaration signature text; merged overloads can appear as one fused multi-block string.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>js_doc</code></TableCell>
+      <TableCell>JSDoc verbatim, when present.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>file_path</code></TableCell>
+      <TableCell>Primary declaration site, package-relative. May contain index encoding tokens (<code>__nci_external__</code> / <code>__up__</code>) when the declaration sits outside the indexed package root.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>source_package_name</code></TableCell>
+      <TableCell>The npm package that owns the declaration. Matches <code>--source-package</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>source_package_version</code></TableCell>
+      <TableCell>Semver of the source package — only when source = indexed package; usually <code>NULL</code> for external declarations.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>source_file_path</code></TableCell>
+      <TableCell>Path inside the owning package. <code>NOT NULL</code>. Use this for disk navigation, not raw <code>file_path</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>parent_symbol_id</code></TableCell>
+      <TableCell>Immediate <strong>lexical containment</strong> parent (a method&rsquo;s class, etc.). Not a type-use edge.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>enclosing_module_declaration_id</code></TableCell>
+      <TableCell>Id of the surrounding <code>ModuleDeclaration</code> / namespace block. Not always equal to <code>parent_symbol_id</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>entry_visibility_json</code></TableCell>
+      <TableCell>JSON list of package-relative entry / barrel paths through which this symbol is reachable on the public export surface (<code>types</code> / <code>exports</code>). Distinct from <code>file_path</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>merge_provenance_json</code></TableCell>
+      <TableCell>How the row was merged: <code>merge_scope</code>, <code>identical_fold</code>, <code>overload_key</code>. Pair with <code>signature</code> + <code>kind_name</code> when interpreting overloads vs. re-exports.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>visibility</code></TableCell>
+      <TableCell>JSDoc API tag (<code>@public</code>, <code>@internal</code>, <code>@alpha</code>, <code>@beta</code>) — separate from <code>is_internal</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>is_internal</code></TableCell>
+      <TableCell>Export-graph reachability. <code>1</code> = not on the public export path from package entries. <strong>Not</strong> &ldquo;skip this row&rdquo;.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>is_global_augmentation</code></TableCell>
+      <TableCell><code>1</code> if the symbol came from <code>declare global &#123; … &#125;</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>is_inherited</code></TableCell>
+      <TableCell><code>1</code> for synthesised inherited members; see <code>symbol_inherited_from_sources</code> for contributing bases.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>is_type_only</code> / <code>symbol_space</code></TableCell>
+      <TableCell>Distinguish type-only declarations from value-namespace symbols.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## Path encoding (`__nci_external__`, `__up__`)
+
+When a declaration resolves outside the indexed package root, `file_path` does **not** use raw `../` segments. Instead it uses canonical tokens — `__nci_external__` plus one `__up__` segment per parent hop. Treat those as **stable SQLite keys**, not filesystem paths.
+
+For real disk access, combine `source_package_name` + `source_file_path` with the install layout. If that still does not yield a real file, fall back to `nci query snippet` / `nci query show` — those return cite-ready text without needing a path.
+
+## Three id shapes
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Pick the right id for the join.</CalloutTitle>
+  <CalloutBody>
+    <code>symbols.symbol_id</code> (int) → joins to <code>symbol_dependencies.from_symbol_id</code>, <code>symbol_inherited_from_sources.symbol_id</code>, etc. <code>symbols.id</code> (string) → handles for <code>query show</code> / <code>snippet</code> / <code>overloads</code> and target of <code>symbol_dependencies.to_symbol_id_text</code>. <code>id</code> suffixes <code>#2</code>, <code>#3</code>, … disambiguate homonyms — different rows, not overload indices on their own.
+  </CalloutBody>
+</CalloutRoot>
+
+## Worked example: a class&rsquo;s members
+
+<TerminalRoot>
+  <TerminalCommand>nci query symbol ZodObject --package zod -n 1 --format json</TerminalCommand>
+</TerminalRoot>
+
+Take the `id` from that JSON envelope and feed it into `query overloads` to see every sibling row, or join in SQL on `parent_symbol_id` to walk a class&rsquo;s declared members.
+
+```sql
+SELECT m.name, m.signature
+FROM symbols m
+JOIN symbols c ON c.symbol_id = m.parent_symbol_id
+JOIN packages p ON p.package_id = c.package_id
+WHERE c.name = 'ZodObject'
+  AND c.kind_name = 'ClassDeclaration'
+  AND p.name = 'zod'
+ORDER BY m.name;
+```

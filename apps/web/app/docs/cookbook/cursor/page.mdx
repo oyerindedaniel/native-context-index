@@ -1,0 +1,83 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Cookbook · Cursor</PageEyebrow>
+
+# Wire NCI into Cursor
+
+<PageLede>
+  Drop one MCP entry into Cursor and the agent can ask exact questions about the libraries you have installed without leaving the editor. The server inherits NCI&rsquo;s config-driven database resolution, so each open workspace gets the right index automatically.
+</PageLede>
+
+## Add the MCP server
+
+Edit `~/.cursor/mcp.json`, or open <MenuPathRoot ariaLabel="Cursor MCP settings"><MenuPathSegment>Cursor</MenuPathSegment><MenuPathSegment>Settings</MenuPathSegment><MenuPathSegment current>MCP</MenuPathSegment></MenuPathRoot>:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"]
+    }
+  }
+}
+```
+
+That is the whole entry. `nci-mcp` reads the open workspace through the same logic `nci` uses for `nci.config.json` — there is no `NCI_PROJECT_ROOT` env var.
+
+If `nci` is not on Cursor&rsquo;s `PATH`, point at the binary explicitly:
+
+```json
+{
+  "mcpServers": {
+    "nci": {
+      "command": "npx",
+      "args": ["-y", "@nativecontextindex/mcp"],
+      "env": {
+        "NCI_BINARY": "/absolute/path/to/nci"
+      }
+    }
+  }
+}
+```
+
+Find the absolute path with:
+
+<TerminalRoot>
+  <TerminalCommand>nci binary-path</TerminalCommand>
+</TerminalRoot>
+
+## Apply changes
+
+Cursor watches `mcp.json` and rebuilds the server list when you save — no app restart needed. Open <MenuPathRoot ariaLabel="Cursor MCP settings"><MenuPathSegment>Cursor</MenuPathSegment><MenuPathSegment>Settings</MenuPathSegment><MenuPathSegment current>MCP</MenuPathSegment></MenuPathRoot> to confirm `nci` is listed with two tools and three resources. If the toggle row looks stuck, the command palette&rsquo;s **Developer: Reload Window** is the only escalation you should ever need.
+
+## Best-practice prompts
+
+- &ldquo;Look up `ZodObject.omit` in the version of zod we have installed before writing the schema.&rdquo;
+- &ldquo;List the public exports of `@my-org/shared` so I can decide what to import.&rdquo;
+- &ldquo;Find every overload of `useState` and tell me which packages provide it.&rdquo;
+
+The agent picks the right `nci_query` `subcommand`. Pin `package_name` and `package_version` in the prompt when you want exact answers fast — the [agent primer](/docs/primer) goes into more detail on why.
+
+## Re-index on demand
+
+NCI&rsquo;s tools read the database; they do not build it. Re-run `nci index` whenever the lockfile changes:
+
+<TerminalRoot>
+  <TerminalCommand>nci index</TerminalCommand>
+</TerminalRoot>
+
+For monorepo setups see [Monorepo indexing](/docs/cookbook/monorepo).
+
+<CalloutRoot variant="info">
+  <CalloutTitle>One server, one `project_root`.</CalloutTitle>
+  <CalloutBody>
+    Each Cursor MCP entry binds an `nci-mcp` instance to one `project_root`. The DB itself can hold many packages and many versions per package by design — the agent disambiguates via `subcommand: "active_package"` before each lookup. What you must not do is point a server at repo A while its `project_root` (config or `--project-root`) still resolves repo B&rsquo;s `node_modules`; then `active_package` walks the wrong tree.
+  </CalloutBody>
+</CalloutRoot>
+
+## Troubleshooting
+
+If Cursor reports the wrong NCI version or &ldquo;binary not found&rdquo;, set `NCI_BINARY` to the path printed by `nci binary-path`. The Node shim and `nci-mcp` both defer to it.

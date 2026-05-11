@@ -1,0 +1,116 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { PipelineFlow } from "@/components/docs/widgets/pipeline-flow";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Architecture · Pipeline</PageEyebrow>
+
+# Pipeline internals
+
+<PageLede>
+  This page describes the engine's internal layout. Only the CLI surface (`nci index`, `nci query`, `nci sql`) is part of the public contract — everything below is `pub(crate)` and may move between releases. It is documented so contributors and curious users can map &ldquo;what the CLI does&rdquo; to a real module.
+</PageLede>
+
+## Crate layout
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Module</TableHeaderCell>
+      <TableHeaderCell>Surface</TableHeaderCell>
+      <TableHeaderCell>What it does</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>cli.rs</code></TableCell>
+      <TableCell>public</TableCell>
+      <TableCell>The clap parser. Every flag the user can type is here.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>config.rs</code></TableCell>
+      <TableCell>public</TableCell>
+      <TableCell><code>NciConfigFile</code> (the on-disk schema), <code>PackageScope</code>, merge order helpers.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>scanner.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Walks install roots and returns one row per discovered package install.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>filter.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Applies <code>package_scope</code>, <code>packages.include</code>, <code>packages.exclude</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>parser.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Reads a <code>.d.ts</code>, emits parsed declarations and imports.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>crawler.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Walks the per-package module graph from each entry.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>resolver.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Resolves re-exports and dependency edges (<code>nci-dep-v1</code>) to terminal declarations.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>graph.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Owns the in-memory symbol graph between resolve and store.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>dedupe.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Identical-fold and overload-key merging — produces <code>merge_provenance_json</code>.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>storage.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Bulk SQLite writes, FTS rebuild, schema migrations.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>pipeline.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Orchestrates the modules above. <code>nci index</code> calls in here.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>cache.rs</code></TableCell>
+      <TableCell>internal</TableCell>
+      <TableCell>Per-package cache so re-indexing only touches changed packages.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+<CalloutRoot variant="warning">
+  <CalloutTitle>Internal modules are not a CLI feature.</CalloutTitle>
+  <CalloutBody>
+    If you can&rsquo;t reach a behaviour through `nci index`, `nci query`, `nci sql`, or `nci.config.json`, it isn&rsquo;t supported. The internal modules are documented here for orientation — not as configuration knobs.
+  </CalloutBody>
+</CalloutRoot>
+
+## High-level data flow
+
+<PipelineFlow
+  steps={[
+    "scanner",
+    "filter",
+    "parser",
+    "crawler",
+    "resolver",
+    "dedupe",
+    "graph",
+    "storage",
+  ]}
+/>
+
+## Why split it like this
+
+- Splitting parser from crawler keeps parsing pure — the crawler decides how far to walk based on `--max-hops` without re-parsing files.
+- Splitting resolver from dedupe lets `merge_provenance_json` carry exactly which mechanism merged a row, instead of mixing the two.
+- Splitting storage from everything else means the writer can run on its own thread; the rest of the pipeline does not block on disk.
+
+For the on-disk shape the storage stage produces, see [SQLite schema](/docs/architecture/sqlite-schema). For how the resolver decides what is &ldquo;the same&rdquo; symbol, see [Re-export resolution](/docs/architecture/re-exports).

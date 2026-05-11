@@ -24,16 +24,15 @@ function useSplitButtonContext() {
 }
 
 const splitButtonRootVariants = cva(
-  "inline-flex overflow-hidden rounded-3xl focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2",
+  "inline-flex overflow-hidden rounded-3xl transition-[box-shadow,border-color] duration-150 ease-out",
   {
     variants: {
       variant: {
-        primary:
-          "shadow-[0_2px_4px_#00000038,0_7px_13px_-3px_#00000034,inset_0_-3px_#0003,inset_0_1px_#ffffff52] focus-within:ring-primary/35",
-        accent:
-          "shadow-[0_2px_4px_#0006,0_7px_13px_-3px_#0000004d,inset_0_-3px_#0003,inset_0_1px_#ffffff52] focus-within:ring-accent/35",
-        outline: "border border-border focus-within:ring-primary/35",
-        ghost: "focus-within:ring-primary/35",
+        primary: "nci-shadow-btn-primary",
+        accent: "nci-shadow-btn-accent",
+        outline:
+          "border border-border bg-elevated shadow-[0_1px_2px_#0000000a,inset_0_-1.5px_#0000000d,inset_0_1px_#ffffff] hover:border-primary/35",
+        ghost: "border border-transparent",
       },
       size: {
         sm: "",
@@ -53,11 +52,11 @@ function dividerClass(
   switch (variant) {
     case "primary":
     case "accent":
-      return "border-r border-black/15";
+      return "border-x border-white/30";
     case "outline":
-      return "border-r border-border";
+      return "border-x border-border";
     case "ghost":
-      return "border-r border-ink/10";
+      return "border-x border-ink/10";
   }
 }
 
@@ -70,9 +69,24 @@ function segmentVariantClass(
     case "accent":
       return "bg-accent text-white hover:bg-accent/90";
     case "outline":
-      return "bg-elevated text-ink hover:bg-elevated/90";
+      return "bg-transparent text-ink hover:bg-surface-hover";
     case "ghost":
-      return "bg-transparent text-ink hover:bg-surface/90";
+      return "bg-transparent text-ink/85 hover:bg-surface-hover hover:text-ink";
+  }
+}
+
+function segmentFocusVisibleClass(
+  variant: NonNullable<VariantProps<typeof splitButtonRootVariants>["variant"]>,
+): string {
+  switch (variant) {
+    case "primary":
+      return "focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/35";
+    case "accent":
+      return "focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent/35";
+    case "outline":
+      return "focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/35";
+    case "ghost":
+      return "focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/35";
   }
 }
 
@@ -129,10 +143,11 @@ function SplitButtonMain({
       type="button"
       disabled={isDisabled}
       className={cn(
-        "inline-flex min-w-0 flex-1 cursor-pointer items-center justify-start font-medium whitespace-nowrap transition-[background-color,color,border-color,opacity] duration-150 ease-out focus-visible:relative focus-visible:z-10 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60",
+        "inline-flex min-w-0 flex-1 cursor-pointer items-center justify-start font-medium whitespace-nowrap transition-[background-color,color,border-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-60",
         size === "sm" ? "h-9 px-4 text-sm" : "h-11 px-5 text-sm",
         dividerClass(variant),
         segmentVariantClass(variant),
+        segmentFocusVisibleClass(variant),
         className,
       )}
       {...props}
@@ -168,11 +183,12 @@ function SplitButtonIconTrigger({
       type="button"
       disabled={isDisabled}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center justify-center font-medium transition-[background-color,color,border-color,opacity] duration-150 ease-out focus-visible:relative focus-visible:z-10 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
+        "inline-flex shrink-0 cursor-pointer items-center justify-center font-medium transition-[background-color,color,border-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
         size === "sm"
           ? "h-9 min-w-9 px-0 text-sm"
           : "h-11 min-w-11 px-0 text-sm",
         segmentVariantClass(variant),
+        segmentFocusVisibleClass(variant),
         className,
       )}
       {...props}

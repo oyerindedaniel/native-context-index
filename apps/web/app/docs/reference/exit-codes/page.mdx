@@ -1,0 +1,59 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+<PageEyebrow>Reference · Exit codes</PageEyebrow>
+
+# Exit codes
+
+<PageLede>
+  The CLI uses two exit code spaces: clap's defaults for argument parsing, and one NCI-specific code for &ldquo;the symbol id you asked about does not exist&rdquo;. Anything else surfaces as a generic failure.
+</PageLede>
+
+## Codes
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Code</TableHeaderCell>
+      <TableHeaderCell>When it fires</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>0</code></TableCell>
+      <TableCell>Command succeeded.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>2</code></TableCell>
+      <TableCell>
+        Two unrelated cases share this code:
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>Argument / usage error from clap — e.g. an unknown flag.</li>
+          <li>NCI&rsquo;s <code>EXIT_QUERY_NOT_FOUND</code>: <code>nci query show</code>, <code>snippet</code>, or <code>overloads</code> received a stable id that does not match any indexed row. Stderr carries the &ldquo;recover the right id with <code>query find</code> / <code>query symbol</code>&rdquo; hint.</li>
+        </ul>
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>1</code></TableCell>
+      <TableCell>Generic runtime failure — anything not covered above. The error message lives on stderr; on JSON-format commands it is also echoed inside the <code>&#123;&quot;ok&quot;:false,&quot;error&quot;:…&#125;</code> envelope.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>130</code></TableCell>
+      <TableCell>SIGINT (Ctrl-C). Platform default — NCI does not set it explicitly.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+<CalloutRoot variant="warning">
+  <CalloutTitle>Don&rsquo;t branch on `2` for usage errors alone.</CalloutTitle>
+  <CalloutBody>
+    Because clap and `EXIT_QUERY_NOT_FOUND` both exit with `2`, scripts that distinguish &ldquo;not found&rdquo; from &ldquo;bad command line&rdquo; should read the JSON envelope on stdout (`--format json`) instead of relying on the code alone. The not-found path is the only one that returns a structured <code>data</code> field with a `null`-shaped payload (e.g. `data.symbol: null`).
+  </CalloutBody>
+</CalloutRoot>
+
+## Reading the JSON envelope
+
+For commands that support `--format json`, failures print `{ "ok": false, "error": "<string>" }` to stdout — `error` is a **single human-readable string**, not an object (see `json_err` in `packages/nci-engine/src/cli.rs`). There is no separate `kind` / `message` split in the binary today.
+
+For the success envelopes and `data` shapes used by `nci query`, see [JSON output schemas](/docs/reference/json-schemas).

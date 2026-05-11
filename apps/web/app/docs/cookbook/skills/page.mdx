@@ -1,0 +1,119 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Cookbook · Skills</PageEyebrow>
+
+# NCI skills
+
+<PageLede>
+  Skills are short SKILL.md files that tell an agent how to think when it touches NCI. They live under `skills/` in the repo and ship as a single shared knowledge layer for any client that loads them.
+</PageLede>
+
+## What a skill is
+
+A skill is a plain Markdown file with frontmatter. The frontmatter names the skill and decides whether the host can auto-invoke it; the body is a short protocol the agent follows when the skill is in scope.
+
+```
+skills/
+  README.md
+  <skill-name>/
+    SKILL.md
+```
+
+Hosts that understand the open [Agent Skills](https://agentskills.io/) shape each discover `SKILL.md` from their own paths — there is no single global folder. The table below is a map; check each product&rsquo;s docs when they ship an update.
+
+## Where each host looks
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Host</TableHeaderCell>
+      <TableHeaderCell>Typical locations</TableHeaderCell>
+      <TableHeaderCell>How it behaves</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>Cursor</TableCell>
+      <TableCell>
+        <code>.cursor/skills/&hellip;</code>, <code>.agents/skills/&hellip;</code>, plus user-level paths listed in <a href="https://cursor.com/docs/skills" target="_blank" rel="noopener noreferrer">Cursor&rsquo;s skills docs</a>
+      </TableCell>
+      <TableCell>
+        Complements always-on <strong>Rules</strong> (<code>.cursor/rules/</code>). Skills are loaded when the task matches the description — not on every message.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Claude Code</TableCell>
+      <TableCell>
+        <code>~/.claude/skills/</code> (user), <code>.claude/skills/</code> in the repo (project)
+      </TableCell>
+      <TableCell>
+        Directory name becomes a slash command (for example <code>/deploy</code> for a folder named <code>deploy</code>); see <a href="https://docs.anthropic.com/en/docs/claude-code/skills" target="_blank" rel="noopener noreferrer">Claude Code skills</a>.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Claude Desktop / Claude apps</TableCell>
+      <TableCell>
+        Managed in the app (Skills library, connectors, synced packs) — not the same on-disk layout as Claude Code
+      </TableCell>
+      <TableCell>
+        For repo-local workflows, many teams still keep a <code>skills/</code> tree in git and point agents at it via prompts or filesystem access.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>OpenCode</TableCell>
+      <TableCell>
+        <code>.opencode/skills/</code>, <code>~/.config/opencode/skills/</code>, and compatibility paths such as <code>.claude/skills/</code> (see <a href="https://opencode.ai/docs/skills" target="_blank" rel="noopener noreferrer">OpenCode skills</a>)
+      </TableCell>
+      <TableCell>
+        Skills are usually invoked through OpenCode&rsquo;s <code>skill</code> tool so only metadata loads until the agent needs the body.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Antigravity</TableCell>
+      <TableCell>
+        Workspace <code>.agent/skills/</code> and user <code>~/.gemini/antigravity/skills/</code> (see Google&rsquo;s <a href="https://codelabs.developers.google.com/getting-started-with-antigravity-skills" target="_blank" rel="noopener noreferrer">Antigravity skills codelab</a>)
+      </TableCell>
+      <TableCell>
+        Same bundle layout as other hosts: one folder per skill with <code>SKILL.md</code> at the root.
+      </TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+## Shipped skills
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Skill</TableHeaderCell>
+      <TableHeaderCell>When it fires</TableHeaderCell>
+      <TableHeaderCell>What it forces</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>
+        <code>nci-answer-quality</code>
+      </TableCell>
+      <TableCell>
+        On any &ldquo;using nci&rdquo; question, type-level explanation request, or strict-correctness ask about composition operators.
+      </TableCell>
+      <TableCell>
+        Signature-first reasoning: list decision symbols, fetch their declarations through NCI, derive the conclusion from the signature, show one wrong alternative with its rejection, end with a confidence line.
+      </TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+The skill&rsquo;s `disable-model-invocation: true` flag means the agent runs it deterministically when the trigger fires — it does not paraphrase the protocol.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>One skill today, more later.</CalloutTitle>
+  <CalloutBody>
+    `nci-answer-quality` is the only skill that ships with NCI right now. A general &ldquo;NCI&rdquo; skill that sets up the agent for first contact is on the roadmap. Adding skills is additive — drop a new folder under `skills/` with a `SKILL.md`, then copy or symlink that tree into the discovery path for the host you use (see the table above).
+  </CalloutBody>
+</CalloutRoot>
+
+The skills directory is not part of the CLI surface — `nci` does not read or write it. It is a sibling to NCI that any agent runtime can mount.

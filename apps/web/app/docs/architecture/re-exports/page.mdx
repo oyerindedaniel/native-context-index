@@ -1,0 +1,89 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Architecture · Re-exports</PageEyebrow>
+
+# Re-export and dependency resolution
+
+<PageLede>
+  Almost no real package&rsquo;s entry file declares its own surface — most just re-export from internal modules. The resolver replays those rewrites until every public symbol points at its terminal declaration. The behaviour visible through the CLI is documented here; the implementation lives in `resolver.rs` and is internal.
+</PageLede>
+
+## Hops and `max_hops`
+
+Each follow is one hop. `max_hops = 0` parses the entry only and stops. `-1` is unlimited. The `nci-engine` constant `DEFAULT_MAX_HOPS` is what `nci init` writes into `nci.config.json` and what `nci index` uses when neither the file nor `--max-hops` says otherwise.
+
+## Dependency resolution policy: `nci-dep-v1`
+
+`symbol_dependencies` (resolved &ldquo;uses&rdquo; edges) follow a fixed precedence — strongest first:
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Layer</TableHeaderCell>
+      <TableHeaderCell>Resolution rule</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>1</TableCell>
+      <TableCell>Explicit module specifier on the import statement.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>2</TableCell>
+      <TableCell>Same file as the using declaration.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>3</TableCell>
+      <TableCell>Import alias visible in that file.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>4</TableCell>
+      <TableCell>Files reachable via <code>/// &lt;reference path=&quot;…&quot; /&gt;</code> closure.</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>5</TableCell>
+      <TableCell>Weakest: package-wide bare-name fallback. Can tie homonyms — known limitation.</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+`is_internal` does **not** block an edge — internal symbols still participate in `symbol_dependencies`.
+
+## Two separate edge tables
+
+- `symbol_dependencies` — the resolved graph above, suitable for &ldquo;what does this declaration reference?&rdquo;.
+- `symbol_surface_dependencies` — namespace/module-surface rollup. Don&rsquo;t use it as a substitute on arbitrary member rows; it answers a different question.
+
+## Source package vs. exporting package
+
+When a re-export crosses package boundaries, the resulting `symbols` row records both ownership layers:
+
+- `package_id` is the indexed install the user typed into the import.
+- `source_package_name` (and `source_package_version` when in-tree) is the package that **authored** the declaration.
+
+Use `source_package_name` for `nci query --source-package` to scope hits to the right ownership layer.
+
+## Merge provenance
+
+When the resolver emits two declarations that the dedupe stage decides are &ldquo;the same&rdquo;, the row records why:
+
+- `merge_scope` — same merge key as another contribution.
+- `identical_fold` — same `name`, `kind`, normalised signature across external files.
+- `overload_key` — overload-style merge keyed by normalised signature.
+
+Read these from `merge_provenance_json` together with `signature` and `kind_name` when an overload count looks wrong — overload rows can either fuse into one row or stay distinct depending on normalisation.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Cycles and conditional exports.</CalloutTitle>
+  <CalloutBody>
+    Cyclical re-exports are valid TypeScript and the resolver short-circuits on the second visit per package. Conditional exports (different `.d.ts` for ESM vs. CJS) prefer the `types` condition; mismatched type vs. runtime exports are tracked but not auto-reconciled — this is a known footgun.
+  </CalloutBody>
+</CalloutRoot>
+
+## Where to go next
+
+- The full schema sits at [SQLite schema](/docs/architecture/sqlite-schema).
+- The graph row shape (including `merge_provenance_json`) is at [Symbol graph model](/docs/architecture/symbol-graph).
+- The agent-facing instructions for navigating these edges live in the [Agent primer](/docs/primer).

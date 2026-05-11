@@ -1,0 +1,12 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { PrimerView } from "@/components/docs/primer-view";
+
+<PageEyebrow>Primer</PageEyebrow>
+
+# Agent primer
+
+<PageLede>
+  This is the same text the MCP server returns at the URI `nci://primer/agent`. It is the operating manual a fresh agent reads before its first NCI call. The shorter `compact` variant is what `nci-mcp` actually emits; the `live` and `reference` variants are the longer in-tree explainers.
+</PageLede>
+
+<PrimerView />
