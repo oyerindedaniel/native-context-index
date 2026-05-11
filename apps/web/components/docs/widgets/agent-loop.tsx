@@ -246,7 +246,7 @@ export function AgentLoopProgress({ className }: AgentLoopProgressProps) {
               title={frame.label}
               onClick={() => goToFrame(frameIndex)}
               className={cn(
-                "rounded-md p-1 -m-1 transition-[background-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                "-m-1 cursor-pointer rounded-md p-1 transition-[background-color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                 "hover:bg-surface-hover/80",
               )}
             >

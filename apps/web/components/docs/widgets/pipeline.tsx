@@ -215,7 +215,7 @@ export function PipelineMaxHopsToggle({
               type="button"
               onClick={() => setMaxHops(option)}
               className={cn(
-                "relative inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                "relative inline-flex cursor-pointer items-center rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                 isActive ? "text-ink" : "text-muted hover:text-ink",
               )}
             >

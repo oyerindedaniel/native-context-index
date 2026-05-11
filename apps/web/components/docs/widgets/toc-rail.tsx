@@ -101,7 +101,7 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
               <a
                 href={`#${item.id}`}
                 className={cn(
-                  "group relative block rounded-md py-1.5 pr-3 text-[0.8125rem] tracking-tight-p transition-colors duration-150 ease-out",
+                  "group relative block rounded-md py-1.5 pr-3 text-[0.8125rem] tracking-tight-p outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                   item.level === 3 ? "pl-12" : "pl-7",
                   isActive
                     ? "font-medium text-primary"

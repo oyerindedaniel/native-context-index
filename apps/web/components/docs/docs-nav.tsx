@@ -74,10 +74,10 @@ export function DocsNavItem({ href, children, className }: DocsNavItemProps) {
     <Link
       href={href}
       className={cn(
-        "relative flex items-center px-3 py-1.5 text-sm font-medium transition-colors rounded-md",
+        "relative flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
         isActive
           ? "text-primary"
-          : "text-ink/60 hover:text-ink hover:bg-surface-hover",
+          : "text-ink/60 hover:bg-surface-hover hover:text-ink",
         className,
       )}
     >
