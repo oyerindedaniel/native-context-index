@@ -3,12 +3,14 @@
 import * as React from "react";
 import Image from "next/image";
 import * as Popover from "@radix-ui/react-popover";
+import { motion } from "motion/react";
 import {
   ClipboardIcon,
   CheckIcon,
   ChevronDownIcon,
 } from "@heroicons/react/20/solid";
 import { SplitButton } from "@/components/ui/split-button";
+import { buttonVariants } from "@/components/ui/button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
@@ -111,7 +113,7 @@ export function InstallPickerRoot({
 
   return (
     <InstallPickerContext.Provider value={value}>
-      <div className={cn("inline-flex flex-col gap-2", className)}>
+      <div className={cn("flex w-full flex-col gap-2", className)}>
         {children}
       </div>
     </InstallPickerContext.Provider>
@@ -151,6 +153,7 @@ interface InstallPickerControlProps {
 export function InstallPickerControl({ className }: InstallPickerControlProps) {
   const { managers, active, setActiveId } = useInstallPickerContext();
   const [open, setOpen] = React.useState(false);
+  const layoutId = React.useId();
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = React.useCallback(() => {
@@ -161,104 +164,162 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
 
   return (
     <div className={cn("w-full max-w-2xl", className)}>
-      <SplitButton.Root variant="primary" size="md" className="w-full">
-        <Popover.Root open={open} onOpenChange={setOpen}>
-          <Popover.Trigger asChild>
-            <SplitButton.IconTrigger
-              aria-label={`Switch package manager (current: ${active.label})`}
-              className="gap-1.5 px-3"
-            >
-              <PackageManagerLogo id={active.id} variant="inverse" />
-              <ChevronDownIcon
-                className={cn(
-                  "h-3.5 w-3.5 text-white/85 transition-transform duration-150 ease-out",
-                  open && "rotate-180",
-                )}
-                aria-hidden="true"
-              />
-            </SplitButton.IconTrigger>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="start"
-              sideOffset={10}
-              className="z-50 w-56 overflow-hidden rounded-2xl border border-border bg-elevated p-1 shadow-[0_2px_4px_#00000010,0_18px_30px_-12px_#0000001f]"
-            >
-              <ul role="listbox" className="flex flex-col">
-                {managers.map((entry) => {
-                  const isActive = entry.id === active.id;
-                  return (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isActive}
-                        onClick={() => {
-                          setActiveId(entry.id);
-                          setOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-150 ease-out",
-                          isActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-ink/85 hover:bg-surface-hover",
-                        )}
-                      >
-                        <span
+      <div className="hidden sm:block">
+        <SplitButton.Root variant="primary" size="md" className="w-full">
+          <Popover.Root open={open} onOpenChange={setOpen}>
+            <Popover.Trigger asChild>
+              <SplitButton.IconTrigger
+                aria-label={`Switch package manager (current: ${active.label})`}
+                className="gap-1.5 px-3"
+              >
+                <PackageManagerLogo id={active.id} variant="inverse" />
+                <ChevronDownIcon
+                  className={cn(
+                    "h-3.5 w-3.5 text-white/85 transition-transform duration-150 ease-out",
+                    open && "rotate-180",
+                  )}
+                  aria-hidden="true"
+                />
+              </SplitButton.IconTrigger>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                align="start"
+                sideOffset={10}
+                className="z-50 w-56 overflow-hidden rounded-2xl border border-border bg-elevated p-1 shadow-[0_2px_4px_#00000010,0_18px_30px_-12px_#0000001f]"
+              >
+                <ul role="listbox" className="flex flex-col">
+                  {managers.map((entry) => {
+                    const isActive = entry.id === active.id;
+                    return (
+                      <li key={entry.id}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={isActive}
+                          onClick={() => {
+                            setActiveId(entry.id);
+                            setOpen(false);
+                          }}
                           className={cn(
-                            "inline-flex size-6 items-center justify-center rounded-md",
-                            isActive ? "bg-primary" : "bg-surface",
+                            "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-150 ease-out",
+                            isActive
+                              ? "bg-primary/10 text-primary"
+                              : "text-ink/85 hover:bg-surface-hover",
                           )}
-                          aria-hidden="true"
                         >
-                          <PackageManagerLogo
-                            id={entry.id}
-                            variant={isActive ? "inverse" : "muted"}
-                          />
-                        </span>
-                        <span className="flex flex-col">
-                          <span className="text-sm font-semibold tracking-tight">
-                            {entry.label}
-                          </span>
-                          {entry.hint ? (
-                            <span className="text-[0.7rem] tracking-tight-p text-muted">
-                              {entry.hint}
-                            </span>
-                          ) : null}
-                        </span>
-                        {isActive ? (
-                          <CheckIcon
-                            className="ml-auto h-4 w-4 text-primary"
+                          <span
+                            className={cn(
+                              "inline-flex size-6 items-center justify-center rounded-md",
+                              isActive ? "bg-primary" : "bg-surface",
+                            )}
                             aria-hidden="true"
-                          />
-                        ) : null}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+                          >
+                            <PackageManagerLogo
+                              id={entry.id}
+                              variant={isActive ? "inverse" : "muted"}
+                            />
+                          </span>
+                          <span className="flex flex-col">
+                            <span className="text-sm font-semibold tracking-tight">
+                              {entry.label}
+                            </span>
+                            {entry.hint ? (
+                              <span className="text-[0.7rem] tracking-tight-p text-muted">
+                                {entry.hint}
+                              </span>
+                            ) : null}
+                          </span>
+                          {isActive ? (
+                            <CheckIcon
+                              className="ml-auto h-4 w-4 text-primary"
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
 
-        <SplitButton.Main
-          type="button"
-          onClick={handleCopy}
-          aria-label={`Copy install command for ${active.label}`}
-          className="cursor-copy gap-3 px-5 font-mono"
-        >
-          <span className="text-white/65">$</span>
-          <span className="truncate text-white">{active.install}</span>
-        </SplitButton.Main>
+          <SplitButton.Main
+            type="button"
+            onClick={handleCopy}
+            aria-label={`Copy install command for ${active.label}`}
+            className="cursor-copy gap-3 px-5 font-mono"
+          >
+            <span className="text-white/65">$</span>
+            <span className="truncate text-white">{active.install}</span>
+          </SplitButton.Main>
 
-        <SplitButton.IconTrigger
-          type="button"
-          onClick={handleCopy}
-          aria-label={copied ? "Copied" : "Copy install command"}
+          <SplitButton.IconTrigger
+            type="button"
+            onClick={handleCopy}
+            aria-label={copied ? "Copied" : "Copy install command"}
+          >
+            <StatusIcon className="h-4 w-4" aria-hidden="true" />
+          </SplitButton.IconTrigger>
+        </SplitButton.Root>
+      </div>
+
+      <div className="w-full overflow-hidden rounded-2xl border border-border bg-elevated sm:hidden">
+        <div
+          role="tablist"
+          aria-label="Package manager"
+          className="flex flex-wrap items-center gap-1 border-b border-border bg-surface/70 px-2 py-1.5"
         >
-          <StatusIcon className="h-4 w-4" aria-hidden="true" />
-        </SplitButton.IconTrigger>
-      </SplitButton.Root>
+          {managers.map((entry) => {
+            const isActive = entry.id === active.id;
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveId(entry.id)}
+                className={cn(
+                  "relative inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                  isActive ? "text-ink" : "text-muted hover:text-ink",
+                )}
+              >
+                {isActive ? (
+                  <motion.span
+                    layoutId={`install-picker-tab-${layoutId}`}
+                    className="absolute inset-0 -z-0 rounded-full bg-elevated shadow-[0_1px_2px_#00000010,0_6px_14px_-8px_#0000001a,inset_0_1px_#ffffff80]"
+                    transition={{ type: "spring", stiffness: 360, damping: 32 }}
+                  />
+                ) : null}
+                <span className="relative z-10">{entry.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div
+          role="tabpanel"
+          className="flex flex-row items-start gap-3 px-5 py-5"
+        >
+          <div className="flex min-h-9 min-w-0 flex-1 items-center font-mono text-sm leading-relaxed tracking-tight-p text-ink">
+            <span className="break-all">
+              <span className="select-none text-muted">$ </span>
+              {active.install}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={copied ? "Copied" : "Copy install command"}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "icon" }),
+              "shrink-0",
+            )}
+          >
+            <StatusIcon className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

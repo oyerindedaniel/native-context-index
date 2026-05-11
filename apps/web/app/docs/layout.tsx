@@ -7,6 +7,7 @@ import {
   DocsNavItem,
 } from "@/components/docs/docs-nav";
 import { DocsHeader } from "@/components/docs/docs-header";
+import { DocsBreadcrumbInline } from "@/components/docs/docs-breadcrumb";
 import { PrevNext } from "@/components/docs/widgets/prev-next";
 import { TocRail } from "@/components/docs/widgets/toc-rail";
 import { docsGroups } from "@/lib/docs/registry";
@@ -50,11 +51,12 @@ export default function DocsLayout({
         </div>
       </aside>
 
-      <div className="flex-1 lg:pl-docs-sidebar">
+      <div className="min-w-0 flex-1 lg:pl-docs-sidebar">
         <DocsHeader />
         <div className="mx-auto flex w-full max-w-docs-shell gap-12 px-4 py-6 lg:px-8">
           <main id="docs-main" className="min-w-0 flex-1">
             <article className="docs-prose mx-auto w-full min-w-0 max-w-docs-content">
+              <DocsBreadcrumbInline className="lg:hidden" />
               <div className="mb-12">{children}</div>
               <PrevNext />
             </article>

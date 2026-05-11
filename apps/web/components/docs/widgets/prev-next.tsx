@@ -28,23 +28,23 @@ function PagerCard({ page, direction }: PagerCardProps) {
     <Link
       href={page.slug}
       className={cn(
-        "group relative flex flex-1 flex-col gap-2 rounded-2xl border border-border bg-elevated p-5 transition-colors duration-150 ease-out hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+        "group relative flex flex-1 flex-col gap-2 rounded-xl border border-border bg-elevated px-3.5 py-3 transition-colors duration-150 ease-out hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
         isPrev ? "items-start text-left" : "items-end text-right",
       )}
     >
       <span
         className={cn(
-          "flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-muted/80",
+          "flex items-center gap-2 text-xs font-medium uppercase tracking-tight-p text-muted/80",
           isPrev ? "flex-row" : "flex-row-reverse",
         )}
       >
         <Icon
-          className="h-3.5 w-3.5 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+          className="h-3.5 w-3.5 shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
           aria-hidden="true"
         />
         {directionLabel}
       </span>
-      <span className="text-base font-semibold tracking-tight-sub text-ink">
+      <span className="text-base font-semibold tracking-tight-p text-ink">
         {page.title}
       </span>
     </Link>
@@ -63,7 +63,7 @@ export function PrevNext({ className }: PrevNextProps) {
     <nav
       aria-label="Pagination"
       className={cn(
-        "mt-16 flex flex-col gap-4 border-t border-border pt-10 sm:flex-row",
+        "mt-10 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-stretch",
         className,
       )}
     >

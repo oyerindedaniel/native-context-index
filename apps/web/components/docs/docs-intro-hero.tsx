@@ -94,12 +94,12 @@ export function DocsIntroHero() {
         </InstallPickerRoot>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <Link
           href="/docs/quickstart"
           className={cn(
             buttonVariants({ variant: "accent", size: "md" }),
-            "gap-2",
+            "w-full gap-2 sm:w-auto",
           )}
         >
           <RocketLaunchIcon className="h-4 w-4" aria-hidden="true" />
@@ -113,7 +113,7 @@ export function DocsIntroHero() {
           href="/docs/cli"
           className={cn(
             buttonVariants({ variant: "outline", size: "md" }),
-            "gap-2",
+            "w-full gap-2 sm:w-auto",
           )}
         >
           <CommandLineIcon className="h-4 w-4" aria-hidden="true" />
@@ -127,8 +127,8 @@ export function DocsIntroHero() {
             key={tile.href}
             href={tile.href}
             className={cn(
-              "group relative flex min-h-60 flex-col gap-5 rounded-2xl border border-border bg-elevated p-7 transition-[border-color,box-shadow] duration-150 ease-out",
-              "hover:border-primary/35 hover:shadow-[0_1px_2px_#0000000a,0_8px_24px_-12px_#0000001f]",
+              "group relative flex min-h-60 flex-col gap-5 rounded-2xl border border-border bg-elevated p-7 transition-colors duration-150 ease-out",
+              "hover:border-primary/35",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
             )}
           >
