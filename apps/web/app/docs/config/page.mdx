@@ -155,7 +155,7 @@ Glob list, relative to `project_root`. Each entry contributes its own `node_modu
 
 ### dependency_stub_packages
 
-Names a package whose dependencies should be persisted as `npm::…` stub edges only. Set this when one of your dependencies pulls in a heavy AI/SDK tree that you do not want walked. The stub keeps the import edge in the graph without loading any of its `.d.ts`.
+Names a dependency that should be persisted as `npm::…` stub edges instead of being crawled. Whenever a crawled file imports a listed name (or a subpath of it), NCI records the edge as `npm::<specifier>::<member>` and skips its `.d.ts`. Use it for shared validators or heavy SDKs (`zod`, `@aws-sdk/client-s3`, `googleapis`) that you reference but do not need walked.
 
 ## Verify
 

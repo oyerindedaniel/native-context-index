@@ -108,4 +108,4 @@ A `grep` over `node_modules` returns lines. NCI returns symbols — merged graph
   <TerminalCommand>nci index --package "@my-org/*"</TerminalCommand>
 </TerminalRoot>
 
-`--package` accepts globs and is repeatable. Combine with `--dependency-stub-package` to keep huge transitive trees as `npm::…` stubs without parsing them.
+`--package` accepts globs and is repeatable. Combine with `--dependency-stub-package` to skip walking into noisy SDKs — every consumer import of those packages collapses into an `npm::…` stub edge.

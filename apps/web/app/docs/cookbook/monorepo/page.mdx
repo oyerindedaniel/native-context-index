@@ -67,19 +67,19 @@ If your monorepo hoists everything into `node_modules` at the workspaces but kee
 
 That tells the scanner to ignore `<project_root>/node_modules` and only walk the listed workspaces. Conflicts with `--include-root-workspace` (the override that forces the root in even when `nci.config.json` excluded it).
 
-## Stub heavy transitive dependencies
+## Stub noisy dependencies
 
-Some packages drag in a forest. `firebase` re-exports a dozen sub-modules (auth, firestore, functions, storage…), each with its own `.d.ts` and its own transitive declarations. If `apps/web` only calls `initializeApp` and `getAuth`, fully indexing every Firestore field type is pure overhead — and it slows the first index, bloats `nci.sqlite`, and makes `find` noisier.
+Some dependencies show up everywhere. `zod` lives in nearly every workspace package, and almost every file does `import { z } from "zod"`. Its types are deep generic chains — `z.object({...}).strict().refine(...)` builds large inference trees that NCI has to walk on every consumer file. You almost never query zod&rsquo;s internals; you just want NCI to know your packages reference it.
 
-Tell NCI to keep `firebase`&rsquo;s **own** declarations but record its dependencies as `npm::…` stubs:
+Tell NCI not to crawl into `zod`. Every consumer-side import collapses into a single stub edge:
 
 <TerminalRoot cwd="my-monorepo">
   <TerminalCommand>{`nci index \\
-  --dependency-stub-package firebase \\
+  --dependency-stub-package zod \\
   --dependency-stub-package @aws-sdk/client-s3`}</TerminalCommand>
 </TerminalRoot>
 
-The flag (short: `-s`) is repeatable and accepts bare package names or specifiers like `@scope/pkg`. NCI parses the listed package itself, but emits `npm::firebase-auth@…` style stub edges for everything it pulls in — fast to write, queryable as evidence, never parsed.
+The flag (short: `-s`) is repeatable and accepts bare names or scoped specifiers like `@aws-sdk/client-s3`. Each consumer-side import becomes an `npm::<specifier>::<member>` edge — e.g. `import { z } from "zod"` resolves to `npm::zod::z`. Fast to write, queryable as evidence, never parsed.
 
 Make it sticky by setting `dependency_stub_packages` in `nci.config.json`:
 
@@ -89,7 +89,7 @@ Make it sticky by setting `dependency_stub_packages` in `nci.config.json`:
   "workspaces": ["apps/*", "packages/*"],
   "package_scope": ["dependencies", "dev_dependencies"],
   "dependency_stub_packages": [
-    "firebase",
+    "zod",
     "@aws-sdk/client-s3",
     "googleapis"
   ]
@@ -101,7 +101,7 @@ The CLI value is **unioned** with the config — CI can add more stubs without r
 <CalloutRoot variant="tip">
   <CalloutTitle>Start narrow, stub later.</CalloutTitle>
   <CalloutBody>
-    Run a normal `nci index` first. If `nci db status` shows one package with a much larger symbol count than the rest (or your `find` queries return too many matches from the same library), add it to `dependency_stub_packages` and re-index. You keep the public API queryable through stubs and shed the deep internal types.
+    Run a normal `nci index` first. If `nci db status` shows one package with a much larger symbol count than the rest (or your `find` queries return too many matches from the same library), add it to `dependency_stub_packages` and re-index. Consumer edges to that package collapse into `npm::…` stubs you can still query — the deep internal types are dropped.
   </CalloutBody>
 </CalloutRoot>
 

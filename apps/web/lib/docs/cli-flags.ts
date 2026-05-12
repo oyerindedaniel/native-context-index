@@ -76,7 +76,7 @@ export const cliFlags: FlagDescriptor[] = [
     valuePlaceholder: "<PKG>",
     subcommand: "index",
     description:
-      "Repeatable. Treat this package's dependencies as `npm::…` stubs only — do not parse them. Unioned with `dependency_stub_packages` from `nci.config.json`.",
+      "Repeatable. When any crawled file imports this package (or a subpath), record an `npm::…` stub edge instead of walking into it. Unioned with `dependency_stub_packages` from `nci.config.json`.",
   },
   {
     id: "index-package-scope",
