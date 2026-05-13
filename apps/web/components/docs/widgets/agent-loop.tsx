@@ -9,8 +9,11 @@ import {
   ChatBubbleOvalLeftIcon,
   WrenchScrewdriverIcon,
   SparklesIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/20/solid";
 import { Button } from "@/components/ui/button";
+import { SplitButton } from "@/components/ui/split-button";
 import { cn } from "@/lib/utils";
 
 type FrameKind = "thought" | "toolCall" | "response";
@@ -58,7 +61,7 @@ const DEFAULT_FRAME_DURATION_MS = 2200;
 export function AgentLoopRoot({
   frames,
   className,
-  defaultPlaying = true,
+  defaultPlaying = false,
   children,
 }: AgentLoopRootProps) {
   const [activeFrameIndex, setActiveFrameIndex] = React.useState(0);
@@ -133,6 +136,14 @@ const FRAME_ENTRANCE: Variants = {
 
 const FRAME_TRANSITION = { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const };
 
+const STAGE_HEIGHT_TRANSITION = {
+  duration: 0.34,
+  ease: [0.16, 1, 0.3, 1] as const,
+};
+
+// Floor matches former `min-h-[10rem]` — short frames don't squish the stage.
+const STAGE_MIN_HEIGHT_PX = 160;
+
 interface AgentLoopStageProps {
   className?: string;
 }
@@ -140,55 +151,85 @@ interface AgentLoopStageProps {
 export function AgentLoopStage({ className }: AgentLoopStageProps) {
   const { frames, activeFrameIndex } = useAgentLoopContext();
   const active = frames[activeFrameIndex];
+
+  const innerRef = React.useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = React.useState<number | null>(
+    null,
+  );
+
+  React.useLayoutEffect(() => {
+    const node = innerRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const measure = () => {
+      setMeasuredHeight(node.offsetHeight);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   if (!active) {
     return null;
   }
 
   const { Icon, accentClass, eyebrow } = describeFrame(active.kind);
 
+  const targetHeight =
+    measuredHeight === null
+      ? "auto"
+      : Math.max(STAGE_MIN_HEIGHT_PX, measuredHeight);
+
   return (
-    <div
+    <motion.div
+      initial={false}
+      animate={{ height: targetHeight }}
+      transition={STAGE_HEIGHT_TRANSITION}
       className={cn(
-        "relative min-h-[10rem] w-full min-w-0 max-w-full overflow-x-clip overflow-y-visible rounded-2xl border border-border bg-surface/40 px-5 py-4 [contain:inline-size]",
+        "relative w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-surface/40 [contain:inline-size]",
         className,
       )}
     >
-      <AnimatePresence mode="wait">
-        <motion.article
-          key={active.id}
-          variants={FRAME_ENTRANCE}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          transition={FRAME_TRANSITION}
-          layout={false}
-          className="flex w-full min-w-0 max-w-full flex-col gap-3"
-        >
-          <header className="flex min-w-0 items-center gap-3">
-            <span
-              className={cn(
-                "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                accentClass,
-              )}
-              aria-hidden="true"
-            >
-              <Icon className="h-4 w-4" />
-            </span>
-            <div className="flex min-w-0 flex-col">
-              <span className="text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/85">
-                {eyebrow}
+      <div ref={innerRef} className="px-5 py-4">
+        <AnimatePresence mode="popLayout">
+          <motion.article
+            key={active.id}
+            variants={FRAME_ENTRANCE}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            transition={FRAME_TRANSITION}
+            layout={false}
+            className="flex w-full min-w-0 max-w-full flex-col gap-3"
+          >
+            <header className="flex min-w-0 items-center gap-3">
+              <span
+                className={cn(
+                  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                  accentClass,
+                )}
+                aria-hidden="true"
+              >
+                <Icon className="h-4 w-4" />
               </span>
-              <span className="truncate text-sm font-semibold tracking-tight-sub text-ink">
-                {active.label}
-              </span>
+              <div className="flex min-w-0 flex-col">
+                <span className="text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/85">
+                  {eyebrow}
+                </span>
+                <span className="truncate text-sm font-semibold tracking-tight-sub text-ink">
+                  {active.label}
+                </span>
+              </div>
+            </header>
+            <div className="min-w-0 w-full max-w-full overflow-x-clip text-sm leading-relaxed tracking-tight-p text-ink/85 [&_.nci-agent-loop-code]:min-w-0 [&_.nci-agent-loop-code]:max-w-full [&_pre]:my-0 [&_pre]:block [&_pre]:min-w-0 [&_pre]:w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre [&_pre]:[overflow-wrap:normal]">
+              {active.body}
             </div>
-          </header>
-          <div className="min-w-0 w-full max-w-full overflow-x-clip text-sm leading-relaxed tracking-tight-p text-ink/85 [&_.nci-agent-loop-code]:min-w-0 [&_.nci-agent-loop-code]:max-w-full [&_pre]:my-0 [&_pre]:block [&_pre]:min-w-0 [&_pre]:w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre [&_pre]:[overflow-wrap:normal]">
-            {active.body}
-          </div>
-        </motion.article>
-      </AnimatePresence>
-    </div>
+          </motion.article>
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 }
 
@@ -274,8 +315,17 @@ interface AgentLoopControlsProps {
 }
 
 export function AgentLoopControls({ className }: AgentLoopControlsProps) {
-  const { isPlaying, setPlaying, restart } = useAgentLoopContext();
+  const { isPlaying, setPlaying, restart, goToFrame, activeFrameIndex } =
+    useAgentLoopContext();
   const PlayPauseIcon = isPlaying ? PauseIcon : PlayIcon;
+
+  const handleStep = React.useCallback(
+    (direction: 1 | -1) => {
+      setPlaying(false);
+      goToFrame(activeFrameIndex + direction);
+    },
+    [setPlaying, goToFrame, activeFrameIndex],
+  );
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -288,6 +338,21 @@ export function AgentLoopControls({ className }: AgentLoopControlsProps) {
       >
         <PlayPauseIcon className="h-4 w-4" aria-hidden="true" />
       </Button>
+      <SplitButton.Root variant="outline" size="sm">
+        <SplitButton.IconTrigger
+          onClick={() => handleStep(-1)}
+          aria-label="Previous frame"
+        >
+          <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+        </SplitButton.IconTrigger>
+        <SplitButton.IconTrigger
+          onClick={() => handleStep(1)}
+          aria-label="Next frame"
+          className="border-l border-border"
+        >
+          <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+        </SplitButton.IconTrigger>
+      </SplitButton.Root>
       <Button
         type="button"
         variant="outline"

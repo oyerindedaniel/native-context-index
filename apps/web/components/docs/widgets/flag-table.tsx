@@ -266,7 +266,7 @@ function FlagTableRow({ flag }: FlagTableRowProps) {
             }
           }}
           aria-label={copied ? "Copied" : `Copy ${copyTarget}`}
-          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 active:scale-[0.97] active:blur-[1px]"
+          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 active:scale-[0.99] active:blur-[0.5px]"
         >
           <CopyStatusIcon
             copied={copied}

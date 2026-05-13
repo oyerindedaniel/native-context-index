@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center whitespace-nowrap cursor-pointer rounded-3xl",
-    "font-medium transition-[background-color,color,border-color,opacity,box-shadow,transform,filter] duration-150 ease-out",
+    "font-medium transition-[background-color,color,border-color,opacity,box-shadow,transform] duration-150 ease-out",
     "outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
     "disabled:pointer-events-none disabled:opacity-60",
-    "active:scale-[0.97] active:blur-[1px]",
+    "active:scale-[0.99]",
   ],
   {
     variants: {

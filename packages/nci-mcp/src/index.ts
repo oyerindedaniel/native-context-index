@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  buildNciFirstAgentPrimer,
+  buildNciFirstAgentPrimerCompact,
   buildNciFirstAgentPrimerReferenceDoc,
 } from "@repo/nci-agent-primer/nci-first-agent-primer";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
         {
           uri: uri.href,
           mimeType: "text/markdown",
-          text: buildNciFirstAgentPrimer(),
+          text: buildNciFirstAgentPrimerCompact(),
         },
       ],
     }),

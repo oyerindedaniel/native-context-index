@@ -3,6 +3,7 @@
 import * as React from "react";
 import { motion } from "motion/react";
 import { usePathname } from "next/navigation";
+import { ListBulletIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
 import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
 
@@ -20,14 +21,18 @@ interface TocRailProps {
 const HEADING_QUERY = "h2[id], h3[id]";
 
 function readHeadings(scope: HTMLElement): TocItem[] {
-  const nodes = Array.from(scope.querySelectorAll<HTMLElement>(HEADING_QUERY));
-  return nodes
-    .filter((node) => Boolean(node.id))
-    .map((node) => ({
+  const items: TocItem[] = [];
+  for (const node of scope.querySelectorAll<HTMLElement>(HEADING_QUERY)) {
+    if (!node.id) {
+      continue;
+    }
+    items.push({
       id: node.id,
       text: node.textContent?.trim() ?? node.id,
       level: Number.parseInt(node.tagName.substring(1), 10),
-    }));
+    });
+  }
+  return items;
 }
 
 export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
@@ -51,9 +56,13 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
       setActiveId(firstHeading.id);
     }
 
-    const headingElements = collected
-      .map((item) => document.getElementById(item.id))
-      .filter((element): element is HTMLElement => Boolean(element));
+    const headingElements: HTMLElement[] = [];
+    for (const item of collected) {
+      const element = document.getElementById(item.id);
+      if (element) {
+        headingElements.push(element);
+      }
+    }
 
     if (headingElements.length === 0) {
       return;
@@ -115,8 +124,12 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
         className,
       )}
     >
-      <p className="mb-3 px-3 text-[0.68rem] font-medium uppercase tracking-[0.11em] text-muted/70">
-        On this page
+      <p className="mb-3 flex items-center gap-1.5 px-3 text-[0.68rem] font-medium uppercase tracking-[0.11em] text-muted/70">
+        <ListBulletIcon
+          className="h-3.5 w-3.5 -translate-y-px"
+          aria-hidden="true"
+        />
+        <span>On this page</span>
       </p>
       <ul className="flex flex-col">
         {items.map((item) => {

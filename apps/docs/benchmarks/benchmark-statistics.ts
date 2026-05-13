@@ -160,9 +160,12 @@ export function buildPairwiseAggregates(
     const reasonKey = judgment.skippedReason ?? "unknown";
     skippedReasonCounts[reasonKey] = (skippedReasonCounts[reasonKey] ?? 0) + 1;
   }
-  const judges = completedJudgments
-    .map((judgment) => judgment.judge)
-    .filter((judge): judge is PairwiseJudgeResult => judge !== undefined);
+  const judges: PairwiseJudgeResult[] = [];
+  for (const judgment of completedJudgments) {
+    if (judgment.judge !== undefined) {
+      judges.push(judgment.judge);
+    }
+  }
   const completedPairCount = judges.length;
   const skippedPairCount = skippedJudgments.length;
 

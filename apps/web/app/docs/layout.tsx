@@ -8,6 +8,7 @@ import {
 } from "@/components/docs/docs-nav";
 import { DocsHeader } from "@/components/docs/docs-header";
 import { DocsBreadcrumbInline } from "@/components/docs/docs-breadcrumb";
+import { DocsScrollToTop } from "@/components/docs/docs-scroll-to-top";
 import { PrevNext } from "@/components/docs/widgets/prev-next";
 import { TocRail } from "@/components/docs/widgets/toc-rail";
 import { docsGroups } from "@/lib/docs/registry";
@@ -19,6 +20,7 @@ export default function DocsLayout({
 }) {
   return (
     <div className="flex min-h-screen bg-surface">
+      <DocsScrollToTop />
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-docs-sidebar flex-col border-r border-border bg-white lg:flex">
         <div className="flex h-docs-chrome shrink-0 items-center border-b border-border px-5">
           <Link href="/" className="flex items-center gap-2">

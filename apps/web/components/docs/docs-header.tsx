@@ -44,7 +44,10 @@ export function DocsHeader({ className }: DocsHeaderProps) {
             "hidden shrink-0 gap-2 sm:inline-flex",
           )}
         >
-          <StarIcon className="h-4 w-4 text-accent" aria-hidden="true" />
+          <StarIcon
+            className="h-4 w-4 -translate-y-px text-accent"
+            aria-hidden="true"
+          />
           <span>GitHub</span>
         </a>
 

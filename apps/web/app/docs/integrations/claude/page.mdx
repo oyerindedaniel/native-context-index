@@ -3,7 +3,7 @@ import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/termina
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
-<PageEyebrow>Cookbook · Claude</PageEyebrow>
+<PageEyebrow>Integrations · Claude</PageEyebrow>
 
 # Wire NCI into Claude
 
@@ -152,3 +152,7 @@ The server speaks JSON-RPC over stdio with no startup banner — it sits silent 
 - The repo hasn&rsquo;t been indexed yet. Run `nci index`.
 - Two MCP entries conflict on the name `nci`. Rename one (e.g. `nci-monorepo`).
 - Claude Code only: `claude mcp list` shows the entry but a `tools/list` is empty — the binary couldn&rsquo;t spawn. Run `claude mcp get nci` to inspect the resolved command, then try the command directly in a shell.
+
+## Skills
+
+Claude follows the open Agent Skills standard. NCI&rsquo;s shipped skill (`nci-answer-quality`) drops into Claude&rsquo;s discovery path with no rewriting — see [NCI Skills](/docs/guides/skills) for the host-by-host map.

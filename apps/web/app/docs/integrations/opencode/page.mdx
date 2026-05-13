@@ -2,7 +2,7 @@ import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
 import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 
-<PageEyebrow>Cookbook · OpenCode</PageEyebrow>
+<PageEyebrow>Integrations · OpenCode</PageEyebrow>
 
 # Wire NCI into OpenCode
 
@@ -112,3 +112,7 @@ The server speaks JSON-RPC over stdio with no startup banner — it sits silent 
 - The repo has not been indexed yet. Run `nci index`.
 - `command` was given as a single string instead of an array. OpenCode requires the array form for `type: "local"`.
 - Two MCP entries share the key `nci`. Rename one (e.g. `nci-monorepo`).
+
+## Skills
+
+OpenCode follows the open Agent Skills standard. NCI&rsquo;s shipped skill (`nci-answer-quality`) drops into OpenCode&rsquo;s discovery path with no rewriting — see [NCI Skills](/docs/guides/skills) for the host-by-host map.

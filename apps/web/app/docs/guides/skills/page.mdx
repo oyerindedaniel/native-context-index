@@ -2,7 +2,7 @@ import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
-<PageEyebrow>Cookbook · Skills</PageEyebrow>
+<PageEyebrow>Guides · Skills</PageEyebrow>
 
 # NCI skills
 
@@ -77,6 +77,15 @@ Hosts that understand the open [Agent Skills](https://agentskills.io/) shape eac
       </TableCell>
       <TableCell>
         Same bundle layout as other hosts: one folder per skill with <code>SKILL.md</code> at the root.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Codex</TableCell>
+      <TableCell>
+        Repo and parents <code>.agents/skills/</code> and user <code>~/.agents/skills/</code> (see OpenAI&rsquo;s <a href="https://developers.openai.com/codex/skills" target="_blank" rel="noopener noreferrer">Codex skills docs</a>)
+      </TableCell>
+      <TableCell>
+        Loads name + description first, then the full <code>SKILL.md</code> only when the skill is invoked (progressive disclosure). Per-skill enable/disable lives in <code>[[skills.config]]</code> blocks in <code>config.toml</code>.
       </TableCell>
     </TableRow>
   </TableBody>

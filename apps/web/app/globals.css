@@ -15,6 +15,14 @@
   --nci-color-surface-hover: #eef1f9;
   --nci-color-elevated: #ffffff;
 
+  /* Dark code-surface palette. Shared by every dark UI that frames code:
+     `<Terminal>`, `<ConfigBuilder>` preview, `<PrimerView>` raw output,
+     `<AgentLoopCode>` (shiki + plaintext fallback). Keep these aligned so
+     a code block reads as the same surface regardless of which component
+     hosts it. */
+  --nci-color-code-surface: #0f1116;
+  --nci-color-code-ink: #e8ecf4;
+
   --nci-z-command-overlay: 100;
   --nci-z-mobile-drawer: 90;
 
@@ -48,6 +56,9 @@
   --color-surface: var(--nci-color-surface);
   --color-surface-hover: var(--nci-color-surface-hover);
   --color-elevated: var(--nci-color-elevated);
+
+  --color-code-surface: var(--nci-color-code-surface);
+  --color-code-ink: var(--nci-color-code-ink);
 
   --spacing-docs-chrome: 3.5rem;
   --spacing-docs-sidebar: 16rem;
@@ -209,7 +220,7 @@
     box-shadow: var(--nci-shadow-button-accent);
   }
 
-  /* Shiki (`AgentLoopCode`) — outer panel supplies #0F1116 */
+  /* Shiki (`AgentLoopCode`) — outer panel supplies `bg-code-surface` */
   .nci-agent-loop-code pre.shiki {
     margin: 0;
     padding: 0;

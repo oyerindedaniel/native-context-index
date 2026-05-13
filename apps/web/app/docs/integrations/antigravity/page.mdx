@@ -3,7 +3,7 @@ import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/termina
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
-<PageEyebrow>Cookbook · Antigravity</PageEyebrow>
+<PageEyebrow>Integrations · Antigravity</PageEyebrow>
 
 # Wire NCI into Antigravity
 
@@ -108,3 +108,7 @@ Gemini routes to `nci_query` with `subcommand: "evidence"` (or `symbols` if it w
 - The Agent panel shows `nci` but tool calls fail → run `nci binary-path`, set `NCI_BINARY` to that path in the env block, then refresh from <MenuPathRoot ariaLabel="Antigravity MCP servers menu"><MenuPathSegment>…</MenuPathSegment><MenuPathSegment current>MCP Servers</MenuPathSegment></MenuPathRoot>.
 - &ldquo;Tool unavailable&rdquo; on first message → the repo wasn&rsquo;t indexed yet. Open a terminal in Antigravity, run `nci index`, retry.
 - Two MCP entries collide on the name `nci` → rename one (e.g. `nci-monorepo`); Antigravity dedupes by key, not by command.
+
+## Skills
+
+Antigravity follows the open Agent Skills standard. NCI&rsquo;s shipped skill (`nci-answer-quality`) drops into Antigravity&rsquo;s discovery path with no rewriting — see [NCI Skills](/docs/guides/skills) for the host-by-host map.

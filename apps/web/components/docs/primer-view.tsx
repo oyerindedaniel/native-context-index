@@ -4,7 +4,6 @@ import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ClipboardIcon, DocumentTextIcon } from "@heroicons/react/20/solid";
 import {
-  buildNciFirstAgentPrimer,
   buildNciFirstAgentPrimerCompact,
   buildNciFirstAgentPrimerReferenceDoc,
 } from "@repo/nci-agent-primer/nci-first-agent-primer";
@@ -29,12 +28,12 @@ const PRIMER_VARIANTS: PrimerVariant[] = [
     hint: "What nci-mcp returns at nci://primer/agent",
     build: buildNciFirstAgentPrimerCompact,
   },
-  {
-    id: "live",
-    label: "Live",
-    hint: "Full prose body — same module, longer form",
-    build: buildNciFirstAgentPrimer,
-  },
+  // {
+  //   id: "live",
+  //   label: "Live",
+  //   hint: "Full prose body — same module, longer form",
+  //   build: buildNciFirstAgentPrimer,
+  // },
   {
     id: "reference",
     label: "Reference",
@@ -125,7 +124,7 @@ export function PrimerView() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="max-h-[32rem] overflow-y-auto rounded-2xl border border-border bg-[#0F1116] px-5 py-4 font-mono text-[0.78rem] leading-relaxed whitespace-pre-wrap text-white/85 shadow-[inset_0_1px_#ffffff10]"
+          className="max-h-[32rem] overflow-y-auto rounded-2xl border border-border bg-code-surface px-5 py-4 font-mono text-[0.78rem] leading-relaxed whitespace-pre-wrap text-white/85 shadow-[inset_0_1px_#ffffff10]"
         >
           {text}
         </motion.pre>

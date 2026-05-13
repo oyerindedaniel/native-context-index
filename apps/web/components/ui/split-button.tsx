@@ -24,10 +24,7 @@ function useSplitButtonContext() {
 }
 
 const splitButtonRootVariants = cva(
-  // Press feedback lives on the root, not the segments: `:has(button:active)`
-  // lets the whole pill compress as one unit so we never get a visible gap
-  // between Main and IconTrigger from one segment shrinking on its own.
-  "inline-flex overflow-hidden rounded-3xl transition-[box-shadow,border-color,transform,filter] duration-150 ease-out has-[button:active]:scale-[0.97] has-[button:active]:blur-[1px]",
+  "inline-flex overflow-hidden rounded-3xl transition-[box-shadow,border-color] duration-150 ease-out",
   {
     variants: {
       variant: {

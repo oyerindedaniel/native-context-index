@@ -1099,18 +1099,19 @@ export async function runBenchmarksWithDependencies(
         }
       }
     } else if (options.verbose) {
-      const failureSummary = recordsForAdvancedTask
-        .filter(
-          (record) =>
-            record.status !== "success" ||
-            record.errorMessage ||
-            record.responseText.trim().length === 0 ||
-            record.durationMs <= 0,
-        )
-        .map(
-          (record) =>
+      const failureSummary: string[] = [];
+      for (const record of recordsForAdvancedTask) {
+        if (
+          record.status !== "success" ||
+          record.errorMessage ||
+          record.responseText.trim().length === 0 ||
+          record.durationMs <= 0
+        ) {
+          failureSummary.push(
             `${record.strategy}/${record.runtime}: status=${record.status} error=${record.errorMessage ?? "none"} responseTextLen=${record.responseText.length} durationMs=${record.durationMs}`,
-        );
+          );
+        }
+      }
       logBench(
         `sequential step NOT advanced for ${sequentialAdvanceTaskId} (strict=${sequentialStepStrict}) due to incomplete pipeline runs: ${failureSummary.join(" | ")}`,
       );

@@ -138,10 +138,80 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
   const [open, setOpen] = React.useState(false);
   const layoutId = React.useId();
   const { copied, copy } = useCopyToClipboard();
+  const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
 
   const handleCopy = React.useCallback(() => {
     void copy(active.install);
   }, [active.install, copy]);
+
+  const focusOptionAt = React.useCallback(
+    (index: number) => {
+      const total = managers.length;
+      if (total === 0) {
+        return;
+      }
+      const wrapped = ((index % total) + total) % total;
+      optionRefs.current[wrapped]?.focus();
+    },
+    [managers.length],
+  );
+
+  // Roving-tabindex listbox: arrow keys cycle focus, Home/End jump to ends.
+  // Enter / Space fire the option button's native onClick (which commits the
+  // selection and closes the popover), so we don't intercept them here.
+  const handleListKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLUListElement>) => {
+      if (managers.length === 0) {
+        return;
+      }
+      const currentIndex = optionRefs.current.findIndex(
+        (button) => button === document.activeElement,
+      );
+      const fallbackIndex = managers.findIndex(
+        (entry) => entry.id === active.id,
+      );
+      const base = currentIndex >= 0 ? currentIndex : fallbackIndex;
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          focusOptionAt(base + 1);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          focusOptionAt(base - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusOptionAt(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusOptionAt(managers.length - 1);
+          break;
+        default:
+          break;
+      }
+    },
+    [managers, active.id, focusOptionAt],
+  );
+
+  const activeIndex = React.useMemo(
+    () => managers.findIndex((entry) => entry.id === active.id),
+    [managers, active.id],
+  );
+
+  // When the popover opens, land focus on the currently-selected option so
+  // arrow keys feel like they originate from the right place. RAF defers
+  // until after the Radix Portal has mounted.
+  React.useEffect(() => {
+    if (!open || activeIndex < 0) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      optionRefs.current[activeIndex]?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, activeIndex]);
 
   return (
     <div className={cn("w-full max-w-2xl", className)}>
@@ -169,21 +239,30 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                 sideOffset={10}
                 className="z-50 w-56 overflow-hidden rounded-2xl border border-border bg-elevated p-1 shadow-[0_2px_4px_#00000010,0_18px_30px_-12px_#0000001f]"
               >
-                <ul role="listbox" className="flex flex-col">
-                  {managers.map((entry) => {
+                <ul
+                  role="listbox"
+                  aria-label="Package manager"
+                  className="flex flex-col"
+                  onKeyDown={handleListKeyDown}
+                >
+                  {managers.map((entry, index) => {
                     const isActive = entry.id === active.id;
                     return (
                       <li key={entry.id}>
                         <button
+                          ref={(element) => {
+                            optionRefs.current[index] = element;
+                          }}
                           type="button"
                           role="option"
                           aria-selected={isActive}
+                          tabIndex={isActive ? 0 : -1}
                           onClick={() => {
                             setActiveId(entry.id);
                             setOpen(false);
                           }}
                           className={cn(
-                            "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-150 ease-out",
+                            "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                             isActive
                               ? "bg-primary/10 text-primary"
                               : "text-ink/85 hover:bg-surface-hover",

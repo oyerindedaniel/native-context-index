@@ -370,12 +370,12 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-2xl border border-border bg-[#0F1116] text-[#E8ECF4] shadow-[inset_0_1px_#ffffff10]",
+        "flex flex-col overflow-hidden rounded-2xl border border-border bg-code-surface text-code-ink shadow-[inset_0_1px_#ffffff10]",
         "lg:sticky lg:self-start lg:top-[calc(var(--spacing-docs-chrome)+1rem)] lg:max-h-[calc(100dvh-var(--spacing-docs-chrome)-2rem)]",
         className,
       )}
     >
-      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/5 bg-[#0F1116] px-4 py-3">
+      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/5 bg-code-surface px-4 py-3">
         <span className="text-[0.7rem] font-medium uppercase tracking-[0.11em] text-white/65">
           nci.config.json
         </span>
@@ -385,7 +385,7 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
             void copy(json);
           }}
           aria-label={copied ? "Copied" : "Copy config"}
-          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.97] active:blur-[1px]"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
         >
           <CopyStatusIcon
             copied={copied}

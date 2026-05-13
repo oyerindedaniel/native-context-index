@@ -48,9 +48,12 @@ export function AgentLoopCode({
     return (
       <div
         className={cn(
-          "nci-agent-loop-code block min-w-0 max-w-full overflow-x-auto rounded-xl bg-[#0F1116] px-4 py-3",
+          "nci-agent-loop-code block min-w-0 max-w-full overflow-x-auto rounded-xl bg-code-surface px-4 py-3",
           className,
         )}
+        // Safe by construction: `code` is passed from our own MDX/JSX
+        //  and Shiki's `codeToHtml` HTML-escapes the source
+        // text before wrapping it in plain <pre>/<span>.
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -59,7 +62,7 @@ export function AgentLoopCode({
   return (
     <pre
       className={cn(
-        "block min-w-0 max-w-full overflow-x-auto whitespace-pre rounded-xl bg-[#0F1116] px-4 py-3 font-mono text-[0.78rem] text-white/80",
+        "block min-w-0 max-w-full overflow-x-auto whitespace-pre rounded-xl bg-code-surface px-4 py-3 font-mono text-[0.78rem] text-white/80",
         className,
       )}
     >

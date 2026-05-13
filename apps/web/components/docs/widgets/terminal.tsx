@@ -118,7 +118,7 @@ export function TerminalRoot({
         animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
-          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-[#0F1116] text-[#E8ECF4] shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14] [will-change:transform]",
+          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14] [will-change:transform]",
           className,
         )}
       >
@@ -193,7 +193,7 @@ export function TerminalCommand({
           void copy(children);
         }}
         aria-label={copied ? "Copied" : "Copy command"}
-        className="ml-auto inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.97] active:blur-[1px]"
+        className="ml-auto inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
       >
         <CopyStatusIcon
           copied={copied}

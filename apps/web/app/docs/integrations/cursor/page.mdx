@@ -2,7 +2,7 @@ import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
 import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 
-<PageEyebrow>Cookbook · Cursor</PageEyebrow>
+<PageEyebrow>Integrations · Cursor</PageEyebrow>
 
 # Wire NCI into Cursor
 
@@ -69,7 +69,7 @@ NCI&rsquo;s tools read the database; they do not build it. Re-run `nci index` wh
   <TerminalCommand>nci index</TerminalCommand>
 </TerminalRoot>
 
-For monorepo setups see [Monorepo indexing](/docs/cookbook/monorepo).
+For monorepo setups see [Monorepo indexing](/docs/guides/monorepo).
 
 <CalloutRoot variant="info">
   <CalloutTitle>One server, one `project_root`.</CalloutTitle>
@@ -81,3 +81,7 @@ For monorepo setups see [Monorepo indexing](/docs/cookbook/monorepo).
 ## Troubleshooting
 
 If Cursor reports the wrong NCI version or &ldquo;binary not found&rdquo;, set `NCI_BINARY` to the path printed by `nci binary-path`. The Node shim and `nci-mcp` both defer to it.
+
+## Skills
+
+Cursor follows the open Agent Skills standard. NCI&rsquo;s shipped skill (`nci-answer-quality`) drops into Cursor&rsquo;s discovery path with no rewriting — see [NCI Skills](/docs/guides/skills) for the host-by-host map.

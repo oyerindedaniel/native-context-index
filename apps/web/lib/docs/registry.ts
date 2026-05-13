@@ -1,7 +1,8 @@
 export type DocsGroupId =
   | "getting-started"
   | "core-concepts"
-  | "cookbook"
+  | "integrations"
+  | "guides"
   | "architecture"
   | "reference"
   | "reference-tables";
@@ -10,6 +11,7 @@ export type DocsIconName =
   | "RocketLaunchIcon"
   | "LightBulbIcon"
   | "BookOpenIcon"
+  | "CommandLineIcon"
   | "RectangleStackIcon"
   | "BookmarkSquareIcon"
   | "TableCellsIcon";
@@ -93,55 +95,70 @@ export const docsGroups: DocsGroup[] = [
     ],
   },
   {
-    id: "cookbook",
-    title: "Cookbook",
-    iconName: "BookOpenIcon",
+    id: "integrations",
+    title: "Integrations",
+    iconName: "CommandLineIcon",
     pages: [
       {
-        slug: "/docs/cookbook/monorepo",
-        title: "Monorepo Indexing",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
-        summary:
-          "Use workspaces and package_scope together to index every dependency across a pnpm or yarn monorepo.",
-      },
-      {
-        slug: "/docs/cookbook/claude",
+        slug: "/docs/integrations/claude",
         title: "Claude Setup",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
+        eyebrow: "Integrations",
+        groupId: "integrations",
         summary:
           "Wire nci-mcp into Claude Desktop (claude_desktop_config.json) and Claude Code (claude mcp add) with one entry that works for both.",
       },
       {
-        slug: "/docs/cookbook/cursor",
+        slug: "/docs/integrations/cursor",
         title: "Cursor Setup",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
+        eyebrow: "Integrations",
+        groupId: "integrations",
         summary:
           "Wire nci-mcp into Cursor so the agent reaches your local index inside the editor.",
       },
       {
-        slug: "/docs/cookbook/antigravity",
+        slug: "/docs/integrations/codex",
+        title: "Codex Setup",
+        eyebrow: "Integrations",
+        groupId: "integrations",
+        summary:
+          "Add nci-mcp to OpenAI Codex's config.toml so the CLI and the IDE extension share one entry across every session.",
+      },
+      {
+        slug: "/docs/integrations/antigravity",
         title: "Antigravity Setup",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
+        eyebrow: "Integrations",
+        groupId: "integrations",
         summary:
           "Drop nci-mcp into Google Antigravity's mcp_config.json so the Gemini agent can quote your installed packages.",
       },
       {
-        slug: "/docs/cookbook/opencode",
+        slug: "/docs/integrations/opencode",
         title: "OpenCode Setup",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
+        eyebrow: "Integrations",
+        groupId: "integrations",
         summary:
           "Register nci-mcp in opencode.json (or shared .mcp.json) for terminal-first agent sessions.",
       },
+    ],
+  },
+  {
+    id: "guides",
+    title: "Guides",
+    iconName: "BookOpenIcon",
+    pages: [
       {
-        slug: "/docs/cookbook/skills",
+        slug: "/docs/guides/monorepo",
+        title: "Monorepo Indexing",
+        eyebrow: "Guides",
+        groupId: "guides",
+        summary:
+          "Use workspaces and package_scope together to index every dependency across a pnpm or yarn monorepo.",
+      },
+      {
+        slug: "/docs/guides/skills",
         title: "NCI Skills",
-        eyebrow: "Cookbook",
-        groupId: "cookbook",
+        eyebrow: "Guides",
+        groupId: "guides",
         summary:
           "Skills shipped under skills/, when each one applies, and how to author the next one.",
       },

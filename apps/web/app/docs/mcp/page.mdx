@@ -89,6 +89,7 @@ The full primer text is rendered at [Agent primer](/docs/primer).
     <InstallTabsTrigger tabKey="cursor">Cursor</InstallTabsTrigger>
     <InstallTabsTrigger tabKey="claude-desktop">Claude Desktop</InstallTabsTrigger>
     <InstallTabsTrigger tabKey="claude-code">Claude Code</InstallTabsTrigger>
+    <InstallTabsTrigger tabKey="codex">Codex</InstallTabsTrigger>
     <InstallTabsTrigger tabKey="antigravity">Antigravity</InstallTabsTrigger>
     <InstallTabsTrigger tabKey="opencode">OpenCode</InstallTabsTrigger>
     <InstallTabsTrigger tabKey="other">Other clients</InstallTabsTrigger>
@@ -108,10 +109,10 @@ The full primer text is rendered at [Agent primer](/docs/primer).
 }
 ```
 
-    Cursor opens the server in the workspace it launched in; the server inherits NCI&rsquo;s working-directory-aware config resolution (the same logic `nci` uses for `nci.config.json`). Full setup at the [Cursor cookbook](/docs/cookbook/cursor).
+    Cursor opens the server in the workspace it launched in; the server inherits NCI&rsquo;s working-directory-aware config resolution (the same logic `nci` uses for `nci.config.json`). Full setup at [Cursor setup](/docs/integrations/cursor).
   </InstallTabsPanel>
   <InstallTabsPanel tabKey="claude-desktop">
-    Drop this into `claude_desktop_config.json` (path varies by OS — see the [Claude cookbook](/docs/cookbook/claude)):
+    Drop this into `claude_desktop_config.json` (path varies by OS — see [Claude setup](/docs/integrations/claude)):
 
 ```json
 {
@@ -136,7 +137,25 @@ The full primer text is rendered at [Agent primer](/docs/primer).
       <TerminalCommand>claude mcp add --transport stdio --scope user nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
     </TerminalRoot>
 
-    Flags go **before** the server name; the command after `--` is what Claude spawns. Verify with `claude mcp list` and `claude mcp get nci`. Full setup at the [Claude cookbook](/docs/cookbook/claude).
+    Flags go **before** the server name; the command after `--` is what Claude spawns. Verify with `claude mcp list` and `claude mcp get nci`. Full setup at [Claude setup](/docs/integrations/claude).
+  </InstallTabsPanel>
+  <InstallTabsPanel tabKey="codex">
+    Codex shares one `config.toml` between the CLI and the IDE extension. Register with the CLI:
+
+    <TerminalRoot>
+      <TerminalCommand>codex mcp add nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
+    </TerminalRoot>
+
+    Or hand-edit `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.nci]
+command = "npx"
+args = ["-y", "@nativecontextindex/mcp"]
+enabled = true
+```
+
+    Verify with `codex mcp list` and `codex mcp get nci`. Start a new Codex session (or reload the IDE extension) after editing — `config.toml` is read per session. Full setup at [Codex setup](/docs/integrations/codex).
   </InstallTabsPanel>
   <InstallTabsPanel tabKey="antigravity">
     Edit `~/.gemini/antigravity/mcp_config.json` (Windows: `%UserProfile%\.gemini\antigravity\mcp_config.json`):
@@ -152,7 +171,7 @@ The full primer text is rendered at [Agent primer](/docs/primer).
 }
 ```
 
-    Restart Antigravity (or end and restart the Agent session) — the config is read at IDE startup. Full setup at the [Antigravity cookbook](/docs/cookbook/antigravity).
+    Restart Antigravity (or end and restart the Agent session) — the config is read at IDE startup. Full setup at [Antigravity setup](/docs/integrations/antigravity).
   </InstallTabsPanel>
   <InstallTabsPanel tabKey="opencode">
     OpenCode reads `opencode.json` (user or project scope). Local stdio servers use the array form for `command`:
@@ -170,7 +189,7 @@ The full primer text is rendered at [Agent primer](/docs/primer).
 }
 ```
 
-    A `.mcp.json` at the repo root (Claude Code-compatible shape) is also picked up. Full setup at the [OpenCode cookbook](/docs/cookbook/opencode).
+    A `.mcp.json` at the repo root (Claude Code-compatible shape) is also picked up. Full setup at [OpenCode setup](/docs/integrations/opencode).
   </InstallTabsPanel>
   <InstallTabsPanel tabKey="other">
     Any MCP-compliant client can use the server. Launch it directly:

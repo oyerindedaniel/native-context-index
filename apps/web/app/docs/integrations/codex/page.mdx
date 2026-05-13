@@ -1,0 +1,133 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+
+<PageEyebrow>Integrations · Codex</PageEyebrow>
+
+# Wire NCI into Codex
+
+<PageLede>
+  OpenAI&rsquo;s Codex is an agentic coding tool with a CLI and an IDE extension that **share one config file**. Add one `[mcp_servers.nci]` block to `config.toml` (or use `codex mcp add`) and every Codex session — terminal or editor — can ask exact questions about the packages you have installed.
+</PageLede>
+
+## Pick the scope
+
+Codex reads MCP servers from a TOML file. The CLI and the IDE extension look at the same locations:
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Scope</TableHeaderCell>
+      <TableHeaderCell>Path</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>User (every project)</TableCell>
+      <TableCell><code>~/.codex/config.toml</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>Project (this repo only — trusted projects)</TableCell>
+      <TableCell><code>.codex/config.toml</code> at the repo root</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+Project-scoped configs only load for projects Codex has marked as trusted (run `codex` once in the repo and accept the trust prompt). User scope is the path of least resistance and matches the rest of NCI&rsquo;s working-directory-aware story.
+
+## Add the server — CLI
+
+<TerminalRoot>
+  <TerminalCommand>codex mcp add nci -- npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+The `--` separates Codex&rsquo;s flags from the command Codex spawns for the server. Repeat with `--env KEY=VALUE` if you need to pass env vars at registration time:
+
+<TerminalRoot>
+  <TerminalCommand>{`codex mcp add nci --env NCI_BINARY=$(nci binary-path) -- npx -y @nativecontextindex/mcp`}</TerminalCommand>
+</TerminalRoot>
+
+`codex mcp add` writes to `~/.codex/config.toml` by default.
+
+## Add the server — TOML
+
+If you prefer hand-editing the config, drop this block under `[mcp_servers]`:
+
+```toml
+[mcp_servers.nci]
+command = "npx"
+args = ["-y", "@nativecontextindex/mcp"]
+enabled = true
+```
+
+Need `NCI_BINARY` (when the bundled binary is not on `PATH`)?
+
+```toml
+[mcp_servers.nci]
+command = "npx"
+args = ["-y", "@nativecontextindex/mcp"]
+env = { NCI_BINARY = "/absolute/path/to/nci" }
+enabled = true
+```
+
+Find the absolute path with:
+
+<TerminalRoot>
+  <TerminalCommand>nci binary-path</TerminalCommand>
+</TerminalRoot>
+
+Both styles produce the same on-disk result; pick whichever matches the rest of your workflow.
+
+## Verify
+
+<TerminalRoot>
+  <TerminalCommand>codex mcp list</TerminalCommand>
+</TerminalRoot>
+
+<TerminalRoot>
+  <TerminalCommand>codex mcp get nci</TerminalCommand>
+</TerminalRoot>
+
+The first lists every registered server; the second prints the resolved `command`, `args`, `env`, and timeouts for `nci`. Expect two tools (`nci_query`, `nci_sql`) and three resources (`nci://primer/agent`, `nci://primer/reference`, `nci://database/active`).
+
+## Apply changes
+
+Codex evaluates `config.toml` per session. After editing the file or running `codex mcp add`:
+
+- **CLI** — start a new `codex` session. In-flight sessions keep their old server list.
+- **IDE extension** (VS Code / Cursor / Windsurf) — reload the Codex extension or restart the IDE window.
+
+There is no hot-reload to wait for; nothing in `nci-mcp` keeps long-lived state between sessions.
+
+## First call
+
+The agent should read `nci://primer/agent` first — that resource is the operating manual the MCP server&rsquo;s `instructions` field points it to. Then ask:
+
+> Quote `ZodObject.omit` from the version of zod we have installed before writing the schema.
+
+Codex routes to `nci_query` with `subcommand: "evidence"` and cites the stored `signature` + `js_doc` back. Pin `package_name` and `package_version` in the prompt when you want exact answers fast — the [agent primer](/docs/primer) explains why.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Index before you ask.</CalloutTitle>
+  <CalloutBody>
+    NCI&rsquo;s tools read the database; they do not build it. Run `nci index` once in the project before your first prompt. The MCP server inherits NCI&rsquo;s config-driven DB resolution, so an indexed repo elsewhere will not help.
+  </CalloutBody>
+</CalloutRoot>
+
+## Troubleshooting
+
+<TerminalRoot>
+  <TerminalCommand>npx -y @nativecontextindex/mcp</TerminalCommand>
+</TerminalRoot>
+
+The server speaks JSON-RPC over stdio with no startup banner — it sits silent waiting for a `tools/list`. If Codex reports the server as down or empty:
+
+- `nci` is not on `PATH` and `NCI_BINARY` is unset. Add it via `env = { … }` in the TOML block or `--env` at `codex mcp add` time.
+- The repo has not been indexed yet. Run `nci index`.
+- Two MCP entries share the key `nci`. Rename one (for example `nci-monorepo`) — Codex dedupes by table name, not by command.
+- Project-scoped config is being ignored. Run `codex` once in the repo and accept the trust prompt; only trusted projects load `.codex/config.toml`.
+
+## Skills
+
+Codex follows the open Agent Skills standard. NCI&rsquo;s shipped skill (`nci-answer-quality`) drops into Codex&rsquo;s discovery path with no rewriting — see [NCI Skills](/docs/guides/skills) for the host-by-host map.

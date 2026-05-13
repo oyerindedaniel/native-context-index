@@ -10,6 +10,7 @@ import {
   BookmarkSquareIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CommandLineIcon,
   LightBulbIcon,
   RectangleStackIcon,
   RocketLaunchIcon,
@@ -32,6 +33,7 @@ const GROUP_ICONS: Record<
   RocketLaunchIcon,
   LightBulbIcon,
   BookOpenIcon,
+  CommandLineIcon,
   RectangleStackIcon,
   BookmarkSquareIcon,
   TableCellsIcon,
@@ -364,12 +366,93 @@ export function DocsBreadcrumbInline({
 
   const panelOpen = openSide !== null;
 
+  const panelContent =
+    openSide === "pages" ? (
+      <ul
+        role="listbox"
+        aria-label={`Pages in ${group.title}`}
+        className="flex flex-col gap-0.5 px-1.5 py-1.5"
+      >
+        {group.pages.map((page) => {
+          const isActive = page.slug === current.slug;
+          return (
+            <li key={page.slug}>
+              <Link
+                href={page.slug}
+                role="option"
+                aria-selected={isActive}
+                tabIndex={openSide === "pages" ? 0 : -1}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink/85 hover:bg-surface-hover hover:text-ink",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    isActive ? "bg-primary" : "bg-muted/40",
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{page.title}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    ) : openSide === "headings" ? (
+      <ul
+        role="listbox"
+        aria-label="On this page"
+        className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto px-1.5 py-1.5"
+      >
+        {headings.map((heading) => {
+          const isActive = heading.id === activeHeading?.id;
+          return (
+            <li key={heading.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                tabIndex={openSide === "headings" ? 0 : -1}
+                onClick={() => scrollToHeading(heading.id)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                  heading.level === 3 && "pl-6",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink/85 hover:bg-surface-hover hover:text-ink",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    isActive ? "bg-primary" : "bg-muted/40",
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{heading.text}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    ) : null;
+
   return (
     <nav
       ref={navRef}
       aria-label="Page location"
       className={cn(
-        "sticky top-[calc(var(--spacing-docs-chrome)+0.5rem)] z-20 mb-6 max-w-full overflow-hidden rounded-2xl border border-border bg-elevated/85 shadow-[0_1px_2px_#0000000a,inset_0_1px_#ffffff] backdrop-blur-md",
+        // Sticky bar. Note: no `overflow-hidden` here — the panel below is
+        // absolutely-positioned so it overlays content rather than reserving
+        // flow space. Reserving flow space would shift content downstream
+        // when the nav is pinned.
+        // Bottom corners flatten when open so the abs panel reads as one card.
+        "sticky top-[calc(var(--spacing-docs-chrome)+0.5rem)] z-20 mb-6 max-w-full rounded-2xl border border-border bg-elevated/85 shadow-[0_1px_2px_#0000000a,inset_0_1px_#ffffff] backdrop-blur-md transition-[border-radius] duration-200 ease-out",
+        panelOpen && "rounded-b-none",
         className,
       )}
     >
@@ -469,94 +552,41 @@ export function DocsBreadcrumbInline({
         )}
       </div>
 
-      <motion.div
-        id={panelId}
-        initial={false}
-        animate={{
-          height: panelOpen ? "auto" : 0,
-          opacity: panelOpen ? 1 : 0,
-        }}
-        transition={{
-          duration: reduceMotion ? 0 : 0.22,
-          ease: ENTER_EASE,
-        }}
-        style={{ overflow: "hidden" }}
-        aria-hidden={!panelOpen}
-      >
-        {openSide === "pages" ? (
-          <ul
-            role="listbox"
-            aria-label={`Pages in ${group.title}`}
-            className="flex flex-col gap-0.5 border-t border-border px-1.5 py-1.5"
+      <AnimatePresence initial={false}>
+        {panelOpen ? (
+          <motion.div
+            id={panelId}
+            key="panel"
+            // Absolute child of the sticky nav. Pinned-stickies act as the
+            // containing block for abs descendants, so `top-full` and the
+            // outset `-inset-x-px` align the overlay flush with the nav's
+            // outer border at every scroll position — no document reflow.
+            className="absolute -inset-x-px top-full z-10 overflow-hidden rounded-b-2xl border-x border-b border-border bg-elevated/95 shadow-[0_8px_18px_-10px_#0000001f,inset_0_-1px_#0000000a] backdrop-blur-md"
+            initial={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, clipPath: "inset(0% 0% 100% 0%)" }
+            }
+            animate={
+              reduceMotion
+                ? { opacity: 1 }
+                : { opacity: 1, clipPath: "inset(0% 0% 0% 0%)" }
+            }
+            exit={
+              reduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, clipPath: "inset(0% 0% 100% 0%)" }
+            }
+            transition={{
+              duration: reduceMotion ? 0 : 0.24,
+              ease: ENTER_EASE,
+            }}
+            aria-hidden={!panelOpen}
           >
-            {group.pages.map((page) => {
-              const isActive = page.slug === current.slug;
-              return (
-                <li key={page.slug}>
-                  <Link
-                    href={page.slug}
-                    role="option"
-                    aria-selected={isActive}
-                    tabIndex={openSide === "pages" ? 0 : -1}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-ink/85 hover:bg-surface-hover hover:text-ink",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        isActive ? "bg-primary" : "bg-muted/40",
-                      )}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{page.title}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : openSide === "headings" ? (
-          <ul
-            role="listbox"
-            aria-label="On this page"
-            className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto border-t border-border px-1.5 py-1.5"
-          >
-            {headings.map((heading) => {
-              const isActive = heading.id === activeHeading?.id;
-              return (
-                <li key={heading.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isActive}
-                    tabIndex={openSide === "headings" ? 0 : -1}
-                    onClick={() => scrollToHeading(heading.id)}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-                      heading.level === 3 && "pl-6",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-ink/85 hover:bg-surface-hover hover:text-ink",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        isActive ? "bg-primary" : "bg-muted/40",
-                      )}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{heading.text}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+            {panelContent}
+          </motion.div>
         ) : null}
-      </motion.div>
+      </AnimatePresence>
     </nav>
   );
 }

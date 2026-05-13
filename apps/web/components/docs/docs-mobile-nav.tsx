@@ -368,7 +368,10 @@ function DrawerDocsGroup({ group, normalizedPath }: DrawerDocsGroupProps) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 px-3">
-        <GroupIcon className="h-3.5 w-3.5 text-muted/70" aria-hidden="true" />
+        <GroupIcon
+          className="h-3.5 w-3.5 -translate-y-px text-muted/70"
+          aria-hidden="true"
+        />
         <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted/85">
           {group.title}
         </h5>
