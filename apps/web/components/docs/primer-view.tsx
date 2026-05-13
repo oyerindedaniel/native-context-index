@@ -2,12 +2,24 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ClipboardIcon, DocumentTextIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowTopRightOnSquareIcon,
+  ChevronDownIcon,
+  ClipboardDocumentIcon,
+  DocumentTextIcon,
+} from "@heroicons/react/20/solid";
 import {
   buildNciFirstAgentPrimerCompact,
   buildNciFirstAgentPrimerReferenceDoc,
 } from "@repo/nci-agent-primer/nci-first-agent-primer";
 import { SplitButton } from "@/components/ui/split-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
@@ -46,7 +58,7 @@ const FALLBACK_VARIANT = PRIMER_VARIANTS[0]!;
 
 export function PrimerView() {
   const [activeId, setActiveId] = React.useState<PrimerVariantId>("compact");
-  const { copied, copy } = useCopyToClipboard();
+  const { copied, copy } = useCopyToClipboard({ resetMs: 2000 });
 
   const active = React.useMemo(
     () =>
@@ -56,6 +68,16 @@ export function PrimerView() {
   );
 
   const text = React.useMemo(() => active.build(), [active]);
+  const variantLabel = active.label.toLowerCase();
+
+  const handleCopy = React.useCallback(() => {
+    void copy(text);
+  }, [copy, text]);
+
+  const handleViewRaw = React.useCallback(() => {
+    const url = `data:text/markdown;charset=utf-8,${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [text]);
 
   return (
     <section className="my-8 flex flex-col gap-4">
@@ -83,33 +105,89 @@ export function PrimerView() {
             );
           })}
         </SplitButton.Root>
+
         <SplitButton.Root variant="outline" size="sm">
           <SplitButton.Main
             type="button"
-            onClick={() => {
-              void copy(text);
-            }}
-            className="gap-2 px-4"
-          >
-            <DocumentTextIcon
-              className="h-4 w-4 text-muted/85"
-              aria-hidden="true"
-            />
-            <span>{copied ? "Copied" : "Copy primer"}</span>
-          </SplitButton.Main>
-          <SplitButton.IconTrigger
-            type="button"
-            onClick={() => {
-              void copy(text);
-            }}
-            aria-label={copied ? "Copied" : "Copy primer text"}
+            onClick={handleCopy}
+            aria-label={
+              copied ? "Copied primer text" : "Copy primer text to clipboard"
+            }
+            className="gap-2 px-3 sm:px-4"
           >
             <CopyStatusIcon
               copied={copied}
-              idle={ClipboardIcon}
-              className="h-4 w-4"
+              idle={ClipboardDocumentIcon}
+              className={cn(
+                "h-4 w-4 shrink-0",
+                copied ? "text-accent" : "text-muted",
+              )}
             />
-          </SplitButton.IconTrigger>
+            <span className="hidden sm:inline">
+              {copied ? "Copied" : "Copy primer"}
+            </span>
+          </SplitButton.Main>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SplitButton.IconTrigger
+                type="button"
+                aria-label="More primer copy and view options"
+              >
+                <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+              </SplitButton.IconTrigger>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-72 p-1.5">
+              <DropdownMenuItem
+                className="flex cursor-pointer items-start gap-3 px-3 py-2.5"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleCopy();
+                }}
+              >
+                <ClipboardDocumentIcon
+                  className="mt-0.5 h-5 w-5 shrink-0 text-muted"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 text-left">
+                  <span className="block text-sm font-medium text-ink">
+                    Copy primer
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-snug text-muted">
+                    Copy the {variantLabel} variant as Markdown
+                  </span>
+                </span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                className="flex cursor-pointer items-start gap-3 px-3 py-2.5"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  handleViewRaw();
+                }}
+              >
+                <DocumentTextIcon
+                  className="mt-0.5 h-5 w-5 shrink-0 text-muted"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                    View as Markdown
+                    <ArrowTopRightOnSquareIcon
+                      className="h-3.5 w-3.5 shrink-0 text-muted"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-snug text-muted">
+                    Open the {variantLabel} variant in a new tab
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </SplitButton.Root>
       </div>
 
