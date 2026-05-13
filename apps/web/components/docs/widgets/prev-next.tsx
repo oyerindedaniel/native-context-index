@@ -44,7 +44,7 @@ function PagerCard({ page, direction }: PagerCardProps) {
         />
         {directionLabel}
       </span>
-      <span className="text-base font-semibold tracking-tight-p text-ink">
+      <span className="text-[15px] font-semibold tracking-tight-p text-ink">
         {page.title}
       </span>
     </Link>

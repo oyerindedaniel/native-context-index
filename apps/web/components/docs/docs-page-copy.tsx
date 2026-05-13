@@ -4,7 +4,6 @@ import * as React from "react";
 import { usePathname } from "next/navigation";
 import {
   ArrowTopRightOnSquareIcon,
-  CheckIcon,
   ChevronDownIcon,
   ClipboardDocumentIcon,
   DocumentTextIcon,
@@ -18,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 async function fetchPageSource(pathname: string): Promise<string | null> {
@@ -64,8 +64,6 @@ export function DocsPageCopy({ className }: { className?: string }) {
     return null;
   }
 
-  const StatusIcon = copied ? CheckIcon : ClipboardDocumentIcon;
-
   return (
     <div className={cn("shrink-0", className)}>
       <SplitButton.Root variant="outline" size="sm">
@@ -78,12 +76,13 @@ export function DocsPageCopy({ className }: { className?: string }) {
           }
           className="gap-2 px-3 sm:px-4"
         >
-          <StatusIcon
+          <CopyStatusIcon
+            copied={copied}
+            idle={ClipboardDocumentIcon}
             className={cn(
               "h-4 w-4 shrink-0",
               copied ? "text-accent" : "text-muted",
             )}
-            aria-hidden="true"
           />
           <span className="hidden sm:inline">
             {pending ? "Copying…" : copied ? "Copied" : "Copy page"}

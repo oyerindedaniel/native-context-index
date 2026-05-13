@@ -2,12 +2,9 @@
 
 import * as React from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
-import {
-  ClipboardIcon,
-  CheckIcon,
-  CommandLineIcon,
-} from "@heroicons/react/20/solid";
+import { ClipboardIcon, CommandLineIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 interface TerminalContextValue {
@@ -169,7 +166,6 @@ export function TerminalCommand({
     registerCommand(children);
   }, [children, registerCommand]);
 
-  const StatusIcon = copied ? CheckIcon : ClipboardIcon;
   const showCursor = isPlaying || !isCommandComplete;
 
   return (
@@ -197,9 +193,13 @@ export function TerminalCommand({
           void copy(children);
         }}
         aria-label={copied ? "Copied" : "Copy command"}
-        className="ml-auto inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.97]"
+        className="ml-auto inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.97] active:blur-[1px]"
       >
-        <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        <CopyStatusIcon
+          copied={copied}
+          idle={ClipboardIcon}
+          className="h-3.5 w-3.5"
+        />
       </button>
     </div>
   );

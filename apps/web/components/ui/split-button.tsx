@@ -24,7 +24,10 @@ function useSplitButtonContext() {
 }
 
 const splitButtonRootVariants = cva(
-  "inline-flex overflow-hidden rounded-3xl transition-[box-shadow,border-color] duration-150 ease-out",
+  // Press feedback lives on the root, not the segments: `:has(button:active)`
+  // lets the whole pill compress as one unit so we never get a visible gap
+  // between Main and IconTrigger from one segment shrinking on its own.
+  "inline-flex overflow-hidden rounded-3xl transition-[box-shadow,border-color,transform,filter] duration-150 ease-out has-[button:active]:scale-[0.97] has-[button:active]:blur-[1px]",
   {
     variants: {
       variant: {
@@ -63,11 +66,16 @@ function dividerClass(
 function segmentVariantClass(
   variant: NonNullable<VariantProps<typeof splitButtonRootVariants>["variant"]>,
 ): string {
+  // Inset bevel (top highlight + bottom darken) lives on the colored segments,
+  // not the root: filled segments paint on top of the root and would otherwise
+  // hide the wrapper's insets. Outline/ghost segments are transparent, so the
+  // root's own inset highlight already shows through and no segment bevel is
+  // needed.
   switch (variant) {
     case "primary":
-      return "bg-primary text-white hover:bg-primary/90";
+      return "bg-primary text-white hover:bg-primary/90 shadow-[inset_0_1px_rgb(255_255_255/0.38),inset_0_-2px_rgb(0_0_0/0.12)]";
     case "accent":
-      return "bg-accent text-white hover:bg-accent/90";
+      return "bg-accent text-white hover:bg-accent/90 shadow-[inset_0_1px_rgb(255_255_255/0.38),inset_0_-2px_rgb(0_0_0/0.14)]";
     case "outline":
       return "bg-transparent text-ink hover:bg-surface-hover";
     case "ghost":

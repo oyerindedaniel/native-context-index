@@ -1,12 +1,9 @@
 "use client";
 
 import * as React from "react";
-import {
-  ClipboardIcon,
-  CheckIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/20/solid";
+import { ClipboardIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 export interface FlagDescriptor {
@@ -236,7 +233,6 @@ interface FlagTableRowProps {
 function FlagTableRow({ flag }: FlagTableRowProps) {
   const { copied, copy } = useCopyToClipboard();
   const copyTarget = flag.long ?? flag.short ?? "";
-  const StatusIcon = copied ? CheckIcon : ClipboardIcon;
 
   return (
     <tr className="align-top">
@@ -272,7 +268,11 @@ function FlagTableRow({ flag }: FlagTableRowProps) {
           aria-label={copied ? "Copied" : `Copy ${copyTarget}`}
           className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 active:scale-[0.97] active:blur-[1px]"
         >
-          <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <CopyStatusIcon
+            copied={copied}
+            idle={ClipboardIcon}
+            className="h-3.5 w-3.5"
+          />
         </button>
       </td>
     </tr>

@@ -13,6 +13,7 @@ import { SplitButton } from "@/components/ui/split-button";
 import { buttonVariants } from "@/components/ui/button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 export type PackageManagerId = "npm" | "pnpm" | "yarn" | "bun";
@@ -142,8 +143,6 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
     void copy(active.install);
   }, [active.install, copy]);
 
-  const StatusIcon = copied ? CheckIcon : ClipboardIcon;
-
   return (
     <div className={cn("w-full max-w-2xl", className)}>
       <div className="hidden sm:block">
@@ -242,7 +241,11 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
             onClick={handleCopy}
             aria-label={copied ? "Copied" : "Copy install command"}
           >
-            <StatusIcon className="h-4 w-4" aria-hidden="true" />
+            <CopyStatusIcon
+              copied={copied}
+              idle={ClipboardIcon}
+              className="h-4 w-4"
+            />
           </SplitButton.IconTrigger>
         </SplitButton.Root>
       </div>
@@ -298,7 +301,11 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
               "shrink-0",
             )}
           >
-            <StatusIcon className="h-4 w-4" aria-hidden="true" />
+            <CopyStatusIcon
+              copied={copied}
+              idle={ClipboardIcon}
+              className="h-4 w-4"
+            />
           </button>
         </div>
       </div>

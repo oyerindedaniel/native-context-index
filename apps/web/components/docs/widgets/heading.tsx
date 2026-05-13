@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { LinkIcon, CheckIcon } from "@heroicons/react/20/solid";
+import { LinkIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 type HeadingLevel = 2 | 3 | 4;
@@ -83,7 +84,6 @@ export function Heading({
     [id, clearPendingClick, copy],
   );
 
-  const Icon = copied ? CheckIcon : LinkIcon;
   const interactive = Boolean(id);
 
   const headingProps: React.HTMLAttributes<HTMLHeadingElement> & {
@@ -111,7 +111,7 @@ export function Heading({
             copied && "text-accent opacity-100 group-hover:text-accent",
           )}
         >
-          <Icon className="h-4 w-4" />
+          <CopyStatusIcon copied={copied} idle={LinkIcon} className="h-4 w-4" />
         </span>
       ) : null}
     </>

@@ -3,11 +3,11 @@
 import * as React from "react";
 import {
   ClipboardIcon,
-  CheckIcon,
   ExclamationTriangleIcon,
   CheckBadgeIcon,
 } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 import {
   validateConfig,
@@ -365,7 +365,6 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
   const cleaned = stripUndefined(config);
   const json = JSON.stringify(cleaned, null, 2);
 
-  const StatusIcon = copied ? CheckIcon : ClipboardIcon;
   const errorIssues = issues.filter((issue) => issue.level === "error");
 
   return (
@@ -388,7 +387,11 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
           aria-label={copied ? "Copied" : "Copy config"}
           className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.97] active:blur-[1px]"
         >
-          <StatusIcon className="h-4 w-4" aria-hidden="true" />
+          <CopyStatusIcon
+            copied={copied}
+            idle={ClipboardIcon}
+            className="h-4 w-4"
+          />
         </button>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">

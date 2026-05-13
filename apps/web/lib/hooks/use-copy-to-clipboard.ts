@@ -32,9 +32,14 @@ export function useCopyToClipboard(
       setCopied(false);
       return false;
     }
+    // Optimistic: flip to "copied" on the same frame as the click so the
+    // icon swap starts immediately. `clipboard.writeText` is async and on
+    // large payloads (full page MDX, primer text) the await alone can eat
+    // 15–60ms — long enough to feel laggy on a hot action. We revert only
+    // if the write actually fails.
+    setCopied(true);
     try {
       await navigator.clipboard.writeText(value);
-      setCopied(true);
       return true;
     } catch {
       setCopied(false);

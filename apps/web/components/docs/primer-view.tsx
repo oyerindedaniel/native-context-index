@@ -2,11 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  ClipboardIcon,
-  CheckIcon,
-  DocumentTextIcon,
-} from "@heroicons/react/20/solid";
+import { ClipboardIcon, DocumentTextIcon } from "@heroicons/react/20/solid";
 import {
   buildNciFirstAgentPrimer,
   buildNciFirstAgentPrimerCompact,
@@ -14,6 +10,7 @@ import {
 } from "@repo/nci-agent-primer/nci-first-agent-primer";
 import { SplitButton } from "@/components/ui/split-button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
 type PrimerVariantId = "compact" | "live" | "reference";
@@ -60,8 +57,6 @@ export function PrimerView() {
   );
 
   const text = React.useMemo(() => active.build(), [active]);
-
-  const StatusIcon = copied ? CheckIcon : ClipboardIcon;
 
   return (
     <section className="my-8 flex flex-col gap-4">
@@ -110,7 +105,11 @@ export function PrimerView() {
             }}
             aria-label={copied ? "Copied" : "Copy primer text"}
           >
-            <StatusIcon className="h-4 w-4" aria-hidden="true" />
+            <CopyStatusIcon
+              copied={copied}
+              idle={ClipboardIcon}
+              className="h-4 w-4"
+            />
           </SplitButton.IconTrigger>
         </SplitButton.Root>
       </div>
