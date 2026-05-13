@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
 import {
   docsGroups,
   normalizeDocsPath,
@@ -153,19 +154,7 @@ function DocsMobileDrawer({
     return () => window.removeEventListener("keydown", handler);
   }, [open, onOpenChange]);
 
-  React.useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const html = document.documentElement;
-    const previousOverflow = html.style.overflow;
-    html.style.overflow = "hidden";
-    html.classList.add("nci-scroll-locked");
-    return () => {
-      html.style.overflow = previousOverflow;
-      html.classList.remove("nci-scroll-locked");
-    };
-  }, [open]);
+  useDocumentScrollLock(open);
 
   if (!mounted) {
     return null;

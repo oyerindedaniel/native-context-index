@@ -12,6 +12,7 @@ import {
 import { SplitButton } from "@/components/ui/split-button";
 import { buttonVariants } from "@/components/ui/button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
 import { cn } from "@/lib/utils";
 
 export type PackageManagerId = "npm" | "pnpm" | "yarn" | "bun";
@@ -67,38 +68,19 @@ export function InstallPickerRoot({
     defaultId && managers.some((entry) => entry.id === defaultId)
       ? defaultId
       : fallback.id;
-  const [activeId, setActiveIdState] =
-    React.useState<PackageManagerId>(initialId);
   const fullStorageKey = storageKey ? STORAGE_PREFIX + storageKey : null;
-
-  React.useEffect(() => {
-    if (!fullStorageKey) {
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(
-        fullStorageKey,
-      ) as PackageManagerId | null;
-      if (stored && managers.some((entry) => entry.id === stored)) {
-        setActiveIdState(stored);
-      }
-    } catch {
-      /* localStorage may be unavailable */
-    }
-  }, [fullStorageKey, managers]);
-
-  const setActiveId = React.useCallback(
-    (next: PackageManagerId) => {
-      setActiveIdState(next);
-      if (fullStorageKey) {
-        try {
-          window.localStorage.setItem(fullStorageKey, next);
-        } catch {
-          /* ignore */
-        }
-      }
+  const managerSync = managers.map((entry) => entry.id).join(",");
+  const [activeId, setActiveId] = useLocalStorageState<PackageManagerId>(
+    fullStorageKey,
+    initialId,
+    {
+      serialize: (value) => value,
+      deserialize: (raw) =>
+        managers.some((entry) => entry.id === raw)
+          ? (raw as PackageManagerId)
+          : null,
     },
-    [fullStorageKey],
+    managerSync,
   );
 
   const active = React.useMemo(

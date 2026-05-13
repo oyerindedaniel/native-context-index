@@ -56,7 +56,7 @@ export default function DocsLayout({
         <div className="mx-auto flex w-full max-w-docs-shell gap-12 px-4 py-6 lg:px-8">
           <main id="docs-main" className="min-w-0 flex-1">
             <article className="docs-prose mx-auto w-full min-w-0 max-w-docs-content">
-              <DocsBreadcrumbInline className="lg:hidden" />
+              <DocsBreadcrumbInline className="xl:hidden" />
               <div className="mb-12">{children}</div>
               <PrevNext />
             </article>

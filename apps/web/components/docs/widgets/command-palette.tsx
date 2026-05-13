@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { docsGroups, type DocsPage, type DocsGroup } from "@/lib/docs/registry";
 import { docsGroupIcons, type IconComponent } from "@/lib/docs/icons";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
+import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
 
 type ScopeId = "all" | DocsGroup["id"];
 
@@ -35,8 +36,12 @@ interface CommandPaletteContextValue {
   setScope: (next: ScopeId) => void;
   results: CommandResult[];
   activeIndex: number;
-  setActiveIndex: (next: number) => void;
+  setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
   navigateToResult: (result: CommandResult) => void;
+  /** Call before keyboard-driven `setActiveIndex` so list hover does not fight arrows. */
+  markResultsKeyboardNav: () => void;
+  /** True briefly after keyboard list nav — skip `onMouseEnter` active changes. */
+  shouldIgnoreResultsHoverSelect: () => boolean;
 }
 
 const CommandPaletteContext =
@@ -94,6 +99,20 @@ function pageBySlug(slug: string): DocsPage | undefined {
   return undefined;
 }
 
+const SCOPE_ORDER: ScopeId[] = ["all", ...docsGroups.map((group) => group.id)];
+
+function shiftScope(current: ScopeId, direction: 1 | -1): ScopeId {
+  const currentIndex = SCOPE_ORDER.indexOf(current);
+  if (currentIndex === -1) {
+    return current;
+  }
+  const nextIndex = currentIndex + direction;
+  if (nextIndex < 0 || nextIndex >= SCOPE_ORDER.length) {
+    return current;
+  }
+  return SCOPE_ORDER[nextIndex] ?? current;
+}
+
 interface CommandPaletteRootProps {
   open: boolean;
   onOpenChange: (next: boolean) => void;
@@ -109,6 +128,13 @@ function CommandPaletteRoot({
   const [query, setQuery] = React.useState("");
   const [scope, setScope] = React.useState<ScopeId>("all");
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const resultsKeyboardNavAt = React.useRef(0);
+  const markResultsKeyboardNav = React.useCallback(() => {
+    resultsKeyboardNavAt.current = performance.now();
+  }, []);
+  const shouldIgnoreResultsHoverSelect = React.useCallback(() => {
+    return performance.now() - resultsKeyboardNavAt.current < 180;
+  }, []);
 
   React.useEffect(() => {
     if (!open) {
@@ -172,23 +198,23 @@ function CommandPaletteRoot({
       activeIndex,
       setActiveIndex,
       navigateToResult,
+      markResultsKeyboardNav,
+      shouldIgnoreResultsHoverSelect,
     }),
-    [open, setOpen, query, scope, results, activeIndex, navigateToResult],
+    [
+      open,
+      setOpen,
+      query,
+      scope,
+      results,
+      activeIndex,
+      navigateToResult,
+      markResultsKeyboardNav,
+      shouldIgnoreResultsHoverSelect,
+    ],
   );
 
-  React.useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const html = document.documentElement;
-    const previousOverflow = html.style.overflow;
-    html.style.overflow = "hidden";
-    html.classList.add("nci-scroll-locked");
-    return () => {
-      html.style.overflow = previousOverflow;
-      html.classList.remove("nci-scroll-locked");
-    };
-  }, [open]);
+  useDocumentScrollLock(open);
 
   return (
     <CommandPaletteContext.Provider value={value}>
@@ -215,8 +241,9 @@ function CommandPaletteOverlay({
       aria-modal="true"
       aria-label="Search documentation"
       className={cn(
-        "fixed inset-0 flex items-start justify-center bg-ink/45 px-4 backdrop-blur-sm",
-        "pt-[max(3rem,calc(var(--spacing-docs-chrome)+1.25rem))]",
+        "fixed inset-0 flex bg-ink/45 backdrop-blur-sm",
+        "max-md:h-[100dvh] max-md:flex-col max-md:items-stretch max-md:justify-start max-md:px-0 max-md:pt-0",
+        "items-start justify-center px-4 pt-[max(3rem,calc(var(--spacing-docs-chrome)+1.25rem))]",
         className,
       )}
       style={{ zIndex: "var(--nci-z-command-overlay)" }}
@@ -237,7 +264,10 @@ function CommandPaletteOverlay({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.97 }}
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-2xl overflow-hidden rounded-3xl border border-border bg-elevated shadow-[0_8px_24px_-8px_#00000026,0_24px_48px_-16px_#0000002a]"
+        className={cn(
+          "flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-[0_8px_24px_-8px_#00000026,0_24px_48px_-16px_#0000002a]",
+          "max-md:max-w-none max-md:max-h-[100dvh] max-md:min-h-0 max-md:flex-1 max-md:rounded-none max-md:border-x-0 max-md:shadow-none",
+        )}
       >
         {children}
       </motion.div>
@@ -258,6 +288,9 @@ function CommandPaletteInput() {
     activeIndex,
     setActiveIndex,
     navigateToResult,
+    scope,
+    setScope,
+    markResultsKeyboardNav,
   } = useCommandPaletteContext();
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -277,7 +310,8 @@ function CommandPaletteInput() {
       if (results.length === 0) {
         return;
       }
-      setActiveIndex((activeIndex + 1) % results.length);
+      markResultsKeyboardNav();
+      setActiveIndex((previous) => Math.min(results.length - 1, previous + 1));
       return;
     }
     if (event.key === "ArrowUp") {
@@ -285,7 +319,36 @@ function CommandPaletteInput() {
       if (results.length === 0) {
         return;
       }
-      setActiveIndex((activeIndex - 1 + results.length) % results.length);
+      markResultsKeyboardNav();
+      setActiveIndex((previous) => Math.max(0, previous - 1));
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      // Only steal the keystroke when the caret is at the relevant boundary
+      // — otherwise the user is editing the query and expects normal cursor
+      // movement inside the input.
+      const input = event.currentTarget;
+      const caretStart = input.selectionStart ?? 0;
+      const caretEnd = input.selectionEnd ?? 0;
+      const collapsed = caretStart === caretEnd;
+      const atStart = collapsed && caretStart === 0;
+      const atEnd = collapsed && caretStart === input.value.length;
+      if (event.key === "ArrowLeft" && atStart) {
+        const next = shiftScope(scope, -1);
+        if (next !== scope) {
+          event.preventDefault();
+          setScope(next);
+        }
+        return;
+      }
+      if (event.key === "ArrowRight" && atEnd) {
+        const next = shiftScope(scope, 1);
+        if (next !== scope) {
+          event.preventDefault();
+          setScope(next);
+        }
+        return;
+      }
       return;
     }
     if (event.key === "Enter") {
@@ -298,7 +361,7 @@ function CommandPaletteInput() {
   };
 
   return (
-    <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+    <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-4">
       <MagnifyingGlassIcon
         className="h-4 w-4 shrink-0 text-muted/70"
         aria-hidden="true"
@@ -328,7 +391,7 @@ function CommandPaletteInput() {
         type="button"
         onClick={() => setOpen(false)}
         aria-label="Close"
-        className="hidden text-xs font-medium uppercase tracking-[0.08em] text-muted/70 hover:text-ink sm:inline-flex"
+        className="hidden text-xs font-medium uppercase tracking-[0.08em] text-muted/70 hover:text-ink md:inline-flex"
       >
         Esc
       </button>
@@ -348,7 +411,7 @@ function CommandPalettePillRow() {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface/60 px-4 py-2.5">
+    <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-surface/60 px-4 py-2.5">
       {pills.map((pill) => {
         const isActive = pill.id === scope;
         const PillIcon = pill.icon;
@@ -377,12 +440,35 @@ function CommandPalettePillRow() {
 }
 
 function CommandPaletteResults() {
-  const { results, activeIndex, setActiveIndex, navigateToResult } =
-    useCommandPaletteContext();
+  const {
+    results,
+    activeIndex,
+    setActiveIndex,
+    navigateToResult,
+    shouldIgnoreResultsHoverSelect,
+  } = useCommandPaletteContext();
+  const itemRefs = React.useRef(new Map<number, HTMLButtonElement | null>());
+
+  React.useEffect(() => {
+    const activeEl = itemRefs.current.get(activeIndex);
+    if (!activeEl) {
+      return;
+    }
+
+    // `behavior: "auto"` forces an instant scroll regardless of any
+    // ancestor `scroll-behavior: smooth`; without this, arrow-nav that
+    // crosses the visible boundary feels sluggish because the browser
+    // walks up to the smooth-scrolling outer container.
+    activeEl.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "auto",
+    });
+  }, [activeIndex, results]);
 
   if (results.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 px-5 py-12 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-4 py-12 text-center">
         <p className="text-sm font-medium text-ink">No matches.</p>
         <p className="text-xs tracking-tight-p text-muted">
           Try a different keyword or pick another category.
@@ -400,13 +486,16 @@ function CommandPaletteResults() {
 
   let runningIndex = -1;
   return (
-    <div className="max-h-[60vh] overflow-y-auto px-2 py-2">
+    <div
+      data-command-palette-results
+      className="min-h-0 flex-1 overflow-y-auto px-4 py-2 [scrollbar-gutter:stable] max-md:max-h-none md:max-h-[60vh]"
+    >
       {Object.entries(groupedByGroup).map(([groupId, items]) => {
         const groupTitle = items[0]?.groupTitle ?? groupId;
         const GroupIcon = items[0]?.groupIcon;
         return (
-          <section key={groupId} className="px-2 py-2">
-            <header className="flex items-center gap-2 px-2 pb-1.5 text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/75">
+          <section key={groupId} className="py-2 first:pt-0">
+            <header className="flex items-center gap-2 pb-1.5 text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/75">
               {GroupIcon ? (
                 <GroupIcon className="h-3 w-3" aria-hidden="true" />
               ) : null}
@@ -420,8 +509,20 @@ function CommandPaletteResults() {
                 return (
                   <li key={item.id}>
                     <button
+                      ref={(node) => {
+                        if (node) {
+                          itemRefs.current.set(itemIndex, node);
+                        } else {
+                          itemRefs.current.delete(itemIndex);
+                        }
+                      }}
                       type="button"
-                      onMouseEnter={() => setActiveIndex(itemIndex)}
+                      onMouseEnter={() => {
+                        if (shouldIgnoreResultsHoverSelect()) {
+                          return;
+                        }
+                        setActiveIndex(itemIndex);
+                      }}
                       onClick={() => navigateToResult(item)}
                       className={cn(
                         "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-150 ease-out",
@@ -458,9 +559,10 @@ function CommandPaletteResults() {
 }
 
 function CommandPaletteFooter() {
+  const { setOpen } = useCommandPaletteContext();
   return (
-    <footer className="flex items-center justify-between gap-3 border-t border-border bg-surface/70 px-4 py-2 text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/75">
-      <div className="flex items-center gap-3">
+    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface/70 px-4 py-2 text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/75">
+      <div className="hidden items-center gap-3 md:flex">
         <span className="inline-flex items-center gap-1.5">
           <kbd className="inline-flex h-5 items-center rounded border border-border bg-elevated px-1.5 font-mono text-[10px] text-ink/85">
             ↵
@@ -474,12 +576,24 @@ function CommandPaletteFooter() {
           Navigate
         </span>
       </div>
-      <span className="inline-flex items-center gap-1.5">
+      <span className="hidden items-center gap-1.5 md:inline-flex">
         <kbd className="inline-flex h-5 items-center rounded border border-border bg-elevated px-1.5 font-mono text-[10px] text-ink/85">
           Esc
         </kbd>
         Close
       </span>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        aria-label="Close search"
+        className="ml-auto inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold normal-case tracking-tight text-ink/90 outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 md:hidden"
+      >
+        <XMarkIcon
+          className="size-4 shrink-0 text-muted/80"
+          aria-hidden="true"
+        />
+        Close
+      </button>
     </footer>
   );
 }

@@ -73,7 +73,11 @@ export function Heading({
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-        window.history.replaceState(null, "", `#${id}`);
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}#${id}`,
+        );
       }, SINGLE_VS_DOUBLE_MS);
     },
     [id, clearPendingClick, copy],
@@ -88,7 +92,7 @@ export function Heading({
     id,
     onClick: interactive ? handleClick : undefined,
     className: cn(
-      "group scroll-mt-24",
+      "group",
       LEVEL_CLASS[level],
       interactive && "cursor-pointer select-none",
       className,

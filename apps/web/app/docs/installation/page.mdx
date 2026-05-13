@@ -52,7 +52,7 @@ import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widget
 <CalloutRoot variant="info">
   <CalloutTitle>Why global, not `-D`?</CalloutTitle>
   <CalloutBody>
-    `nci` is a CLI you run against any tree, the same way you run `git` or `node`. `-g` puts the binary on `PATH` once. `-D` (`--save-dev`) is for *libraries* a project imports at build time; it pins a copy per repo and forces every contributor to re-install. The two flags are orthogonal: when you use `-g` you do **not** add `-D`. If you genuinely want a project-pinned copy (CI runners, locked monorepo tooling), drop the `-g` and use your package manager&rsquo;s normal install — but for everyday use, global is the path the rest of the docs assume.
+    `nci` is a CLI you run against any tree, like `git` or `node`. `-g` puts it on `PATH` once; use the same binary in every repo. Skip `-D` (`--save-dev`) — that&rsquo;s for libraries you import at build time, not CLIs.
   </CalloutBody>
 </CalloutRoot>
 

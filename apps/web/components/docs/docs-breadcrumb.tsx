@@ -23,6 +23,7 @@ import {
   type DocsIconName,
   type DocsPage,
 } from "@/lib/docs/registry";
+import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
 
 const GROUP_ICONS: Record<
   DocsIconName,
@@ -104,11 +105,6 @@ export function DocsBreadcrumbStatic({ className }: DocsBreadcrumbStaticProps) {
 
 interface DocsBreadcrumbInlineProps {
   className?: string;
-  /**
-   * CSS selector for the content scope whose headings (`h2[id], h3[id]`) drive
-   * the scroll-aware TOC behavior. The breadcrumb's last segment swaps to the
-   * currently visible heading text once the user has scrolled past it.
-   */
   scopeSelector?: string;
 }
 
@@ -147,16 +143,32 @@ interface ActiveHeading {
   text: string;
 }
 
+interface TocHeading {
+  id: string;
+  text: string;
+  level: 2 | 3;
+}
+
 const HEADING_QUERY = "h2[id], h3[id]";
 
-function useActiveHeading(
+function useDocsMainToc(
   scopeSelector: string,
   pathname: string,
-): ActiveHeading | null {
-  const [active, setActive] = React.useState<ActiveHeading | null>(null);
+): {
+  headings: TocHeading[];
+  activeHeading: ActiveHeading | null;
+  pinActiveHeading: (id: string, lockMs?: number) => void;
+} {
+  const [headings, setHeadings] = React.useState<TocHeading[]>([]);
+  const [activeHeading, setActiveHeading] =
+    React.useState<ActiveHeading | null>(null);
+  const activeLock = useActiveHeadingLock();
+  const isLockedRef = React.useRef(activeLock.isLocked);
+  isLockedRef.current = activeLock.isLocked;
 
   React.useEffect(() => {
-    setActive(null);
+    setActiveHeading(null);
+    setHeadings([]);
     const scope = document.querySelector<HTMLElement>(scopeSelector);
     if (!scope) {
       return;
@@ -167,6 +179,14 @@ function useActiveHeading(
     if (nodes.length === 0) {
       return;
     }
+
+    setHeadings(
+      nodes.map((node) => ({
+        id: node.id,
+        text: node.textContent?.trim() ?? node.id,
+        level: node.tagName === "H3" ? 3 : 2,
+      })),
+    );
 
     const firstHeading = nodes[0];
     if (!firstHeading) {
@@ -181,8 +201,8 @@ function useActiveHeading(
           return;
         }
         aboveFirst = entry.boundingClientRect.top > 0;
-        if (aboveFirst) {
-          setActive(null);
+        if (aboveFirst && !isLockedRef.current()) {
+          setActiveHeading(null);
         }
       },
       { rootMargin: "0px 0px -100% 0px", threshold: [0] },
@@ -191,7 +211,7 @@ function useActiveHeading(
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (aboveFirst) {
+        if (aboveFirst || isLockedRef.current()) {
           return;
         }
         const visible = entries
@@ -203,7 +223,7 @@ function useActiveHeading(
         const top = visible.at(-1);
         const target = top?.target;
         if (target instanceof HTMLElement && target.id) {
-          setActive({
+          setActiveHeading({
             id: target.id,
             text: target.textContent?.trim() ?? target.id,
           });
@@ -222,7 +242,29 @@ function useActiveHeading(
     };
   }, [scopeSelector, pathname]);
 
-  return active;
+  const headingsRef = React.useRef(headings);
+  headingsRef.current = headings;
+
+  const pinActiveHeading = React.useCallback(
+    (id: string, lockMs?: number) => {
+      const fromList = headingsRef.current.find((heading) => heading.id === id);
+      if (fromList) {
+        setActiveHeading({ id: fromList.id, text: fromList.text });
+      } else {
+        const headingEl = document.getElementById(id);
+        setActiveHeading({
+          id,
+          text: headingEl?.textContent?.trim() ?? id,
+        });
+      }
+      if (lockMs && lockMs > 0) {
+        activeLock.lock(lockMs);
+      }
+    },
+    [activeLock],
+  );
+
+  return { headings, activeHeading, pinActiveHeading };
 }
 
 export function DocsBreadcrumbInline({
@@ -231,13 +273,76 @@ export function DocsBreadcrumbInline({
 }: DocsBreadcrumbInlineProps) {
   const { pathname, current, group } = useBreadcrumbContext();
   const reduceMotion = useReducedMotion();
-  const [open, setOpen] = React.useState(false);
+  const [openSide, setOpenSide] = React.useState<"pages" | "headings" | null>(
+    null,
+  );
   const panelId = React.useId();
-  const activeHeading = useActiveHeading(scopeSelector, pathname);
+  const navRef = React.useRef<HTMLElement>(null);
+  const { headings, activeHeading, pinActiveHeading } = useDocsMainToc(
+    scopeSelector,
+    pathname,
+  );
 
   React.useEffect(() => {
-    setOpen(false);
+    setOpenSide(null);
   }, [current?.slug]);
+
+  React.useEffect(() => {
+    if (openSide === null) {
+      return;
+    }
+    const handlePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && !navRef.current?.contains(target)) {
+        setOpenSide(null);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenSide(null);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [openSide]);
+
+  const scrollToHeading = React.useCallback(
+    (id: string) => {
+      const targetEl = document.getElementById(id);
+      if (!targetEl) {
+        setOpenSide(null);
+        return;
+      }
+      const wasOpen = openSide !== null;
+      setOpenSide(null);
+      const closeBufferMs = wasOpen && !reduceMotion ? 240 : 0;
+      // Pin + lock the active row so the IntersectionObserver doesn't
+      // oscillate between intermediate sections during smooth scroll.
+      // Lock window covers panel-collapse + a generous smooth-scroll budget.
+      pinActiveHeading(id, reduceMotion ? 0 : closeBufferMs + 900);
+      const run = () => {
+        targetEl.scrollIntoView({
+          behavior: reduceMotion ? "auto" : "smooth",
+          block: "start",
+        });
+        window.history.replaceState(
+          null,
+          "",
+          `${pathname}${window.location.search}#${id}`,
+        );
+      };
+      if (closeBufferMs === 0) {
+        run();
+      } else {
+        window.setTimeout(run, closeBufferMs);
+      }
+    },
+    [reduceMotion, openSide, pathname, pinActiveHeading],
+  );
 
   if (!group || !current) {
     return null;
@@ -246,6 +351,7 @@ export function DocsBreadcrumbInline({
   const GroupIcon = GROUP_ICONS[group.iconName] ?? BookOpenIcon;
   const displayLabel = activeHeading?.text ?? current.title;
   const displayKey = activeHeading?.id ?? `__page__:${current.slug}`;
+  const hasToc = headings.length > 0;
 
   const labelMaskStyle: CSSVarStyle = {
     WebkitMaskImage:
@@ -256,8 +362,11 @@ export function DocsBreadcrumbInline({
     "--mask-pos": "112%",
   };
 
+  const panelOpen = openSide !== null;
+
   return (
     <nav
+      ref={navRef}
       aria-label="Page location"
       className={cn(
         "sticky top-[calc(var(--spacing-docs-chrome)+0.5rem)] z-20 mb-6 max-w-full overflow-hidden rounded-2xl border border-border bg-elevated/85 shadow-[0_1px_2px_#0000000a,inset_0_1px_#ffffff] backdrop-blur-md",
@@ -267,12 +376,14 @@ export function DocsBreadcrumbInline({
       <div className="flex w-full min-w-0 items-center gap-1.5 px-3 py-1.5 text-sm font-medium">
         <button
           type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
+          onClick={() =>
+            setOpenSide((value) => (value === "pages" ? null : "pages"))
+          }
+          aria-expanded={openSide === "pages"}
           aria-controls={panelId}
           className={cn(
-            "inline-flex min-w-0 max-w-[55%] shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-            open
+            "inline-flex min-w-0 max-w-[45%] shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+            openSide === "pages"
               ? "bg-primary/10 text-primary"
               : "text-muted/85 hover:bg-surface-hover hover:text-ink",
           )}
@@ -282,7 +393,7 @@ export function DocsBreadcrumbInline({
           <ChevronDownIcon
             className={cn(
               "size-3.5 shrink-0 transition-transform duration-200 ease-out",
-              open && "rotate-180",
+              openSide === "pages" && "rotate-180",
             )}
             aria-hidden="true"
           />
@@ -291,77 +402,160 @@ export function DocsBreadcrumbInline({
           className="size-3.5 shrink-0 text-muted/50"
           aria-hidden="true"
         />
-        <span
-          className="relative isolate flex min-w-0 flex-1 items-center overflow-hidden text-ink"
-          aria-current="page"
-        >
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={displayKey}
-              className="block w-full truncate"
-              style={labelMaskStyle}
-              initial={reduceMotion ? reducedInitial : animatedInitial}
-              animate={reduceMotion ? reducedAnimate : animatedAnimate}
-              exit={reduceMotion ? reducedExit : animatedExit}
-              transition={{
-                duration: reduceMotion ? 0 : 0.28,
-                ease: EXIT_EASE,
-              }}
-            >
-              {displayLabel}
-            </motion.span>
-          </AnimatePresence>
-        </span>
+        {hasToc ? (
+          <button
+            type="button"
+            onClick={() =>
+              setOpenSide((value) => (value === "headings" ? null : "headings"))
+            }
+            aria-expanded={openSide === "headings"}
+            aria-controls={panelId}
+            className={cn(
+              "relative isolate flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 overflow-hidden rounded-full px-2.5 py-1 text-left text-ink outline-none transition-[background-color,color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+              openSide === "headings"
+                ? "bg-primary/10 text-primary"
+                : "hover:bg-surface-hover/80",
+            )}
+            aria-current="page"
+          >
+            <span className="relative isolate min-w-0 flex-1 overflow-hidden">
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={displayKey}
+                  className="block w-full truncate"
+                  style={labelMaskStyle}
+                  initial={reduceMotion ? reducedInitial : animatedInitial}
+                  animate={reduceMotion ? reducedAnimate : animatedAnimate}
+                  exit={reduceMotion ? reducedExit : animatedExit}
+                  transition={{
+                    duration: reduceMotion ? 0 : 0.28,
+                    ease: EXIT_EASE,
+                  }}
+                >
+                  {displayLabel}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+            <ChevronDownIcon
+              className={cn(
+                "size-3.5 shrink-0 transition-transform duration-200 ease-out",
+                openSide === "headings" && "rotate-180",
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        ) : (
+          <span
+            className="relative isolate flex min-w-0 flex-1 items-center overflow-hidden text-ink"
+            aria-current="page"
+          >
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={displayKey}
+                className="block w-full truncate"
+                style={labelMaskStyle}
+                initial={reduceMotion ? reducedInitial : animatedInitial}
+                animate={reduceMotion ? reducedAnimate : animatedAnimate}
+                exit={reduceMotion ? reducedExit : animatedExit}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.28,
+                  ease: EXIT_EASE,
+                }}
+              >
+                {displayLabel}
+              </motion.span>
+            </AnimatePresence>
+          </span>
+        )}
       </div>
 
       <motion.div
         id={panelId}
         initial={false}
         animate={{
-          height: open ? "auto" : 0,
-          opacity: open ? 1 : 0,
+          height: panelOpen ? "auto" : 0,
+          opacity: panelOpen ? 1 : 0,
         }}
         transition={{
           duration: reduceMotion ? 0 : 0.22,
           ease: ENTER_EASE,
         }}
         style={{ overflow: "hidden" }}
-        aria-hidden={!open}
+        aria-hidden={!panelOpen}
       >
-        <ul
-          role="listbox"
-          aria-label={`Pages in ${group.title}`}
-          className="flex flex-col gap-0.5 border-t border-border px-1.5 py-1.5"
-        >
-          {group.pages.map((page) => {
-            const isActive = page.slug === current.slug;
-            return (
-              <li key={page.slug}>
-                <Link
-                  href={page.slug}
-                  role="option"
-                  aria-selected={isActive}
-                  tabIndex={open ? 0 : -1}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-ink/85 hover:bg-surface-hover hover:text-ink",
-                  )}
-                >
-                  <span
+        {openSide === "pages" ? (
+          <ul
+            role="listbox"
+            aria-label={`Pages in ${group.title}`}
+            className="flex flex-col gap-0.5 border-t border-border px-1.5 py-1.5"
+          >
+            {group.pages.map((page) => {
+              const isActive = page.slug === current.slug;
+              return (
+                <li key={page.slug}>
+                  <Link
+                    href={page.slug}
+                    role="option"
+                    aria-selected={isActive}
+                    tabIndex={openSide === "pages" ? 0 : -1}
                     className={cn(
-                      "size-1.5 shrink-0 rounded-full",
-                      isActive ? "bg-primary" : "bg-muted/40",
+                      "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-ink/85 hover:bg-surface-hover hover:text-ink",
                     )}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">{page.title}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                  >
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        isActive ? "bg-primary" : "bg-muted/40",
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">{page.title}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : openSide === "headings" ? (
+          <ul
+            role="listbox"
+            aria-label="On this page"
+            className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto border-t border-border px-1.5 py-1.5"
+          >
+            {headings.map((heading) => {
+              const isActive = heading.id === activeHeading?.id;
+              return (
+                <li key={heading.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isActive}
+                    tabIndex={openSide === "headings" ? 0 : -1}
+                    onClick={() => scrollToHeading(heading.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                      heading.level === 3 && "pl-6",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-ink/85 hover:bg-surface-hover hover:text-ink",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        isActive ? "bg-primary" : "bg-muted/40",
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">{heading.text}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
       </motion.div>
     </nav>
   );

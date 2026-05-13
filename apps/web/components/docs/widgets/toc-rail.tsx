@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
 
 interface TocItem {
   id: string;
@@ -33,6 +34,9 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
   const pathname = usePathname();
   const [items, setItems] = React.useState<TocItem[]>([]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const activeLock = useActiveHeadingLock();
+  const isLockedRef = React.useRef(activeLock.isLocked);
+  isLockedRef.current = activeLock.isLocked;
 
   React.useEffect(() => {
     const scope = document.querySelector<HTMLElement>(scopeSelector);
@@ -57,6 +61,9 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        if (isLockedRef.current()) {
+          return;
+        }
         const visible = entries
           .filter((entry) => entry.isIntersecting)
           .sort(
@@ -77,6 +84,24 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
     headingElements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, [scopeSelector, pathname]);
+
+  // Native hash navigation handles scroll + URL hash + new-tab modifiers.
+  // We only pin the click target and arm the IO lock so the active row
+  // doesn't oscillate as the page passes intermediate sections. Skip when
+  // the click is a "open in new tab/window" intent — the current page
+  // doesn't actually scroll then.
+  const handleNavigate = React.useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+      const opensElsewhere =
+        event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey;
+      if (opensElsewhere) {
+        return;
+      }
+      setActiveId(id);
+      activeLock.lock(900);
+    },
+    [activeLock],
+  );
 
   if (items.length === 0) {
     return null;
@@ -100,6 +125,7 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
             <li key={item.id}>
               <a
                 href={`#${item.id}`}
+                onClick={(event) => handleNavigate(event, item.id)}
                 className={cn(
                   "group relative block rounded-md py-1.5 pr-3 text-[0.8125rem] tracking-tight-p outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                   item.level === 3 ? "pl-12" : "pl-7",

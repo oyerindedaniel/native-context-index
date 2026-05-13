@@ -3,8 +3,64 @@
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+type DropdownMenuRootProps = React.ComponentPropsWithoutRef<
+  typeof DropdownMenuPrimitive.Root
+>;
+
+/**
+ * `modal` defaults to **false** (Radix's default is true). When Radix opens a
+ * `modal` DropdownMenu it wraps content in `FocusScope` + `react-remove-scroll`;
+ * inside a `position: sticky` ancestor that combination is known to make the
+ * page scroll to the trigger's document position on open
+ * (see radix-ui/primitives#2331 and #2369 — closed/open respectively, with
+ * `modal={false}` as the confirmed workaround for cases the official PR
+ * doesn't cover).
+ *
+ * For our usage — action menus like "Copy page", install picker, config
+ * builder — non-modal is also semantically correct: the user can still
+ * interact with the rest of the page while a contextual menu is open.
+ *
+ * The custom `useDocumentScrollLock` only fires when `modal` is true, since
+ * its purpose is to hide our custom scrollbar visual whenever Radix's own
+ * scroll lock runs (and Radix only runs that lock in modal mode).
+ */
+function DropdownMenu({
+  open,
+  defaultOpen,
+  onOpenChange,
+  modal = false,
+  ...rest
+}: DropdownMenuRootProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(
+    defaultOpen ?? false,
+  );
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : uncontrolledOpen;
+
+  useDocumentScrollLock(isOpen && modal !== false);
+
+  const handleOpenChange = React.useCallback(
+    (next: boolean) => {
+      if (!isControlled) {
+        setUncontrolledOpen(next);
+      }
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  return (
+    <DropdownMenuPrimitive.Root
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={handleOpenChange}
+      modal={modal}
+      {...rest}
+    />
+  );
+}
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 

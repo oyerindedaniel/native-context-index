@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion } from "motion/react";
+import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
 import { cn } from "@/lib/utils";
 
 interface InstallTabsContextValue {
@@ -40,35 +41,14 @@ export function InstallTabsRoot({
   children,
 }: InstallTabsRootProps) {
   const layoutId = React.useId();
-  const [activeKey, setActiveKeyState] = React.useState<string>(defaultKey);
   const fullStorageKey = storageKey ? STORAGE_PREFIX + storageKey : null;
-
-  React.useEffect(() => {
-    if (!fullStorageKey) {
-      return;
-    }
-    try {
-      const stored = window.localStorage.getItem(fullStorageKey);
-      if (stored) {
-        setActiveKeyState(stored);
-      }
-    } catch {
-      /* localStorage may be unavailable; fall back to defaultKey */
-    }
-  }, [fullStorageKey]);
-
-  const setActiveKey = React.useCallback(
-    (next: string) => {
-      setActiveKeyState(next);
-      if (fullStorageKey) {
-        try {
-          window.localStorage.setItem(fullStorageKey, next);
-        } catch {
-          /* ignore quota / privacy mode */
-        }
-      }
+  const [activeKey, setActiveKey] = useLocalStorageState(
+    fullStorageKey,
+    defaultKey,
+    {
+      serialize: (value) => value,
+      deserialize: (raw) => (raw.length > 0 ? raw : null),
     },
-    [fullStorageKey],
   );
 
   const value = React.useMemo<InstallTabsContextValue>(
