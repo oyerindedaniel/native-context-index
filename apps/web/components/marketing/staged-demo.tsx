@@ -6,22 +6,29 @@ import { cn } from "@/lib/utils";
 function StagedDemoRoot({
   children,
   className,
+  surfaceTint = "primary",
 }: {
   children: React.ReactNode;
   className?: string;
+  surfaceTint?: "primary" | "accent";
 }) {
   const patternId = React.useId().replace(/:/g, "");
+  const tintSurface =
+    surfaceTint === "accent"
+      ? "border-accent/12 bg-[color-mix(in_oklch,var(--nci-color-accent)_7%,var(--nci-color-surface))]"
+      : "border-primary/12 bg-[color-mix(in_oklch,var(--nci-color-primary)_7%,var(--nci-color-surface))]";
+  const patternInk = surfaceTint === "accent" ? "text-accent" : "text-primary";
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[1.75rem] border border-primary/12 p-6 sm:p-8 lg:p-10",
-        "bg-[color-mix(in_oklch,var(--nci-color-primary)_7%,var(--nci-color-surface))]",
+        "relative overflow-hidden rounded-[1.75rem] border p-6 sm:p-8 lg:p-10",
+        tintSurface,
         className,
       )}
     >
       <svg
-        className="pointer-events-none absolute inset-0 text-primary"
+        className={cn("pointer-events-none absolute inset-0", patternInk)}
         style={{ opacity: 0.1 }}
         aria-hidden
       >

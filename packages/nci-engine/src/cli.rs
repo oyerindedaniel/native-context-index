@@ -758,6 +758,144 @@ fn emit_error(fmt: OutputFormat, msg: &str) -> Result<(), String> {
     }
 }
 
+/// How `query active-package` located installs under each `node_modules` root (see `resolve_active_package_candidates`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActivePackageResolutionMode {
+    /// Hoisted path only: `node_modules/<pkg>` or `node_modules/@scope/pkg` per root, in workspace order.
+    DirectInstallPath,
+    /// No hoisted match at any root; fell back to enumerating all top-level installs per root.
+    FullScanFallback,
+}
+
+fn active_package_resolution_label(mode: ActivePackageResolutionMode) -> &'static str {
+    match mode {
+        ActivePackageResolutionMode::DirectInstallPath => "directInstallPath",
+        ActivePackageResolutionMode::FullScanFallback => "fullScanFallback",
+    }
+}
+
+fn push_active_package_candidate_from_package_info(
+    package_name: &str,
+    indexed_versions: &HashSet<String>,
+    node_modules_root: &Path,
+    package_info: &nci_engine::types::PackageInfo,
+    seen_package_dirs: &mut HashSet<PathBuf>,
+    candidates: &mut Vec<ActivePackageCandidate>,
+) {
+    if package_info.name.as_ref() != package_name {
+        return;
+    }
+    let package_dir_path = PathBuf::from(package_info.dir.as_ref());
+    let canonical_package_dir =
+        fs::canonicalize(&package_dir_path).unwrap_or(package_dir_path.clone());
+    if !seen_package_dirs.insert(canonical_package_dir) {
+        return;
+    }
+    let package_version = package_info.version.to_string();
+    candidates.push(ActivePackageCandidate {
+        package_name: package_name.to_string(),
+        indexed: indexed_versions.contains(package_version.as_str()),
+        package_version,
+        node_modules_root: display_path(node_modules_root),
+        package_dir: display_path(&package_dir_path),
+    });
+}
+
+fn resolve_active_package_candidates(
+    package_name: &str,
+    node_modules_roots: &[PathBuf],
+    indexed_versions: &HashSet<String>,
+) -> Result<(Vec<ActivePackageCandidate>, ActivePackageResolutionMode), String> {
+    let mut seen_package_dirs: HashSet<PathBuf> = HashSet::new();
+    let mut candidates: Vec<ActivePackageCandidate> = Vec::new();
+
+    for node_modules_root in node_modules_roots {
+        match scanner::try_read_installed_package_named(node_modules_root, package_name) {
+            Ok(Some(info)) => {
+                push_active_package_candidate_from_package_info(
+                    package_name,
+                    indexed_versions,
+                    node_modules_root,
+                    &info,
+                    &mut seen_package_dirs,
+                    &mut candidates,
+                );
+            }
+            Ok(None) => {}
+            Err(scanner::ScanError::NotFound { .. }) => {}
+            Err(scan_error) => {
+                return Err(format!(
+                    "scan {}: {scan_error}",
+                    node_modules_root.display()
+                ));
+            }
+        }
+    }
+
+    let mode = if !candidates.is_empty() {
+        ActivePackageResolutionMode::DirectInstallPath
+    } else {
+        for node_modules_root in node_modules_roots {
+            let scanned_packages =
+                scanner::scan_packages(node_modules_root).map_err(|scan_error| {
+                    format!("scan {}: {scan_error}", node_modules_root.display())
+                })?;
+            for package_info in scanned_packages {
+                push_active_package_candidate_from_package_info(
+                    package_name,
+                    indexed_versions,
+                    node_modules_root,
+                    &package_info,
+                    &mut seen_package_dirs,
+                    &mut candidates,
+                );
+            }
+        }
+        ActivePackageResolutionMode::FullScanFallback
+    };
+
+    Ok((candidates, mode))
+}
+
+fn query_meta_merge(query: &'static str, extra: serde_json::Value) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    map.insert(
+        "envelopeVersion".into(),
+        serde_json::Value::Number(serde_json::Number::from(1i64)),
+    );
+    map.insert("query".into(), serde_json::Value::String(query.to_string()));
+    if let serde_json::Value::Object(extra_obj) = extra {
+        map.extend(extra_obj);
+    }
+    serde_json::Value::Object(map)
+}
+
+fn print_query_json_success(
+    query: &'static str,
+    data: serde_json::Value,
+    meta_extra: serde_json::Value,
+) -> Result<(), String> {
+    print_json(&serde_json::json!({
+        "ok": true,
+        "data": data,
+        "meta": query_meta_merge(query, meta_extra),
+    }))
+}
+
+fn print_query_json_success_with_hint(
+    query: &'static str,
+    data: serde_json::Value,
+    meta_extra: serde_json::Value,
+    hint: &str,
+) -> Result<(), String> {
+    print_json(&serde_json::json!({
+        "ok": true,
+        "data": data,
+        "meta": query_meta_merge(query, meta_extra),
+        "hint": hint,
+    }))
+}
+
 fn display_path(path: &Path) -> String {
     let raw = path.to_string_lossy();
     raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_string()
@@ -950,7 +1088,7 @@ fn run_init(defaults: bool, database_cli: Option<PathBuf>) -> Result<(), String>
     if should_print_banner(OutputFormat::Plain, Some(&file_cfg))? {
         print_banner();
     }
-    emit_ui_line_stdout(ProgressTone::Done, "init", "initialization complete");
+    emit_ui_line_stdout(ProgressTone::Done, "init", "complete");
     println!("Database: {}", display_path(&db_path));
     println!("Config: {}", display_path(&written_config_path));
     emit_ui_line_stdout(
@@ -1580,41 +1718,6 @@ fn scan_all_packages_across_roots(
     Ok(pipeline::dedupe_packages_by_canonical_dir(all_packages))
 }
 
-fn resolve_active_package_candidates(
-    package_name: &str,
-    node_modules_roots: &[PathBuf],
-    indexed_versions: &HashSet<String>,
-) -> Result<Vec<ActivePackageCandidate>, String> {
-    let mut seen_package_dirs: HashSet<PathBuf> = HashSet::new();
-    let mut candidates: Vec<ActivePackageCandidate> = Vec::new();
-
-    for node_modules_root in node_modules_roots {
-        let scanned_packages = scanner::scan_packages(node_modules_root)
-            .map_err(|scan_error| format!("scan {}: {scan_error}", node_modules_root.display()))?;
-        for package_info in scanned_packages {
-            if package_info.name.as_ref() != package_name {
-                continue;
-            }
-            let package_dir_path = PathBuf::from(package_info.dir.as_ref());
-            let canonical_package_dir =
-                fs::canonicalize(&package_dir_path).unwrap_or(package_dir_path.clone());
-            if !seen_package_dirs.insert(canonical_package_dir) {
-                continue;
-            }
-            let package_version = package_info.version.to_string();
-            candidates.push(ActivePackageCandidate {
-                package_name: package_name.to_string(),
-                indexed: indexed_versions.contains(package_version.as_str()),
-                package_version,
-                node_modules_root: display_path(node_modules_root),
-                package_dir: display_path(&package_dir_path),
-            });
-        }
-    }
-
-    Ok(candidates)
-}
-
 fn build_index_options(
     cli: &Cli,
     file: Option<&NciConfigFile>,
@@ -2059,8 +2162,16 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     print_symbol_search_hits_plain(&search_hits);
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(
-                        &serde_json::json!({ "ok": true, "data": { "symbols": search_hits } }),
+                    let returned = search_hits.len();
+                    let truncated = returned >= *limit;
+                    print_query_json_success(
+                        "find",
+                        serde_json::json!({ "symbols": search_hits }),
+                        serde_json::json!({
+                            "limit": limit,
+                            "truncated": truncated,
+                            "returned": returned,
+                        }),
                     )?;
                 }
             }
@@ -2100,8 +2211,16 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(
-                        &serde_json::json!({ "ok": true, "data": { "symbols": search_hits } }),
+                    let returned = search_hits.len();
+                    let truncated = returned >= *limit;
+                    print_query_json_success(
+                        "symbol",
+                        serde_json::json!({ "symbols": search_hits }),
+                        serde_json::json!({
+                            "limit": limit,
+                            "truncated": truncated,
+                            "returned": returned,
+                        }),
                     )?;
                 }
             }
@@ -2123,14 +2242,17 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     if miss {
-                        print_json(&serde_json::json!({
-                            "ok": true,
-                            "data": { "symbol": serde_json::Value::Null },
-                            "hint": hint_text,
-                        }))?;
+                        print_query_json_success_with_hint(
+                            "show",
+                            serde_json::json!({ "symbol": serde_json::Value::Null }),
+                            serde_json::json!({ "found": false }),
+                            &hint_text,
+                        )?;
                     } else {
-                        print_json(
-                            &serde_json::json!({ "ok": true, "data": { "symbol": search_hit } }),
+                        print_query_json_success(
+                            "show",
+                            serde_json::json!({ "symbol": search_hit }),
+                            serde_json::json!({ "found": true }),
                         )?;
                     }
                 }
@@ -2162,14 +2284,21 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     if miss {
-                        print_json(&serde_json::json!({
-                            "ok": true,
-                            "data": { "symbols": siblings },
-                            "hint": hint_text,
-                        }))?;
+                        print_query_json_success_with_hint(
+                            "overloads",
+                            serde_json::json!({ "symbols": siblings }),
+                            serde_json::json!({ "found": false, "returned": 0 }),
+                            &hint_text,
+                        )?;
                     } else {
-                        print_json(
-                            &serde_json::json!({ "ok": true, "data": { "symbols": siblings } }),
+                        let returned = siblings.len();
+                        print_query_json_success(
+                            "overloads",
+                            serde_json::json!({ "symbols": siblings }),
+                            serde_json::json!({
+                                "found": true,
+                                "returned": returned,
+                            }),
                         )?;
                     }
                 }
@@ -2207,16 +2336,20 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                 },
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     if miss {
-                        print_json(&serde_json::json!({
-                            "ok": true,
-                            "data": { "snippet": serde_json::Value::Null },
-                            "hint": hint_text,
-                        }))?;
+                        print_query_json_success_with_hint(
+                            "snippet",
+                            serde_json::json!({ "snippet": serde_json::Value::Null }),
+                            serde_json::json!({ "found": false }),
+                            &hint_text,
+                        )?;
                     } else {
-                        print_json(&serde_json::json!({
-                            "ok": true,
-                            "data": { "snippet": snippet }
-                        }))?;
+                        print_query_json_success(
+                            "snippet",
+                            serde_json::json!({
+                                "snippet": snippet
+                            }),
+                            serde_json::json!({ "found": true }),
+                        )?;
                     }
                 }
             }
@@ -2243,7 +2376,12 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             serde_json::json!({ "name": pkg_name, "version": pkg_version })
                         })
                         .collect();
-                    print_json(&serde_json::json!({ "ok": true, "data": { "packages": list } }))?;
+                    let total = list.len();
+                    print_query_json_success(
+                        "packages",
+                        serde_json::json!({ "packages": list }),
+                        serde_json::json!({ "returned": total }),
+                    )?;
                 }
             }
             CliExit::Success
@@ -2272,10 +2410,12 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({
-                        "ok": true,
-                        "data": { "name": name, "versions": versions }
-                    }))?;
+                    let returned = versions.len();
+                    print_query_json_success(
+                        "package-versions",
+                        serde_json::json!({ "name": name, "versions": versions }),
+                        serde_json::json!({ "returned": returned }),
+                    )?;
                 }
             }
             CliExit::Success
@@ -2307,14 +2447,16 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({
-                        "ok": true,
-                        "data": {
+                    let returned = dependency_names.len();
+                    print_query_json_success(
+                        "package-deps",
+                        serde_json::json!({
                             "name": name,
                             "version": version,
                             "dependencies": dependency_names,
-                        }
-                    }))?;
+                        }),
+                        serde_json::json!({ "returned": returned }),
+                    )?;
                 }
             }
             CliExit::Success
@@ -2330,8 +2472,11 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(
-                        &serde_json::json!({ "ok": true, "data": { "source_packages": source_packages } }),
+                    let returned = source_packages.len();
+                    print_query_json_success(
+                        "source-packages",
+                        serde_json::json!({ "source_packages": source_packages }),
+                        serde_json::json!({ "returned": returned }),
                     )?;
                 }
             }
@@ -2365,7 +2510,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                 .map_err(|err| err.to_string())?
                 .into_iter()
                 .collect();
-            let candidates =
+            let (candidates, resolution_mode) =
                 resolve_active_package_candidates(name, &node_modules_roots, &indexed_versions)?;
             let selected = candidates.first().cloned();
             let alternates = if candidates.len() > 1 {
@@ -2415,16 +2560,23 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({
-                        "ok": true,
-                        "data": {
+                    print_query_json_success(
+                        "active-package",
+                        serde_json::json!({
                             "name": name,
                             "packageManager": package_manager,
                             "selected": selected,
                             "alternates": alternates,
                             "count": candidates.len(),
-                        }
-                    }))?;
+                        }),
+                        serde_json::json!({
+                            "rootsChecked": node_modules_roots.len(),
+                            "candidatesTotal": candidates.len(),
+                            "activePackageResolution": active_package_resolution_label(resolution_mode),
+                            "alternatesTruncated": false,
+                            "alternatesOmitted": 0,
+                        }),
+                    )?;
                 }
             }
             CliExit::Success
@@ -2456,17 +2608,26 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
-                    print_json(&serde_json::json!({
-                        "ok": true,
-                        "data": {
+                    let returned = symbols.len();
+                    let has_more = *offset + returned < total_symbols;
+                    print_query_json_success(
+                        "symbols",
+                        serde_json::json!({
                             "name": name,
                             "version": version,
                             "total": total_symbols,
                             "offset": offset,
                             "limit": limit,
                             "symbols": symbols,
-                        }
-                    }))?;
+                        }),
+                        serde_json::json!({
+                            "limit": limit,
+                            "offset": offset,
+                            "total": total_symbols,
+                            "returned": returned,
+                            "hasMore": has_more,
+                        }),
+                    )?;
                 }
             }
             CliExit::Success
@@ -2516,8 +2677,9 @@ struct EvidenceQueryRequest<'a> {
 }
 
 /// Sentinel marker placed as the trailing element of `data.symbols` when the combined
-/// search produced more hits than `--limit`. The agent / consumer detects truncation by
-/// looking for `kind_name == "<truncated>"` in the last hit — no new envelope key.
+/// search produced more hits than `--limit`. Consumers may also read `meta.truncated` on
+/// JSON envelopes. The agent / consumer detects truncation by looking for
+/// `kind_name == "<truncated>"` in the last hit.
 const EVIDENCE_TRUNCATED_MARKER: &str = "<truncated>";
 
 fn build_evidence_filters(request: &EvidenceQueryRequest<'_>) -> SymbolSearchFilters {
@@ -2729,9 +2891,14 @@ fn run_query_evidence(
                     )
                 })
             }));
-            print_json(&serde_json::json!({
-                "ok": true,
-                "data": {
+            let unique_hits_returned = if truncated {
+                combined_hits.len().saturating_sub(1)
+            } else {
+                combined_hits.len()
+            };
+            print_query_json_success(
+                "evidence",
+                serde_json::json!({
                     "package": {
                         "name": request.package_name,
                         "version": request.package_version,
@@ -2742,8 +2909,16 @@ fn run_query_evidence(
                     "emptyAnchors": empty_anchors,
                     "symbols": combined_hits,
                     "snippets": snippets_json,
-                }
-            }))?;
+                }),
+                serde_json::json!({
+                    "limit": request.limit,
+                    "snippetLimitApplied": snippet_cap,
+                    "snippetLimitRequested": request.snippet_limit,
+                    "truncated": truncated,
+                    "uniqueHitsReturned": unique_hits_returned,
+                    "uniqueHitsBeforeDedupeCap": total_unique_hits,
+                }),
+            )?;
         }
     }
     Ok(())

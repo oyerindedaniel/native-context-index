@@ -50,7 +50,7 @@ export function DocsNavGroup({ title, iconName, children }: DocsNavGroupProps) {
       <div className="flex items-center gap-2 px-3">
         {Icon ? (
           <Icon
-            className="h-3.5 w-3.5 -translate-y-px text-muted/70"
+            className="size-3.5 -translate-y-px text-muted/70"
             aria-hidden="true"
           />
         ) : null}

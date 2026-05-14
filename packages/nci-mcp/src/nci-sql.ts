@@ -2,8 +2,9 @@ import { z } from "zod";
 
 export const nciSqlDescription =
   "Run read-only SQL against the NCI SQLite database (CLI equivalent: `nci sql`). " +
-  'Default `format=json` returns a raw JSON array of row objects (not the `{"ok":...}` envelope used by `nci_query`). ' +
-  "Use `schema: true` to print the full table DDL instead of running SQL.";
+  'Default `format=json` returns a raw JSON array of row objects (not the `{"ok":...,"meta":...}` envelope used by `nci_query`). ' +
+  "Use `schema: true` to print the full table DDL instead of running SQL. " +
+  "When `nci_sql` omits `max_rows`, MCP passes **--max-rows 500** by default so wide SELECTs fail fast instead of streaming huge arrays.";
 
 export const nciSqlInputSchema = z
   .object({
@@ -36,8 +37,9 @@ export const nciSqlInputSchema = z
       .int()
       .positive()
       .optional()
+      .default(500)
       .describe(
-        "Hard cap on rows (CLI: `--max-rows`). The command fails if the query would return more than this. Applies only to `nci sql`, NOT to `nci_query`.",
+        "Hard cap on rows (CLI: `--max-rows`). The command fails if the query would return more than this. Applies only to `nci sql`, NOT to `nci_query`. MCP defaults to 500 when omitted so accidental unbounded SELECTs are rare.",
       ),
     format: z
       .enum(["json", "jsonl", "plain"])
@@ -72,7 +74,9 @@ export function buildSqlArgv(input: NciSqlInput): string[] {
   if (input.schema) {
     args.push("--schema");
   }
-  if (input.max_rows != null) {
+  // `nci sql --schema` prints DDL and exits before any SELECT; `--max-rows` is ignored there,
+  // so omit it to keep argv aligned with what the CLI actually uses.
+  if (!input.schema) {
     args.push("--max-rows", String(input.max_rows));
   }
   if (input.command != null && input.command.length > 0) {

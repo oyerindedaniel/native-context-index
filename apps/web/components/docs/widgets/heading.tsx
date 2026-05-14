@@ -107,11 +107,11 @@ export function Heading({
         <span
           aria-hidden="true"
           className={cn(
-            "ml-2 inline-flex h-6 w-6 shrink-0 -translate-y-px items-center justify-center rounded-md text-muted opacity-0 transition-[opacity,color] duration-150 ease-out group-hover:text-primary group-hover:opacity-100",
+            "ml-2 inline-flex size-6 shrink-0 -translate-y-px items-center justify-center rounded-md text-muted opacity-0 transition-[opacity,color] duration-150 ease-out group-hover:text-primary group-hover:opacity-100",
             copied && "text-accent opacity-100 group-hover:text-accent",
           )}
         >
-          <CopyStatusIcon copied={copied} idle={LinkIcon} className="h-4 w-4" />
+          <CopyStatusIcon copied={copied} idle={LinkIcon} className="size-4" />
         </span>
       ) : null}
     </>

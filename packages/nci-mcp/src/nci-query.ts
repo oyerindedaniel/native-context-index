@@ -93,7 +93,10 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Max hits to return (CLI: `--limit`; default 20)."),
+        .default(20)
+        .describe(
+          "Max hits to return (CLI: `--limit`; MCP defaults to 20 when omitted).",
+        ),
       ...symbolFilterShape,
     }),
     z.object({
@@ -107,7 +110,10 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Max hits to return (CLI: `--limit`; default 20)."),
+        .default(20)
+        .describe(
+          "Max hits to return (CLI: `--limit`; MCP defaults to 20 when omitted).",
+        ),
       ...symbolFilterShape,
     }),
     z.object({
@@ -201,19 +207,25 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
-        .describe("Page size (CLI: `--limit`; default 100)."),
+        .default(100)
+        .describe(
+          "Page size (CLI: `--limit`; MCP defaults to 100 when omitted).",
+        ),
       offset: z
         .number()
         .int()
         .min(0)
         .optional()
-        .describe("Skip this many rows before returning (CLI: `--offset`)."),
+        .default(0)
+        .describe(
+          "Skip this many rows before returning (CLI: `--offset`; MCP defaults to 0).",
+        ),
     }),
     z.object({
       subcommand: z
         .literal("evidence")
         .describe(
-          "Bundled evidence in ONE call: exact-name hits + FTS phrase fallback + batched signature/JSDoc snippets, all from a single SQLite open. Replaces chained `find` + `symbol` + per-id `snippet` for 'find these symbols and cite them'. JSON envelope: `data.symbols` (deduped hits, last entry may be a `<truncated>` sentinel when more existed than `--limit`) and `data.snippets` keyed by `symbols.id`.",
+          "Bundled evidence in ONE call: exact-name hits + FTS phrase fallback + batched signature/JSDoc snippets, all from a single SQLite open. Replaces chained `find` + `symbol` + per-id `snippet` for 'find these symbols and cite them'. JSON: `data.symbols` (deduped hits, last entry may be `<truncated>` sentinel) and `data.snippets` keyed by `symbols.id`; **`meta.truncated`** mirrors the sentinel for structured clients.",
         ),
       database: databaseField,
       package_name: z
@@ -262,8 +274,9 @@ export const nciQueryInputSchema = z.preprocess(
         .int()
         .positive()
         .optional()
+        .default(10)
         .describe(
-          "Cap on hit rows in `data.symbols` after dedupe across all anchors (CLI: `-n` / `--limit`; default 10).",
+          "Cap on hit rows in `data.symbols` after dedupe across all anchors (CLI: `-n` / `--limit`; MCP defaults to 10 when omitted).",
         ),
       snippet_limit: z
         .number()
@@ -281,9 +294,9 @@ export type NciQueryInput = z.infer<typeof nciQueryInputSchema>;
 
 export const nciQueryDescription =
   "Query the NCI index for symbols, packages, and source packages (CLI equivalent: `nci query <subcommand>`). " +
-  "Subcommands: evidence (bundled exact + FTS hits + batched snippets in ONE call — preferred for 'find these symbols and cite them'), find (FTS), symbol (exact), show, snippet, overloads, packages, package_versions, package_deps, source_packages, active_package, symbols (paginated). " +
-  'JSON output uses the CLI envelope: `{"ok":true,"data":...}` on success, `{"ok":false,...}` on error. ' +
-  "Use `nci_sql` for relational joins. Use `--limit` to cap result counts (NOT `max_rows`).";
+  "Subcommands: evidence (bundled exact + FTS hits + batched snippets — preferred for 'find these symbols and cite them'), find (FTS), symbol (exact), show, snippet, overloads, packages, package_versions, package_deps, source_packages, active_package, symbols (paginated). " +
+  'JSON output uses `{"ok":true,"data":...,"meta":...}` on success: **`meta`** always includes **`envelopeVersion`** and **`query`**, plus limits/truncation hints (see CLI). ' +
+  "Use `nci_sql` for relational joins. `nci sql` uses `--max-rows` (not `--limit`).";
 
 type SymbolFilterInput = {
   package_name?: string;
@@ -329,18 +342,14 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
   switch (input.subcommand) {
     case "find": {
       argv.push("find");
-      if (input.limit != null) {
-        argv.push("--limit", String(input.limit));
-      }
+      argv.push("--limit", String(input.limit));
       appendSymbolFilters(argv, input);
       argv.push(input.fts_query);
       return argv;
     }
     case "symbol": {
       argv.push("symbol", input.name);
-      if (input.limit != null) {
-        argv.push("--limit", String(input.limit));
-      }
+      argv.push("--limit", String(input.limit));
       appendSymbolFilters(argv, input);
       return argv;
     }
@@ -370,10 +379,8 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
       return argv;
     case "symbols": {
       argv.push("symbols", input.name, input.version);
-      if (input.limit != null) {
-        argv.push("--limit", String(input.limit));
-      }
-      if (input.offset != null && input.offset > 0) {
+      argv.push("--limit", String(input.limit));
+      if (input.offset > 0) {
         argv.push("--offset", String(input.offset));
       }
       return argv;
@@ -402,9 +409,7 @@ export function buildQueryArgv(input: NciQueryInput): string[] {
       if (input.public_only) {
         argv.push("--public-only");
       }
-      if (input.limit != null) {
-        argv.push("--limit", String(input.limit));
-      }
+      argv.push("--limit", String(input.limit));
       if (input.snippet_limit != null) {
         argv.push("--snippet-limit", String(input.snippet_limit));
       }

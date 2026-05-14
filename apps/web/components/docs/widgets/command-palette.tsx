@@ -297,7 +297,7 @@ function CommandPaletteOverlay({
         transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
           "flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-[0_8px_24px_-8px_#00000026,0_24px_48px_-16px_#0000002a]",
-          "max-md:max-w-none max-md:max-h-[100dvh] max-md:min-h-0 max-md:flex-1 max-md:rounded-none max-md:border-x-0 max-md:shadow-none",
+          "max-md:max-w-none max-md:max-h-dvh max-md:min-h-0 max-md:flex-1 max-md:rounded-none max-md:border-x-0 max-md:shadow-none",
           "md:max-h-[min(80vh,calc(100dvh-5rem))]",
         )}
         data-command-palette="dialog"
@@ -394,9 +394,9 @@ function CommandPaletteInput() {
   };
 
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-4">
+    <div className="flex shrink-0 items-center gap-3 border-b border-border p-4">
       <MagnifyingGlassIcon
-        className="h-4 w-4 shrink-0 text-muted/70"
+        className="size-4 shrink-0 text-muted/70"
         aria-hidden="true"
       />
       <input
@@ -415,9 +415,9 @@ function CommandPaletteInput() {
           type="button"
           onClick={() => setQuery("")}
           aria-label="Clear search"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted/70 transition-colors hover:bg-surface-hover hover:text-ink"
+          className="inline-flex size-6 items-center justify-center rounded-full text-muted/70 transition-colors hover:bg-surface-hover hover:text-ink"
         >
-          <XMarkIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <XMarkIcon className="size-3.5" aria-hidden="true" />
         </button>
       ) : null}
       <button
@@ -462,7 +462,7 @@ function CommandPalettePillRow() {
             )}
           >
             {PillIcon ? (
-              <PillIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              <PillIcon className="size-3.5" aria-hidden="true" />
             ) : null}
             <span>{pill.label}</span>
           </button>
@@ -530,7 +530,7 @@ function CommandPaletteResults() {
           <section key={groupId} className="py-2 first:pt-0">
             <header className="flex items-center gap-2 pb-1.5 text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/75">
               {GroupIcon ? (
-                <GroupIcon className="h-3 w-3" aria-hidden="true" />
+                <GroupIcon className="size-3" aria-hidden="true" />
               ) : null}
               {groupTitle}
             </header>
@@ -575,7 +575,7 @@ function CommandPaletteResults() {
                       </div>
                       {isActive ? (
                         <ArrowUturnLeftIcon
-                          className="h-3.5 w-3.5 -scale-x-100 shrink-0 text-primary"
+                          className="size-3.5 -scale-x-100 shrink-0 text-primary"
                           aria-hidden="true"
                         />
                       ) : null}

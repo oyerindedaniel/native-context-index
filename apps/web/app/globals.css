@@ -7,6 +7,9 @@
   --nci-color-dark: #4429c6;
   --nci-color-light: #7a63f5;
   --nci-color-accent: #027582;
+  /* CLI stderr/stdout tone colors (see packages/nci-engine/src/cli/style.rs) */
+  --nci-color-cli-warn: #e8b93a;
+  --nci-color-cli-error: #e05a5a;
 
   --nci-color-ink: #111318;
   --nci-color-muted: #5f6675;
@@ -49,6 +52,8 @@
   --color-dark: var(--nci-color-dark);
   --color-light: var(--nci-color-light);
   --color-accent: var(--nci-color-accent);
+  --color-cli-warn: var(--nci-color-cli-warn);
+  --color-cli-error: var(--nci-color-cli-error);
 
   --color-ink: var(--nci-color-ink);
   --color-muted: var(--nci-color-muted);
@@ -247,4 +252,17 @@
     );
     background-size: 17px 17px;
   }
+}
+
+/* Unlayered (wins over `@layer base` global `::-webkit-scrollbar`): home CLI cinema
+   inner Y scroller — WebKit `width:0` collapses vertical bar, `height:10px` keeps X.
+   Firefox: `scrollbar-width:none` (no per-axis; this port is overflow-y–driven). */
+.nci-cli-cinema-scroll-y {
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.nci-cli-cinema-scroll-y::-webkit-scrollbar {
+  width: 0 !important;
+  height: 10px !important;
 }

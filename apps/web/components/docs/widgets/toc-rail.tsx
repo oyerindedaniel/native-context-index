@@ -123,7 +123,7 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
     >
       <p className="mb-3 flex items-center gap-1.5 px-3 text-[0.68rem] font-medium uppercase tracking-[0.11em] text-muted/70">
         <ListBulletIcon
-          className="h-3.5 w-3.5 -translate-y-px"
+          className="size-3.5 -translate-y-px"
           aria-hidden="true"
         />
         <span>On this page</span>
@@ -154,7 +154,7 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
                       mass: 0.6,
                     }}
                     className={cn(
-                      "absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary",
+                      "absolute top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary",
                       item.level === 3 ? "left-7" : "left-2",
                     )}
                     aria-hidden="true"

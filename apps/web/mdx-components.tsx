@@ -71,7 +71,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
             <span className="inline-flex items-baseline gap-1">
               {children}
               <ArrowTopRightOnSquareIcon
-                className="h-3 w-3 self-center text-primary/70"
+                className="size-3 self-center text-primary/70"
                 aria-hidden="true"
               />
             </span>

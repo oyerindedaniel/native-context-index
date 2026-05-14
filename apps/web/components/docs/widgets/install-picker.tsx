@@ -226,7 +226,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                 <PackageManagerLogo id={active.id} variant="inverse" />
                 <ChevronDownIcon
                   className={cn(
-                    "h-3.5 w-3.5 text-white/85 transition-transform duration-150 ease-out",
+                    "size-3.5 text-white/85 transition-transform duration-150 ease-out",
                     open && "rotate-180",
                   )}
                   aria-hidden="true"
@@ -292,7 +292,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                           </span>
                           {isActive ? (
                             <CheckIcon
-                              className="ml-auto h-4 w-4 text-primary"
+                              className="ml-auto size-4 text-primary"
                               aria-hidden="true"
                             />
                           ) : null}
@@ -323,7 +323,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
             <CopyStatusIcon
               copied={copied}
               idle={ClipboardIcon}
-              className="h-4 w-4"
+              className="size-4"
             />
           </SplitButton.IconTrigger>
         </SplitButton.Root>
@@ -361,10 +361,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
             );
           })}
         </div>
-        <div
-          role="tabpanel"
-          className="flex flex-row items-start gap-3 px-5 py-5"
-        >
+        <div role="tabpanel" className="flex flex-row items-start gap-3 p-5">
           <div className="flex min-h-9 min-w-0 flex-1 items-center font-mono text-sm leading-relaxed tracking-tight-p text-ink">
             <span className="break-all">
               <span className="select-none text-muted">$ </span>
@@ -383,7 +380,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
             <CopyStatusIcon
               copied={copied}
               idle={ClipboardIcon}
-              className="h-4 w-4"
+              className="size-4"
             />
           </button>
         </div>

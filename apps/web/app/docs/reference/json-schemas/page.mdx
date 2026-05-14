@@ -14,14 +14,16 @@ import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell
 
 ```typescript
 type QueryEnvelope<TData> =
-  | { ok: true;  data: TData }
+  | { ok: true; data: TData; meta: QueryMeta }
   | { ok: false; error: string };
 ```
 
-- `ok: true` — non-empty `data` payload below. Exit code `0`.
+`QueryMeta` always includes `envelopeVersion` (currently `1`) and `query` (the subcommand name). Other keys are subcommand-specific — for example `active_package` adds `activePackageResolution`, and `evidence` adds limit / truncation fields. Treat `nci query … --format json` output as the source of truth.
+
+- `ok: true` — non-empty `data` payload below, plus `meta` as above. Exit code `0`.
 - `ok: false` — non-zero exit code. `error` is one human-readable string (stderr usually repeats the same text for plain mode).
 
-Some subcommands return `data` shapes whose &ldquo;not found&rdquo; case is `null`-valued rather than the failure envelope. `query show`, `query snippet`, and `query overloads` exit with `EXIT_QUERY_NOT_FOUND = 2` and return `{ ok: true, data: { symbol: null } }` (or the equivalent for `snippet` / `symbols: []` for `overloads`). Read [Exit codes](/docs/reference/exit-codes) for the matrix.
+Some subcommands return `data` shapes whose &ldquo;not found&rdquo; case is `null`-valued rather than the failure envelope. `query show`, `query snippet`, and `query overloads` exit with `EXIT_QUERY_NOT_FOUND = 2` and return `{ ok: true, data: { symbol: null } }` (or the equivalent for `snippet` / `symbols: []` for `overloads`). Those responses may also include a top-level string `hint` alongside `data` and `meta`. Read [Exit codes](/docs/reference/exit-codes) for the matrix.
 
 ## `data` shapes by subcommand
 
@@ -89,7 +91,7 @@ Some subcommands return `data` shapes whose &ldquo;not found&rdquo; case is `nul
 <CalloutRoot variant="info">
   <CalloutTitle>`evidence` truncation marker.</CalloutTitle>
   <CalloutBody>
-    When `query evidence` would return more hits than `--limit`, the **last** entry of `data.symbols` is a sentinel hit whose `id`, `name`, and `kind_name` are the literal string <code>&lt;truncated&gt;</code>. There is no separate envelope key — the marker is in-band so the snippet keys stay aligned with the hit list.
+    When `query evidence` would return more hits than `--limit`, the **last** entry of `data.symbols` is a sentinel hit whose `id`, `name`, and `kind_name` are the literal string <code>&lt;truncated&gt;</code>. The marker stays in-band so snippet keys stay aligned with the hit list; on `--format json`, <code>meta.truncated</code> (and related caps) duplicates the same signal for structured clients.
   </CalloutBody>
 </CalloutRoot>
 

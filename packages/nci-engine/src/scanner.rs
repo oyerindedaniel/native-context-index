@@ -116,6 +116,35 @@ pub fn find_package_in_node_modules(
     Ok(info)
 }
 
+/// Reads only the hoisted install path `node_modules/<name>` or `node_modules/@scope/pkg`; returns `None` if that directory is missing or the `package.json` name does not match.
+pub fn try_read_installed_package_named(
+    node_modules_path: &Path,
+    package_name: &str,
+) -> Result<Option<PackageInfo>, ScanError> {
+    if !node_modules_path.exists() {
+        return Err(ScanError::NotFound {
+            path: node_modules_path.to_path_buf(),
+        });
+    }
+    let Some(install_path) = package_install_subpath(node_modules_path, package_name) else {
+        return Ok(None);
+    };
+    let resolved_dir = match fs::canonicalize(&install_path) {
+        Ok(dir) => dir,
+        Err(_) => return Ok(None),
+    };
+    if !resolved_dir.is_dir() {
+        return Ok(None);
+    }
+    let Some(info) = read_package_info(&resolved_dir, package_name) else {
+        return Ok(None);
+    };
+    if info.name.as_ref() != package_name {
+        return Ok(None);
+    }
+    Ok(Some(info))
+}
+
 fn scan_scoped_packages(
     node_modules_path: &Path,
     scope_name: &str,
@@ -294,6 +323,26 @@ mod tests {
         .unwrap();
         assert_eq!(info.name.as_ref(), "@acme/self-stub");
         assert!(info.is_scoped);
+    }
+
+    #[test]
+    fn try_read_installed_package_named_finds_hoisted_package() {
+        let node_modules = fixture_dir("dependency-stub-packages").join("node_modules");
+        let info = try_read_installed_package_named(&node_modules, "other-dep")
+            .unwrap()
+            .expect("other-dep is hoisted under this fixture node_modules");
+        assert_eq!(info.name.as_ref(), "other-dep");
+        assert_eq!(info.version.as_ref(), "2.0.0");
+    }
+
+    #[test]
+    fn try_read_installed_package_named_returns_none_when_path_missing() {
+        let node_modules = fixture_dir("dependency-stub-packages").join("node_modules");
+        assert!(
+            try_read_installed_package_named(&node_modules, "definitely-not-installed")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

@@ -1,7 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { nciQueryInputSchema } from "../src/nci-query";
+import { buildQueryArgv, nciQueryInputSchema } from "../src/nci-query";
 
 const stableId = "pkg@1.0.0::SomeSymbol";
+
+describe("buildQueryArgv MCP defaults", () => {
+  it("emits explicit --limit for find when the caller omits limit", () => {
+    const parsed = nciQueryInputSchema.parse({
+      subcommand: "find",
+      fts_query: "foo",
+    });
+    expect(buildQueryArgv(parsed)).toEqual([
+      "--format",
+      "json",
+      "query",
+      "find",
+      "--limit",
+      "20",
+      "foo",
+    ]);
+  });
+
+  it("emits explicit --limit and --offset defaults for symbols", () => {
+    const parsed = nciQueryInputSchema.parse({
+      subcommand: "symbols",
+      name: "motion",
+      version: "1.0.0",
+    });
+    expect(buildQueryArgv(parsed)).toEqual([
+      "--format",
+      "json",
+      "query",
+      "symbols",
+      "motion",
+      "1.0.0",
+      "--limit",
+      "100",
+    ]);
+  });
+});
 
 describe("nci-query id alias canonicalization", () => {
   it.each([

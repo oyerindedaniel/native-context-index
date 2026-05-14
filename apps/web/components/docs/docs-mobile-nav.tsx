@@ -304,7 +304,7 @@ function DrawerExternalLink({
       className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium text-ink/85 outline-none transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2"
     >
       {Icon ? (
-        <Icon className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+        <Icon className="size-4 shrink-0 text-accent" aria-hidden="true" />
       ) : null}
       <span className="truncate">{label}</span>
     </a>

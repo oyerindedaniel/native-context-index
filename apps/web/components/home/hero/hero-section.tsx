@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { motion } from "motion/react";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  SiteMarketingHeaderDesktop,
+  SiteMarketingHeaderMobileRow,
+} from "@/components/site/site-marketing-header";
 import { HeroCanvas } from "./hero-canvas";
 
 export function HeroSection() {
@@ -14,49 +14,10 @@ export function HeroSection() {
         <HeroCanvas />
       </div>
 
-      <header className="absolute inset-x-0 top-0 z-20 px-4 pt-4 sm:px-6 sm:pt-5">
-        <div className="mx-auto grid max-w-[1050px] grid-cols-[minmax(0,auto)_1fr_minmax(0,auto)] items-center gap-3 sm:gap-4">
-          <Link
-            href="/"
-            className="inline-flex shrink-0 items-center gap-3 opacity-90 transition-opacity hover:opacity-100 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            aria-label="Native Context Index home"
-          >
-            <Image
-              src="/nci-full-logo.svg"
-              alt=""
-              width={921}
-              height={346}
-              className="h-8 w-auto sm:h-9"
-              priority
-            />
-          </Link>
-
-          <nav
-            className="pointer-events-auto flex min-w-0 items-center justify-center gap-5 sm:gap-10"
-            aria-label="Primary"
-          >
-            <Link
-              href="/why-nci"
-              className="text-base font-semibold text-ink/75 transition-colors hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            >
-              Why NCI
-            </Link>
-            <Link
-              href="/docs"
-              className="text-base font-semibold text-ink/75 transition-colors hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-            >
-              Documentation
-            </Link>
-          </nav>
-
-          <div className="pointer-events-auto shrink-0 justify-self-end">
-            <Link
-              href="/docs/quickstart"
-              className={cn(buttonVariants({ variant: "primary", size: "sm" }))}
-            >
-              Get started
-            </Link>
-          </div>
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20">
+        <div className="pointer-events-auto mx-auto max-w-[1050px] px-4 sm:px-6">
+          <SiteMarketingHeaderMobileRow className="md:hidden" />
+          <SiteMarketingHeaderDesktop className="hidden md:grid" logoPriority />
         </div>
       </header>
 
@@ -80,7 +41,7 @@ export function HeroSection() {
               Native Context Index
             </span>
             <motion.h1
-              className="font-instrument-serif leading-[0.88] text-ink text-3xl lg:text-4xl"
+              className="font-sans text-2xl font-semibold leading-tight tracking-tight-sub text-ink sm:text-3xl lg:text-[2.125rem]"
               variants={{
                 hidden: { opacity: 0, y: 26, filter: "blur(10px)" },
                 visible: {

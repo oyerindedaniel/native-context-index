@@ -341,7 +341,7 @@ export function ConfigBuilderValidationBadge({
           className,
         )}
       >
-        <CheckBadgeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        <CheckBadgeIcon className="size-3.5" aria-hidden="true" />
         Valid
       </div>
     );
@@ -353,7 +353,7 @@ export function ConfigBuilderValidationBadge({
         className,
       )}
     >
-      <ExclamationTriangleIcon className="h-3.5 w-3.5" aria-hidden="true" />
+      <ExclamationTriangleIcon className="size-3.5" aria-hidden="true" />
       {errors.length} {errors.length === 1 ? "issue" : "issues"}
     </div>
   );
@@ -385,16 +385,16 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
             void copy(json);
           }}
           aria-label={copied ? "Copied" : "Copy config"}
-          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
+          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
         >
           <CopyStatusIcon
             copied={copied}
             idle={ClipboardIcon}
-            className="h-4 w-4"
+            className="size-4"
           />
         </button>
       </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
         <pre className="overflow-x-auto whitespace-pre font-mono text-[0.78rem] leading-relaxed text-white/90">
           {json}
         </pre>
@@ -406,7 +406,7 @@ export function ConfigBuilderPreview({ className }: { className?: string }) {
                 className="flex items-start gap-2"
               >
                 <ExclamationTriangleIcon
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  className="mt-0.5 size-3.5 shrink-0"
                   aria-hidden="true"
                 />
                 <span>

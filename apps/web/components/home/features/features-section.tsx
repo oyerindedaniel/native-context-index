@@ -5,10 +5,10 @@ export function FeaturesSection() {
     <section className="bg-surface py-24 sm:py-32">
       <div className="mx-auto max-w-[1050px] px-6">
         <div className="mb-16 max-w-2xl">
-          <h2 className="font-instrument-serif text-4xl font-normal text-ink sm:text-5xl">
+          <h2 className="font-sans text-2xl font-semibold tracking-tight-sub text-ink sm:text-3xl">
             Built for day-to-day engineering decisions
           </h2>
-          <p className="mt-6 text-lg text-muted tracking-tight-p">
+          <p className="mt-6 text-base sm:text-lg text-muted tracking-tight-p">
             Four practical workflows where NCI removes API guesswork and speeds
             up your development cycle.
           </p>

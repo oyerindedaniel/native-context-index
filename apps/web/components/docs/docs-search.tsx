@@ -43,7 +43,7 @@ export function DocsSearch() {
         )}
       >
         <MagnifyingGlassIcon
-          className="h-4 w-4 shrink-0 text-muted/65 transition-colors duration-150 ease-out group-hover:text-primary"
+          className="size-4 shrink-0 text-muted/65 transition-colors duration-150 ease-out group-hover:text-primary"
           aria-hidden="true"
         />
         <span className="hidden min-w-0 flex-1 truncate text-left text-sm tracking-tight-p sm:inline">

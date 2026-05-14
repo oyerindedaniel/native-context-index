@@ -27,6 +27,7 @@ export function useIntersectionObserverEffect(
   const handleIntersect = React.useEffectEvent(onIntersect);
   const thresholdKey = serializeThreshold(threshold);
 
+  /* eslint-disable react-hooks/exhaustive-deps -- `handleIntersect` is `useEffectEvent`; omit from deps */
   React.useEffect(() => {
     if (!effectIsEnabled) {
       return;
@@ -49,7 +50,8 @@ export function useIntersectionObserverEffect(
     );
     intersectionObserver.observe(elementNode);
     return () => intersectionObserver.disconnect();
-  }, [effectIsEnabled, elementRef, rootMargin, thresholdKey, handleIntersect]);
+  }, [effectIsEnabled, elementRef, rootMargin, thresholdKey, threshold]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 }
 
 /**
@@ -70,6 +72,8 @@ export function useIntersectionObserverTargetsEffect(
   const { rootMargin, threshold } = observerOptions;
   const thresholdKey = serializeThreshold(threshold);
 
+  /* eslint-disable react-hooks/exhaustive-deps -- `dependencyList` is the contract for
+   * `getTargets`/DOM deps; `handleTargetEntries` is `useEffectEvent`; spread deps are intentional. */
   React.useEffect(() => {
     if (!effectIsEnabled) {
       return;
@@ -96,7 +100,8 @@ export function useIntersectionObserverTargetsEffect(
     root,
     rootMargin,
     thresholdKey,
-    handleTargetEntries,
+    threshold,
     ...dependencyList,
   ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 }

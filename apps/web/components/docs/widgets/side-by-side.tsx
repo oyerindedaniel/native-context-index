@@ -103,7 +103,7 @@ export function SideBySidePanel({
           ) : null}
         </div>
       </header>
-      <div className="flex-1 px-4 py-4 text-sm leading-relaxed">{children}</div>
+      <div className="flex-1 p-4 text-sm leading-relaxed">{children}</div>
     </div>
   );
 }

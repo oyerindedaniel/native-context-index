@@ -1750,6 +1750,12 @@ fn query_active_package_prefers_root_node_modules_then_workspace_json() {
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
     let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["meta"]["envelopeVersion"], 1);
+    assert_eq!(parsed["meta"]["query"], "active-package");
+    assert_eq!(
+        parsed["meta"]["activePackageResolution"],
+        "directInstallPath"
+    );
     assert_eq!(parsed["data"]["packageManager"], "npm");
     let selected = &parsed["data"]["selected"];
     assert_eq!(selected["packageVersion"], "4.1.0");
@@ -1760,6 +1766,57 @@ fn query_active_package_prefers_root_node_modules_then_workspace_json() {
     assert_eq!(alternates.len(), 1);
     assert_eq!(alternates[0]["packageVersion"], "3.2.4");
     assert_eq!(alternates[0]["indexed"], true);
+}
+
+/// When the hoisted path `node_modules/<name>` is absent, resolution falls back to a full
+/// top-level scan so oddly named folders (still declaring the same npm `name`) remain discoverable.
+#[test]
+fn query_active_package_full_scan_fallback_finds_odd_top_level_folder_name() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("active-pkg-fallback.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::write(
+        proj.path().join("package-lock.json"),
+        r#"{"lockfileVersion":3}"#,
+    )
+    .unwrap();
+
+    let odd = proj.path().join("node_modules").join("motion-build");
+    write_minimal_pkg_at(&odd, "motion", "2.0.0");
+    seed_indexed_package_row(&db_path, "motion", "2.0.0");
+
+    let assert = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "active-package",
+            "motion",
+        ])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf8");
+    let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(
+        parsed["meta"]["activePackageResolution"],
+        "fullScanFallback"
+    );
+    assert_eq!(parsed["data"]["selected"]["packageVersion"], "2.0.0");
 }
 
 #[test]
@@ -1954,6 +2011,8 @@ fn query_snippet_unknown_stable_id_json_exit_2_hint_and_null_envelope() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["meta"]["envelopeVersion"], 1);
+    assert_eq!(parsed["meta"]["query"], "snippet");
     assert!(parsed["data"]["snippet"].is_null());
     assert!(parsed["hint"].as_str().unwrap().contains("query find"));
 }
@@ -1982,6 +2041,8 @@ fn query_show_unknown_stable_id_json_exit_2_hint_and_null_envelope() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["meta"]["envelopeVersion"], 1);
+    assert_eq!(parsed["meta"]["query"], "show");
     assert!(parsed["data"]["symbol"].is_null());
     assert!(parsed["hint"].as_str().unwrap().contains("query symbol"));
 }
@@ -2010,6 +2071,8 @@ fn query_overloads_unknown_stable_id_json_exit_2_hint_and_empty_symbols() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: Value = serde_json::from_str(stdout.trim()).expect("json");
     assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["meta"]["envelopeVersion"], 1);
+    assert_eq!(parsed["meta"]["query"], "overloads");
     assert_eq!(parsed["data"]["symbols"].as_array().unwrap().len(), 0);
     assert!(parsed["hint"].as_str().unwrap().contains("recover"));
 }

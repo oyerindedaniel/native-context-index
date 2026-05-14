@@ -119,7 +119,7 @@ export function PrimerView() {
               copied={copied}
               idle={ClipboardDocumentIcon}
               className={cn(
-                "h-4 w-4 shrink-0",
+                "size-4 shrink-0",
                 copied ? "text-accent" : "text-muted",
               )}
             />
@@ -134,7 +134,7 @@ export function PrimerView() {
                 type="button"
                 aria-label="More primer copy and view options"
               >
-                <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+                <ChevronDownIcon className="size-4" aria-hidden="true" />
               </SplitButton.IconTrigger>
             </DropdownMenuTrigger>
 
@@ -147,7 +147,7 @@ export function PrimerView() {
                 }}
               >
                 <ClipboardDocumentIcon
-                  className="mt-0.5 h-5 w-5 shrink-0 text-muted"
+                  className="mt-0.5 size-5 shrink-0 text-muted"
                   aria-hidden="true"
                 />
                 <span className="min-w-0 text-left">
@@ -170,14 +170,14 @@ export function PrimerView() {
                 }}
               >
                 <DocumentTextIcon
-                  className="mt-0.5 h-5 w-5 shrink-0 text-muted"
+                  className="mt-0.5 size-5 shrink-0 text-muted"
                   aria-hidden="true"
                 />
                 <span className="min-w-0 flex-1 text-left">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
                     View as Markdown
                     <ArrowTopRightOnSquareIcon
-                      className="h-3.5 w-3.5 shrink-0 text-muted"
+                      className="size-3.5 shrink-0 text-muted"
                       aria-hidden="true"
                     />
                   </span>

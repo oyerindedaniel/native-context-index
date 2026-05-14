@@ -2,9 +2,17 @@
 
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { useMediaQuery } from "@/lib/hooks/use-media-query";
 
 const indexFieldVertexShader = `
 varying vec2 vUv;
@@ -166,9 +174,11 @@ function HeroIndexField() {
 function NCIModelMesh({
   uniforms,
   reducedMotion,
+  compactViewport,
 }: {
   uniforms: HeroUniforms;
   reducedMotion: boolean;
+  compactViewport: boolean;
 }) {
   const rawObject = useLoader(OBJLoader, "/nci.obj");
   const introStartRef = useRef<number | null>(null);
@@ -200,19 +210,26 @@ function NCIModelMesh({
     const boundingSize = boundingBox.getSize(new THREE.Vector3());
     const longestAxis =
       Math.max(boundingSize.x, boundingSize.y, boundingSize.z) || 1;
-    const uniformScale = 1.7 / longestAxis;
 
     model.position.sub(boundingCenter);
 
     const pivot = new THREE.Group();
     pivot.add(model);
-    pivot.scale.setScalar(uniformScale);
-    pivot.userData.baseScale = uniformScale;
+    pivot.userData.longestAxis = longestAxis;
     pivot.rotation.copy(BASE_LOGO_ROTATION);
     pivot.position.set(0, 0, 0);
 
     return pivot;
   }, [rawObject, uniforms]);
+
+  useLayoutEffect(() => {
+    const pivot = pivotGroup;
+    const longestAxis = (pivot.userData.longestAxis as number) || 1;
+    const targetSpan = compactViewport ? 1.32 : 1.7;
+    const uniformScale = targetSpan / longestAxis;
+    pivot.scale.setScalar(uniformScale);
+    pivot.userData.baseScale = uniformScale;
+  }, [pivotGroup, compactViewport]);
 
   useFrame((state, delta) => {
     introStartRef.current ??= state.clock.getElapsedTime();
@@ -309,7 +326,7 @@ function NCIModelMesh({
   return <primitive object={pivotGroup} />;
 }
 
-function HeroScene() {
+function HeroScene({ compactViewport }: { compactViewport: boolean }) {
   const reducedMotion = usePrefersReducedMotion();
   const logoUniforms = useMemo<HeroUniforms>(
     () => ({
@@ -324,7 +341,11 @@ function HeroScene() {
       <HeroIndexField />
 
       <Suspense fallback={null}>
-        <NCIModelMesh uniforms={logoUniforms} reducedMotion={reducedMotion} />
+        <NCIModelMesh
+          uniforms={logoUniforms}
+          reducedMotion={reducedMotion}
+          compactViewport={compactViewport}
+        />
       </Suspense>
 
       <ambientLight intensity={0.7} />
@@ -346,6 +367,8 @@ function HeroScene() {
 }
 
 export function HeroCanvas() {
+  const isMaxSm = useMediaQuery("(max-width: 639px)");
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       <Canvas
@@ -360,7 +383,7 @@ export function HeroCanvas() {
         }}
       >
         <color attach="background" args={["#ffffff"]} />
-        <HeroScene />
+        <HeroScene compactViewport={isMaxSm} />
       </Canvas>
     </div>
   );

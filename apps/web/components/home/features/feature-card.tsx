@@ -20,10 +20,10 @@ export function FeatureCard({
       className={cn("group relative flex flex-col transition-all", className)}
     >
       <div className="mb-6 text-primary">
-        {icon || <div className="h-6 w-6 rounded-md bg-border/50" />}
+        {icon || <div className="size-6 rounded-md bg-border/50" />}
       </div>
 
-      <h3 className="text-xl font-semibold tracking-tight-sub text-ink">
+      <h3 className="text-lg font-semibold tracking-tight-sub text-ink">
         {title}
       </h3>
 

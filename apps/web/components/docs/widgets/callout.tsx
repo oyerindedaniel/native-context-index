@@ -60,12 +60,12 @@ export function CalloutRoot({
     >
       <span
         className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+          "flex size-9 shrink-0 items-center justify-center rounded-full",
           iconWrap,
         )}
         aria-hidden="true"
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="size-5" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">{children}</div>
     </aside>

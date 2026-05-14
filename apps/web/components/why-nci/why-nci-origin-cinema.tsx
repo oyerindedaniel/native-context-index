@@ -162,7 +162,7 @@ function CinemaDocCard({ beat }: { beat: OriginCardBeat }) {
         <span className="inline-block size-2 shrink-0 rounded-full bg-primary/55" />
         <span className="min-w-0 truncate">{beat.title}</span>
       </div>
-      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 py-3 font-mono text-[0.8rem] leading-relaxed text-ink/85">
+      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap p-3 font-mono text-[0.8rem] leading-relaxed text-ink/85">
         {beat.body}
       </pre>
     </div>
@@ -492,8 +492,8 @@ export function WhyNciOriginCinema() {
       ref={rootRef}
       className="w-full min-w-0 max-sm:-mx-6 max-sm:w-[calc(100%+3rem)] max-sm:max-w-none"
     >
-      <StagedDemo.Root className="max-sm:rounded-none max-sm:border-x-0 max-sm:p-2">
-        <StagedDemo.Card className="relative overflow-hidden rounded-2xl border border-border/90 bg-elevated p-4 shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)] max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-5 md:p-6 lg:px-10 lg:py-9">
+      <StagedDemo.Root className="max-sm:rounded-none max-sm:border-x-0 max-sm:p-3">
+        <StagedDemo.Card className="relative overflow-hidden rounded-2xl border border-border/90 bg-elevated p-4 shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)] max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:px-4 max-sm:pb-5 max-sm:pt-4 max-sm:shadow-none sm:p-5 md:p-6 lg:px-10 lg:py-9">
           {TEMP_CALIPER_DISABLE_PAUSE_OVERLAY ? (
             <div
               id="caliper-why-nci-cinema-controls"
@@ -507,7 +507,7 @@ export function WhyNciOriginCinema() {
                   }}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink shadow-sm transition-colors hover:bg-surface/80"
                 >
-                  <ArrowPathIcon className="h-3.5 w-3.5" aria-hidden />
+                  <ArrowPathIcon className="size-3.5" aria-hidden />
                   Replay
                 </button>
               ) : (

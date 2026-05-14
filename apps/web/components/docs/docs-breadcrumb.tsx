@@ -84,7 +84,7 @@ export function DocsBreadcrumbStatic({ className }: DocsBreadcrumbStaticProps) {
           <React.Fragment key={`${crumb.label}-${index}`}>
             {index > 0 ? (
               <ChevronRightIcon
-                className="h-3.5 w-3.5 shrink-0 text-muted/50"
+                className="size-3.5 shrink-0 text-muted/50"
                 aria-hidden="true"
               />
             ) : null}
@@ -371,7 +371,7 @@ export function DocsBreadcrumbInline({
       <ul
         role="listbox"
         aria-label={`Pages in ${group.title}`}
-        className="flex flex-col gap-0.5 px-1.5 py-1.5"
+        className="flex flex-col gap-0.5 p-1.5"
       >
         {group.pages.map((page) => {
           const isActive = page.slug === current.slug;
@@ -406,7 +406,7 @@ export function DocsBreadcrumbInline({
       <ul
         role="listbox"
         aria-label="On this page"
-        className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto px-1.5 py-1.5"
+        className="flex max-h-[60vh] flex-col gap-0.5 overflow-y-auto p-1.5"
       >
         {headings.map((heading) => {
           const isActive = heading.id === activeHeading?.id;

@@ -192,12 +192,12 @@ export function AgentLoopStage({ className }: AgentLoopStageProps) {
             <header className="flex min-w-0 items-center gap-3">
               <span
                 className={cn(
-                  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                  "inline-flex size-8 shrink-0 items-center justify-center rounded-full",
                   accentClass,
                 )}
                 aria-hidden="true"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="size-4" />
               </span>
               <div className="flex min-w-0 flex-col">
                 <span className="text-[0.7rem] font-medium uppercase tracking-[0.11em] text-muted/85">
@@ -321,21 +321,21 @@ export function AgentLoopControls({ className }: AgentLoopControlsProps) {
         onClick={() => setPlaying(!isPlaying)}
         aria-label={isPlaying ? "Pause loop" : "Play loop"}
       >
-        <PlayPauseIcon className="h-4 w-4" aria-hidden="true" />
+        <PlayPauseIcon className="size-4" aria-hidden="true" />
       </Button>
       <SplitButton.Root variant="outline" size="sm">
         <SplitButton.IconTrigger
           onClick={() => handleStep(-1)}
           aria-label="Previous frame"
         >
-          <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+          <ChevronLeftIcon className="size-4" aria-hidden="true" />
         </SplitButton.IconTrigger>
         <SplitButton.IconTrigger
           onClick={() => handleStep(1)}
           aria-label="Next frame"
           className="border-l border-border"
         >
-          <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+          <ChevronRightIcon className="size-4" aria-hidden="true" />
         </SplitButton.IconTrigger>
       </SplitButton.Root>
       <Button
@@ -345,7 +345,7 @@ export function AgentLoopControls({ className }: AgentLoopControlsProps) {
         onClick={restart}
         aria-label="Restart loop"
       >
-        <ArrowPathIcon className="h-4 w-4" aria-hidden="true" />
+        <ArrowPathIcon className="size-4" aria-hidden="true" />
       </Button>
     </div>
   );

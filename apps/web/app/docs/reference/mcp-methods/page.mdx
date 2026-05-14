@@ -26,12 +26,12 @@ import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widget
       <TableCell>
         Discriminated union over <code>subcommand</code>: <code>find</code>, <code>symbol</code>, <code>show</code>, <code>snippet</code>, <code>overloads</code>, <code>packages</code>, <code>package_versions</code>, <code>package_deps</code>, <code>source_packages</code>, <code>active_package</code>, <code>symbols</code>, <code>evidence</code>. Optional <code>database</code> overrides the resolved DB path.
       </TableCell>
-      <TableCell>CLI envelope <code>&#123;ok:true, data:…&#125;</code> on success, <code>&#123;ok:false, error:…&#125;</code> on failure.</TableCell>
+      <TableCell>CLI envelope <code>&#123;ok:true, data:…, meta:…&#125;</code> on success, <code>&#123;ok:false, error:…&#125;</code> on failure.</TableCell>
     </TableRow>
     <TableRow>
       <TableCell><code>nci_sql</code></TableCell>
       <TableCell>
-        Optional <code>database</code>, <code>schema</code>, <code>command</code>, <code>sql_parts</code>, <code>max_rows</code>, <code>format</code> (<code>json</code> default, <code>jsonl</code>, <code>plain</code>). At least one of <code>schema:true</code>, <code>command</code>, or <code>sql_parts</code> is required.
+        Optional <code>database</code>, <code>schema</code>, <code>command</code>, <code>sql_parts</code>, <code>max_rows</code> (default <code>500</code> when not in schema mode), <code>format</code> (<code>json</code> default, <code>jsonl</code>, <code>plain</code>). At least one of <code>schema:true</code>, <code>command</code>, or <code>sql_parts</code> is required. When <code>schema</code> is true, the MCP does not pass <code>--max-rows</code> (DDL-only path).
       </TableCell>
       <TableCell>Raw row array (no envelope). <code>--max-rows</code> failures surface as MCP errors.</TableCell>
     </TableRow>

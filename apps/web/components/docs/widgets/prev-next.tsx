@@ -39,7 +39,7 @@ function PagerCard({ page, direction }: PagerCardProps) {
         )}
       >
         <Icon
-          className="h-3.5 w-3.5 shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+          className="size-3.5 shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
           aria-hidden="true"
         />
         {directionLabel}

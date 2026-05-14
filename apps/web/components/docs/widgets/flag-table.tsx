@@ -102,7 +102,7 @@ export function FlagTableSearch() {
   return (
     <div className="flex items-center gap-2 border-b border-border bg-surface/60 px-4 py-2.5">
       <MagnifyingGlassIcon
-        className="h-4 w-4 shrink-0 text-muted/70"
+        className="size-4 shrink-0 text-muted/70"
         aria-hidden="true"
       />
       <input
@@ -266,12 +266,12 @@ function FlagTableRow({ flag }: FlagTableRowProps) {
             }
           }}
           aria-label={copied ? "Copied" : `Copy ${copyTarget}`}
-          className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 active:scale-[0.99] active:blur-[0.5px]"
+          className="inline-flex size-7 cursor-pointer items-center justify-center rounded-full text-muted/80 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-surface-hover hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 active:scale-[0.99] active:blur-[0.5px]"
         >
           <CopyStatusIcon
             copied={copied}
             idle={ClipboardIcon}
-            className="h-3.5 w-3.5"
+            className="size-3.5"
           />
         </button>
       </td>

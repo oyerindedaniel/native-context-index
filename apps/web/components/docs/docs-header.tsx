@@ -45,7 +45,7 @@ export function DocsHeader({ className }: DocsHeaderProps) {
           )}
         >
           <StarIcon
-            className="h-4 w-4 -translate-y-px text-accent"
+            className="size-4 -translate-y-px text-accent"
             aria-hidden="true"
           />
           <span>GitHub</span>

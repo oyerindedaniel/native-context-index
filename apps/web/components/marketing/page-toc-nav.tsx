@@ -159,7 +159,7 @@ export function PageTocNav({
       <div className="sticky top-28 w-[11.5rem]">
         <div className="mb-3 flex items-center gap-1.5 px-3 text-[0.68rem] font-medium uppercase tracking-[0.11em] text-muted/70">
           <ListBulletIcon
-            className="h-3.5 w-3.5 -translate-y-px shrink-0"
+            className="size-3.5 -translate-y-px shrink-0"
             aria-hidden="true"
           />
           <span>{heading}</span>
@@ -220,7 +220,7 @@ export function PageTocNav({
                             layoutId={`page-toc-active-dot-${layoutGroupId}`}
                             transition={KITE_SPRING}
                             className={cn(
-                              "absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary",
+                              "absolute top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary",
                               depth === 1 ? "left-7" : "left-2",
                             )}
                             aria-hidden="true"

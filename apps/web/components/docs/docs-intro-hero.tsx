@@ -123,7 +123,7 @@ export function DocsIntroHero() {
             "w-full gap-2 sm:w-auto",
           )}
         >
-          <CommandLineIcon className="h-4 w-4" aria-hidden="true" />
+          <CommandLineIcon className="size-4" aria-hidden="true" />
           Browse the CLI
         </Link>
       </div>
@@ -150,7 +150,7 @@ export function DocsIntroHero() {
               <span className="flex items-start justify-between gap-3 text-lg font-semibold tracking-tight-sub text-ink">
                 <span>{tile.title}</span>
                 <ArrowLongRightIcon
-                  className="mt-1 h-4 w-4 shrink-0 text-muted/70 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-primary"
+                  className="mt-1 size-4 shrink-0 text-muted/70 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-primary"
                   aria-hidden="true"
                 />
               </span>

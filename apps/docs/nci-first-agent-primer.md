@@ -4,6 +4,7 @@ You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node
 - **`sql`** — the same data as relations: `SELECT` over `packages`, `symbols`, and the `symbol_*` tables.
 - **Shell invocation (Windows PowerShell):** Always run the binary as **`& "<path-to-nci.exe>" <subcommand> …args…`** (call operator). A quoted path immediately followed by a bare token like `sql` or `query` is **not** parsed as a subcommand—the shell treats the quoted string as a value, then errors on the next word.
 - **Row caps:** **`--max-rows`** applies **only** to **`nci sql`**. For **`nci query find <phrase>`**, cap how many hits are returned with **`-n` / `--limit`** (default **20**). **`--max-rows` is not valid on `query find`**; use `sql` when you need that cap.
+- **MCP `nci_sql`:** defaults **`max_rows`** to **500**; when **`schema: true`**, the MCP omits **`--max-rows`** because **`nci sql --schema`** prints DDL only and never applies a row cap.
 
 **Fast path for declaration evidence:**
 
