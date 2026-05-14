@@ -1,0 +1,73 @@
+import Link from "next/link";
+import { WhyNciOriginCinema } from "@/components/why-nci/why-nci-origin-cinema";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+<section className="mx-auto max-w-[1050px] px-6 py-12 sm:py-16">
+  <span className="text-sm font-medium uppercase tracking-[0.11em] text-primary">
+    Story
+  </span>
+
+# Why NCI
+
+<p className="mt-4 max-w-2xl text-lg leading-relaxed tracking-tight-p text-muted sm:text-xl">
+  NCI indexes TypeScript declarations and package relationships on disk so tools
+  can answer questions from the same sources you compile against. The short
+  version is the Introduction in the docs; this page walks through how the
+  project came about and how that lines up with what we ship today.
+</p>
+
+<WhyNciOriginCinema />
+
+## Why NCI exists
+
+<p>
+  Agents and editors already have access to your source tree, but searching raw
+  text across <code className="nci-code-chip">node_modules</code> is brittle.
+  Public docs are useful for orientation; they are not a substitute for the
+  exact signatures and overload sets in the version you installed. NCI exists so
+  those answers can be indexed once and queried quickly, without repeating the
+  same dead ends on every task.
+</p>
+
+## Who it is for
+
+<p>
+  It is for teams that work in real JavaScript and TypeScript monorepos, and for
+  anyone wiring an agent through MCP or the CLI who wants stable, structured
+  access to exports, types, and dependency edges. If you already maintain skills
+  or prompts that tell an agent to read{" "}
+  <code className="nci-code-chip">.d.ts</code> files by hand, NCI is the same
+  idea turned into an index you can depend on across sessions.
+</p>
+
+## What it replaces in an agent workflow
+
+<p>
+  It replaces open-ended grepping through generated types, guessing which file
+  holds the truth, and falling back to scraped documentation when search misses.
+  Instead of repeating that loop on every question, you index the tree you care
+  about and let the agent pull precise rows from a local database.
+</p>
+
+  <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+    <Link
+      href="/docs"
+      className={cn(
+        buttonVariants({ variant: "accent", size: "md" }),
+        "w-full sm:w-auto",
+      )}
+    >
+      Read the Introduction
+    </Link>
+    <Link
+      href="/docs/quickstart"
+      className={cn(
+        buttonVariants({ variant: "outline", size: "md" }),
+        "w-full sm:w-auto",
+      )}
+    >
+      Open the Quickstart
+    </Link>
+  </div>
+</section>

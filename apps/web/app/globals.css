@@ -237,4 +237,14 @@
     line-height: inherit;
     background: transparent !important;
   }
+
+  /* Marketing demo stages (Why NCI, future home flows): subtle dot grid on primary wash */
+  .why-nci-stage-pattern {
+    background-image: radial-gradient(
+      circle at center,
+      color-mix(in oklch, var(--nci-color-primary) 24%, transparent) 0.85px,
+      transparent 1.1px
+    );
+    background-size: 17px 17px;
+  }
 }

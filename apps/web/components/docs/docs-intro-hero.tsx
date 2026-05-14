@@ -77,7 +77,14 @@ export function DocsIntroHero() {
         <p className="max-w-2xl text-lg leading-relaxed tracking-tight-p text-muted sm:text-xl">
           NCI reads the actual <code className="nci-code-chip">.d.ts</code> on
           your disk and serves agents a structured index they can query in
-          milliseconds.
+          milliseconds. For the background that led here, read{" "}
+          <Link
+            href="/why-nci"
+            className="font-medium text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:text-dark hover:decoration-primary/70"
+          >
+            Why NCI
+          </Link>
+          .
         </p>
       </div>
 
