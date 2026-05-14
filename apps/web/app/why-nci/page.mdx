@@ -1,73 +1,114 @@
 import Link from "next/link";
+import { ArrowLongRightIcon, BookOpenIcon } from "@heroicons/react/20/solid";
 import { WhyNciOriginCinema } from "@/components/why-nci/why-nci-origin-cinema";
+import { WhyNciStoryBubble } from "@/components/why-nci/why-nci-story-bubble";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-<section className="mx-auto max-w-[1050px] px-6 py-12 sm:py-16">
-  <span className="text-sm font-medium uppercase tracking-[0.11em] text-primary">
-    Story
-  </span>
+<div className="flex flex-col gap-12 sm:gap-14">
+  <div className="flex flex-col gap-4">
+    <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+      NCI indexes TypeScript declarations and package relationships on disk so
+      tools can answer questions from the same sources you compile against. The
+      overview lives in the Introduction; what follows is how this work came
+      about and how it lines up with what we ship today.
+    </div>
+    <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+      A compact mental model helps agents use it well: NCI is an index and query
+      surface over your tree—exports, types, dependency edges—not another runtime.
+      When a tool can ask structured questions instead of rediscovering the same
+      files every turn, the model gets room to think about architecture, trade-offs,
+      and safer ways to implement a change instead of burning context on dead-end
+      greps.
+    </div>
+  </div>
 
-# Why NCI
+<div className="scroll-mt-28 flex w-full flex-col gap-6">
+  <div className="flex flex-col gap-3">
+    <div className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+      Origin
+    </div>
+    <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+      The story starts with a real Cursor agent session in the editor: local
+      generated types versus web documentation, dead ends, and the moment the
+      workflow lands on something stable enough to ship. The replay below is
+      shortened from that trace so you can follow the beats without sitting through
+      the full clock time.
+    </div>
+  </div>
+  <div id="why-nci-origin" className="min-w-0 w-full">
+    <WhyNciOriginCinema />
+  </div>
+  <WhyNciStoryBubble />
+</div>
 
-<p className="mt-4 max-w-2xl text-lg leading-relaxed tracking-tight-p text-muted sm:text-xl">
-  NCI indexes TypeScript declarations and package relationships on disk so tools
-  can answer questions from the same sources you compile against. The short
-  version is the Introduction in the docs; this page walks through how the
-  project came about and how that lines up with what we ship today.
-</p>
+<div id="why-nci-exists" className="scroll-mt-28 flex flex-col gap-3">
+  <div className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+    Why NCI exists
+  </div>
+  <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+    Agents and editors already have access to your source tree, but searching
+    raw text across <code className="nci-code-chip">node_modules</code> is
+    brittle. Public docs help with orientation; they do not replace the exact
+    signatures and overload sets in the version you installed. NCI exists so
+    those answers can be indexed once and queried quickly, without repeating the
+    same dead ends on every task.
+  </div>
+</div>
 
-<WhyNciOriginCinema />
+<div id="why-nci-audience" className="scroll-mt-28 flex flex-col gap-3">
+  <div className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+    Who it is for
+  </div>
+  <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+    It is for teams that work in real JavaScript and TypeScript monorepos, and
+    for anyone wiring an agent through MCP or the CLI who wants stable,
+    structured access to exports, types, and dependency edges. If you already
+    maintain skills or prompts that tell an agent to read{" "}
+    <code className="nci-code-chip">.d.ts</code> files by hand, NCI is the same
+    idea turned into an index you can depend on across sessions.
+  </div>
+</div>
 
-## Why NCI exists
+<div id="why-nci-replaces" className="scroll-mt-28 flex flex-col gap-3">
+  <div className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">
+    What it replaces
+  </div>
+  <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+    It replaces open-ended grepping through generated types, guessing which file
+    holds the truth, and falling back to scraped documentation when search
+    misses. Instead of repeating that loop on every question, you index the tree
+    you care about and let the agent pull precise rows from a local database.
+  </div>
+</div>
 
-<p>
-  Agents and editors already have access to your source tree, but searching raw
-  text across <code className="nci-code-chip">node_modules</code> is brittle.
-  Public docs are useful for orientation; they are not a substitute for the
-  exact signatures and overload sets in the version you installed. NCI exists so
-  those answers can be indexed once and queried quickly, without repeating the
-  same dead ends on every task.
-</p>
-
-## Who it is for
-
-<p>
-  It is for teams that work in real JavaScript and TypeScript monorepos, and for
-  anyone wiring an agent through MCP or the CLI who wants stable, structured
-  access to exports, types, and dependency edges. If you already maintain skills
-  or prompts that tell an agent to read{" "}
-  <code className="nci-code-chip">.d.ts</code> files by hand, NCI is the same
-  idea turned into an index you can depend on across sessions.
-</p>
-
-## What it replaces in an agent workflow
-
-<p>
-  It replaces open-ended grepping through generated types, guessing which file
-  holds the truth, and falling back to scraped documentation when search misses.
-  Instead of repeating that loop on every question, you index the tree you care
-  about and let the agent pull precise rows from a local database.
-</p>
-
-  <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+  <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-center">
     <Link
       href="/docs"
       className={cn(
         buttonVariants({ variant: "accent", size: "md" }),
-        "w-full sm:w-auto",
+        "group w-full gap-2 sm:w-auto",
       )}
     >
-      Read the Introduction
+      <BookOpenIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>Read the Introduction</span>
+      <ArrowLongRightIcon
+        className="h-4 w-4 shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+        aria-hidden="true"
+      />
     </Link>
     <Link
       href="/docs/quickstart"
       className={cn(
         buttonVariants({ variant: "outline", size: "md" }),
-        "w-full sm:w-auto",
+        "group w-full gap-2 sm:w-auto",
       )}
     >
-      Open the Quickstart
+      <span>Open the Quickstart</span>
+      <ArrowLongRightIcon
+        className="h-4 w-4 shrink-0 text-muted transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-primary"
+        aria-hidden="true"
+      />
     </Link>
   </div>
-</section>
+</div>

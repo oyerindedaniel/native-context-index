@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ListBulletIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
 import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
+import { useIntersectionObserverTargetsEffect } from "@/lib/hooks/use-intersection-observer-effect";
 
 interface TocItem {
   id: string;
@@ -55,44 +56,40 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
     if (firstHeading) {
       setActiveId(firstHeading.id);
     }
-
-    const headingElements: HTMLElement[] = [];
-    for (const item of collected) {
-      const element = document.getElementById(item.id);
-      if (element) {
-        headingElements.push(element);
-      }
-    }
-
-    if (headingElements.length === 0) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isLockedRef.current()) {
-          return;
-        }
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort(
-            (first, second) =>
-              first.intersectionRatio - second.intersectionRatio,
-          );
-        const top = visible.at(-1);
-        if (top?.target.id) {
-          setActiveId(top.target.id);
-        }
-      },
-      {
-        rootMargin: "-96px 0px -55% 0px",
-        threshold: [0, 0.25, 0.5, 0.75, 1],
-      },
-    );
-
-    headingElements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
   }, [scopeSelector, pathname]);
+
+  useIntersectionObserverTargetsEffect(
+    items.length > 0,
+    {
+      rootMargin: "-96px 0px -55% 0px",
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    },
+    () => {
+      const headingElements: HTMLElement[] = [];
+      for (const item of items) {
+        const element = document.getElementById(item.id);
+        if (element) {
+          headingElements.push(element);
+        }
+      }
+      return headingElements;
+    },
+    [items],
+    (entries) => {
+      if (isLockedRef.current()) {
+        return;
+      }
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort(
+          (first, second) => first.intersectionRatio - second.intersectionRatio,
+        );
+      const top = visible.at(-1);
+      if (top?.target.id) {
+        setActiveId(top.target.id);
+      }
+    },
+  );
 
   // Native hash navigation handles scroll + URL hash + new-tab modifiers.
   // We only pin the click target and arm the IO lock so the active row

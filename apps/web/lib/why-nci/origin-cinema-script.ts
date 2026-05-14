@@ -122,3 +122,12 @@ export const ORIGIN_SCENES: readonly OriginScene[] = [
     ],
   },
 ] as const;
+
+/** Short narration shown beside the trace after each scene finishes. */
+export const ORIGIN_SCENE_CAPTIONS: readonly string[] = [
+  "The agent searched generated modules for permission hooks and came back empty. That mismatch is common when names live behind re-exports or build stubs.",
+  "A second pattern search for factory-style hooks also missed. At this point the trace is still entirely local — nothing has indexed the graph yet.",
+  "With local hits exhausted, the next step is often public docs: accurate for orientation, but not tied to the exact build on disk.",
+  "The agent then opens small declaration slices and narrows the search toward the camera package, still line by line.",
+  "After more reads and retries, the shape of the API becomes clear from the types themselves — the same conclusion NCI is built to surface in one indexed pass.",
+];

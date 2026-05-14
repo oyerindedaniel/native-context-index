@@ -51,7 +51,7 @@ export function HeroSection() {
 
           <div className="pointer-events-auto shrink-0 justify-self-end">
             <Link
-              href="/get-started"
+              href="/docs/quickstart"
               className={cn(buttonVariants({ variant: "primary", size: "sm" }))}
             >
               Get started

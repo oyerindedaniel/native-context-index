@@ -106,13 +106,13 @@ export function DocsIntroHero() {
           href="/docs/quickstart"
           className={cn(
             buttonVariants({ variant: "accent", size: "md" }),
-            "w-full gap-2 sm:w-auto",
+            "group w-full gap-2 sm:w-auto",
           )}
         >
-          <RocketLaunchIcon className="h-4 w-4" aria-hidden="true" />
+          <RocketLaunchIcon className="size-4" aria-hidden="true" />
           Start the Quickstart
           <ArrowLongRightIcon
-            className="h-4 w-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
+            className="size-4 shrink-0 transition-transform duration-150 ease-out group-hover:translate-x-0.5"
             aria-hidden="true"
           />
         </Link>

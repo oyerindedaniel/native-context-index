@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { SplitButton } from "@/components/ui/split-button";
 import { cn } from "@/lib/utils";
+import { useResizeObserverElementHeight } from "@/lib/hooks/use-resize-observer-element-height";
 
 type FrameKind = "thought" | "toolCall" | "response";
 
@@ -153,23 +154,7 @@ export function AgentLoopStage({ className }: AgentLoopStageProps) {
   const active = frames[activeFrameIndex];
 
   const innerRef = React.useRef<HTMLDivElement>(null);
-  const [measuredHeight, setMeasuredHeight] = React.useState<number | null>(
-    null,
-  );
-
-  React.useLayoutEffect(() => {
-    const node = innerRef.current;
-    if (!node || typeof ResizeObserver === "undefined") {
-      return;
-    }
-    const measure = () => {
-      setMeasuredHeight(node.offsetHeight);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  const measuredHeight = useResizeObserverElementHeight(innerRef);
 
   if (!active) {
     return null;

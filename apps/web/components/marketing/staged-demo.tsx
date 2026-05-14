@@ -1,10 +1,8 @@
+"use client";
+
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * Framed “stage” for product demos: tinted wash + subtle pattern, optional inner card.
- * Intended for reuse (Why NCI origin, future home flow from install to index).
- */
 function StagedDemoRoot({
   children,
   className,
@@ -12,16 +10,46 @@ function StagedDemoRoot({
   children: React.ReactNode;
   className?: string;
 }) {
+  const patternId = React.useId().replace(/:/g, "");
+
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-3xl border border-primary/15 p-4 sm:p-6",
-        "bg-[color-mix(in_oklch,var(--nci-color-primary)_8%,var(--nci-color-surface))]",
-        "why-nci-stage-pattern",
+        "relative overflow-hidden rounded-[1.75rem] border border-primary/12 p-6 sm:p-8 lg:p-10",
+        "bg-[color-mix(in_oklch,var(--nci-color-primary)_7%,var(--nci-color-surface))]",
         className,
       )}
     >
-      {children}
+      <svg
+        className="pointer-events-none absolute inset-0 text-primary"
+        style={{ opacity: 0.1 }}
+        aria-hidden
+      >
+        <defs>
+          <pattern
+            id={patternId}
+            width="36"
+            height="36"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M0 18 L36 18 M18 0 L18 36"
+              stroke="currentColor"
+              strokeWidth="0.4"
+              fill="none"
+            />
+            <circle
+              cx="18"
+              cy="18"
+              r="1.15"
+              fill="currentColor"
+              opacity="0.4"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+      </svg>
+      <div className="relative z-[1]">{children}</div>
     </div>
   );
 }
@@ -36,7 +64,7 @@ function StagedDemoCard({
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-border bg-elevated shadow-[0_12px_40px_-24px_rgb(0_0_0_/_0.18)]",
+        "relative rounded-2xl border border-border/90 bg-elevated shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)]",
         className,
       )}
     >

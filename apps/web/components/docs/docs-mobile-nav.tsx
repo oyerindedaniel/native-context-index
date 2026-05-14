@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import type { TargetAndTransition, Transition } from "motion/react";
+import type { Transition } from "motion/react";
 import {
   BookOpenIcon,
   HomeIcon,
@@ -15,6 +15,7 @@ import {
 } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { MobileHamburgerButton } from "@/components/nav/mobile-hamburger-button";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
 import {
@@ -28,12 +29,6 @@ const GITHUB_URL = "https://github.com/oyerindedaniel/native-context-index";
 
 const DRAWER_EASE = [0.16, 1, 0.3, 1] as const;
 const FADE_EASE = "easeOut" as const;
-const BAR_EASE = [0.4, 0, 0.2, 1] as const;
-
-const TOP_BAR_OPEN: TargetAndTransition = { y: 0, rotate: 45 };
-const TOP_BAR_CLOSED: TargetAndTransition = { y: -4, rotate: 0 };
-const BOTTOM_BAR_OPEN: TargetAndTransition = { y: 0, rotate: -45 };
-const BOTTOM_BAR_CLOSED: TargetAndTransition = { y: 4, rotate: 0 };
 
 interface DocsMobileNavProps {
   className?: string;
@@ -45,7 +40,7 @@ export function DocsMobileNav({ className }: DocsMobileNavProps) {
 
   return (
     <div className={cn("flex min-w-0 items-center gap-2", className)}>
-      <HamburgerButton
+      <MobileHamburgerButton
         open={open}
         onToggle={() => setOpen((value) => !value)}
       />
@@ -59,7 +54,7 @@ export function DocsMobileNav({ className }: DocsMobileNavProps) {
           alt="NCI"
           width={28}
           height={28}
-          className="h-6 w-6"
+          className="size-6"
           priority
         />
       </Link>
@@ -69,47 +64,6 @@ export function DocsMobileNav({ className }: DocsMobileNavProps) {
         pathname={pathname}
       />
     </div>
-  );
-}
-
-interface HamburgerButtonProps {
-  open: boolean;
-  onToggle: () => void;
-}
-
-function HamburgerButton({ open, onToggle }: HamburgerButtonProps) {
-  const reduceMotion = useReducedMotion();
-  const transition: Transition = {
-    duration: reduceMotion ? 0 : 0.22,
-    ease: BAR_EASE,
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-label={open ? "Close menu" : "Open menu"}
-      className={cn(
-        buttonVariants({ variant: "outline", size: "icon" }),
-        "shrink-0",
-      )}
-    >
-      <span className="relative inline-block h-4 w-4" aria-hidden="true">
-        <motion.span
-          className="absolute left-0 h-[1.5px] w-full rounded-full bg-current"
-          style={{ top: "calc(50% - 0.75px)", transformOrigin: "center" }}
-          animate={open ? TOP_BAR_OPEN : TOP_BAR_CLOSED}
-          transition={transition}
-        />
-        <motion.span
-          className="absolute left-0 h-[1.5px] w-full rounded-full bg-current"
-          style={{ top: "calc(50% - 0.75px)", transformOrigin: "center" }}
-          animate={open ? BOTTOM_BAR_OPEN : BOTTOM_BAR_CLOSED}
-          transition={transition}
-        />
-      </span>
-    </button>
   );
 }
 
@@ -237,7 +191,7 @@ function DrawerHeader({ onClose }: DrawerHeaderProps) {
           "shrink-0",
         )}
       >
-        <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+        <XMarkIcon className="size-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -320,7 +274,7 @@ function DrawerLink({ href, label, icon: Icon, active }: DrawerLinkProps) {
       {Icon ? (
         <Icon
           className={cn(
-            "h-4 w-4 shrink-0",
+            "size-4 shrink-0",
             active ? "text-primary" : "text-muted/70",
           )}
           aria-hidden="true"
@@ -369,7 +323,7 @@ function DrawerDocsGroup({ group, normalizedPath }: DrawerDocsGroupProps) {
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 px-3">
         <GroupIcon
-          className="h-3.5 w-3.5 -translate-y-px text-muted/70"
+          className="size-3.5 -translate-y-px text-muted/70"
           aria-hidden="true"
         />
         <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted/85">

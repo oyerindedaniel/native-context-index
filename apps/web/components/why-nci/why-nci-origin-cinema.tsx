@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
-import { ArrowPathIcon } from "@heroicons/react/20/solid";
+import { ArrowPathIcon, PauseIcon, PlayIcon } from "@heroicons/react/20/solid";
 import { StagedDemo } from "@/components/marketing/staged-demo";
-import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   ORIGIN_SCENES,
@@ -12,6 +11,9 @@ import {
   type OriginCardBeat,
   type OriginMonoBeat,
 } from "@/lib/why-nci/origin-cinema-script";
+import { useWhyNciStory } from "@/components/why-nci/why-nci-story-context";
+import { useResizeObserverElementHeight } from "@/lib/hooks/use-resize-observer-element-height";
+import { useIntersectionObserverEffect } from "@/lib/hooks/use-intersection-observer-effect";
 
 const DEFAULT_TYPING_MS_PER_CHAR = 11;
 const CARD_TITLE_MS_PER_CHAR = 10;
@@ -19,94 +21,254 @@ const MONO_HOLD_MS = 420;
 const PILL_DWELL_MS = 560;
 const CARD_TITLE_HOLD_MS = 380;
 const CARD_BODY_DWELL_MS = 2200;
-const SCENE_GAP_MS = 620;
+
+const STAGE_HEIGHT_TRANSITION = {
+  duration: 0.34,
+  ease: [0.16, 1, 0.3, 1] as const,
+};
+
+const STAGE_MIN_HEIGHT_PX = 130;
+
+/**
+ * When `true`, hides the full-card tap-to-pause layer and the pause/replay blur
+ * overlay so the stage stays visible (e.g. for Caliper). Top-right Pause/Play
+ * and Replay remain available. Toggle to `false` to restore the default UX;
+ * both code paths stay in the tree and are gated only by this flag.
+ */
+const TEMP_CALIPER_DISABLE_PAUSE_OVERLAY = false;
+
+const ORIGIN_CINEMA_INTERSECTION_ROOT_MARGIN = "120px 0px 50% 0px";
+const ORIGIN_CINEMA_INTERSECTION_THRESHOLD = 0;
+
+type PlaybackCursorState = {
+  sceneIndex: number;
+  beatIndex: number;
+};
+
+function computePlaybackOutcomeAfterBeatCompletes(
+  previousCursor: PlaybackCursorState,
+): {
+  nextCursor: PlaybackCursorState;
+  pendingBetweenScenesSceneIndex: number | null;
+  markCinemaComplete: boolean;
+} {
+  const { sceneIndex, beatIndex } = previousCursor;
+  const scene = ORIGIN_SCENES[sceneIndex];
+  if (!scene) {
+    return {
+      nextCursor: previousCursor,
+      pendingBetweenScenesSceneIndex: null,
+      markCinemaComplete: false,
+    };
+  }
+  const nextBeatIndex = beatIndex + 1;
+  if (nextBeatIndex < scene.beats.length) {
+    return {
+      nextCursor: { sceneIndex, beatIndex: nextBeatIndex },
+      pendingBetweenScenesSceneIndex: null,
+      markCinemaComplete: false,
+    };
+  }
+  if (sceneIndex + 1 < ORIGIN_SCENES.length) {
+    return {
+      nextCursor: { sceneIndex, beatIndex: scene.beats.length },
+      pendingBetweenScenesSceneIndex: sceneIndex,
+      markCinemaComplete: false,
+    };
+  }
+  return {
+    nextCursor: { sceneIndex, beatIndex: scene.beats.length },
+    pendingBetweenScenesSceneIndex: null,
+    markCinemaComplete: true,
+  };
+}
 
 const SCENE_MOTION = {
-  initial: { opacity: 0, y: 10, filter: "blur(6px)" as const },
+  initial: { opacity: 0, y: 8, filter: "blur(4px)" as const },
   animate: {
     opacity: 1,
     y: 0,
     filter: "blur(0px)" as const,
-    transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] as const },
+    transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const },
   },
   exit: {
     opacity: 0,
-    y: -8,
-    filter: "blur(5px)" as const,
-    transition: { duration: 0.26, ease: [0.4, 0, 1, 1] as const },
+    y: -6,
+    filter: "blur(3px)" as const,
+    transition: { duration: 0.22, ease: [0.4, 0, 1, 1] as const },
+  },
+};
+
+const SCENE_INNER_CLASS =
+  "flex min-h-[10rem] min-w-0 flex-col gap-2.5 overflow-hidden sm:min-h-[11.5rem] md:min-h-[12rem] md:gap-3";
+
+const OVERLAY_MOTION = {
+  initial: { opacity: 0, scale: 0.94 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.96,
+    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const },
   },
 };
 
 function CinemaMonoLine({ text }: { text: string }) {
   return (
-    <p className="font-mono text-[0.72rem] leading-relaxed text-code-ink/90 sm:text-[0.78rem]">
+    <p className="min-w-0 break-words border-l-2 border-transparent pl-3 font-mono text-sm leading-relaxed tracking-tight-p text-ink/88 [overflow-wrap:anywhere]">
       {text}
     </p>
   );
 }
 
-function CinemaPill({ label }: { label: string }) {
+function MonoLineWithPill({
+  monoText,
+  pillLabel,
+}: {
+  monoText: string;
+  pillLabel: string;
+}) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-center font-mono text-[0.72rem] text-code-ink/75 sm:text-[0.78rem]">
-      {label}
+    <div className="relative flex flex-col gap-2 border-l-2 border-primary/30 py-1 pl-3 max-sm:gap-2 sm:block">
+      <p
+        className={cn(
+          "min-w-0 max-w-full break-words font-mono text-sm leading-relaxed tracking-tight-p text-ink/88 [overflow-wrap:anywhere]",
+          "max-sm:pr-0 sm:pr-[9.5rem] md:pr-[10.25rem]",
+        )}
+      >
+        {monoText}
+      </p>
+      <div
+        className={cn(
+          "z-[1] w-fit max-w-full rounded-full border border-border bg-elevated px-2.5 py-1 text-left font-mono text-[0.7rem] font-medium text-muted",
+          "shadow-[0_1px_0_rgb(255_255_255_/_0.9)_inset,0_2px_6px_-2px_rgb(0_0_0_/_0.12)]",
+          "max-sm:relative max-sm:translate-y-0 sm:pointer-events-none sm:absolute sm:right-0.5 sm:top-1/2 sm:-translate-y-1/2 sm:text-center",
+        )}
+        aria-hidden
+      >
+        {pillLabel}
+      </div>
     </div>
   );
 }
 
 function CinemaDocCard({ beat }: { beat: OriginCardBeat }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-white/12 bg-black/35">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2 text-[0.65rem] text-code-ink/60 sm:text-[0.7rem]">
-        <span className="inline-block size-2 shrink-0 rounded-full bg-emerald-500/80" />
+    <div className="overflow-hidden rounded-xl border border-border bg-surface/90 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.7)]">
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted">
+        <span className="inline-block size-2 shrink-0 rounded-full bg-primary/55" />
         <span className="min-w-0 truncate">{beat.title}</span>
       </div>
-      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 py-3 font-mono text-[0.68rem] leading-relaxed text-code-ink/88 sm:text-[0.74rem]">
+      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 py-3 font-mono text-[0.8rem] leading-relaxed text-ink/85">
         {beat.body}
       </pre>
     </div>
   );
 }
 
+function mapBeatsToNodes(
+  beats: readonly OriginBeat[],
+  keyPrefix: string,
+): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  let index = 0;
+  while (index < beats.length) {
+    const item = beats[index]!;
+    if (item.beatKind === "mono") {
+      const next = beats[index + 1];
+      if (next?.beatKind === "pill") {
+        nodes.push(
+          <MonoLineWithPill
+            key={`${keyPrefix}-${index}`}
+            monoText={item.text}
+            pillLabel={next.text}
+          />,
+        );
+        index += 2;
+        continue;
+      }
+      nodes.push(
+        <CinemaMonoLine key={`${keyPrefix}-${index}`} text={item.text} />,
+      );
+      index += 1;
+      continue;
+    }
+    if (item.beatKind === "card") {
+      nodes.push(<CinemaDocCard key={`${keyPrefix}-${index}`} beat={item} />);
+      index += 1;
+      continue;
+    }
+    index += 1;
+  }
+  return nodes;
+}
+
 function CinemaReducedMotionSummary() {
   return (
-    <section className="my-10 sm:my-14" aria-label="Origin story">
-      <h2 className="mb-4 font-instrument-serif text-2xl font-normal text-ink sm:text-3xl">
-        Where this started
-      </h2>
-      <StagedDemo.Root>
-        <StagedDemo.Card className="p-6 sm:p-8">
-          <p className="text-base leading-relaxed tracking-tight-p text-muted">
-            This trace is shortened from a real session: the agent searched
-            generated types under{" "}
-            <code className="nci-code-chip">expo-modules-core</code>, hit dead
-            ends, opened public Expo docs, then worked through more files before
-            landing on how{" "}
-            <code className="nci-code-chip">useCameraPermissions()</code> is
-            shaped. The full cinema animation is available with motion enabled
-            in your system settings.
-          </p>
-        </StagedDemo.Card>
-      </StagedDemo.Root>
-    </section>
+    <div className="scroll-mt-28 border border-border/80 bg-surface/40 px-5 py-6 sm:px-7 sm:py-7">
+      <p className="text-base leading-relaxed tracking-tight-p text-muted">
+        This trace is shortened from a real session: the agent searched
+        generated types under{" "}
+        <code className="nci-code-chip">expo-modules-core</code>, hit dead ends,
+        opened public Expo docs, then worked through more files before landing
+        on how <code className="nci-code-chip">useCameraPermissions()</code> is
+        shaped. The full sequence is available with motion enabled in your
+        system settings.
+      </p>
+    </div>
   );
 }
 
 export function WhyNciOriginCinema() {
   const prefersReducedMotion = useReducedMotion();
+  const story = useWhyNciStory();
+
+  const measureRef = React.useRef<HTMLDivElement | null>(null);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const measuredStageHeight = useResizeObserverElementHeight(measureRef);
+
+  const intersectionObserverSupported =
+    typeof IntersectionObserver !== "undefined";
+
+  useIntersectionObserverEffect(
+    rootRef,
+    intersectionObserverSupported && !story.originCinemaScrollArmed,
+    ORIGIN_CINEMA_INTERSECTION_ROOT_MARGIN,
+    ORIGIN_CINEMA_INTERSECTION_THRESHOLD,
+    (entry) => {
+      if (entry.isIntersecting) {
+        story.setOriginCinemaScrollArmed(true);
+        story.setOriginCinemaUserPaused(false);
+      }
+    },
+  );
+
+  React.useEffect(() => {
+    if (!intersectionObserverSupported) {
+      story.setOriginCinemaScrollArmed(true);
+    }
+  }, [intersectionObserverSupported, story]);
 
   const [playbackCursor, setPlaybackCursor] = React.useState({
     sceneIndex: 0,
     beatIndex: 0,
   });
+  const playbackCursorRef = React.useRef(playbackCursor);
+  React.useLayoutEffect(() => {
+    playbackCursorRef.current = playbackCursor;
+  }, [playbackCursor]);
+
+  const [pendingBetweenScenesSceneIndex, setPendingBetweenScenesSceneIndex] =
+    React.useState<number | null>(null);
+
   const [settledEntries, setSettledEntries] = React.useState<OriginBeat[]>([]);
   const [monoRevealLength, setMonoRevealLength] = React.useState(0);
   const [cardTitleRevealLength, setCardTitleRevealLength] = React.useState(0);
   const [cardBodyVisible, setCardBodyVisible] = React.useState(false);
   const [cinemaComplete, setCinemaComplete] = React.useState(false);
-  const [shouldRunCinema, setShouldRunCinema] = React.useState(false);
-
-  const sceneGapTimeoutRef = React.useRef<number | null>(null);
-  const rootRef = React.useRef<HTMLElement | null>(null);
 
   const currentScene = ORIGIN_SCENES[playbackCursor.sceneIndex];
   const currentBeat =
@@ -120,73 +282,64 @@ export function WhyNciOriginCinema() {
     setCardBodyVisible(false);
   }, []);
 
-  const appendSettledAndAdvance = React.useCallback(
-    (completedBeat: OriginBeat) => {
-      setSettledEntries((previous) => [...previous, completedBeat]);
-      setPlaybackCursor(({ sceneIndex, beatIndex }) => {
-        const scene = ORIGIN_SCENES[sceneIndex];
-        if (!scene) {
-          return { sceneIndex, beatIndex };
-        }
-        const nextBeatIndex = beatIndex + 1;
-        if (nextBeatIndex < scene.beats.length) {
-          return { sceneIndex, beatIndex: nextBeatIndex };
-        }
-        if (sceneIndex + 1 < ORIGIN_SCENES.length) {
-          if (sceneGapTimeoutRef.current) {
-            window.clearTimeout(sceneGapTimeoutRef.current);
-          }
-          sceneGapTimeoutRef.current = window.setTimeout(() => {
-            setPlaybackCursor({
-              sceneIndex: sceneIndex + 1,
-              beatIndex: 0,
-            });
-            setSettledEntries([]);
-            resetPartials();
-            sceneGapTimeoutRef.current = null;
-          }, SCENE_GAP_MS);
-          return { sceneIndex, beatIndex: scene.beats.length };
-        }
-        setCinemaComplete(true);
-        return { sceneIndex, beatIndex: scene.beats.length };
+  React.useEffect(() => {
+    if (pendingBetweenScenesSceneIndex === null) {
+      return;
+    }
+    const sceneIndex = pendingBetweenScenesSceneIndex;
+    setPendingBetweenScenesSceneIndex(null);
+    story.scheduleBetweenScenes(sceneIndex, () => {
+      setPlaybackCursor({
+        sceneIndex: sceneIndex + 1,
+        beatIndex: 0,
       });
+      setSettledEntries([]);
+      resetPartials();
+    });
+  }, [pendingBetweenScenesSceneIndex, story, resetPartials]);
+
+  const timelineRunning =
+    story.originCinemaScrollArmed &&
+    !prefersReducedMotion &&
+    !cinemaComplete &&
+    !story.timelineSuspended &&
+    !story.originCinemaUserPaused;
+
+  const appendSettledAndAdvance = React.useCallback(
+    (_completedBeat: OriginBeat) => {
+      setSettledEntries((previous) => [...previous, _completedBeat]);
+      const previousCursor = playbackCursorRef.current;
+      const outcome = computePlaybackOutcomeAfterBeatCompletes(previousCursor);
+      setPlaybackCursor(outcome.nextCursor);
+      if (outcome.pendingBetweenScenesSceneIndex !== null) {
+        setPendingBetweenScenesSceneIndex(
+          outcome.pendingBetweenScenesSceneIndex,
+        );
+      }
+      if (outcome.markCinemaComplete) {
+        setCinemaComplete(true);
+      }
     },
-    [resetPartials],
+    [],
   );
+
+  const restartFromBeginning = React.useCallback(() => {
+    story.clearBetweenScenes();
+    setPlaybackCursor({ sceneIndex: 0, beatIndex: 0 });
+    setSettledEntries([]);
+    resetPartials();
+    setCinemaComplete(false);
+    setPendingBetweenScenesSceneIndex(null);
+    story.setOriginCinemaScrollArmed(true);
+    story.setOriginCinemaUserPaused(false);
+  }, [resetPartials, story]);
 
   React.useLayoutEffect(() => {
     resetPartials();
   }, [playbackCursor.sceneIndex, playbackCursor.beatIndex, resetPartials]);
 
   React.useEffect(() => {
-    return () => {
-      if (sceneGapTimeoutRef.current) {
-        window.clearTimeout(sceneGapTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  React.useEffect(() => {
-    const node = rootRef.current;
-    if (!node || shouldRunCinema) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry?.isIntersecting) {
-          return;
-        }
-        setShouldRunCinema(true);
-      },
-      { root: null, rootMargin: "140px 0px 55% 0px", threshold: 0 },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [shouldRunCinema]);
-
-  React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "mono") {
@@ -201,16 +354,10 @@ export function WhyNciOriginCinema() {
       setMonoRevealLength((previous) => previous + 1);
     }, delayMs);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    monoRevealLength,
-  ]);
+  }, [timelineRunning, currentBeat, monoRevealLength]);
 
   React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "mono") {
@@ -224,17 +371,10 @@ export function WhyNciOriginCinema() {
       appendSettledAndAdvance(monoBeat);
     }, MONO_HOLD_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    monoRevealLength,
-    appendSettledAndAdvance,
-  ]);
+  }, [timelineRunning, currentBeat, monoRevealLength, appendSettledAndAdvance]);
 
   React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "pill") {
@@ -244,16 +384,10 @@ export function WhyNciOriginCinema() {
       appendSettledAndAdvance(currentBeat);
     }, PILL_DWELL_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    appendSettledAndAdvance,
-  ]);
+  }, [timelineRunning, currentBeat, appendSettledAndAdvance]);
 
   React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "card") {
@@ -270,17 +404,10 @@ export function WhyNciOriginCinema() {
       setCardTitleRevealLength((previous) => previous + 1);
     }, CARD_TITLE_MS_PER_CHAR);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    cardTitleRevealLength,
-    cardBodyVisible,
-  ]);
+  }, [timelineRunning, currentBeat, cardTitleRevealLength, cardBodyVisible]);
 
   React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "card") {
@@ -297,17 +424,10 @@ export function WhyNciOriginCinema() {
       setCardBodyVisible(true);
     }, CARD_TITLE_HOLD_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    cardTitleRevealLength,
-    cardBodyVisible,
-  ]);
+  }, [timelineRunning, currentBeat, cardTitleRevealLength, cardBodyVisible]);
 
   React.useEffect(() => {
-    if (!shouldRunCinema || prefersReducedMotion || cinemaComplete) {
+    if (!timelineRunning) {
       return;
     }
     if (!currentBeat || currentBeat.beatKind !== "card") {
@@ -321,26 +441,18 @@ export function WhyNciOriginCinema() {
       appendSettledAndAdvance(cardBeat);
     }, CARD_BODY_DWELL_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    shouldRunCinema,
-    prefersReducedMotion,
-    cinemaComplete,
-    currentBeat,
-    cardBodyVisible,
-    appendSettledAndAdvance,
-  ]);
+  }, [timelineRunning, currentBeat, cardBodyVisible, appendSettledAndAdvance]);
 
-  const handleReplay = React.useCallback(() => {
-    if (sceneGapTimeoutRef.current) {
-      window.clearTimeout(sceneGapTimeoutRef.current);
-      sceneGapTimeoutRef.current = null;
+  const handleOverlayPointerUp = React.useCallback(() => {
+    if (prefersReducedMotion) {
+      return;
     }
-    setPlaybackCursor({ sceneIndex: 0, beatIndex: 0 });
-    setSettledEntries([]);
-    resetPartials();
-    setCinemaComplete(false);
-    setShouldRunCinema(true);
-  }, [resetPartials]);
+    if (cinemaComplete) {
+      restartFromBeginning();
+      return;
+    }
+    story.setOriginCinemaUserPaused(false);
+  }, [cinemaComplete, prefersReducedMotion, restartFromBeginning, story]);
 
   if (prefersReducedMotion) {
     return <CinemaReducedMotionSummary />;
@@ -356,87 +468,187 @@ export function WhyNciOriginCinema() {
       ? (currentBeat as OriginCardBeat).title.slice(0, cardTitleRevealLength)
       : "";
 
+  const settledForDisplay =
+    currentBeat?.beatKind === "pill" &&
+    settledEntries.length > 0 &&
+    settledEntries[settledEntries.length - 1]!.beatKind === "mono"
+      ? settledEntries.slice(0, -1)
+      : settledEntries;
+
+  const monoTailForPillOverlay =
+    currentBeat?.beatKind === "pill" &&
+    settledEntries.length > 0 &&
+    settledEntries[settledEntries.length - 1]!.beatKind === "mono"
+      ? (settledEntries[settledEntries.length - 1] as OriginMonoBeat).text
+      : null;
+
+  const targetStageHeight =
+    measuredStageHeight === null
+      ? "auto"
+      : Math.max(STAGE_MIN_HEIGHT_PX, measuredStageHeight);
+
   return (
-    <section ref={rootRef} className="my-10 sm:my-14" aria-label="Origin story">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-instrument-serif text-2xl font-normal text-ink sm:text-3xl">
-          Where this started
-        </h2>
-        {cinemaComplete ? (
-          <button
-            type="button"
-            onClick={handleReplay}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "gap-2",
-            )}
+    <div
+      ref={rootRef}
+      className="w-full min-w-0 max-sm:-mx-6 max-sm:w-[calc(100%+3rem)] max-sm:max-w-none"
+    >
+      <StagedDemo.Root className="max-sm:rounded-none max-sm:border-x-0 max-sm:p-2">
+        <StagedDemo.Card className="relative overflow-hidden rounded-2xl border border-border/90 bg-elevated p-4 shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)] max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none sm:p-5 md:p-6 lg:px-10 lg:py-9">
+          {TEMP_CALIPER_DISABLE_PAUSE_OVERLAY ? (
+            <div
+              id="caliper-why-nci-cinema-controls"
+              className="absolute right-3 top-3 z-[35] flex items-center gap-2"
+            >
+              {cinemaComplete ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOverlayPointerUp();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink shadow-sm transition-colors hover:bg-surface/80"
+                >
+                  <ArrowPathIcon className="h-3.5 w-3.5" aria-hidden />
+                  Replay
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    story.setOriginCinemaUserPaused(
+                      !story.originCinemaUserPaused,
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-elevated px-2.5 py-1.5 text-xs font-medium text-ink shadow-sm transition-colors hover:bg-surface/80"
+                  aria-pressed={story.originCinemaUserPaused}
+                >
+                  {!story.originCinemaUserPaused ? (
+                    <>
+                      <PauseIcon className="size-3.5" aria-hidden />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <PlayIcon className="size-3.5" aria-hidden />
+                      Play
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          ) : null}
+
+          <motion.div
+            initial={false}
+            animate={{ height: targetStageHeight }}
+            transition={STAGE_HEIGHT_TRANSITION}
+            className="relative z-0 w-full min-w-0 max-w-prose overflow-hidden rounded-xl border border-border bg-surface/95 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.75)] [contain:inline-size] max-sm:rounded-none max-sm:border-0 max-sm:border-y max-sm:border-border/80 max-sm:shadow-none sm:rounded-xl md:rounded-xl"
           >
-            <ArrowPathIcon className="h-4 w-4" aria-hidden="true" />
-            Replay
-          </button>
-        ) : null}
-      </div>
+            <div ref={measureRef} className="p-3 sm:p-4">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={playbackCursor.sceneIndex}
+                  {...SCENE_MOTION}
+                  className={SCENE_INNER_CLASS}
+                >
+                  <div className="flex min-w-0 flex-col gap-2.5 overflow-hidden">
+                    {mapBeatsToNodes(
+                      settledForDisplay,
+                      `scene-${playbackCursor.sceneIndex}`,
+                    )}
 
-      <StagedDemo.Root>
-        <StagedDemo.Card className="p-4 sm:p-6">
-          <div className="mb-3 flex items-center justify-between gap-3 border-b border-border pb-3">
-            <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
-              Agent trace (illustration)
-            </span>
-            <span className="font-mono text-[0.65rem] text-muted sm:text-xs">
-              Scene {playbackCursor.sceneIndex + 1} / {ORIGIN_SCENES.length}
-            </span>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-code-surface px-3 py-4 sm:px-4 sm:py-5">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={playbackCursor.sceneIndex}
-                {...SCENE_MOTION}
-                className="flex min-h-[12rem] flex-col gap-3 sm:min-h-[14rem]"
-              >
-                <div className="flex flex-col gap-3">
-                  {settledEntries.map((entry, entryIndex) => {
-                    const stableKey = `${playbackCursor.sceneIndex}-${entryIndex}-${entry.beatKind}`;
-                    if (entry.beatKind === "mono") {
-                      return (
-                        <CinemaMonoLine key={stableKey} text={entry.text} />
-                      );
-                    }
-                    if (entry.beatKind === "pill") {
-                      return <CinemaPill key={stableKey} label={entry.text} />;
-                    }
-                    return <CinemaDocCard key={stableKey} beat={entry} />;
-                  })}
-
-                  {currentBeat?.beatKind === "mono" ? (
-                    <div className="flex items-end gap-0.5">
-                      <CinemaMonoLine text={partialMonoText} />
-                      <span
-                        className="mb-0.5 inline-block h-3.5 w-px animate-pulse bg-code-ink/50"
-                        aria-hidden="true"
+                    {monoTailForPillOverlay !== null &&
+                    currentBeat?.beatKind === "pill" ? (
+                      <MonoLineWithPill
+                        monoText={monoTailForPillOverlay}
+                        pillLabel={currentBeat.text}
                       />
-                    </div>
-                  ) : null}
+                    ) : null}
 
-                  {currentBeat?.beatKind === "pill" ? (
-                    <CinemaPill label={currentBeat.text} />
-                  ) : null}
+                    {currentBeat?.beatKind === "mono" ? (
+                      <div className="min-w-0 overflow-hidden border-l-2 border-transparent pl-3">
+                        <p className="min-w-0 max-w-full break-words font-mono text-sm leading-relaxed tracking-tight-p text-ink/88 [overflow-wrap:anywhere]">
+                          {partialMonoText}
+                          <span
+                            aria-hidden
+                            className="ml-px inline-block h-[1.125em] w-px translate-y-[0.05em] align-baseline animate-pulse bg-ink/35"
+                          />
+                        </p>
+                      </div>
+                    ) : null}
 
-                  {currentBeat?.beatKind === "card" ? (
-                    <div className="flex flex-col gap-2">
-                      <CinemaMonoLine text={partialCardTitle} />
-                      {cardBodyVisible ? (
-                        <CinemaDocCard beat={currentBeat as OriginCardBeat} />
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </motion.div>
+                    {currentBeat?.beatKind === "card" ? (
+                      <div className="flex min-w-0 flex-col gap-2 overflow-hidden border-l-2 border-transparent pl-3">
+                        <p className="min-w-0 break-words font-mono text-sm leading-relaxed tracking-tight-p text-ink/88 [overflow-wrap:anywhere]">
+                          {partialCardTitle}
+                        </p>
+                        {cardBodyVisible ? (
+                          <CinemaDocCard beat={currentBeat as OriginCardBeat} />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {!TEMP_CALIPER_DISABLE_PAUSE_OVERLAY &&
+          !story.originCinemaUserPaused &&
+          !cinemaComplete ? (
+            <button
+              type="button"
+              onPointerUp={(event) => {
+                event.preventDefault();
+                story.setOriginCinemaUserPaused(true);
+              }}
+              className="absolute inset-0 z-10 cursor-pointer rounded-2xl border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-elevated"
+              aria-label="Pause trace"
+            />
+          ) : null}
+
+          {!TEMP_CALIPER_DISABLE_PAUSE_OVERLAY ? (
+            <AnimatePresence>
+              {cinemaComplete || story.originCinemaUserPaused ? (
+                <motion.button
+                  type="button"
+                  key={cinemaComplete ? "replay" : "paused"}
+                  {...OVERLAY_MOTION}
+                  onPointerUp={(event) => {
+                    event.preventDefault();
+                    handleOverlayPointerUp();
+                  }}
+                  className={cn(
+                    "absolute inset-0 z-20 flex cursor-pointer flex-col items-center justify-center gap-3 border-0 bg-white/72 p-0 backdrop-blur-[2px] outline-none",
+                    "transition-[background-color] duration-150 ease-out hover:bg-white/78",
+                    "focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-elevated",
+                  )}
+                  aria-label={cinemaComplete ? "Replay trace" : "Resume trace"}
+                >
+                  <div
+                    className={cn(
+                      "flex h-14 w-14 items-center justify-center rounded-full border border-border bg-elevated text-ink",
+                      "shadow-[0_1px_0_rgb(255_255_255_/_0.9)_inset,0_2px_8px_-2px_rgb(0_0_0_/_0.12)]",
+                      "will-change-transform",
+                    )}
+                    aria-hidden
+                  >
+                    {cinemaComplete ? (
+                      <ArrowPathIcon className="size-7" aria-hidden="true" />
+                    ) : (
+                      <PlayIcon className="ml-0.5 size-7" aria-hidden="true" />
+                    )}
+                  </div>
+                  <span className="text-xs font-medium tracking-tight-p text-muted">
+                    {cinemaComplete
+                      ? "Tap to replay"
+                      : "Paused — tap to resume"}
+                  </span>
+                </motion.button>
+              ) : null}
             </AnimatePresence>
-          </div>
+          ) : null}
         </StagedDemo.Card>
       </StagedDemo.Root>
-    </section>
+    </div>
   );
 }

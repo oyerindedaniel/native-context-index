@@ -38,9 +38,9 @@ interface CommandPaletteContextValue {
   activeIndex: number;
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
   navigateToResult: (result: CommandResult) => void;
-  /** Call before keyboard-driven `setActiveIndex` so list hover does not fight arrows. */
+  /** Call when arrow keys move the highlight — hover is ignored until the pointer actually moves. */
   markResultsKeyboardNav: () => void;
-  /** True briefly after keyboard list nav — skip `onMouseEnter` active changes. */
+  /** While keyboard drives the highlight, skip `onMouseEnter` selection until a real pointer move. */
   shouldIgnoreResultsHoverSelect: () => boolean;
 }
 
@@ -128,12 +128,16 @@ function CommandPaletteRoot({
   const [query, setQuery] = React.useState("");
   const [scope, setScope] = React.useState<ScopeId>("all");
   const [activeIndex, setActiveIndex] = React.useState(0);
-  const resultsKeyboardNavAt = React.useRef(0);
+  /** After ↑/↓ from the input, ignore result hover until the user moves the pointing device. */
+  const keyboardDrivesListRef = React.useRef(false);
+  const lastPointerRef = React.useRef<{ x: number; y: number } | null>(null);
+
   const markResultsKeyboardNav = React.useCallback(() => {
-    resultsKeyboardNavAt.current = performance.now();
+    keyboardDrivesListRef.current = true;
   }, []);
+
   const shouldIgnoreResultsHoverSelect = React.useCallback(() => {
-    return performance.now() - resultsKeyboardNavAt.current < 180;
+    return keyboardDrivesListRef.current;
   }, []);
 
   React.useEffect(() => {
@@ -141,7 +145,34 @@ function CommandPaletteRoot({
       setQuery("");
       setScope("all");
       setActiveIndex(0);
+      keyboardDrivesListRef.current = false;
+      lastPointerRef.current = null;
+      return;
     }
+    keyboardDrivesListRef.current = false;
+    lastPointerRef.current = null;
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const moveThresholdPx = 2;
+    const thresholdSq = moveThresholdPx * moveThresholdPx;
+    const onPointerMove = (event: PointerEvent) => {
+      const { clientX, clientY } = event;
+      const last = lastPointerRef.current;
+      if (last) {
+        const dx = clientX - last.x;
+        const dy = clientY - last.y;
+        if (dx * dx + dy * dy >= thresholdSq) {
+          keyboardDrivesListRef.current = false;
+        }
+      }
+      lastPointerRef.current = { x: clientX, y: clientY };
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onPointerMove);
   }, [open]);
 
   const results = React.useMemo(
@@ -243,7 +274,7 @@ function CommandPaletteOverlay({
       className={cn(
         "fixed inset-0 flex bg-ink/45 backdrop-blur-sm",
         "max-md:h-[100dvh] max-md:flex-col max-md:items-stretch max-md:justify-start max-md:px-0 max-md:pt-0",
-        "items-start justify-center px-4 pt-[max(3rem,calc(var(--spacing-docs-chrome)+1.25rem))]",
+        "md:min-h-dvh md:items-center md:justify-center md:px-4 md:py-6",
         className,
       )}
       style={{ zIndex: "var(--nci-z-command-overlay)" }}
@@ -267,7 +298,9 @@ function CommandPaletteOverlay({
         className={cn(
           "flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-elevated shadow-[0_8px_24px_-8px_#00000026,0_24px_48px_-16px_#0000002a]",
           "max-md:max-w-none max-md:max-h-[100dvh] max-md:min-h-0 max-md:flex-1 max-md:rounded-none max-md:border-x-0 max-md:shadow-none",
+          "md:max-h-[min(80vh,calc(100dvh-5rem))]",
         )}
+        data-command-palette="dialog"
       >
         {children}
       </motion.div>
@@ -488,7 +521,7 @@ function CommandPaletteResults() {
   return (
     <div
       data-command-palette-results
-      className="min-h-0 flex-1 overflow-y-auto px-4 py-2 [scrollbar-gutter:stable] max-md:max-h-none md:max-h-[60vh]"
+      className="min-h-0 flex-1 overflow-y-auto px-4 py-2 [scrollbar-gutter:stable] max-md:max-h-none"
     >
       {Object.entries(groupedByGroup).map(([groupId, items]) => {
         const groupTitle = items[0]?.groupTitle ?? groupId;
