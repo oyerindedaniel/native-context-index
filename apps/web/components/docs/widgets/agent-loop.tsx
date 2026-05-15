@@ -130,9 +130,9 @@ export function AgentLoopRoot({
 }
 
 const FRAME_ENTRANCE: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -8 },
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 const FRAME_TRANSITION = { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const };

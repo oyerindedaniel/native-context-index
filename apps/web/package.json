@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit",
-    "test:benchmarks": "vitest run components/benchmarks/__tests__"
+    "test:benchmarks": "vitest run components/benchmarks"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

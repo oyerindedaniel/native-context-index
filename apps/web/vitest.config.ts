@@ -11,6 +11,8 @@ export default defineConfig({
     environment: "jsdom",
     include: [
       "components/benchmarks/__tests__/**/*.test.tsx",
+      "components/benchmarks/benchmark-vessel/__tests__/**/*.test.ts",
+      "components/benchmarks/benchmark-vessel/__tests__/**/*.test.tsx",
       "components/docs/widgets/__tests__/**/*.test.ts",
     ],
   },
