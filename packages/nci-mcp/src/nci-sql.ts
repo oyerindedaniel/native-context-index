@@ -4,7 +4,7 @@ export const nciSqlDescription =
   "Run read-only SQL against the NCI SQLite database (CLI equivalent: `nci sql`). " +
   'Default `format=json` returns a raw JSON array of row objects (not the `{"ok":...,"meta":...}` envelope used by `nci_query`). ' +
   "Use `schema: true` to print the full table DDL instead of running SQL. " +
-  "When `nci_sql` omits `max_rows`, MCP passes **--max-rows 500** by default so wide SELECTs fail fast instead of streaming huge arrays.";
+  "Omitting **max_rows** defaults to **500** (`--max-rows`) so accidental unbounded SELECTs stay rare.";
 
 export const nciSqlInputSchema = z
   .object({
@@ -39,7 +39,7 @@ export const nciSqlInputSchema = z
       .optional()
       .default(500)
       .describe(
-        "Hard cap on rows (CLI: `--max-rows`). The command fails if the query would return more than this. Applies only to `nci sql`, NOT to `nci_query`. MCP defaults to 500 when omitted so accidental unbounded SELECTs are rare.",
+        "Hard cap on rows (CLI: `--max-rows`); fails if the result would exceed it. `nci sql` only, not `nci_query`. Defaults to 500 when omitted.",
       ),
     format: z
       .enum(["json", "jsonl", "plain"])

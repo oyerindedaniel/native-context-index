@@ -5,6 +5,7 @@ import { ClipboardIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
+import { buildFlagCopyText } from "@/components/docs/widgets/flag-table-copy";
 
 export interface FlagDescriptor {
   id: string;
@@ -14,10 +15,48 @@ export interface FlagDescriptor {
   defaultValue?: string;
   description: React.ReactNode;
   subcommand?: string;
+  /** When set, overrides {@link buildFlagCopyText} for the row copy button. */
+  copyText?: string;
 }
 
 function describeFlagName(flag: FlagDescriptor): string {
   return [flag.long, flag.short].filter(Boolean).join(", ");
+}
+
+export { buildFlagCopyText } from "@/components/docs/widgets/flag-table-copy";
+
+const BACKTICK_SEGMENT = /(`[^`]*`)/g;
+
+function renderBacktickDescription(text: string): React.ReactNode {
+  const segments = text.split(BACKTICK_SEGMENT);
+  return segments.map((segment, segmentIndex) => {
+    if (
+      segment.length >= 2 &&
+      segment.startsWith("`") &&
+      segment.endsWith("`")
+    ) {
+      return (
+        <code key={segmentIndex} className="nci-code-chip">
+          {segment.slice(1, -1)}
+        </code>
+      );
+    }
+    if (segment.length === 0) {
+      return null;
+    }
+    return <React.Fragment key={segmentIndex}>{segment}</React.Fragment>;
+  });
+}
+
+function FlagTableDescription({
+  description,
+}: {
+  description: React.ReactNode;
+}) {
+  if (typeof description === "string") {
+    return <>{renderBacktickDescription(description)}</>;
+  }
+  return <>{description}</>;
 }
 
 interface FlagTableContextValue {
@@ -232,18 +271,18 @@ interface FlagTableRowProps {
 
 function FlagTableRow({ flag }: FlagTableRowProps) {
   const { copied, copy } = useCopyToClipboard();
-  const copyTarget = flag.long ?? flag.short ?? "";
+  const copyTarget = buildFlagCopyText(flag);
 
   return (
     <tr className="align-top">
       <td className="border-b border-border/60 px-4 py-3">
         <div className="flex flex-col gap-1">
-          <code className="font-mono text-[0.82rem] text-ink">
+          <span className="font-mono text-[0.82rem] text-ink">
             {describeFlagName(flag)}
             {flag.valuePlaceholder ? (
               <span className="ml-1 text-muted">{flag.valuePlaceholder}</span>
             ) : null}
-          </code>
+          </span>
           {flag.defaultValue ? (
             <span className="font-mono text-[0.7rem] text-muted/80">
               default = {flag.defaultValue}
@@ -254,8 +293,8 @@ function FlagTableRow({ flag }: FlagTableRowProps) {
       <td className="border-b border-border/60 px-4 py-3 font-mono text-xs text-muted">
         {flag.subcommand ?? "—"}
       </td>
-      <td className="border-b border-border/60 px-4 py-3 text-sm tracking-tight-p text-ink/85 [&_code]:rounded-md [&_code]:bg-surface [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-ink">
-        {flag.description}
+      <td className="border-b border-border/60 px-4 py-3 text-sm tracking-tight-p text-ink/85">
+        <FlagTableDescription description={flag.description} />
       </td>
       <td className="border-b border-border/60 px-4 py-3 text-right">
         <button

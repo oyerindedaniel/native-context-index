@@ -95,7 +95,7 @@ export const nciQueryInputSchema = z.preprocess(
         .optional()
         .default(20)
         .describe(
-          "Max hits to return (CLI: `--limit`; MCP defaults to 20 when omitted).",
+          "Max hits to return (CLI: `--limit`). Defaults to 20 when omitted.",
         ),
       ...symbolFilterShape,
     }),
@@ -112,7 +112,7 @@ export const nciQueryInputSchema = z.preprocess(
         .optional()
         .default(20)
         .describe(
-          "Max hits to return (CLI: `--limit`; MCP defaults to 20 when omitted).",
+          "Max hits to return (CLI: `--limit`). Defaults to 20 when omitted.",
         ),
       ...symbolFilterShape,
     }),
@@ -208,9 +208,7 @@ export const nciQueryInputSchema = z.preprocess(
         .positive()
         .optional()
         .default(100)
-        .describe(
-          "Page size (CLI: `--limit`; MCP defaults to 100 when omitted).",
-        ),
+        .describe("Page size (CLI: `--limit`). Defaults to 100 when omitted."),
       offset: z
         .number()
         .int()
@@ -218,7 +216,7 @@ export const nciQueryInputSchema = z.preprocess(
         .optional()
         .default(0)
         .describe(
-          "Skip this many rows before returning (CLI: `--offset`; MCP defaults to 0).",
+          "Skip this many rows before returning (CLI: `--offset`). Defaults to 0 when omitted.",
         ),
     }),
     z.object({
@@ -276,7 +274,7 @@ export const nciQueryInputSchema = z.preprocess(
         .optional()
         .default(10)
         .describe(
-          "Cap on hit rows in `data.symbols` after dedupe across all anchors (CLI: `-n` / `--limit`; MCP defaults to 10 when omitted).",
+          "Cap on hit rows in `data.symbols` after dedupe across all anchors (CLI: `-n` / `--limit`). Defaults to 10 when omitted.",
         ),
       snippet_limit: z
         .number()

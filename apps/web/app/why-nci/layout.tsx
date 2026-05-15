@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SiteMarketingFooter } from "@/components/marketing/site-marketing-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { WhyNciShell } from "@/components/why-nci/why-nci-shell";
 import { WhyNciStoryProvider } from "@/components/why-nci/why-nci-story-context";
@@ -22,6 +23,7 @@ export default function WhyNciLayout({
           <WhyNciShell>{children}</WhyNciShell>
         </WhyNciStoryProvider>
       </main>
+      <SiteMarketingFooter />
     </div>
   );
 }
