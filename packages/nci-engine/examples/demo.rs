@@ -12,7 +12,12 @@
 //! `--no-package-cache` (no SQLite read/write; crawl only, then optional JSON — for dev profiling),
 //! `--no-parallel-resolve-deps` (graph build resolves symbol dependencies sequentially — for A/B timing),
 //! `--max-hops N` (crawl depth from package entries; `-1` = unlimited, see `MAX_HOPS_UNLIMITED` in
-//! `nci_engine::constants`; default 10 when omitted).
+//! `nci_engine::constants`; default 10 when omitted),
+//! `--database PATH` (SQLite path for per-package cache; overrides OS cache dir),
+//! `--fresh-db` (use a new temp `nci-demo-*.sqlite` so probes are cold misses),
+//! `--limit N` (index at most N packages after scan/dedupe),
+//! `--package-scope SCOPE` (`all_installed` default, or `dependencies`, `dev_dependencies`, or both comma-separated),
+//! `--manifest-root PATH` (which `package.json` gates `package-scope`; default repo root).
 //!
 //! Env: `NCI_INDEX_NO_CACHE=1` is the same as `--no-package-cache` (handy when you cannot pass flags).
 //! `NCI_PARALLEL_RESOLVE_DEPS=0` is the same as `--no-parallel-resolve-deps`.
@@ -32,9 +37,10 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use nci_engine::constants::{MAX_HOPS_UNLIMITED, max_hops_from_user_value};
+use nci_engine::filter::{DepKindFilter, FilterConfig};
 use nci_engine::pipeline::{
     GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
@@ -116,6 +122,53 @@ fn load_engine_dotenv(engine_dir: &std::path::Path) {
     }
 }
 
+fn resolve_package_scope_filter(scope_arg: &str) -> Result<DepKindFilter, String> {
+    let normalized = scope_arg.trim().to_ascii_lowercase();
+    if normalized.is_empty() || normalized == "all_installed" || normalized == "all" {
+        return Ok(DepKindFilter::All);
+    }
+    let mut has_runtime_dependencies = false;
+    let mut has_dev_dependencies = false;
+    for segment in normalized.split(',') {
+        let token = segment.trim();
+        match token {
+            "" => {}
+            "all_installed" | "all" => return Ok(DepKindFilter::All),
+            "dependencies" => has_runtime_dependencies = true,
+            "dev_dependencies" | "dev" => has_dev_dependencies = true,
+            unknown => {
+                return Err(format!(
+                    "unknown package-scope segment {unknown:?}; use all_installed, dependencies, dev_dependencies"
+                ));
+            }
+        }
+    }
+    match (has_runtime_dependencies, has_dev_dependencies) {
+        (true, true) => Ok(DepKindFilter::DependenciesAndDevDependencies),
+        (true, false) => Ok(DepKindFilter::DependenciesOnly),
+        (false, true) => Ok(DepKindFilter::DevDependenciesOnly),
+        (false, false) => Err(format!(
+            "empty --package-scope {scope_arg:?}; use all_installed, dependencies, dev_dependencies, or both comma-separated"
+        )),
+    }
+}
+
+fn create_fresh_demo_database_path() -> PathBuf {
+    let mut path = env::temp_dir();
+    path.push(format!(
+        "nci-demo-{}-{}.sqlite",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_millis())
+            .unwrap_or(0)
+    ));
+    if path.exists() {
+        let _ = fs::remove_file(&path);
+    }
+    path
+}
+
 fn try_init_tracing_from_env() {
     static INIT: OnceLock<()> = OnceLock::new();
     INIT.get_or_init(|| {
@@ -157,6 +210,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut no_parallel_resolve_deps = false;
     let mut max_hops_cli: Option<i64> = None;
     let mut max_hops_from_flag = false;
+    let mut database_path_arg: Option<PathBuf> = None;
+    let mut use_fresh_database = false;
+    let mut package_limit: Option<usize> = None;
+    let mut package_scope_arg = String::from("all_installed");
+    let mut manifest_root_arg: Option<PathBuf> = None;
 
     let mut current_index = 1;
     while current_index < args.len() {
@@ -201,6 +259,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--no-parallel-resolve-deps" => {
                 no_parallel_resolve_deps = true;
+            }
+            "--database" if current_index + 1 < args.len() => {
+                database_path_arg = Some(PathBuf::from(&args[current_index + 1]));
+                current_index += 1;
+            }
+            "--fresh-db" => {
+                use_fresh_database = true;
+            }
+            "--limit" if current_index + 1 < args.len() => {
+                let raw = args[current_index + 1].as_str();
+                package_limit = Some(match raw.parse::<usize>() {
+                    Ok(value) if value > 0 => value,
+                    _ => {
+                        eprintln!("--limit expects a positive integer, got {raw:?}");
+                        std::process::exit(2);
+                    }
+                });
+                current_index += 1;
+            }
+            "--package-scope" if current_index + 1 < args.len() => {
+                package_scope_arg = args[current_index + 1].clone();
+                current_index += 1;
+            }
+            "--manifest-root" if current_index + 1 < args.len() => {
+                manifest_root_arg = Some(PathBuf::from(&args[current_index + 1]));
+                current_index += 1;
             }
             _ => {}
         }
@@ -249,6 +333,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     try_init_tracing_from_env();
 
+    let dep_kind_filter = match resolve_package_scope_filter(&package_scope_arg) {
+        Ok(value) => value,
+        Err(message) => {
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
+    };
+
+    let resolved_database_path: Option<PathBuf> = if no_package_cache {
+        None
+    } else if use_fresh_database {
+        let fresh_path = create_fresh_demo_database_path();
+        println!("🗄️  Fresh SQLite: {}\n", fresh_path.display());
+        Some(fresh_path)
+    } else {
+        database_path_arg
+    };
+
     println!("🔍 Scanning node_modules...\n");
     // Wall-clock for discover → index all (used for `total_packages_run_ms`; tables/JSON come after).
     let run_start = Instant::now();
@@ -272,9 +374,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     discovered_packages = dedupe_packages_by_canonical_dir(discovered_packages);
 
+    let manifest_root = manifest_root_arg
+        .map(|relative_or_absolute| {
+            if relative_or_absolute.is_absolute() {
+                relative_or_absolute
+            } else {
+                repo_root.join(relative_or_absolute)
+            }
+        })
+        .unwrap_or_else(|| repo_root.clone());
+
+    let scope_filter = FilterConfig {
+        dep_kind_filter,
+        project_root: Some(manifest_root.clone()),
+        ..Default::default()
+    }
+    .with_nciignore_file(&repo_root);
+    discovered_packages = scope_filter.apply(discovered_packages);
+
     if !target_packages_args.is_empty() {
         discovered_packages
             .retain(|package_info| target_packages_args.contains(&package_info.name.to_string()));
+    }
+
+    if let Some(limit) = package_limit {
+        discovered_packages.truncate(limit);
     }
 
     if discovered_packages.is_empty() {
@@ -289,7 +413,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    println!("📦 Found {} packages\n", discovered_packages.len());
+    println!(
+        "📦 Found {} packages (manifest: {})\n",
+        discovered_packages.len(),
+        manifest_root.display()
+    );
 
     let scan_dedupe_duration = run_start.elapsed();
 
@@ -301,6 +429,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         parallel: !use_sequential,
         project_root: Some(repo_root.clone()),
         enable_package_cache: !no_package_cache,
+        db_path: resolved_database_path.clone(),
+        filter: FilterConfig {
+            dep_kind_filter,
+            ..Default::default()
+        },
         parallel_resolve_deps: !no_parallel_resolve_deps,
         hydrate_cache_hits: false,
         retain_graph_after_save: false,
@@ -417,6 +550,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "on (sqlite read/write when enabled)"
         }
     );
+    if let Some(ref db_path) = resolved_database_path {
+        println!("   SQLite path:     {}", db_path.display());
+    }
+    println!("   Package scope:   {}", package_scope_arg);
+    println!("   Manifest root:   {}", manifest_root.display());
+    if let Some(limit) = package_limit {
+        println!("   Package limit:   {limit}");
+    }
     println!(
         "   Resolve deps:    {}",
         if no_parallel_resolve_deps {

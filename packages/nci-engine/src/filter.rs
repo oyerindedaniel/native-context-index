@@ -54,7 +54,9 @@ impl FilterConfig {
     pub fn with_nciignore_file(mut self, project_root: &Path) -> Self {
         self.nciignore_rules
             .extend(load_nciignore_rules_from_dir(project_root));
-        self.project_root = Some(project_root.to_path_buf());
+        if self.project_root.is_none() {
+            self.project_root = Some(project_root.to_path_buf());
+        }
         self
     }
 
