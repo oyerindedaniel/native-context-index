@@ -1,4 +1,8 @@
+import Link from "next/link";
 import { FeatureCard } from "../features/feature-card";
+
+const docLinkClass =
+  "inline-flex text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2";
 
 export function IntegrationsSection() {
   return (
@@ -34,6 +38,16 @@ export function IntegrationsSection() {
                 />
               </svg>
             }
+            footer={
+              <Link
+                href="/docs/cli"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={docLinkClass}
+              >
+                CLI documentation
+              </Link>
+            }
           />
           <FeatureCard
             title="MCP"
@@ -53,6 +67,16 @@ export function IntegrationsSection() {
                   d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
                 />
               </svg>
+            }
+            footer={
+              <Link
+                href="/docs/mcp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={docLinkClass}
+              >
+                MCP documentation
+              </Link>
             }
           />
         </div>

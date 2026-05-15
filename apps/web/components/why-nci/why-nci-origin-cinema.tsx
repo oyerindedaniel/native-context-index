@@ -493,7 +493,7 @@ export function WhyNciOriginCinema() {
       className="w-full min-w-0 max-sm:-mx-6 max-sm:w-[calc(100%+3rem)] max-sm:max-w-none"
     >
       <StagedDemo.Root className="max-sm:rounded-none max-sm:border-x-0 max-sm:p-3">
-        <StagedDemo.Card className="relative overflow-hidden rounded-2xl border border-border/90 bg-elevated p-4 shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)] max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:px-4 max-sm:pb-5 max-sm:pt-4 max-sm:shadow-none sm:p-5 md:p-6 lg:px-10 lg:py-9">
+        <StagedDemo.Card className="relative overflow-hidden rounded-2xl border border-border/90 bg-elevated/88 p-4 shadow-[0_1px_0_rgb(255_255_255_/_0.85)_inset,0_18px_48px_-28px_rgb(0_0_0_/_0.12)] max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:px-4 max-sm:pb-5 max-sm:pt-4 max-sm:shadow-none sm:p-5 md:p-6 lg:px-10 lg:py-9">
           {TEMP_CALIPER_DISABLE_PAUSE_OVERLAY ? (
             <div
               id="caliper-why-nci-cinema-controls"

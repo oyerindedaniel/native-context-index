@@ -136,13 +136,10 @@ export function TerminalRoot({
 
   return (
     <TerminalContext.Provider value={value}>
-      <motion.div
+      <div
         ref={containerRef}
-        initial={{ opacity: 0, y: 12 }}
-        animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
-          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14] [will-change:transform]",
+          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
           className,
         )}
       >
@@ -174,7 +171,7 @@ export function TerminalRoot({
             <TerminalFloatingCommandCopy commandText={command} />
           ) : null}
         </div>
-      </motion.div>
+      </div>
     </TerminalContext.Provider>
   );
 }
@@ -245,7 +242,7 @@ export function TerminalCommand({
         {revealedCommand}
         {showCursor ? (
           <span
-            className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85"
+            className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85 motion-reduce:animate-none"
             aria-hidden="true"
           />
         ) : null}
@@ -284,6 +281,7 @@ export function TerminalOutput({
   tone = "default",
 }: TerminalOutputProps) {
   const { shouldRenderOutput } = useTerminalContext();
+  const reduceMotion = useReducedMotion() === true;
 
   const toneClass = (() => {
     switch (tone) {
@@ -300,9 +298,16 @@ export function TerminalOutput({
 
   return (
     <motion.pre
-      initial={{ opacity: 0, y: 4 }}
-      animate={shouldRenderOutput ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      initial={false}
+      animate={
+        shouldRenderOutput
+          ? { opacity: 1, y: 0 }
+          : { opacity: 0, y: reduceMotion ? 0 : 4 }
+      }
+      transition={{
+        duration: reduceMotion ? 0 : 0.25,
+        ease: "easeOut",
+      }}
       className={cn(
         "mt-2 whitespace-pre-wrap text-[0.78rem] leading-relaxed",
         toneClass,
@@ -464,9 +469,16 @@ export function TerminalSequenceRoot({
 
     return (
       <motion.pre
-        initial={{ opacity: 0, y: 4 }}
-        animate={visible ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
+        initial={false}
+        animate={
+          visible
+            ? { opacity: 1, y: 0 }
+            : { opacity: 0, y: prefersReducedMotion ? 0 : 4 }
+        }
+        transition={{
+          duration: prefersReducedMotion ? 0 : 0.25,
+          ease: "easeOut",
+        }}
         className={cn(
           "mt-2 whitespace-pre-wrap text-[0.78rem] leading-relaxed",
           toneClass,
@@ -479,13 +491,10 @@ export function TerminalSequenceRoot({
 
   if (prefersReducedMotion) {
     return (
-      <motion.div
+      <div
         ref={containerRef}
-        initial={{ opacity: 0, y: 12 }}
-        animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
-          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14] [will-change:transform]",
+          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
           className,
         )}
       >
@@ -537,7 +546,7 @@ export function TerminalSequenceRoot({
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
     );
   }
 
@@ -546,13 +555,10 @@ export function TerminalSequenceRoot({
     revealedCommandPrefix.length === activeCommandLine.length;
 
   return (
-    <motion.div
+    <div
       ref={containerRef}
-      initial={{ opacity: 0, y: 12 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14] [will-change:transform]",
+        "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
         className,
       )}
     >
@@ -609,7 +615,7 @@ export function TerminalSequenceRoot({
                       {revealedCommandPrefix}
                       {showTypingCursor ? (
                         <span
-                          className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85"
+                          className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85 motion-reduce:animate-none"
                           aria-hidden="true"
                         />
                       ) : null}
@@ -645,7 +651,7 @@ export function TerminalSequenceRoot({
           <TerminalFloatingCommandCopy commandText={activeCommandLine} />
         ) : null}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

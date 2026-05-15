@@ -1,12 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "motion/react";
+import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
 import { ListBulletIcon } from "@heroicons/react/20/solid";
+import { NciKiteMark } from "@/components/marketing/nci-kite-mark";
 import { cn } from "@/lib/utils";
 import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
 import { useIntersectionObserverTargetsEffect } from "@/lib/hooks/use-intersection-observer-effect";
+import {
+  computeKiteRotationPointsUp,
+  KITE_SPRING,
+  useKiteRotateTransition,
+  useKiteTipUpOnScrollUp,
+} from "@/lib/hooks/use-kite-tip-up-on-scroll-up";
 
 interface TocItem {
   id: string;
@@ -40,6 +47,23 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
   const pathname = usePathname();
   const [items, setItems] = React.useState<TocItem[]>([]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const layoutGroupId = React.useId().replace(/:/g, "");
+  const firstId = items[0]?.id ?? null;
+
+  const reduceMotion = useReducedMotion();
+  const { kiteTipUp, resetKiteTipUp } = useKiteTipUpOnScrollUp(
+    items.length > 0,
+  );
+  const kiteRotationPointsUp = computeKiteRotationPointsUp(
+    kiteTipUp,
+    firstId,
+    activeId,
+  );
+  const kiteRotateTransition = useKiteRotateTransition(
+    kiteRotationPointsUp,
+    reduceMotion,
+  );
+
   const activeLock = useActiveHeadingLock();
   const isLockedRef = React.useRef(activeLock.isLocked);
   isLockedRef.current = activeLock.isLocked;
@@ -91,11 +115,6 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
     },
   );
 
-  // Native hash navigation handles scroll + URL hash + new-tab modifiers.
-  // We only pin the click target and arm the IO lock so the active row
-  // doesn't oscillate as the page passes intermediate sections. Skip when
-  // the click is a "open in new tab/window" intent — the current page
-  // doesn't actually scroll then.
   const handleNavigate = React.useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>, id: string) => {
       const opensElsewhere =
@@ -103,10 +122,13 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
       if (opensElsewhere) {
         return;
       }
+      if (firstId != null && activeId === firstId && id !== firstId) {
+        resetKiteTipUp();
+      }
       setActiveId(id);
       activeLock.lock(900);
     },
-    [activeLock],
+    [activeId, activeLock, firstId, resetKiteTipUp],
   );
 
   if (items.length === 0) {
@@ -123,51 +145,69 @@ export function TocRail({ scopeSelector = "main", className }: TocRailProps) {
     >
       <p className="mb-3 flex items-center gap-1.5 px-3 text-[0.68rem] font-medium uppercase tracking-[0.11em] text-muted/70">
         <ListBulletIcon
-          className="size-3.5 -translate-y-px"
+          className="size-3.5 -translate-y-px shrink-0"
           aria-hidden="true"
         />
         <span>On this page</span>
       </p>
-      <ul className="flex flex-col">
-        {items.map((item) => {
-          const isActive = item.id === activeId;
-          return (
-            <li key={item.id}>
-              <a
-                href={`#${item.id}`}
-                onClick={(event) => handleNavigate(event, item.id)}
-                className={cn(
-                  "group relative block rounded-md py-1.5 pr-3 text-[0.8125rem] tracking-tight-p outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-                  item.level === 3 ? "pl-12" : "pl-7",
-                  isActive
-                    ? "font-medium text-primary"
-                    : "text-muted/85 hover:text-ink",
-                )}
-              >
-                {isActive ? (
-                  <motion.span
-                    layoutId="toc-active-dot"
-                    transition={{
-                      type: "spring",
-                      stiffness: 380,
-                      damping: 32,
-                      mass: 0.6,
-                    }}
+      <LayoutGroup id={`docs-toc-${layoutGroupId}`}>
+        <div className="relative">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-1 bottom-1 left-3 w-px bg-gradient-to-b from-primary/25 via-primary/12 to-primary/25"
+          />
+          <ul className="flex flex-col">
+            {items.map((item) => {
+              const isActive = item.id === activeId;
+              return (
+                <li key={item.id}>
+                  <a
+                    href={`#${item.id}`}
+                    onClick={(event) => handleNavigate(event, item.id)}
                     className={cn(
-                      "absolute top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary",
-                      item.level === 3 ? "left-7" : "left-2",
+                      "group relative block rounded-md py-1.5 pr-3 text-[0.8125rem] tracking-tight-p outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                      item.level === 3 ? "pl-12" : "pl-7",
+                      isActive
+                        ? "font-medium text-primary"
+                        : "text-muted/85 hover:text-ink",
                     )}
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <span className="relative z-10 block truncate">
-                  {item.text}
-                </span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
+                  >
+                    {isActive ? (
+                      <motion.span
+                        layoutId={`docs-toc-active-kite-${layoutGroupId}`}
+                        transition={KITE_SPRING}
+                        className="absolute z-[1] flex h-[1.05rem] w-[1rem] items-center justify-center"
+                        aria-hidden="true"
+                        style={{
+                          left: "calc(0.75rem + 0.85px)",
+                          top: "50%",
+                          marginLeft: "-0.5rem",
+                          marginTop: "-0.525rem",
+                        }}
+                      >
+                        <motion.span
+                          initial={false}
+                          className="flex size-full will-change-transform items-center justify-center"
+                          style={{ transformOrigin: "50% 50%" }}
+                          animate={{
+                            rotate: kiteRotationPointsUp ? 180 : 0,
+                          }}
+                          transition={kiteRotateTransition}
+                        >
+                          <NciKiteMark className="h-full w-full translate-x-px drop-shadow-[0_1px_1px_rgb(0_0_0_/_0.06)]" />
+                        </motion.span>
+                      </motion.span>
+                    ) : null}
+                    <span className="relative z-10 block truncate">
+                      {item.text}
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </LayoutGroup>
     </aside>
   );
 }

@@ -1,12 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface FeatureCardProps {
   title: string;
   body: string;
   className?: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
+  footer?: ReactNode;
 }
 
 export function FeatureCard({
@@ -14,6 +16,7 @@ export function FeatureCard({
   body,
   className,
   icon,
+  footer,
 }: FeatureCardProps) {
   return (
     <div
@@ -30,6 +33,7 @@ export function FeatureCard({
       <p className="mt-3 text-base leading-relaxed text-muted tracking-tight-p">
         {body}
       </p>
+      {footer ? <div className="mt-4">{footer}</div> : null}
     </div>
   );
 }

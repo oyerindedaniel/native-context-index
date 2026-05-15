@@ -2,10 +2,15 @@
 
 import * as React from "react";
 import { LayoutGroup, motion, useReducedMotion } from "motion/react";
-import type { Transition } from "motion/react";
 import { ListBulletIcon } from "@heroicons/react/20/solid";
 import { useActiveHeadingLock } from "@/lib/hooks/use-active-heading-lock";
 import { useIntersectionObserverTargetsEffect } from "@/lib/hooks/use-intersection-observer-effect";
+import {
+  computeKiteRotationPointsUp,
+  KITE_SPRING,
+  useKiteRotateTransition,
+  useKiteTipUpOnScrollUp,
+} from "@/lib/hooks/use-kite-tip-up-on-scroll-up";
 import { NciKiteMark } from "@/components/marketing/nci-kite-mark";
 import { cn } from "@/lib/utils";
 
@@ -23,49 +28,6 @@ export interface PageTocNavProps {
   readonly marker?: "dot" | "kite";
 }
 
-const KITE_SPRING = {
-  type: "spring" as const,
-  stiffness: 380,
-  damping: 32,
-  mass: 0.6,
-};
-
-/** Separate from layout spring so layout + rotate transforms do not fight. */
-const KITE_ROTATE_SPRING = {
-  type: "spring" as const,
-  stiffness: 440,
-  damping: 30,
-  mass: 0.45,
-};
-
-const SCROLL_DIR_THRESHOLD_PX = 8;
-
-function useKiteTipPointsUpWhenScrollingUp(marker: "dot" | "kite") {
-  const [tipUp, setTipUp] = React.useState(false);
-  const lastY = React.useRef(0);
-
-  React.useEffect(() => {
-    if (marker !== "kite") {
-      return;
-    }
-    lastY.current = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastY.current;
-      if (delta < -SCROLL_DIR_THRESHOLD_PX) {
-        setTipUp((prev) => (prev ? prev : true));
-      } else if (delta > SCROLL_DIR_THRESHOLD_PX) {
-        setTipUp((prev) => (!prev ? prev : false));
-      }
-      lastY.current = y;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [marker]);
-
-  return tipUp;
-}
-
 export function PageTocNav({
   items,
   className,
@@ -73,24 +35,26 @@ export function PageTocNav({
   marker = "dot",
 }: PageTocNavProps) {
   const reduceMotion = useReducedMotion();
-  const kiteTipUp = useKiteTipPointsUpWhenScrollingUp(marker);
-  const prevKiteTipUpRef = React.useRef(kiteTipUp);
-  const kiteTipJustFlipped = prevKiteTipUpRef.current !== kiteTipUp;
-  React.useLayoutEffect(() => {
-    prevKiteTipUpRef.current = kiteTipUp;
-  }, [kiteTipUp]);
-
-  const kiteRotateTransition: Transition = reduceMotion
-    ? { duration: 0 }
-    : kiteTipJustFlipped
-      ? KITE_ROTATE_SPRING
-      : { type: "tween", duration: 0 };
+  const { kiteTipUp, resetKiteTipUp } = useKiteTipUpOnScrollUp(
+    marker === "kite",
+  );
 
   const layoutGroupId = React.useId().replace(/:/g, "");
   const firstId = items[0]?.id;
   const [activeId, setActiveId] = React.useState<string | null>(
     firstId ?? null,
   );
+
+  const kiteRotationPointsUp = computeKiteRotationPointsUp(
+    kiteTipUp,
+    firstId,
+    activeId,
+  );
+  const kiteRotateTransition = useKiteRotateTransition(
+    kiteRotationPointsUp,
+    reduceMotion,
+  );
+
   const activeLock = useActiveHeadingLock();
   const isLockedRef = React.useRef(activeLock.isLocked);
   isLockedRef.current = activeLock.isLocked;
@@ -141,10 +105,18 @@ export function PageTocNav({
       if (opensElsewhere) {
         return;
       }
+      if (
+        marker === "kite" &&
+        firstId != null &&
+        activeId === firstId &&
+        id !== firstId
+      ) {
+        resetKiteTipUp();
+      }
       setActiveId(id);
       activeLock.lock(900);
     },
-    [activeLock],
+    [activeLock, activeId, firstId, marker, resetKiteTipUp],
   );
 
   if (items.length === 0) {
@@ -208,7 +180,7 @@ export function PageTocNav({
                               className="flex size-full will-change-transform items-center justify-center"
                               style={{ transformOrigin: "50% 50%" }}
                               animate={{
-                                rotate: kiteTipUp ? 180 : 0,
+                                rotate: kiteRotationPointsUp ? 180 : 0,
                               }}
                               transition={kiteRotateTransition}
                             >

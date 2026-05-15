@@ -17,7 +17,7 @@ export function FeaturesSection() {
         <div className="grid gap-6 md:grid-cols-2">
           <FeatureCard
             title="Search Real API Surfaces"
-            body="Query exported symbols directly from declaration graphs to find what a package really exposes, beyond simple documentation."
+            body="Run structured queries over exported symbols and declaration graphs so you see what a package actually exposes — not only what a README claims."
             icon={
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +43,7 @@ export function FeaturesSection() {
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth="1.5"
+                strokeWidth={1.5}
                 stroke="currentColor"
                 className="size-6"
               >
@@ -63,7 +63,7 @@ export function FeaturesSection() {
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth="1.5"
+                strokeWidth={1.5}
                 stroke="currentColor"
                 className="size-6"
               >
@@ -77,13 +77,13 @@ export function FeaturesSection() {
           />
           <FeatureCard
             title="Discover Invisible Semantics"
-            body="Extract deprecation warnings, version tags, and visibility levels directly from source JSDoc to avoid using outdated or internal APIs."
+            body="Surface deprecation tags, visibility, and version notes from TypeScript declarations and JSDoc so agents and humans avoid internal or sunset APIs."
             icon={
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth="1.5"
+                strokeWidth={1.5}
                 stroke="currentColor"
                 className="size-6"
               >

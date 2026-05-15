@@ -224,13 +224,32 @@ export function HomeCliCinema() {
                           setActiveSceneIndex(sceneIndex);
                         }}
                         className={cn(
-                          "min-w-9 rounded-2xl px-2.5 py-1.5 text-center text-xs font-semibold tabular-nums outline-none transition-[color,background-color,box-shadow] duration-150 ease-out focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                          "relative min-w-9 rounded-2xl px-2.5 py-1.5 text-center text-xs font-semibold tabular-nums outline-none transition-[color] duration-150 ease-out focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                           isSelected
-                            ? "bg-primary/12 text-primary shadow-[inset_0_1px_rgb(255_255_255/0.45)]"
+                            ? "text-primary"
                             : "text-muted hover:bg-surface-hover hover:text-ink",
                         )}
                       >
-                        {sceneIndex + 1}
+                        {isSelected ? (
+                          prefersReducedMotion ? (
+                            <span
+                              className="absolute inset-0 rounded-2xl bg-primary/12 shadow-[inset_0_1px_rgb(255_255_255/0.45)]"
+                              aria-hidden
+                            />
+                          ) : (
+                            <motion.span
+                              layoutId="home-cli-cinema-step-pill"
+                              className="absolute inset-0 rounded-2xl bg-primary/12 shadow-[inset_0_1px_rgb(255_255_255/0.45)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 440,
+                                damping: 34,
+                              }}
+                              aria-hidden
+                            />
+                          )
+                        ) : null}
+                        <span className="relative">{sceneIndex + 1}</span>
                       </button>
                     );
                   })}
