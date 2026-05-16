@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import * as Popover from "@radix-ui/react-popover";
 import { motion } from "motion/react";
 import {
@@ -14,15 +13,16 @@ import { buttonVariants } from "@/components/ui/button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
+import {
+  PackageManagerLogo,
+  type PackageManagerId,
+} from "@/components/docs/widgets/package-manager-logo";
 import { cn } from "@/lib/utils";
-
-export type PackageManagerId = "npm" | "pnpm" | "yarn" | "bun";
 
 export interface PackageManagerEntry {
   id: PackageManagerId;
   label: string;
   install: string;
-  hint?: string;
 }
 
 interface InstallPickerContextValue {
@@ -100,32 +100,6 @@ export function InstallPickerRoot({
         {children}
       </div>
     </InstallPickerContext.Provider>
-  );
-}
-
-function PackageManagerLogo({
-  id,
-  variant,
-  className,
-}: {
-  id: PackageManagerId;
-  variant: "inverse" | "muted";
-  className?: string;
-}) {
-  const src = `/package-managers/${id}.svg`;
-  return (
-    <span
-      className={cn(
-        "relative inline-flex size-5 shrink-0 items-center justify-center",
-        variant === "inverse" &&
-          "[&_img]:brightness-0 [&_img]:invert [&_img]:opacity-95",
-        variant === "muted" && "opacity-90",
-        className,
-      )}
-      aria-hidden="true"
-    >
-      <Image src={src} alt="" width={20} height={20} className="size-5" />
-    </span>
   );
 }
 
@@ -223,7 +197,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                 aria-label={`Switch package manager (current: ${active.label})`}
                 className="gap-1.5 px-3"
               >
-                <PackageManagerLogo id={active.id} variant="inverse" />
+                <PackageManagerLogo id={active.id} variant="mono" />
                 <ChevronDownIcon
                   className={cn(
                     "size-3.5 text-white/85 transition-transform duration-150 ease-out",
@@ -237,7 +211,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
               <Popover.Content
                 align="start"
                 sideOffset={10}
-                className="z-50 w-56 overflow-hidden rounded-2xl border border-border bg-elevated p-1 shadow-[0_2px_4px_#00000010,0_18px_30px_-12px_#0000001f]"
+                className="nci-radix-surface z-50 w-56 overflow-hidden rounded-2xl border border-border bg-elevated p-1 shadow-[0_2px_4px_#00000010,0_18px_30px_-12px_#0000001f]"
               >
                 <ul
                   role="listbox"
@@ -268,27 +242,9 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                               : "text-ink/85 hover:bg-surface-hover",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "inline-flex size-6 items-center justify-center rounded-md",
-                              isActive ? "bg-primary" : "bg-surface",
-                            )}
-                            aria-hidden="true"
-                          >
-                            <PackageManagerLogo
-                              id={entry.id}
-                              variant={isActive ? "inverse" : "muted"}
-                            />
-                          </span>
-                          <span className="flex flex-col">
-                            <span className="text-sm font-semibold tracking-tight">
-                              {entry.label}
-                            </span>
-                            {entry.hint ? (
-                              <span className="text-[0.7rem] tracking-tight-p text-muted">
-                                {entry.hint}
-                              </span>
-                            ) : null}
+                          <PackageManagerLogo id={entry.id} variant="colored" />
+                          <span className="text-sm font-semibold tracking-tight">
+                            {entry.label}
                           </span>
                           {isActive ? (
                             <CheckIcon
@@ -352,7 +308,7 @@ export function InstallPickerControl({ className }: InstallPickerControlProps) {
                 {isActive ? (
                   <motion.span
                     layoutId={`install-picker-tab-${layoutId}`}
-                    className="absolute inset-0 -z-0 rounded-full bg-elevated shadow-[0_1px_2px_#00000010,0_6px_14px_-8px_#0000001a,inset_0_1px_#ffffff80]"
+                    className="absolute inset-0 -z-0 rounded-full bg-surface-hover ring-1 ring-border/70"
                     transition={{ type: "spring", stiffness: 360, damping: 32 }}
                   />
                 ) : null}
@@ -407,24 +363,20 @@ export const defaultManagers: PackageManagerEntry[] = [
     id: "npm",
     label: "npm",
     install: "npm install -g @nativecontextindex/cli",
-    hint: "Node Package Manager",
   },
   {
     id: "pnpm",
     label: "pnpm",
     install: "pnpm add -g @nativecontextindex/cli",
-    hint: "Fast, disk-efficient",
   },
   {
     id: "yarn",
     label: "yarn",
     install: "yarn global add @nativecontextindex/cli",
-    hint: "Classic & Berry",
   },
   {
     id: "bun",
     label: "bun",
     install: "bun install -g @nativecontextindex/cli",
-    hint: "All-in-one toolkit",
   },
 ];

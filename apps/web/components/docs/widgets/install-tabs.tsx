@@ -2,6 +2,10 @@
 
 import * as React from "react";
 import { motion } from "motion/react";
+import {
+  PackageManagerLogo,
+  isPackageManagerId,
+} from "@/components/docs/widgets/package-manager-logo";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
 import { cn } from "@/lib/utils";
 
@@ -108,6 +112,7 @@ export function InstallTabsTrigger({
 }: InstallTabsTriggerProps) {
   const { activeKey, setActiveKey, layoutId } = useInstallTabsContext();
   const isActive = activeKey === tabKey;
+  const packageManager = isPackageManagerId(tabKey) ? tabKey : null;
 
   return (
     <button
@@ -124,11 +129,16 @@ export function InstallTabsTrigger({
       {isActive ? (
         <motion.span
           layoutId={`install-tabs-active-${layoutId}`}
-          className="absolute inset-0 -z-0 rounded-full bg-elevated shadow-[0_1px_2px_#00000010,0_6px_14px_-8px_#0000001a,inset_0_1px_#ffffff80]"
+          className="absolute inset-0 -z-0 rounded-full bg-surface-hover ring-1 ring-border/70"
           transition={{ type: "spring", stiffness: 360, damping: 32 }}
         />
       ) : null}
-      <span className="relative z-10">{children}</span>
+      <span className="relative z-10 inline-flex items-center gap-2">
+        {packageManager ? (
+          <PackageManagerLogo id={packageManager} variant="colored" />
+        ) : null}
+        {children}
+      </span>
     </button>
   );
 }

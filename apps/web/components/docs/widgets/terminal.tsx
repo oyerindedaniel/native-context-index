@@ -5,52 +5,314 @@ import { motion, useInView, useReducedMotion } from "motion/react";
 import { ClipboardIcon, CommandLineIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
+import { mergeRefs } from "@/lib/merge-refs";
 import { cn } from "@/lib/utils";
+import {
+  extractSequenceSteps,
+  partitionTerminalLayout,
+  resolveTerminalCommandCopyLayout,
+  TERMINAL_BODY_DISPLAY_NAME,
+  TERMINAL_CHROME_DISPLAY_NAME,
+  TERMINAL_SEQUENCE_STEP_DISPLAY_NAME,
+  TERMINAL_TAB_BAR_DISPLAY_NAME,
+  type ParsedSequenceStep,
+  type TerminalBodyProps,
+  type TerminalChromeProps,
+  type TerminalCommandCopyPlacement,
+  type TerminalSequenceStepProps,
+} from "@/components/docs/widgets/terminal-layout";
 
 type UseInViewOptionsArg = NonNullable<Parameters<typeof useInView>[1]>;
-/** `amount` accepted by Motion’s `useInView` (from `motion/react` → `framer-motion`). */
 export type TerminalInViewAmount = NonNullable<UseInViewOptionsArg["amount"]>;
 
-interface TerminalContextValue {
-  command: string;
-  registerCommand: (command: string) => void;
-  isPlaying: boolean;
-  revealedCommand: string;
-  isCommandComplete: boolean;
-  shouldRenderOutput: boolean;
-  /** When false, `TerminalCommand` omits its trailing copy control (used with floating copy). */
-  showInlineCommandCopy: boolean;
+export interface TerminalTabItem {
+  readonly id: string;
+  readonly label: string;
+  /** Active tab shows a live dot when true (default true). */
+  readonly showLiveDot?: boolean;
 }
 
-const TerminalContext = React.createContext<TerminalContextValue | null>(null);
+type TerminalTabBarProps = React.ComponentProps<"div"> & {
+  readonly tabs: readonly TerminalTabItem[];
+  readonly activeTabId: string;
+  readonly onTabChange: (tabId: string) => void;
+  readonly ariaLabel?: string;
+};
 
-function useTerminalContext(): TerminalContextValue {
-  const context = React.useContext(TerminalContext);
+type TerminalMode = "single" | "sequence";
+
+interface TerminalShellContextValue {
+  readonly mode: TerminalMode;
+  readonly containerRef: React.RefObject<HTMLDivElement | null>;
+  readonly useFloatingCommandCopyLayout: boolean;
+  readonly showInlineCommandCopy: boolean;
+  readonly chromeless: boolean;
+}
+
+const TerminalShellContext =
+  React.createContext<TerminalShellContextValue | null>(null);
+
+function useTerminalShellContext(): TerminalShellContextValue {
+  const context = React.useContext(TerminalShellContext);
   if (!context) {
-    throw new Error("Terminal sub-components must be used inside TerminalRoot");
+    throw new Error(
+      "Terminal shell components must be used inside Terminal.Root or Terminal.Sequence.Root",
+    );
   }
   return context;
 }
 
-interface TerminalRootProps {
-  className?: string;
-  title?: string;
-  cwd?: string;
-  typeMs?: number;
-  outputDelayMs?: number;
-  /**
-   * `floating`: single copy control pinned to the bottom-right of the body (home
-   * cinema). Inline copy per command is used when reduced motion is on.
-   */
-  commandCopyPlacement?: "inline" | "floating";
-  inViewAmount?: TerminalInViewAmount;
-  children: React.ReactNode;
+interface TerminalSingleContextValue {
+  readonly command: string;
+  readonly registerCommand: (command: string) => void;
+  readonly isPlaying: boolean;
+  readonly revealedCommand: string;
+  readonly isCommandComplete: boolean;
+  readonly shouldRenderOutput: boolean;
+  readonly showInlineCommandCopy: boolean;
 }
+
+const TerminalSingleContext =
+  React.createContext<TerminalSingleContextValue | null>(null);
+
+function useTerminalSingleContext(): TerminalSingleContextValue {
+  const context = React.useContext(TerminalSingleContext);
+  if (!context) {
+    throw new Error(
+      "Terminal.Command and Terminal.Output must be used inside Terminal.Root",
+    );
+  }
+  return context;
+}
+
+interface TerminalSequenceContextValue {
+  readonly activeCommandLine: string;
+  readonly showFloatingCommandCopy: boolean;
+}
+
+const TerminalSequenceContext =
+  React.createContext<TerminalSequenceContextValue | null>(null);
 
 const DEFAULT_TYPE_MS = 22;
 const DEFAULT_OUTPUT_DELAY_MS = 280;
+const DEFAULT_PAUSE_BETWEEN_STEPS_MS = 520;
 
-export function TerminalRoot({
+function TerminalWindowChrome({
+  title,
+  cwd,
+  className,
+  ...props
+}: TerminalChromeProps) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 border-b border-white/5 bg-white/[0.03] px-4 py-2",
+        className,
+      )}
+      {...props}
+    >
+      <div className="flex items-center gap-1.5" aria-hidden="true">
+        <span className="size-2 rounded-full bg-[#FF5F56]" />
+        <span className="size-2 rounded-full bg-[#FFBD2E]" />
+        <span className="size-2 rounded-full bg-[#27C93F]" />
+      </div>
+      <div className="flex min-w-0 items-center gap-2 text-xs font-medium tracking-tight-p text-white/55">
+        <CommandLineIcon className="size-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">{title ?? "nci"}</span>
+        {cwd ? (
+          <>
+            <span className="text-white/30">·</span>
+            <span className="truncate font-mono text-white/50">{cwd}</span>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TerminalChrome({
+  title = "nci",
+  cwd,
+  className,
+  ...props
+}: TerminalChromeProps) {
+  return (
+    <TerminalWindowChrome
+      title={title}
+      cwd={cwd}
+      className={className}
+      {...props}
+    />
+  );
+}
+TerminalChrome.displayName = TERMINAL_CHROME_DISPLAY_NAME;
+
+function TerminalBody({ className, children, ...props }: TerminalBodyProps) {
+  const { mode, useFloatingCommandCopyLayout } = useTerminalShellContext();
+
+  return (
+    <div
+      className={cn(
+        "relative min-h-0 font-mono text-[0.825rem] leading-relaxed",
+        mode === "sequence" ? "space-y-5 px-4 py-3" : "px-4 py-3",
+        useFloatingCommandCopyLayout && "pb-11",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+TerminalBody.displayName = TERMINAL_BODY_DISPLAY_NAME;
+
+function TerminalTabBar({
+  tabs,
+  activeTabId,
+  onTabChange,
+  className,
+  ariaLabel = "Terminal sessions",
+  ...props
+}: TerminalTabBarProps) {
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className={cn(
+        "flex items-center gap-1 overflow-x-auto border-b border-white/5 bg-[#0c0e13] px-3 py-2",
+        className,
+      )}
+      {...props}
+    >
+      {tabs.map((tab) => {
+        const isActive = tab.id === activeTabId;
+        const showLiveDot = tab.showLiveDot !== false;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              "relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium tracking-tight outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45",
+              isActive
+                ? "bg-white/10 text-white/92"
+                : "text-white/45 hover:bg-white/[0.04] hover:text-white/70",
+            )}
+          >
+            {isActive && showLiveDot ? (
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-[#5a9cf5] shadow-[0_0_6px_#5a9cf580]"
+                aria-hidden="true"
+              />
+            ) : null}
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+TerminalTabBar.displayName = TERMINAL_TAB_BAR_DISPLAY_NAME;
+
+function TerminalFloatingCommandCopy({
+  commandText,
+}: {
+  readonly commandText: string;
+}) {
+  const { copied, copy } = useCopyToClipboard();
+  return (
+    <div className="pointer-events-none absolute inset-x-4 bottom-3 z-10 flex justify-end">
+      <button
+        type="button"
+        onClick={() => {
+          void copy(commandText);
+        }}
+        aria-label={copied ? "Copied" : "Copy command"}
+        className="pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/8 text-white/75 shadow-[0_2px_10px_-2px_rgb(0_0_0/0.55)] transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99]"
+      >
+        <CopyStatusIcon
+          copied={copied}
+          idle={ClipboardIcon}
+          className="size-3.5"
+        />
+      </button>
+    </div>
+  );
+}
+TerminalFloatingCommandCopy.displayName = "Terminal.Copy";
+
+type TerminalShellProps = React.ComponentProps<"div"> & {
+  readonly children: React.ReactNode;
+  readonly chromeless?: boolean;
+};
+
+function TerminalShell({
+  children,
+  className,
+  chromeless = false,
+  ref,
+  ...props
+}: TerminalShellProps) {
+  const { containerRef, chromeless: chromelessFromContext } =
+    useTerminalShellContext();
+
+  return (
+    <div
+      ref={mergeRefs(containerRef, ref)}
+      className={cn(
+        "relative flex flex-col overflow-hidden",
+        !chromeless &&
+          !chromelessFromContext &&
+          "my-6 rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TerminalShellFloatingCopy() {
+  const { mode, useFloatingCommandCopyLayout } = useTerminalShellContext();
+  const single = React.useContext(TerminalSingleContext);
+  const sequence = React.useContext(TerminalSequenceContext);
+
+  if (!useFloatingCommandCopyLayout) {
+    return null;
+  }
+
+  if (mode === "single" && single?.isCommandComplete && single.command) {
+    return <TerminalFloatingCommandCopy commandText={single.command} />;
+  }
+
+  if (mode === "sequence" && sequence?.showFloatingCommandCopy) {
+    return (
+      <TerminalFloatingCommandCopy commandText={sequence.activeCommandLine} />
+    );
+  }
+
+  return null;
+}
+
+type TerminalRootProps = Omit<React.ComponentProps<"div">, "children"> & {
+  readonly children: React.ReactNode;
+  readonly typeMs?: number;
+  readonly outputDelayMs?: number;
+  /**
+   * `floating`: single copy control pinned to the bottom-right of the shell (home
+   * cinema). Inline copy per command is used when reduced motion is on.
+   */
+  readonly commandCopyPlacement?: TerminalCommandCopyPlacement;
+  readonly inViewAmount?: TerminalInViewAmount;
+  /** Docs shorthand when omitting `<Terminal.Chrome />`. */
+  readonly title?: string;
+  readonly cwd?: string;
+};
+
+function TerminalRoot({
   className,
   title = "nci",
   cwd,
@@ -59,6 +321,8 @@ export function TerminalRoot({
   commandCopyPlacement = "inline",
   inViewAmount = 0.4,
   children,
+  ref,
+  ...shellProps
 }: TerminalRootProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inViewOptions = React.useMemo(
@@ -67,10 +331,11 @@ export function TerminalRoot({
   );
   const inView = useInView(containerRef, inViewOptions);
   const prefersReducedMotion = useReducedMotion() === true;
-  const showInlineCommandCopy =
-    commandCopyPlacement === "inline" || prefersReducedMotion;
-  const useFloatingCommandCopyLayout =
-    commandCopyPlacement === "floating" && !prefersReducedMotion;
+  const { showInlineCommandCopy, useFloatingCommandCopyLayout } =
+    resolveTerminalCommandCopyLayout(
+      commandCopyPlacement,
+      prefersReducedMotion,
+    );
 
   const [command, setCommand] = React.useState("");
   const [revealedCommand, setRevealedCommand] = React.useState("");
@@ -113,7 +378,7 @@ export function TerminalRoot({
     command.length > 0 && revealedCommand.length === command.length;
   const isPlaying = inView && command.length > 0 && !isCommandComplete;
 
-  const value = React.useMemo<TerminalContextValue>(
+  const singleValue = React.useMemo<TerminalSingleContextValue>(
     () => ({
       command,
       registerCommand,
@@ -134,84 +399,53 @@ export function TerminalRoot({
     ],
   );
 
+  const layout = partitionTerminalLayout(children);
+  const chrome = layout.chrome ?? <TerminalChrome title={title} cwd={cwd} />;
+  const tabBar = layout.tabBar;
+  const body =
+    layout.body ??
+    (layout.loose.length > 0 ? (
+      <TerminalBody>{layout.loose}</TerminalBody>
+    ) : (
+      <TerminalBody />
+    ));
+
+  const shellValue = React.useMemo<TerminalShellContextValue>(
+    () => ({
+      mode: "single",
+      containerRef,
+      useFloatingCommandCopyLayout,
+      showInlineCommandCopy,
+      chromeless: false,
+    }),
+    [useFloatingCommandCopyLayout, showInlineCommandCopy],
+  );
+
   return (
-    <TerminalContext.Provider value={value}>
-      <div
-        ref={containerRef}
-        className={cn(
-          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
-          className,
-        )}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-white/[0.03] px-4 py-2">
-          <div className="flex items-center gap-2 text-xs font-medium tracking-tight-p text-white/65">
-            <CommandLineIcon className="size-3.5" aria-hidden="true" />
-            <span>{title}</span>
-            {cwd ? (
-              <>
-                <span className="text-white/30">·</span>
-                <span className="font-mono text-white/55">{cwd}</span>
-              </>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-1.5" aria-hidden="true">
-            <span className="size-2 rounded-full bg-[#FF5F56]" />
-            <span className="size-2 rounded-full bg-[#FFBD2E]" />
-            <span className="size-2 rounded-full bg-[#27C93F]" />
-          </div>
-        </div>
-        <div
-          className={cn(
-            "relative px-4 py-3 font-mono text-[0.825rem] leading-relaxed",
-            useFloatingCommandCopyLayout && "pb-11",
-          )}
-        >
-          {children}
-          {useFloatingCommandCopyLayout && command && isCommandComplete ? (
-            <TerminalFloatingCommandCopy commandText={command} />
-          ) : null}
-        </div>
-      </div>
-    </TerminalContext.Provider>
+    <TerminalShellContext.Provider value={shellValue}>
+      <TerminalSingleContext.Provider value={singleValue}>
+        <TerminalShell className={className} ref={ref} {...shellProps}>
+          {chrome}
+          {tabBar}
+          {body}
+          <TerminalShellFloatingCopy />
+        </TerminalShell>
+      </TerminalSingleContext.Provider>
+    </TerminalShellContext.Provider>
   );
 }
+TerminalRoot.displayName = "Terminal.Root";
 
-interface TerminalCommandProps {
-  prompt?: string;
-  children: string;
-  className?: string;
-}
+type TerminalCommandProps = Omit<React.ComponentProps<"div">, "children"> & {
+  readonly children: string;
+  readonly prompt?: string;
+};
 
-function TerminalFloatingCommandCopy({
-  commandText,
-}: {
-  readonly commandText: string;
-}) {
-  const { copied, copy } = useCopyToClipboard();
-  return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-3 flex justify-end">
-      <button
-        type="button"
-        onClick={() => {
-          void copy(commandText);
-        }}
-        aria-label={copied ? "Copied" : "Copy command"}
-        className="pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/8 text-white/75 shadow-[0_2px_10px_-2px_rgb(0_0_0/0.55)] transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99]"
-      >
-        <CopyStatusIcon
-          copied={copied}
-          idle={ClipboardIcon}
-          className="size-3.5"
-        />
-      </button>
-    </div>
-  );
-}
-
-export function TerminalCommand({
+function TerminalCommand({
   prompt = "$",
   children,
   className,
+  ...props
 }: TerminalCommandProps) {
   const {
     registerCommand,
@@ -219,7 +453,7 @@ export function TerminalCommand({
     isPlaying,
     isCommandComplete,
     showInlineCommandCopy,
-  } = useTerminalContext();
+  } = useTerminalSingleContext();
   const { copied, copy } = useCopyToClipboard();
 
   React.useEffect(() => {
@@ -234,6 +468,7 @@ export function TerminalCommand({
         "group/command flex items-start gap-3 whitespace-pre-wrap break-all",
         className,
       )}
+      {...props}
     >
       <span className="select-none text-[#7A63F5]" aria-hidden="true">
         {prompt}
@@ -268,19 +503,19 @@ export function TerminalCommand({
     </div>
   );
 }
+TerminalCommand.displayName = "Terminal.Command";
 
-interface TerminalOutputProps {
-  children: React.ReactNode;
-  className?: string;
-  tone?: "default" | "muted" | "success" | "error";
-}
+type TerminalOutputProps = React.ComponentProps<typeof motion.pre> & {
+  readonly tone?: "default" | "muted" | "success" | "error";
+};
 
-export function TerminalOutput({
+function TerminalOutput({
   children,
   className,
   tone = "default",
+  ...props
 }: TerminalOutputProps) {
-  const { shouldRenderOutput } = useTerminalContext();
+  const { shouldRenderOutput } = useTerminalSingleContext();
   const reduceMotion = useReducedMotion() === true;
 
   const toneClass = (() => {
@@ -313,62 +548,62 @@ export function TerminalOutput({
         toneClass,
         className,
       )}
+      {...props}
     >
       {children}
     </motion.pre>
   );
 }
-
-export interface TerminalSequenceStep {
-  readonly commandLine: string;
-  readonly output: React.ReactNode;
-}
-
-const DEFAULT_PAUSE_BETWEEN_STEPS_MS = 520;
-
-interface TerminalSequenceRootProps {
-  readonly className?: string;
-  readonly title?: string;
-  readonly cwd?: string;
-  readonly typeMs?: number;
-  readonly outputDelayMs?: number;
-  /** Extra delay after output appears before advancing to the next step. */
-  readonly pauseBetweenStepsMs?: number;
-  readonly commandCopyPlacement?: "inline" | "floating";
-  /**
-   * `useInView` `amount` for the typing gate (default `0.35`). Pass `"some"` when the
-   * sequence sits in a height-animated shell (home CLI cinema).
-   */
-  readonly inViewAmount?: TerminalInViewAmount;
-  readonly steps: readonly TerminalSequenceStep[];
-}
+TerminalOutput.displayName = "Terminal.Output";
 
 /**
- * Multi-command terminal: types each command in order, reveals output, then
- * advances. For a single command, prefer `TerminalRoot` + `TerminalCommand`.
+ * Declarative step slot for `Terminal.Sequence.Root`. Renders nothing; the root
+ * reads `commandLine` / children via `extractSequenceSteps` (see home CLI cinema).
  */
-export function TerminalSequenceRoot({
-  className,
-  title = "nci",
-  cwd,
-  typeMs = DEFAULT_TYPE_MS,
-  outputDelayMs = DEFAULT_OUTPUT_DELAY_MS,
-  pauseBetweenStepsMs = DEFAULT_PAUSE_BETWEEN_STEPS_MS,
-  commandCopyPlacement = "inline",
-  inViewAmount = 0.35,
+function TerminalSequenceStep(props: TerminalSequenceStepProps) {
+  void props;
+  return null;
+}
+TerminalSequenceStep.displayName = TERMINAL_SEQUENCE_STEP_DISPLAY_NAME;
+
+type TerminalSequenceRootProps = Omit<
+  React.ComponentProps<"div">,
+  "children"
+> & {
+  readonly children: React.ReactNode;
+  readonly typeMs?: number;
+  readonly outputDelayMs?: number;
+  readonly pauseBetweenStepsMs?: number;
+  readonly commandCopyPlacement?: TerminalCommandCopyPlacement;
+  readonly inViewAmount?: TerminalInViewAmount;
+  readonly chromeless?: boolean;
+  /** Docs shorthand when omitting `<Terminal.Chrome />`. */
+  readonly title?: string;
+  readonly cwd?: string;
+};
+
+function TerminalSequenceAnimatedBody({
   steps,
-}: TerminalSequenceRootProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  typeMs,
+  outputDelayMs,
+  pauseBetweenStepsMs,
+  inViewAmount = 0.35,
+}: {
+  readonly steps: readonly ParsedSequenceStep[];
+  readonly typeMs: number;
+  readonly outputDelayMs: number;
+  readonly pauseBetweenStepsMs: number;
+  readonly inViewAmount?: TerminalInViewAmount;
+}) {
+  const { containerRef, showInlineCommandCopy, useFloatingCommandCopyLayout } =
+    useTerminalShellContext();
   const inViewOptions = React.useMemo(
     () => ({ once: true as const, amount: inViewAmount }),
     [inViewAmount],
   );
   const inView = useInView(containerRef, inViewOptions);
   const prefersReducedMotion = useReducedMotion() === true;
-  const showInlineCommandCopy =
-    commandCopyPlacement === "inline" || prefersReducedMotion;
-  const useFloatingCommandCopyLayout =
-    commandCopyPlacement === "floating" && !prefersReducedMotion;
+  const showInline = showInlineCommandCopy;
 
   const [activeStepIndex, setActiveStepIndex] = React.useState(0);
   const [revealedCommandPrefix, setRevealedCommandPrefix] = React.useState("");
@@ -382,10 +617,7 @@ export function TerminalSequenceRoot({
   const activeCommandLine = activeStep?.commandLine ?? "";
 
   React.useEffect(() => {
-    if (!inView || steps.length === 0) {
-      return;
-    }
-    if (!activeCommandLine) {
+    if (!inView || steps.length === 0 || !activeCommandLine) {
       return;
     }
     if (prefersReducedMotion) {
@@ -445,13 +677,29 @@ export function TerminalSequenceRoot({
     pauseBetweenStepsMs,
   ]);
 
-  if (steps.length === 0) {
-    return null;
-  }
+  const typingCompleteForActiveStep =
+    activeCommandLine.length > 0 &&
+    revealedCommandPrefix.length === activeCommandLine.length;
+
+  const sequenceValue = React.useMemo<TerminalSequenceContextValue>(
+    () => ({
+      activeCommandLine,
+      showFloatingCommandCopy:
+        useFloatingCommandCopyLayout &&
+        activeCommandLine.length > 0 &&
+        (prefersReducedMotion || typingCompleteForActiveStep),
+    }),
+    [
+      activeCommandLine,
+      useFloatingCommandCopyLayout,
+      prefersReducedMotion,
+      typingCompleteForActiveStep,
+    ],
+  );
 
   const renderOutputBlock = (
     body: React.ReactNode,
-    tone: "default" | "muted" | "success" | "error" = "default",
+    tone: ParsedSequenceStep["tone"],
     visible: boolean,
   ) => {
     const toneClass = (() => {
@@ -491,185 +739,232 @@ export function TerminalSequenceRoot({
 
   if (prefersReducedMotion) {
     return (
-      <div
-        ref={containerRef}
-        className={cn(
-          "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
-          className,
-        )}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-white/[0.03] px-4 py-2">
-          <div className="flex items-center gap-2 text-xs font-medium tracking-tight-p text-white/65">
-            <CommandLineIcon className="size-3.5" aria-hidden="true" />
-            <span>{title}</span>
-            {cwd ? (
-              <>
-                <span className="text-white/30">·</span>
-                <span className="font-mono text-white/55">{cwd}</span>
-              </>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-1.5" aria-hidden="true">
-            <span className="size-2 rounded-full bg-[#FF5F56]" />
-            <span className="size-2 rounded-full bg-[#FFBD2E]" />
-            <span className="size-2 rounded-full bg-[#27C93F]" />
-          </div>
-        </div>
-        <div className="space-y-5 px-4 py-3 font-mono text-[0.825rem] leading-relaxed">
-          {steps.map((step, stepIndex) => (
-            <div key={`${step.commandLine}-${stepIndex}`}>
-              <div className="flex items-start gap-3 whitespace-pre-wrap break-all">
-                <span className="select-none text-[#7A63F5]" aria-hidden="true">
-                  $
-                </span>
-                <span className="flex-1 text-white/95">{step.commandLine}</span>
-                {showInlineCommandCopy ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void copyCommand(step.commandLine);
-                    }}
-                    aria-label={copiedCommand ? "Copied" : "Copy command"}
-                    className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
-                  >
-                    <CopyStatusIcon
-                      copied={copiedCommand}
-                      idle={ClipboardIcon}
-                      className="size-3.5"
-                    />
-                  </button>
-                ) : (
-                  <span className="ml-auto shrink-0" aria-hidden="true" />
-                )}
-              </div>
-              {renderOutputBlock(step.output, "default", true)}
+      <TerminalSequenceContext.Provider value={sequenceValue}>
+        {steps.map((step, stepIndex) => (
+          <div key={`${step.commandLine}-${stepIndex}`}>
+            <div className="flex items-start gap-3 whitespace-pre-wrap break-all">
+              <span className="select-none text-[#7A63F5]" aria-hidden="true">
+                $
+              </span>
+              <span className="flex-1 text-white/95">{step.commandLine}</span>
+              {showInline ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyCommand(step.commandLine);
+                  }}
+                  aria-label={copiedCommand ? "Copied" : "Copy command"}
+                  className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
+                >
+                  <CopyStatusIcon
+                    copied={copiedCommand}
+                    idle={ClipboardIcon}
+                    className="size-3.5"
+                  />
+                </button>
+              ) : (
+                <span className="ml-auto shrink-0" aria-hidden="true" />
+              )}
             </div>
-          ))}
-        </div>
-      </div>
+            {renderOutputBlock(step.output, step.tone, true)}
+          </div>
+        ))}
+      </TerminalSequenceContext.Provider>
     );
   }
 
-  const typingCompleteForActiveStep =
-    activeCommandLine.length > 0 &&
-    revealedCommandPrefix.length === activeCommandLine.length;
-
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "my-6 overflow-hidden rounded-2xl border border-ink/10 bg-code-surface text-code-ink shadow-[0_2px_4px_#00000038,0_18px_30px_-12px_#00000033,inset_0_1px_#ffffff14]",
-        className,
-      )}
-    >
-      <div className="flex items-center justify-between gap-3 border-b border-white/5 bg-white/[0.03] px-4 py-2">
-        <div className="flex items-center gap-2 text-xs font-medium tracking-tight-p text-white/65">
-          <CommandLineIcon className="size-3.5" aria-hidden="true" />
-          <span>{title}</span>
-          {cwd ? (
-            <>
-              <span className="text-white/30">·</span>
-              <span className="font-mono text-white/55">{cwd}</span>
-            </>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="size-2 rounded-full bg-[#FF5F56]" />
-          <span className="size-2 rounded-full bg-[#FFBD2E]" />
-          <span className="size-2 rounded-full bg-[#27C93F]" />
-        </div>
-      </div>
-      <div
-        className={cn(
-          "relative space-y-5 px-4 py-3 font-mono text-[0.825rem] leading-relaxed",
-          useFloatingCommandCopyLayout && "pb-11",
-        )}
-      >
-        {steps.map((step, stepIndex) => {
-          if (stepIndex > activeStepIndex) {
-            return null;
-          }
+    <TerminalSequenceContext.Provider value={sequenceValue}>
+      {steps.map((step, stepIndex) => {
+        if (stepIndex > activeStepIndex) {
+          return null;
+        }
 
-          const isPast = stepIndex < activeStepIndex;
-          const isOutputVisible =
-            isPast || outputVisibleStepIndex === stepIndex;
-          const showTypingCursor =
-            !isPast && outputVisibleStepIndex !== stepIndex;
+        const isPast = stepIndex < activeStepIndex;
+        const isOutputVisible = isPast || outputVisibleStepIndex === stepIndex;
+        const showTypingCursor =
+          !isPast && outputVisibleStepIndex !== stepIndex;
 
-          return (
-            <div key={stepIndex}>
-              <div
-                className={cn(
-                  "group/command flex items-start gap-3 whitespace-pre-wrap break-all",
-                  !isPast && "relative",
-                )}
-              >
-                <span className="select-none text-[#7A63F5]" aria-hidden="true">
-                  $
-                </span>
-                <span className="flex-1 text-white/95">
-                  {isPast ? (
-                    step.commandLine
-                  ) : (
-                    <>
-                      {revealedCommandPrefix}
-                      {showTypingCursor ? (
-                        <span
-                          className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85 motion-reduce:animate-none"
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                    </>
-                  )}
-                </span>
-                {showInlineCommandCopy ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void copyCommand(step.commandLine);
-                    }}
-                    aria-label={copiedCommand ? "Copied" : "Copy command"}
-                    className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
-                  >
-                    <CopyStatusIcon
-                      copied={copiedCommand}
-                      idle={ClipboardIcon}
-                      className="size-3.5"
-                    />
-                  </button>
+        return (
+          <div key={stepIndex}>
+            <div
+              className={cn(
+                "group/command flex items-start gap-3 whitespace-pre-wrap break-all",
+                !isPast && "relative",
+              )}
+            >
+              <span className="select-none text-[#7A63F5]" aria-hidden="true">
+                $
+              </span>
+              <span className="flex-1 text-white/95">
+                {isPast ? (
+                  step.commandLine
                 ) : (
-                  <span className="ml-auto shrink-0" aria-hidden="true" />
+                  <>
+                    {revealedCommandPrefix}
+                    {showTypingCursor ? (
+                      <span
+                        className="ml-0.5 inline-block h-4 w-1.5 translate-y-[2px] animate-[pulse_1.1s_ease-in-out_infinite] bg-white/85 motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </>
                 )}
-              </div>
-              {renderOutputBlock(step.output, "default", isOutputVisible)}
+              </span>
+              {showInline ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyCommand(step.commandLine);
+                  }}
+                  aria-label={copiedCommand ? "Copied" : "Copy command"}
+                  className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/5 text-white/70 transition-[background-color,color,transform,filter] duration-150 ease-out hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45 active:scale-[0.99] active:blur-[0.5px]"
+                >
+                  <CopyStatusIcon
+                    copied={copiedCommand}
+                    idle={ClipboardIcon}
+                    className="size-3.5"
+                  />
+                </button>
+              ) : (
+                <span className="ml-auto shrink-0" aria-hidden="true" />
+              )}
             </div>
-          );
-        })}
-        {useFloatingCommandCopyLayout &&
-        activeCommandLine &&
-        typingCompleteForActiveStep ? (
-          <TerminalFloatingCommandCopy commandText={activeCommandLine} />
-        ) : null}
-      </div>
-    </div>
+            {renderOutputBlock(step.output, step.tone, isOutputVisible)}
+          </div>
+        );
+      })}
+    </TerminalSequenceContext.Provider>
   );
 }
 
-TerminalRoot.displayName = "Terminal.Root";
-TerminalCommand.displayName = "Terminal.Command";
-TerminalOutput.displayName = "Terminal.Output";
-TerminalSequenceRoot.displayName = "Terminal.SequenceRoot";
+function TerminalSequenceRoot({
+  className,
+  title = "nci",
+  cwd,
+  typeMs = DEFAULT_TYPE_MS,
+  outputDelayMs = DEFAULT_OUTPUT_DELAY_MS,
+  pauseBetweenStepsMs = DEFAULT_PAUSE_BETWEEN_STEPS_MS,
+  commandCopyPlacement = "inline",
+  inViewAmount = 0.35,
+  chromeless = false,
+  children,
+  ref,
+  ...shellProps
+}: TerminalSequenceRootProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion() === true;
+  const { showInlineCommandCopy, useFloatingCommandCopyLayout } =
+    resolveTerminalCommandCopyLayout(
+      commandCopyPlacement,
+      prefersReducedMotion,
+    );
+
+  const layout = partitionTerminalLayout(children);
+  const chrome = layout.chrome ?? <TerminalChrome title={title} cwd={cwd} />;
+  const tabBar = layout.tabBar;
+
+  const bodyFromLayout = layout.body;
+  const stepsFromChildren = bodyFromLayout
+    ? extractSequenceSteps(bodyFromLayout.props.children)
+    : extractSequenceSteps(layout.loose);
+
+  const steps = stepsFromChildren;
+
+  const shellValue = React.useMemo<TerminalShellContextValue>(
+    () => ({
+      mode: "sequence",
+      containerRef,
+      useFloatingCommandCopyLayout,
+      showInlineCommandCopy,
+      chromeless,
+    }),
+    [useFloatingCommandCopyLayout, showInlineCommandCopy, chromeless],
+  );
+
+  if (steps.length === 0) {
+    return null;
+  }
+
+  const bodyClassNameMerged = bodyFromLayout?.props.className;
+
+  const animatedBody = (
+    <TerminalSequenceAnimatedBody
+      steps={steps}
+      typeMs={typeMs}
+      outputDelayMs={outputDelayMs}
+      pauseBetweenStepsMs={pauseBetweenStepsMs}
+      inViewAmount={inViewAmount}
+    />
+  );
+
+  const body = (
+    <TerminalBody className={bodyClassNameMerged}>{animatedBody}</TerminalBody>
+  );
+
+  return (
+    <TerminalShellContext.Provider value={shellValue}>
+      <TerminalShell
+        className={className}
+        chromeless={chromeless}
+        ref={ref}
+        {...shellProps}
+      >
+        {chrome}
+        {tabBar}
+        {body}
+        <TerminalShellFloatingCopy />
+      </TerminalShell>
+    </TerminalShellContext.Provider>
+  );
+}
+TerminalSequenceRoot.displayName = "Terminal.Sequence.Root";
+
+export type {
+  TerminalBodyProps,
+  TerminalChromeProps,
+  TerminalCommandCopyPlacement,
+  TerminalSequenceStepProps,
+} from "@/components/docs/widgets/terminal-layout";
+
+export {
+  TerminalRoot,
+  TerminalChrome,
+  TerminalTabBar,
+  TerminalBody,
+  TerminalCommand,
+  TerminalOutput,
+  TerminalSequenceRoot,
+  TerminalSequenceStep,
+  TerminalFloatingCommandCopy,
+};
 
 export interface TerminalNamespace {
   Root: typeof TerminalRoot;
+  Chrome: typeof TerminalChrome;
+  TabBar: typeof TerminalTabBar;
+  Body: typeof TerminalBody;
   Command: typeof TerminalCommand;
   Output: typeof TerminalOutput;
+  Copy: typeof TerminalFloatingCommandCopy;
   SequenceRoot: typeof TerminalSequenceRoot;
+  Sequence: {
+    Root: typeof TerminalSequenceRoot;
+    Step: typeof TerminalSequenceStep;
+  };
 }
 
 export const Terminal: TerminalNamespace = {
   Root: TerminalRoot,
+  Chrome: TerminalChrome,
+  TabBar: TerminalTabBar,
+  Body: TerminalBody,
   Command: TerminalCommand,
   Output: TerminalOutput,
+  Copy: TerminalFloatingCommandCopy,
   SequenceRoot: TerminalSequenceRoot,
+  Sequence: {
+    Root: TerminalSequenceRoot,
+    Step: TerminalSequenceStep,
+  },
 };

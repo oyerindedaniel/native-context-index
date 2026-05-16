@@ -11,7 +11,7 @@ import {
   useKiteRotateTransition,
   useKiteTipUpOnScrollUp,
 } from "@/lib/hooks/use-kite-tip-up-on-scroll-up";
-import { NciKiteMark } from "@/components/marketing/nci-kite-mark";
+import { TocActiveKiteMarker } from "@/components/marketing/toc-active-kite-marker";
 import { cn } from "@/lib/utils";
 
 export interface PageTocLinkItem {
@@ -163,30 +163,11 @@ export function PageTocNav({
                     >
                       {isActive ? (
                         marker === "kite" ? (
-                          <motion.span
+                          <TocActiveKiteMarker
                             layoutId={`page-toc-active-dot-${layoutGroupId}`}
-                            transition={KITE_SPRING}
-                            className="absolute z-[1] flex h-[1.05rem] w-[1rem] items-center justify-center"
-                            aria-hidden="true"
-                            style={{
-                              left: "calc(0.75rem + 0.85px)",
-                              top: "50%",
-                              marginLeft: "-0.5rem",
-                              marginTop: "-0.525rem",
-                            }}
-                          >
-                            <motion.span
-                              initial={false}
-                              className="flex size-full will-change-transform items-center justify-center"
-                              style={{ transformOrigin: "50% 50%" }}
-                              animate={{
-                                rotate: kiteRotationPointsUp ? 180 : 0,
-                              }}
-                              transition={kiteRotateTransition}
-                            >
-                              <NciKiteMark className="h-full w-full translate-x-px drop-shadow-[0_1px_1px_rgb(0_0_0_/_0.06)]" />
-                            </motion.span>
-                          </motion.span>
+                            kiteRotationPointsUp={kiteRotationPointsUp}
+                            kiteRotateTransition={kiteRotateTransition}
+                          />
                         ) : (
                           <motion.span
                             layoutId={`page-toc-active-dot-${layoutGroupId}`}

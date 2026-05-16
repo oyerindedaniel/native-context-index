@@ -7,13 +7,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Transition } from "motion/react";
-import {
-  BookOpenIcon,
-  HomeIcon,
-  StarIcon,
-  XMarkIcon,
-} from "@heroicons/react/20/solid";
+import { BookOpenIcon, HomeIcon, XMarkIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
+import { GitHubMark } from "@/components/docs/github-mark";
 import { buttonVariants } from "@/components/ui/button";
 import { MobileHamburgerButton } from "@/components/nav/mobile-hamburger-button";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
@@ -219,7 +215,11 @@ function DrawerBody({ pathname }: DrawerBodyProps) {
           icon={BookOpenIcon}
           active={normalizedPath === "/docs"}
         />
-        <DrawerExternalLink href={GITHUB_URL} label="GitHub" icon={StarIcon} />
+        <DrawerExternalLink
+          href={GITHUB_URL}
+          label="GitHub"
+          leading={<GitHubMark />}
+        />
       </DrawerSection>
 
       <DrawerSection title="Sections">
@@ -289,12 +289,14 @@ interface DrawerExternalLinkProps {
   href: string;
   label: string;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  leading?: React.ReactNode;
 }
 
 function DrawerExternalLink({
   href,
   label,
   icon: Icon,
+  leading,
 }: DrawerExternalLinkProps) {
   return (
     <a
@@ -303,9 +305,10 @@ function DrawerExternalLink({
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium text-ink/85 outline-none transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2"
     >
-      {Icon ? (
-        <Icon className="size-4 shrink-0 text-accent" aria-hidden="true" />
-      ) : null}
+      {leading ??
+        (Icon ? (
+          <Icon className="size-4 shrink-0 text-accent" aria-hidden="true" />
+        ) : null)}
       <span className="truncate">{label}</span>
     </a>
   );

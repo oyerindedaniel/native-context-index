@@ -132,11 +132,8 @@ pub use crate::storage_migrations::SCHEMA_VERSION;
 /// [`StorageConnectionPragmas::baseline`].
 #[derive(Debug, Clone, Copy)]
 pub struct StorageConnectionPragmas {
-    /// `None` = do not set; `Some(0)` = `PRAGMA mmap_size=0`; `Some(n)` = bytes for mmap.
     pub mmap_size_bytes: Option<i64>,
-    /// Honored only when the database file is created on this `open` (before migrations).
     pub page_size: Option<i32>,
-    /// When false, each [`NciDatabase::save_package`] runs `PRAGMA foreign_keys=OFF` for that txn.
     pub foreign_keys_in_save: bool,
 }
 
@@ -156,15 +153,11 @@ impl Default for StorageConnectionPragmas {
     }
 }
 
-/// Default junction flush size for [`SavePackageMode::JunctionBatch`].
 pub const DEFAULT_JUNCTION_BATCH_CHUNK_SIZE: usize = 100;
 
-/// How [`NciDatabase::save_package_with_mode`] persists junction tables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SavePackageMode {
-    /// One `execute` per junction row.
     Baseline,
-    /// Buffer junction rows and flush with multi-value `INSERT` every `chunk_size` rows.
     JunctionBatch { chunk_size: usize },
 }
 

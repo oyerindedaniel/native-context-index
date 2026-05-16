@@ -69,6 +69,31 @@
   --spacing-docs-sidebar: 16rem;
   --spacing-docs-content: 50rem;
   --spacing-docs-shell: 80rem;
+
+  --animate-nci-surface-in: nci-surface-in 150ms ease-out;
+  --animate-nci-surface-out: nci-surface-out 120ms ease-in;
+
+  @keyframes nci-surface-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes nci-surface-out {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
 }
 
 @layer base {
@@ -251,6 +276,30 @@
       transparent 1.1px
     );
     background-size: 17px 17px;
+  }
+
+  /* Radix Popover / Dropdown: scale from trigger via --radix-*-content-transform-origin */
+  .nci-radix-surface {
+    transform-origin: var(
+      --radix-popover-content-transform-origin,
+      var(--radix-dropdown-menu-content-transform-origin, center)
+    );
+    will-change: transform, opacity;
+  }
+
+  .nci-radix-surface[data-state="open"] {
+    animation: var(--animate-nci-surface-in);
+  }
+
+  .nci-radix-surface[data-state="closed"] {
+    animation: var(--animate-nci-surface-out);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nci-radix-surface[data-state="open"],
+    .nci-radix-surface[data-state="closed"] {
+      animation: none;
+    }
   }
 }
 

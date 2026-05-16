@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
-import { StarIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
+import { GitHubMark } from "@/components/docs/github-mark";
 import { DocsSearch } from "@/components/docs/docs-search";
 import { DocsPageCopy } from "@/components/docs/docs-page-copy";
 import { DocsBreadcrumbStatic } from "@/components/docs/docs-breadcrumb";
@@ -40,35 +39,11 @@ export function DocsHeader({ className }: DocsHeaderProps) {
           rel="noopener noreferrer"
           aria-label="Open Native Context Index on GitHub"
           className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "hidden shrink-0 gap-2 sm:inline-flex",
-          )}
-        >
-          <StarIcon
-            className="size-4 -translate-y-px text-accent"
-            aria-hidden="true"
-          />
-          <span>GitHub</span>
-        </a>
-
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Open Native Context Index on GitHub"
-          className={cn(
             buttonVariants({ variant: "outline", size: "icon" }),
-            "shrink-0 sm:hidden",
+            "shrink-0",
           )}
         >
-          <Image
-            src="/github.svg"
-            alt=""
-            width={16}
-            height={16}
-            className="size-4 opacity-90"
-            aria-hidden
-          />
+          <GitHubMark />
         </a>
       </div>
     </header>

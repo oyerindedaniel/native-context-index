@@ -12,6 +12,7 @@ export type HomeCliSceneVariant = "npm-single" | "nci-single" | "nci-sequence";
 
 export interface HomeCliSceneBase {
   readonly sceneKey: string;
+  readonly tabLabel: string;
   readonly eyebrow: string;
   readonly title: string;
   readonly caption: string;
@@ -77,6 +78,7 @@ export const HOME_CLI_SCENES: readonly HomeCliScene[] = [
   {
     sceneKey: "npm-install-effect",
     variant: "npm-single",
+    tabLabel: "effect",
     eyebrow: "Step 1",
     title: "Add the dependency you care about",
     caption:
@@ -97,6 +99,7 @@ export const HOME_CLI_SCENES: readonly HomeCliScene[] = [
   {
     sceneKey: "npm-install-nci-cli",
     variant: "npm-single",
+    tabLabel: "nci cli",
     eyebrow: "Step 2",
     title: "Install the NCI CLI",
     caption:
@@ -112,6 +115,7 @@ export const HOME_CLI_SCENES: readonly HomeCliScene[] = [
   {
     sceneKey: "nci-init",
     variant: "nci-single",
+    tabLabel: "init",
     eyebrow: "Step 3",
     title: "Initialize the workspace",
     caption:
@@ -127,6 +131,7 @@ export const HOME_CLI_SCENES: readonly HomeCliScene[] = [
   {
     sceneKey: "nci-index",
     variant: "nci-single",
+    tabLabel: "index",
     eyebrow: "Step 4",
     title: "Index one installed package",
     caption:
@@ -142,6 +147,7 @@ export const HOME_CLI_SCENES: readonly HomeCliScene[] = [
   {
     sceneKey: "nci-query-and-sql",
     variant: "nci-sequence",
+    tabLabel: "query",
     eyebrow: "Step 5",
     title: "Query, then drop into SQL",
     caption:
