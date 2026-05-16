@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { LayoutGroup, motion, useInView, useReducedMotion } from "motion/react";
 import { ClipboardIcon, CommandLineIcon } from "@heroicons/react/20/solid";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
@@ -37,7 +37,11 @@ type TerminalTabBarProps = React.ComponentProps<"div"> & {
   readonly activeTabId: string;
   readonly onTabChange: (tabId: string) => void;
   readonly ariaLabel?: string;
+  /** Shared layout id for the active-tab highlight (enables cross-tab motion). */
+  readonly layoutId?: string;
 };
+
+const TERMINAL_TAB_ACTIVE_LAYOUT_ID = "terminal-tab-active";
 
 type TerminalMode = "single" | "sequence";
 
@@ -172,46 +176,72 @@ function TerminalTabBar({
   onTabChange,
   className,
   ariaLabel = "Terminal sessions",
+  layoutId = TERMINAL_TAB_ACTIVE_LAYOUT_ID,
   ...props
 }: TerminalTabBarProps) {
+  const prefersReducedMotion = useReducedMotion() === true;
+
   return (
-    <div
-      role="tablist"
-      aria-label={ariaLabel}
-      className={cn(
-        "flex items-center gap-1 overflow-x-auto border-b border-white/5 bg-[#0c0e13] px-3 py-2",
-        className,
-      )}
-      {...props}
-    >
-      {tabs.map((tab) => {
-        const isActive = tab.id === activeTabId;
-        const showLiveDot = tab.showLiveDot !== false;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onTabChange(tab.id)}
-            className={cn(
-              "relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium tracking-tight outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45",
-              isActive
-                ? "bg-white/10 text-white/92"
-                : "text-white/45 hover:bg-white/[0.04] hover:text-white/70",
-            )}
-          >
-            {isActive && showLiveDot ? (
-              <span
-                className="size-1.5 shrink-0 rounded-full bg-[#5a9cf5] shadow-[0_0_6px_#5a9cf580]"
-                aria-hidden="true"
-              />
-            ) : null}
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
+    <LayoutGroup id={`${layoutId}-group`}>
+      <div
+        role="tablist"
+        aria-label={ariaLabel}
+        className={cn(
+          "flex items-center gap-1 overflow-x-auto border-b border-white/5 bg-[#0c0e13] px-3 py-2",
+          className,
+        )}
+        {...props}
+      >
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          const showLiveDot = tab.showLiveDot !== false;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                "relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium tracking-tight outline-none transition-[color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45",
+                isActive
+                  ? "text-white/92"
+                  : "text-white/45 hover:bg-white/[0.04] hover:text-white/70",
+              )}
+            >
+              {isActive ? (
+                prefersReducedMotion ? (
+                  <span
+                    className="absolute inset-0 rounded-lg bg-white/10"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <motion.span
+                    layoutId={layoutId}
+                    className="absolute inset-0 rounded-lg bg-white/10 shadow-[inset_0_1px_rgb(255_255_255/0.06)]"
+                    transition={{
+                      type: "spring",
+                      stiffness: 440,
+                      damping: 34,
+                    }}
+                    aria-hidden="true"
+                  />
+                )
+              ) : null}
+              <span className="relative inline-flex items-center gap-2">
+                {isActive && showLiveDot ? (
+                  <span
+                    className="size-1.5 shrink-0 rounded-full bg-[#5a9cf5] shadow-[0_0_6px_#5a9cf580]"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </LayoutGroup>
   );
 }
 TerminalTabBar.displayName = TERMINAL_TAB_BAR_DISPLAY_NAME;

@@ -2,7 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  motion,
+  useReducedMotion,
+} from "motion/react";
 import { ArrowLongRightIcon } from "@heroicons/react/20/solid";
 import { StagedDemo } from "@/components/marketing/staged-demo";
 import { Terminal } from "@/components/docs/widgets/terminal";
@@ -94,6 +99,7 @@ function renderSceneBody(
           activeTabId={activeScene.sceneKey}
           onTabChange={onTabChange}
           ariaLabel="CLI journey"
+          layoutId="home-cli-cinema-tab"
         />
         <Terminal.Body>
           <Terminal.Command>{activeScene.commandLine}</Terminal.Command>
@@ -120,6 +126,7 @@ function renderSceneBody(
         activeTabId={activeScene.sceneKey}
         onTabChange={onTabChange}
         ariaLabel="CLI journey"
+        layoutId="home-cli-cinema-tab"
       />
       <Terminal.Body className="nci-cli-cinema-scroll-y max-h-[min(22rem,48vh)] overflow-y-auto overscroll-y-contain">
         {activeScene.steps.map((step) => (
@@ -213,24 +220,26 @@ export function HomeCliCinema() {
                 </h3>
               </div>
 
-              <motion.div
-                initial={false}
-                animate={{ height: terminalStageHeight }}
-                transition={STAGE_HEIGHT_TRANSITION}
-                className="relative min-h-0 min-w-0"
-              >
-                <div ref={terminalMeasureRef} className="min-h-0 min-w-0">
-                  <AnimatePresence mode="popLayout">
-                    <motion.div
-                      key={activeScene.sceneKey}
-                      {...SCENE_SWITCH_MOTION}
-                      className="min-h-0 min-w-0"
-                    >
-                      {renderSceneBody(activeScene, handleTabChange)}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </motion.div>
+              <LayoutGroup id="home-cli-cinema-tab">
+                <motion.div
+                  initial={false}
+                  animate={{ height: terminalStageHeight }}
+                  transition={STAGE_HEIGHT_TRANSITION}
+                  className="relative min-h-0 min-w-0"
+                >
+                  <div ref={terminalMeasureRef} className="min-h-0 min-w-0">
+                    <AnimatePresence mode="popLayout">
+                      <motion.div
+                        key={activeScene.sceneKey}
+                        {...SCENE_SWITCH_MOTION}
+                        className="min-h-0 min-w-0"
+                      >
+                        {renderSceneBody(activeScene, handleTabChange)}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              </LayoutGroup>
             </StagedDemo.Card>
           </StagedDemo.Root>
         </div>
