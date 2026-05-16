@@ -125,6 +125,123 @@ pub type StorageResult<T> = Result<T, StorageError>;
 
 pub use crate::storage_migrations::SCHEMA_VERSION;
 
+/// Connection-level SQLite tuning (bench / experiments). Production [`NciDatabase::open`] uses
+/// [`StorageConnectionPragmas::baseline`].
+#[derive(Debug, Clone, Copy)]
+pub struct StorageConnectionPragmas {
+    /// `None` = do not set; `Some(0)` = `PRAGMA mmap_size=0`; `Some(n)` = bytes for mmap.
+    pub mmap_size_bytes: Option<i64>,
+    /// Honored only when the database file is created on this `open` (before migrations).
+    pub page_size: Option<i32>,
+    /// When false, each [`NciDatabase::save_package`] runs `PRAGMA foreign_keys=OFF` for that txn.
+    pub foreign_keys_in_save: bool,
+}
+
+impl StorageConnectionPragmas {
+    pub const fn baseline() -> Self {
+        Self {
+            mmap_size_bytes: None,
+            page_size: None,
+            foreign_keys_in_save: true,
+        }
+    }
+}
+
+impl Default for StorageConnectionPragmas {
+    fn default() -> Self {
+        Self::baseline()
+    }
+}
+
+/// Default junction flush size for [`SavePackageMode::JunctionBatch`].
+pub const DEFAULT_JUNCTION_BATCH_CHUNK_SIZE: usize = 100;
+
+/// How [`NciDatabase::save_package_with_mode`] persists junction tables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SavePackageMode {
+    /// One `execute` per junction row.
+    Baseline,
+    /// Buffer junction rows and flush with multi-value `INSERT` every `chunk_size` rows.
+    JunctionBatch { chunk_size: usize },
+}
+
+impl Default for SavePackageMode {
+    fn default() -> Self {
+        Self::JunctionBatch {
+            chunk_size: DEFAULT_JUNCTION_BATCH_CHUNK_SIZE,
+        }
+    }
+}
+
+const SAVE_BENCH_MMAP_128MB: i64 = 134_217_728;
+
+/// Maps A/B scenario ids (S0–S5, P0) to connection pragmas and [`SavePackageMode`].
+pub fn save_benchmark_scenario(
+    scenario_id: &str,
+) -> Result<(StorageConnectionPragmas, SavePackageMode), String> {
+    match scenario_id.trim().to_ascii_uppercase().as_str() {
+        "S0" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(0),
+                page_size: None,
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::Baseline,
+        )),
+        "S1" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(0),
+                page_size: None,
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::JunctionBatch { chunk_size: 100 },
+        )),
+        "S2" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(0),
+                page_size: None,
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::JunctionBatch { chunk_size: 200 },
+        )),
+        "S3" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(SAVE_BENCH_MMAP_128MB),
+                page_size: None,
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::Baseline,
+        )),
+        "S4" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(SAVE_BENCH_MMAP_128MB),
+                page_size: None,
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::JunctionBatch { chunk_size: 100 },
+        )),
+        "S5" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(0),
+                page_size: None,
+                foreign_keys_in_save: false,
+            },
+            SavePackageMode::JunctionBatch { chunk_size: 100 },
+        )),
+        "P0" => Ok((
+            StorageConnectionPragmas {
+                mmap_size_bytes: Some(0),
+                page_size: Some(8192),
+                foreign_keys_in_save: true,
+            },
+            SavePackageMode::Baseline,
+        )),
+        other => Err(format!(
+            "unknown save scenario {other:?}; use S0, S1, S2, S3, S4, S5, or P0"
+        )),
+    }
+}
+
 /// First 16 bytes of every SQLite 3 database file.
 const SQLITE3_FILE_HEADER: &[u8; 16] = b"SQLite format 3\0";
 
@@ -220,6 +337,175 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
 
 pub struct NciDatabase {
     connection: Connection,
+    connection_pragmas: StorageConnectionPragmas,
+}
+
+fn apply_rw_connection_pragmas(
+    connection: &Connection,
+    pragmas: StorageConnectionPragmas,
+) -> StorageResult<()> {
+    connection.execute_batch(
+        "
+        PRAGMA foreign_keys = ON;
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA temp_store = MEMORY;
+        PRAGMA cache_size = -64000;
+        ",
+    )?;
+    if let Some(mmap_size_bytes) = pragmas.mmap_size_bytes {
+        connection.execute_batch(&format!("PRAGMA mmap_size = {mmap_size_bytes};"))?;
+    }
+    Ok(())
+}
+
+fn apply_ro_connection_pragmas(
+    connection: &Connection,
+    pragmas: StorageConnectionPragmas,
+) -> StorageResult<()> {
+    connection.execute_batch(
+        "
+        PRAGMA foreign_keys = ON;
+        PRAGMA busy_timeout = 30000;
+        ",
+    )?;
+    if let Some(mmap_size_bytes) = pragmas.mmap_size_bytes {
+        connection.execute_batch(&format!("PRAGMA mmap_size = {mmap_size_bytes};"))?;
+    }
+    Ok(())
+}
+
+fn flush_two_column_junction_batch(
+    transaction: &rusqlite::Transaction<'_>,
+    insert_prefix: &str,
+    pending_rows: &mut Vec<(i64, String)>,
+    chunk_size: usize,
+) -> StorageResult<()> {
+    while !pending_rows.is_empty() {
+        let row_count = chunk_size.min(pending_rows.len());
+        let chunk: Vec<(i64, String)> = pending_rows.drain(..row_count).collect();
+        let value_placeholders: String = (0..chunk.len())
+            .map(|row_index| {
+                let param_base = row_index * 2 + 1;
+                format!("(?{param_base}, ?{})", param_base + 1)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!("{insert_prefix}{value_placeholders}");
+        let sql_params: Vec<rusqlite::types::Value> = chunk
+            .into_iter()
+            .flat_map(|(symbol_row_id, text_value)| {
+                [
+                    rusqlite::types::Value::from(symbol_row_id),
+                    rusqlite::types::Value::from(text_value),
+                ]
+            })
+            .collect();
+        transaction.execute(&sql, rusqlite::params_from_iter(sql_params.iter()))?;
+    }
+    Ok(())
+}
+
+const INHERITED_JUNCTION_INSERT_PREFIX: &str = "INSERT OR IGNORE INTO symbol_inherited_from_sources (symbol_id, source_symbol_id_text) VALUES ";
+const DEPENDENCY_JUNCTION_INSERT_PREFIX: &str =
+    "INSERT OR IGNORE INTO symbol_dependencies (from_symbol_id, to_symbol_id_text) VALUES ";
+const SURFACE_DEPENDENCY_JUNCTION_INSERT_PREFIX: &str =
+    "INSERT OR IGNORE INTO symbol_surface_dependencies (from_symbol_id, to_symbol_id_text) VALUES ";
+const ADDITIONAL_FILE_JUNCTION_INSERT_PREFIX: &str =
+    "INSERT OR IGNORE INTO symbol_additional_files (symbol_id, file_path) VALUES ";
+const HERITAGE_JUNCTION_INSERT_PREFIX: &str =
+    "INSERT OR IGNORE INTO symbol_heritage (symbol_id, heritage) VALUES ";
+const MODIFIER_JUNCTION_INSERT_PREFIX: &str =
+    "INSERT OR IGNORE INTO symbol_modifiers (symbol_id, modifier) VALUES ";
+
+fn record_two_column_junction(
+    save_mode: SavePackageMode,
+    transaction: &rusqlite::Transaction<'_>,
+    insert_prefix: &str,
+    baseline_statement: &mut rusqlite::Statement<'_>,
+    pending_rows: &mut Vec<(i64, String)>,
+    symbol_row_id: i64,
+    text_value: &str,
+) -> StorageResult<()> {
+    match save_mode {
+        SavePackageMode::Baseline => {
+            baseline_statement.execute(rusqlite::params![symbol_row_id, text_value])?;
+        }
+        SavePackageMode::JunctionBatch { chunk_size } => {
+            pending_rows.push((symbol_row_id, text_value.to_string()));
+            if pending_rows.len() >= chunk_size {
+                flush_two_column_junction_batch(
+                    transaction,
+                    insert_prefix,
+                    pending_rows,
+                    chunk_size,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn record_decorator_junction(
+    save_mode: SavePackageMode,
+    transaction: &rusqlite::Transaction<'_>,
+    baseline_statement: &mut rusqlite::Statement<'_>,
+    pending_rows: &mut Vec<(i64, String, Option<String>)>,
+    symbol_row_id: i64,
+    decorator_name: &str,
+    arguments_json: Option<String>,
+) -> StorageResult<()> {
+    match save_mode {
+        SavePackageMode::Baseline => {
+            baseline_statement.execute(rusqlite::params![
+                symbol_row_id,
+                decorator_name,
+                arguments_json.as_deref()
+            ])?;
+        }
+        SavePackageMode::JunctionBatch { chunk_size } => {
+            pending_rows.push((symbol_row_id, decorator_name.to_string(), arguments_json));
+            if pending_rows.len() >= chunk_size {
+                flush_decorator_junction_batch(transaction, pending_rows, chunk_size)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn flush_decorator_junction_batch(
+    transaction: &rusqlite::Transaction<'_>,
+    pending_rows: &mut Vec<(i64, String, Option<String>)>,
+    chunk_size: usize,
+) -> StorageResult<()> {
+    while !pending_rows.is_empty() {
+        let row_count = chunk_size.min(pending_rows.len());
+        let chunk: Vec<(i64, String, Option<String>)> = pending_rows.drain(..row_count).collect();
+        let value_placeholders: String = (0..chunk.len())
+            .map(|row_index| {
+                let param_base = row_index * 3 + 1;
+                format!("(?{param_base}, ?{}, ?{})", param_base + 1, param_base + 2)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "INSERT INTO symbol_decorators (symbol_id, name, arguments) VALUES {value_placeholders}"
+        );
+        let sql_params: Vec<rusqlite::types::Value> = chunk
+            .into_iter()
+            .flat_map(|(symbol_row_id, decorator_name, arguments_json)| {
+                [
+                    rusqlite::types::Value::from(symbol_row_id),
+                    rusqlite::types::Value::from(decorator_name),
+                    arguments_json
+                        .map(rusqlite::types::Value::from)
+                        .unwrap_or(rusqlite::types::Value::Null),
+                ]
+            })
+            .collect();
+        transaction.execute(&sql, rusqlite::params_from_iter(sql_params.iter()))?;
+    }
+    Ok(())
 }
 
 fn signature_snippet(signature_text: Option<&str>) -> Option<String> {
@@ -297,20 +583,26 @@ fn read_symbol_search_hit_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Symbo
 
 impl NciDatabase {
     pub fn open(path: impl AsRef<Path>) -> StorageResult<Self> {
+        Self::open_with_pragmas(path, StorageConnectionPragmas::baseline())
+    }
+
+    pub fn open_with_pragmas(
+        path: impl AsRef<Path>,
+        pragmas: StorageConnectionPragmas,
+    ) -> StorageResult<Self> {
         let path_ref = path.as_ref();
+        let database_is_new = !path_ref.exists();
         info!(path = %path_ref.display(), "opening nci sqlite database");
         let mut connection = Connection::open(path_ref)?;
-        connection.execute_batch(
-            "
-            PRAGMA foreign_keys = ON;
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
-            PRAGMA temp_store = MEMORY;
-            PRAGMA cache_size = -64000;
-            ",
-        )?;
+        if database_is_new && let Some(page_size) = pragmas.page_size {
+            connection.execute_batch(&format!("PRAGMA page_size = {page_size};"))?;
+        }
+        apply_rw_connection_pragmas(&connection, pragmas)?;
         run_migrations(&mut connection)?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection,
+            connection_pragmas: pragmas,
+        })
     }
 
     /// Read-only connection for concurrent cache probes while another connection writes (WAL).
@@ -318,19 +610,24 @@ impl NciDatabase {
     /// Does not run migrations (read-only). Callers should open a read-write [`Self::open`] first
     /// so schema is initialized. One connection per thread (see `rusqlite` / SQLite threading rules).
     pub fn open_read_only(path: impl AsRef<Path>) -> StorageResult<Self> {
+        Self::open_read_only_with_pragmas(path, StorageConnectionPragmas::baseline())
+    }
+
+    pub fn open_read_only_with_pragmas(
+        path: impl AsRef<Path>,
+        pragmas: StorageConnectionPragmas,
+    ) -> StorageResult<Self> {
         let path_ref = path.as_ref();
         trace!(path = %path_ref.display(), "opening nci sqlite database (read-only)");
         let connection = Connection::open_with_flags(
             path_ref,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )?;
-        connection.execute_batch(
-            "
-            PRAGMA foreign_keys = ON;
-            PRAGMA busy_timeout = 30000;
-            ",
-        )?;
-        Ok(Self { connection })
+        apply_ro_connection_pragmas(&connection, pragmas)?;
+        Ok(Self {
+            connection,
+            connection_pragmas: pragmas,
+        })
     }
 
     pub fn stored_schema_version(&self) -> StorageResult<u32> {
@@ -827,9 +1124,28 @@ impl NciDatabase {
         graph: &PackageGraph,
         engine_cache_key: &str,
     ) -> StorageResult<()> {
+        self.save_package_with_mode(
+            package_info,
+            graph,
+            engine_cache_key,
+            SavePackageMode::default(),
+        )
+    }
+
+    pub fn save_package_with_mode(
+        &mut self,
+        package_info: &PackageInfo,
+        graph: &PackageGraph,
+        engine_cache_key: &str,
+        save_mode: SavePackageMode,
+    ) -> StorageResult<()> {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        if !self.connection_pragmas.foreign_keys_in_save {
+            transaction.execute("PRAGMA foreign_keys = OFF", [])?;
+        }
 
         transaction.execute(
             "DELETE FROM packages WHERE name = ?1 AND version = ?2",
@@ -853,6 +1169,19 @@ impl NciDatabase {
         )?;
 
         let package_id = transaction.last_insert_rowid();
+
+        let use_junction_batch = matches!(save_mode, SavePackageMode::JunctionBatch { .. });
+        let mut inherited_pending: Vec<(i64, String)> = Vec::new();
+        let mut dependency_pending: Vec<(i64, String)> = Vec::new();
+        let mut surface_dependency_pending: Vec<(i64, String)> = Vec::new();
+        let mut additional_file_pending: Vec<(i64, String)> = Vec::new();
+        let mut heritage_pending: Vec<(i64, String)> = Vec::new();
+        let mut modifier_pending: Vec<(i64, String)> = Vec::new();
+        let mut decorator_pending: Vec<(i64, String, Option<String>)> = Vec::new();
+        let junction_chunk_size = match save_mode {
+            SavePackageMode::Baseline => 1,
+            SavePackageMode::JunctionBatch { chunk_size } => chunk_size.max(1),
+        };
 
         {
             let mut insert_declared_dependency = transaction.prepare(
@@ -968,36 +1297,76 @@ impl NciDatabase {
                 let symbol_row_id = transaction.last_insert_rowid();
 
                 for source_id in symbol_node.inherited_from_sources.iter() {
-                    insert_inherited
-                        .execute(rusqlite::params![symbol_row_id, source_id.as_ref(),])?;
+                    record_two_column_junction(
+                        save_mode,
+                        &transaction,
+                        INHERITED_JUNCTION_INSERT_PREFIX,
+                        &mut insert_inherited,
+                        &mut inherited_pending,
+                        symbol_row_id,
+                        source_id.as_ref(),
+                    )?;
                 }
 
                 for dependency_id in symbol_node.dependencies.iter() {
-                    insert_dependency
-                        .execute(rusqlite::params![symbol_row_id, dependency_id.as_ref()])?;
+                    record_two_column_junction(
+                        save_mode,
+                        &transaction,
+                        DEPENDENCY_JUNCTION_INSERT_PREFIX,
+                        &mut insert_dependency,
+                        &mut dependency_pending,
+                        symbol_row_id,
+                        dependency_id.as_ref(),
+                    )?;
                 }
                 for surface_dependency_id in symbol_node.surface_dependencies.iter() {
-                    insert_surface_dependency.execute(rusqlite::params![
+                    record_two_column_junction(
+                        save_mode,
+                        &transaction,
+                        SURFACE_DEPENDENCY_JUNCTION_INSERT_PREFIX,
+                        &mut insert_surface_dependency,
+                        &mut surface_dependency_pending,
                         symbol_row_id,
-                        surface_dependency_id.as_ref()
-                    ])?;
+                        surface_dependency_id.as_ref(),
+                    )?;
                 }
 
                 if let Some(ref additional) = symbol_node.additional_files {
                     for additional_path in additional.iter() {
-                        insert_additional
-                            .execute(rusqlite::params![symbol_row_id, additional_path.as_ref()])?;
+                        record_two_column_junction(
+                            save_mode,
+                            &transaction,
+                            ADDITIONAL_FILE_JUNCTION_INSERT_PREFIX,
+                            &mut insert_additional,
+                            &mut additional_file_pending,
+                            symbol_row_id,
+                            additional_path.as_ref(),
+                        )?;
                     }
                 }
 
                 for heritage_name in symbol_node.heritage.iter() {
-                    insert_heritage
-                        .execute(rusqlite::params![symbol_row_id, heritage_name.as_ref()])?;
+                    record_two_column_junction(
+                        save_mode,
+                        &transaction,
+                        HERITAGE_JUNCTION_INSERT_PREFIX,
+                        &mut insert_heritage,
+                        &mut heritage_pending,
+                        symbol_row_id,
+                        heritage_name.as_ref(),
+                    )?;
                 }
 
                 for modifier_name in symbol_node.modifiers.iter() {
-                    insert_modifier
-                        .execute(rusqlite::params![symbol_row_id, modifier_name.as_ref()])?;
+                    record_two_column_junction(
+                        save_mode,
+                        &transaction,
+                        MODIFIER_JUNCTION_INSERT_PREFIX,
+                        &mut insert_modifier,
+                        &mut modifier_pending,
+                        symbol_row_id,
+                        modifier_name.as_ref(),
+                    )?;
                 }
 
                 for decorator in symbol_node.decorators.iter() {
@@ -1005,12 +1374,60 @@ impl NciDatabase {
                         .arguments
                         .as_ref()
                         .map(|args| decorator_arguments_json(args.as_ref()));
-                    insert_decorator.execute(rusqlite::params![
+                    record_decorator_junction(
+                        save_mode,
+                        &transaction,
+                        &mut insert_decorator,
+                        &mut decorator_pending,
                         symbol_row_id,
                         decorator.name.as_ref(),
-                        arguments_json.as_deref(),
-                    ])?;
+                        arguments_json,
+                    )?;
                 }
+            }
+
+            if use_junction_batch {
+                flush_two_column_junction_batch(
+                    &transaction,
+                    INHERITED_JUNCTION_INSERT_PREFIX,
+                    &mut inherited_pending,
+                    junction_chunk_size,
+                )?;
+                flush_two_column_junction_batch(
+                    &transaction,
+                    DEPENDENCY_JUNCTION_INSERT_PREFIX,
+                    &mut dependency_pending,
+                    junction_chunk_size,
+                )?;
+                flush_two_column_junction_batch(
+                    &transaction,
+                    SURFACE_DEPENDENCY_JUNCTION_INSERT_PREFIX,
+                    &mut surface_dependency_pending,
+                    junction_chunk_size,
+                )?;
+                flush_two_column_junction_batch(
+                    &transaction,
+                    ADDITIONAL_FILE_JUNCTION_INSERT_PREFIX,
+                    &mut additional_file_pending,
+                    junction_chunk_size,
+                )?;
+                flush_two_column_junction_batch(
+                    &transaction,
+                    HERITAGE_JUNCTION_INSERT_PREFIX,
+                    &mut heritage_pending,
+                    junction_chunk_size,
+                )?;
+                flush_two_column_junction_batch(
+                    &transaction,
+                    MODIFIER_JUNCTION_INSERT_PREFIX,
+                    &mut modifier_pending,
+                    junction_chunk_size,
+                )?;
+                flush_decorator_junction_batch(
+                    &transaction,
+                    &mut decorator_pending,
+                    junction_chunk_size,
+                )?;
             }
         }
 
@@ -2331,6 +2748,68 @@ mod tests {
                 "demo-pkg@1.0.0::Base.prototype.x",
                 "demo-pkg@1.0.0::Trait.x",
             ]
+        );
+    }
+
+    #[test]
+    fn save_package_junction_batch_matches_baseline_roundtrip() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let baseline_path = temp.path().join("baseline.sqlite");
+        let batch_path = temp.path().join("batch.sqlite");
+
+        let package_info = PackageInfo {
+            name: SharedString::from("junction-ab"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/x"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+
+        let mut sym = minimal_symbol("sym-j", "Child.x");
+        sym.dependencies = SharedVec::from(
+            vec![SharedString::from("junction-ab@1.0.0::Other.y")].into_boxed_slice(),
+        );
+        sym.heritage = SharedVec::from(vec![SharedString::from("Base")].into_boxed_slice());
+        sym.modifiers = SharedVec::from(vec![SharedString::from("public")].into_boxed_slice());
+
+        let graph = PackageGraph {
+            package: package_info.name.clone(),
+            version: package_info.version.clone(),
+            symbols: vec![sym],
+            total_symbols: 1,
+            total_files: 1,
+            crawl_duration_ms: 0.0,
+            build_duration_ms: 0.0,
+        };
+        let cache_key = index_engine_cache_key(&[]);
+
+        let mut baseline_db = NciDatabase::open(&baseline_path).expect("baseline open");
+        baseline_db
+            .save_package(&package_info, &graph, cache_key.as_str())
+            .expect("baseline save");
+
+        let mut batch_db = NciDatabase::open(&batch_path).expect("batch open");
+        batch_db
+            .save_package_with_mode(
+                &package_info,
+                &graph,
+                cache_key.as_str(),
+                SavePackageMode::JunctionBatch { chunk_size: 1 },
+            )
+            .expect("batch save");
+
+        let baseline_loaded = baseline_db
+            .load_package(&package_info)
+            .expect("baseline load");
+        let batch_loaded = batch_db.load_package(&package_info).expect("batch load");
+        assert_eq!(baseline_loaded.symbols.len(), batch_loaded.symbols.len());
+        assert_eq!(
+            baseline_loaded.symbols[0].dependencies.len(),
+            batch_loaded.symbols[0].dependencies.len()
+        );
+        assert_eq!(
+            baseline_loaded.symbols[0].heritage.len(),
+            batch_loaded.symbols[0].heritage.len()
         );
     }
 

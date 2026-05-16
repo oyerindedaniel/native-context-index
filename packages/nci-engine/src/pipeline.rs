@@ -102,6 +102,12 @@ pub struct IndexOptions {
     /// Optional hook after each package’s index outcome is final (cache hit, persist skipped,
     /// send failure, or writer finished crawl+SQLite). Used by `nci index` plain output only.
     pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
+
+    /// SQLite persist mode for the writer thread (default baseline; bench via `storage_save_bench`).
+    pub save_package_mode: crate::storage::SavePackageMode,
+
+    /// Connection pragmas for SQLite open on the writer (and initial migrate open).
+    pub storage_connection_pragmas: crate::storage::StorageConnectionPragmas,
 }
 
 impl Default for IndexOptions {
@@ -120,6 +126,8 @@ impl Default for IndexOptions {
             save_retry_count: 0,
             dependency_stub_packages: Vec::new(),
             on_package_done: None,
+            save_package_mode: crate::storage::SavePackageMode::default(),
+            storage_connection_pragmas: crate::storage::StorageConnectionPragmas::baseline(),
         }
     }
 }
@@ -392,7 +400,7 @@ pub fn index_packages(
                 let _ = fs::create_dir_all(parent);
             }
             debug!(path = %path.display(), "package cache enabled");
-            match NciDatabase::open(&path) {
+            match NciDatabase::open_with_pragmas(&path, index_opts.storage_connection_pragmas) {
                 Ok(_) => Some(path),
                 Err(open_error) => {
                     warn!(
@@ -433,8 +441,13 @@ pub fn index_packages(
         let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
         let engine_cache_key_for_writer = index_engine_cache_key.clone();
         let package_done_writer = on_package_done.clone();
+        let save_package_mode = index_opts.save_package_mode;
+        let storage_connection_pragmas = index_opts.storage_connection_pragmas;
         let join = thread::spawn(move || {
-            let mut db_opt = match NciDatabase::open(&sqlite_path_owned) {
+            let mut db_opt = match NciDatabase::open_with_pragmas(
+                &sqlite_path_owned,
+                storage_connection_pragmas,
+            ) {
                 Ok(database) => Some(database),
                 Err(open_error) => {
                     warn!(
@@ -451,10 +464,11 @@ pub fn index_packages(
                     let mut last_err = None;
                     let mut saved = false;
                     for attempt in 0..save_attempts {
-                        match db.save_package(
+                        match db.save_package_with_mode(
                             &package,
                             &graph,
                             engine_cache_key_for_writer.as_str(),
+                            save_package_mode,
                         ) {
                             Ok(()) => {
                                 saved = true;

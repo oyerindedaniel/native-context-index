@@ -17,7 +17,8 @@
 //! `--fresh-db` (use a new temp `nci-demo-*.sqlite` so probes are cold misses),
 //! `--limit N` (index at most N packages after scan/dedupe),
 //! `--package-scope SCOPE` (`all_installed` default, or `dependencies`, `dev_dependencies`, or both comma-separated),
-//! `--manifest-root PATH` (which `package.json` gates `package-scope`; default repo root).
+//! `--manifest-root PATH` (which `package.json` gates `package-scope`; default repo root),
+//! `--save-scenario ID` (optional save-path A/B: S0–S5; default is junction-batch production mode).
 //!
 //! Env: `NCI_INDEX_NO_CACHE=1` is the same as `--no-package-cache` (handy when you cannot pass flags).
 //! `NCI_PARALLEL_RESOLVE_DEPS=0` is the same as `--no-parallel-resolve-deps`.
@@ -45,6 +46,7 @@ use nci_engine::pipeline::{
     GraphSource, IndexOptions, IndexedGraph, dedupe_packages_by_canonical_dir, index_packages,
 };
 use nci_engine::resolver::normalize_dependency_stub_list;
+use nci_engine::save_benchmark_scenario;
 use nci_engine::scanner::scan_packages;
 
 /// Package roots for dependency stubbing (`npm::…` edges). Edit this slice; leave empty for default
@@ -215,6 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut package_limit: Option<usize> = None;
     let mut package_scope_arg = String::from("all_installed");
     let mut manifest_root_arg: Option<PathBuf> = None;
+    let mut save_scenario_arg: Option<String> = None;
 
     let mut current_index = 1;
     while current_index < args.len() {
@@ -284,6 +287,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--manifest-root" if current_index + 1 < args.len() => {
                 manifest_root_arg = Some(PathBuf::from(&args[current_index + 1]));
+                current_index += 1;
+            }
+            "--save-scenario" if current_index + 1 < args.len() => {
+                save_scenario_arg = Some(args[current_index + 1].clone());
                 current_index += 1;
             }
             _ => {}
@@ -424,6 +431,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dependency_stub_packages =
         normalize_dependency_stub_list(DEMO_DEPENDENCY_STUB_PACKAGES.iter().copied());
 
+    let (storage_connection_pragmas, save_package_mode) =
+        if let Some(ref scenario_id) = save_scenario_arg {
+            match save_benchmark_scenario(scenario_id) {
+                Ok(config) => config,
+                Err(message) => {
+                    eprintln!("{message}");
+                    std::process::exit(2);
+                }
+            }
+        } else {
+            (
+                nci_engine::StorageConnectionPragmas::baseline(),
+                nci_engine::SavePackageMode::default(),
+            )
+        };
+
     let index_options = Some(IndexOptions {
         max_hops,
         parallel: !use_sequential,
@@ -438,6 +461,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         hydrate_cache_hits: false,
         retain_graph_after_save: false,
         dependency_stub_packages,
+        save_package_mode,
+        storage_connection_pragmas,
         ..Default::default()
     });
 
@@ -557,6 +582,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Manifest root:   {}", manifest_root.display());
     if let Some(limit) = package_limit {
         println!("   Package limit:   {limit}");
+    }
+    if let Some(ref scenario_id) = save_scenario_arg {
+        println!("   Save scenario:   {scenario_id}");
     }
     println!(
         "   Resolve deps:    {}",

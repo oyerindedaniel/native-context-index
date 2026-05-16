@@ -31,6 +31,7 @@ out/
 /packages/*/build/
 /dist/
 /packages/*/dist/
+/packages/*/docs/
 
 # Debug
 npm-debug.log*
@@ -83,4 +84,4 @@ nci-report-rust-fix.json
 
 # Benchmark run artifacts (regenerated locally; not the canonical dataset yet)
 apps/web/data/
-
+packages/nci-engine/sqlite-save-demo-runs.log

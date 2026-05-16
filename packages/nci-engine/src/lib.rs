@@ -22,6 +22,8 @@ pub use resolver::{
     normalize_dependency_stub_list, npm_package_root, specifier_is_dependency_stub,
 };
 pub use storage::{
-    DatabaseStatusReport, NciDatabase, SCHEMA_VERSION, SqlRunSummary, StorageError, StorageResult,
+    DEFAULT_JUNCTION_BATCH_CHUNK_SIZE, DatabaseStatusReport, NciDatabase, SCHEMA_VERSION,
+    SavePackageMode, SqlRunSummary, StorageConnectionPragmas, StorageError, StorageResult,
+    save_benchmark_scenario,
 };
 pub use types::PackageIndexMetadata;
