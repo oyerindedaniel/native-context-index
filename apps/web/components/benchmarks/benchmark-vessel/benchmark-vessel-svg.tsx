@@ -22,7 +22,7 @@ const LID_HALF_WIDTH = width / 2;
 const CAP_OVERLAP = 10;
 
 /** Single cap: curved meniscus + lid lip (no separate ellipse layer). */
-const UNIFIED_CAP_PATH = `M ${-LID_HALF_WIDTH} 0 C ${-LID_HALF_WIDTH * 0.45} -6 0 -7.5 ${LID_HALF_WIDTH * 0.45} -6 ${LID_HALF_WIDTH} 0 L ${LID_HALF_WIDTH - 3} -10 L ${-LID_HALF_WIDTH + 3} -10 Z`;
+const UNIFIED_CAP_PATH = `M ${-LID_HALF_WIDTH} 0 C ${-LID_HALF_WIDTH * 0.45} -6 ${LID_HALF_WIDTH * 0.45} -6 ${LID_HALF_WIDTH} 0 L ${LID_HALF_WIDTH - 3} -10 L ${-LID_HALF_WIDTH + 3} -10 Z`;
 
 export type BenchmarkVesselSvgProps = {
   fillTop: MotionValue<number>;

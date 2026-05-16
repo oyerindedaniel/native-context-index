@@ -2,12 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  AnimatePresence,
-  LayoutGroup,
-  motion,
-  useReducedMotion,
-} from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowLongRightIcon } from "@heroicons/react/20/solid";
 import { StagedDemo } from "@/components/marketing/staged-demo";
 import { Terminal } from "@/components/docs/widgets/terminal";
@@ -38,6 +33,11 @@ const SCENE_SWITCH_MOTION = {
   },
 };
 
+const HOME_CLI_CINEMA_TABS = HOME_CLI_SCENES.map((item) => ({
+  id: item.sceneKey,
+  label: item.tabLabel,
+}));
+
 function HomeCliCaptionRich({ text }: { readonly text: string }) {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -67,79 +67,6 @@ function HomeCliCaptionRich({ text }: { readonly text: string }) {
 
 function sceneChromeTitle(scene: HomeCliScene): string {
   return scene.variant === "npm-single" ? scene.chromeTitle : "nci";
-}
-
-function renderSceneBody(
-  activeScene: HomeCliScene,
-  onTabChange: (sceneKey: string) => void,
-) {
-  if (
-    activeScene.variant === "npm-single" ||
-    activeScene.variant === "nci-single"
-  ) {
-    return (
-      <Terminal.Root
-        className="my-0"
-        commandCopyPlacement="floating"
-        inViewAmount="some"
-      >
-        <Terminal.Chrome
-          title={
-            activeScene.variant === "npm-single"
-              ? sceneChromeTitle(activeScene)
-              : "nci"
-          }
-          cwd={activeScene.cwdLabel}
-        />
-        <Terminal.TabBar
-          tabs={HOME_CLI_SCENES.map((item) => ({
-            id: item.sceneKey,
-            label: item.tabLabel,
-          }))}
-          activeTabId={activeScene.sceneKey}
-          onTabChange={onTabChange}
-          ariaLabel="CLI journey"
-          layoutId="home-cli-cinema-tab"
-        />
-        <Terminal.Body>
-          <Terminal.Command>{activeScene.commandLine}</Terminal.Command>
-          <Terminal.Output>{activeScene.outputText}</Terminal.Output>
-        </Terminal.Body>
-      </Terminal.Root>
-    );
-  }
-
-  return (
-    <Terminal.Sequence.Root
-      key={activeScene.sceneKey}
-      className="my-0"
-      commandCopyPlacement="floating"
-      pauseBetweenStepsMs={240}
-      inViewAmount="some"
-    >
-      <Terminal.Chrome cwd={activeScene.cwdLabel} />
-      <Terminal.TabBar
-        tabs={HOME_CLI_SCENES.map((item) => ({
-          id: item.sceneKey,
-          label: item.tabLabel,
-        }))}
-        activeTabId={activeScene.sceneKey}
-        onTabChange={onTabChange}
-        ariaLabel="CLI journey"
-        layoutId="home-cli-cinema-tab"
-      />
-      <Terminal.Body className="nci-cli-cinema-scroll-y max-h-[min(22rem,48vh)] overflow-y-auto overscroll-y-contain">
-        {activeScene.steps.map((step) => (
-          <Terminal.Sequence.Step
-            key={step.commandLine}
-            commandLine={step.commandLine}
-          >
-            {step.outputText}
-          </Terminal.Sequence.Step>
-        ))}
-      </Terminal.Body>
-    </Terminal.Sequence.Root>
-  );
 }
 
 export function HomeCliCinema() {
@@ -175,8 +102,11 @@ export function HomeCliCinema() {
       ? "auto"
       : Math.max(STAGE_MIN_HEIGHT_PX, measuredTerminalHeightPx);
 
+  const frameMode =
+    activeScene.variant === "nci-sequence" ? "sequence" : "single";
+
   return (
-    <section className="border-y border-border bg-surface pt-20 pb-0 sm:py-28">
+    <section className="border-y border-border bg-surface pt-20 pb-0">
       <div className="mx-auto max-w-[1050px] px-6">
         <div className="mb-10 max-w-2xl">
           <p className="font-inter-tight text-sm font-medium uppercase tracking-[0.11em] text-primary">
@@ -220,7 +150,26 @@ export function HomeCliCinema() {
                 </h3>
               </div>
 
-              <LayoutGroup id="home-cli-cinema-tab">
+              <Terminal.Frame
+                mode={frameMode}
+                className="my-0"
+                commandCopyPlacement="floating"
+              >
+                <Terminal.Chrome
+                  title={
+                    activeScene.variant === "npm-single"
+                      ? sceneChromeTitle(activeScene)
+                      : "nci"
+                  }
+                  cwd={activeScene.cwdLabel}
+                />
+                <Terminal.TabBar
+                  tabs={HOME_CLI_CINEMA_TABS}
+                  activeTabId={activeScene.sceneKey}
+                  onTabChange={handleTabChange}
+                  ariaLabel="CLI journey"
+                  layoutId="home-cli-cinema-tab"
+                />
                 <motion.div
                   initial={false}
                   animate={{ height: terminalStageHeight }}
@@ -228,18 +177,47 @@ export function HomeCliCinema() {
                   className="relative min-h-0 min-w-0"
                 >
                   <div ref={terminalMeasureRef} className="min-h-0 min-w-0">
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence mode="wait">
                       <motion.div
                         key={activeScene.sceneKey}
                         {...SCENE_SWITCH_MOTION}
                         className="min-h-0 min-w-0"
                       >
-                        {renderSceneBody(activeScene, handleTabChange)}
+                        {activeScene.variant === "npm-single" ||
+                        activeScene.variant === "nci-single" ? (
+                          <Terminal.Root embed inViewAmount="some">
+                            <Terminal.Body>
+                              <Terminal.Command>
+                                {activeScene.commandLine}
+                              </Terminal.Command>
+                              <Terminal.Output>
+                                {activeScene.outputText}
+                              </Terminal.Output>
+                            </Terminal.Body>
+                          </Terminal.Root>
+                        ) : (
+                          <Terminal.Sequence.Root
+                            embed
+                            pauseBetweenStepsMs={240}
+                            inViewAmount="some"
+                          >
+                            <Terminal.Body className="nci-cli-cinema-scroll-y max-h-[min(22rem,48vh)] overflow-y-auto overscroll-y-contain">
+                              {activeScene.steps.map((step) => (
+                                <Terminal.Sequence.Step
+                                  key={step.commandLine}
+                                  commandLine={step.commandLine}
+                                >
+                                  {step.outputText}
+                                </Terminal.Sequence.Step>
+                              ))}
+                            </Terminal.Body>
+                          </Terminal.Sequence.Root>
+                        )}
                       </motion.div>
                     </AnimatePresence>
                   </div>
                 </motion.div>
-              </LayoutGroup>
+              </Terminal.Frame>
             </StagedDemo.Card>
           </StagedDemo.Root>
         </div>

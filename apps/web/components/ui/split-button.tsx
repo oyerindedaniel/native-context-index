@@ -37,6 +37,7 @@ const splitButtonRootVariants = cva(
       size: {
         sm: "",
         md: "",
+        lg: "",
       },
     },
     defaultVariants: {
@@ -149,7 +150,11 @@ function SplitButtonMain({
       disabled={isDisabled}
       className={cn(
         "inline-flex min-w-0 flex-1 cursor-pointer items-center justify-start font-medium whitespace-nowrap transition-[background-color,color,border-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-60",
-        size === "sm" ? "h-9 px-4 text-sm" : "h-11 px-5 text-sm",
+        size === "sm"
+          ? "h-9 px-4 text-sm"
+          : size === "lg"
+            ? "h-12 px-6 text-base"
+            : "h-11 px-5 text-sm",
         dividerClass(variant),
         segmentVariantClass(variant),
         segmentFocusVisibleClass(variant),
@@ -191,7 +196,9 @@ function SplitButtonIconTrigger({
         "inline-flex shrink-0 cursor-pointer items-center justify-center font-medium transition-[background-color,color,border-color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
         size === "sm"
           ? "h-9 min-w-9 px-0 text-sm"
-          : "h-11 min-w-11 px-0 text-sm",
+          : size === "lg"
+            ? "h-12 min-w-12 px-0 text-base [&_svg]:size-5"
+            : "h-11 min-w-11 px-0 text-sm",
         segmentVariantClass(variant),
         segmentFocusVisibleClass(variant),
         className,

@@ -24,6 +24,8 @@ void main() {
 `;
 
 const indexFieldFragmentShader = `
+uniform float uSplitLayout;
+
 varying vec2 vUv;
 
 float hash(vec2 p) {
@@ -49,8 +51,19 @@ void main() {
   float textFade = smoothstep(0.52, 0.84, uv.x) * (1.0 - smoothstep(0.18, 0.46, uv.y));
   float vignette = smoothstep(1.12, 0.18, length(p));
 
-  float clearZone = clamp(textClear * 1.18 + textFade * 0.58, 0.0, 1.0);
-  float checkerMask = (0.44 + modelFocus * 0.16) * (1.0 - clearZone * 0.98) * vignette;
+  float mobileClearZone = clamp(textClear * 1.18 + textFade * 0.58, 0.0, 1.0);
+  float mobileCheckerMask =
+    (0.44 + modelFocus * 0.16) * (1.0 - mobileClearZone * 0.98) * vignette;
+
+  // md+ split: checker only in a soft halo under the logo — not across the canvas panel.
+  vec2 splitAnchor = vec2(0.0, 0.02);
+  float splitDist = length((p - splitAnchor) * vec2(1.02, 1.1));
+  float logoHalo = 1.0 - smoothstep(0.26, 0.5, splitDist);
+  float seamFade = smoothstep(0.52, 0.14, uv.x);
+  float splitCheckerMask = logoHalo * seamFade * vignette;
+
+  float checkerMask = mix(mobileCheckerMask, splitCheckerMask, uSplitLayout);
+  float clearZone = mix(mobileClearZone, 0.0, uSplitLayout);
   float indexBands = smoothstep(0.985, 1.0, sin((p.x * 3.2 + p.y * 4.4) * 7.0));
 
   vec3 lightTile = vec3(0.995, 0.993, 1.0);
@@ -59,8 +72,9 @@ void main() {
   vec3 color = mix(paper, tileColor, checkerMask);
   color = mix(color, violet, checker * checkerMask * (0.014 + grain * 0.005));
   color = mix(color, slate, edge * checkerMask * 0.015);
-  color = mix(color, violet, indexBands * 0.006 * vignette * (1.0 - textFade));
+  color = mix(color, violet, indexBands * 0.006 * vignette * mix(1.0 - textFade, 1.0, uSplitLayout));
   color = mix(color, paper, smoothstep(0.16, 0.82, clearZone) * 0.94);
+  color = mix(color, paper, uSplitLayout * (1.0 - logoHalo * seamFade) * 0.97);
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -72,6 +86,20 @@ type HeroUniforms = {
 };
 
 const BASE_LOGO_ROTATION = new THREE.Euler(0.06, -0.12, -0.72);
+
+/** Set on the logo pivot in `NCIModelMesh` before layout runs. */
+interface LogoPivotUserData {
+  longestAxis: number;
+  baseScale: number;
+  layoutOffset: THREE.Vector3;
+}
+
+function logoPivotUserData(pivot: THREE.Object3D): LogoPivotUserData {
+  return pivot.userData as LogoPivotUserData;
+}
+
+const LOGO_TARGET_SPAN_COMPACT = 1.32;
+const LOGO_TARGET_SPAN_DEFAULT = 1.88;
 
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -158,12 +186,20 @@ gl_FragColor.rgb += vec3(0.05, 0.04, 0.15) * sin(uTime * 1.35 + vDissolveWorldPo
   return material;
 }
 
-function HeroIndexField() {
+export const HERO_BELOW_MD_MEDIA = "(max-width: 767px)";
+
+function HeroIndexField({ splitLayout }: { readonly splitLayout: boolean }) {
+  const uniformsRef = useRef({ uSplitLayout: { value: 0 } });
+
+  useLayoutEffect(() => {
+    uniformsRef.current.uSplitLayout.value = splitLayout ? 1 : 0;
+  }, [splitLayout]);
+
   return (
     <mesh position={[0, 0, -2.5]} scale={[30, 30, 1]}>
       <planeGeometry args={[1, 1, 1, 1]} />
       <shaderMaterial
-        uniforms={{}}
+        uniforms={uniformsRef.current}
         vertexShader={indexFieldVertexShader}
         fragmentShader={indexFieldFragmentShader}
       />
@@ -215,7 +251,12 @@ function NCIModelMesh({
 
     const pivot = new THREE.Group();
     pivot.add(model);
-    pivot.userData.longestAxis = longestAxis;
+    const pivotData: LogoPivotUserData = {
+      longestAxis,
+      baseScale: 1,
+      layoutOffset: new THREE.Vector3(),
+    };
+    pivot.userData = pivotData;
     pivot.rotation.copy(BASE_LOGO_ROTATION);
     pivot.position.set(0, 0, 0);
 
@@ -224,11 +265,23 @@ function NCIModelMesh({
 
   useLayoutEffect(() => {
     const pivot = pivotGroup;
-    const longestAxis = (pivot.userData.longestAxis as number) || 1;
-    const targetSpan = compactViewport ? 1.32 : 1.7;
-    const uniformScale = targetSpan / longestAxis;
+    const pivotData = logoPivotUserData(pivot);
+    const targetSpan = compactViewport
+      ? LOGO_TARGET_SPAN_COMPACT
+      : LOGO_TARGET_SPAN_DEFAULT;
+    const uniformScale = targetSpan / pivotData.longestAxis;
     pivot.scale.setScalar(uniformScale);
-    pivot.userData.baseScale = uniformScale;
+    pivotData.baseScale = uniformScale;
+
+    // Bbox-center the OBJ at load; after rotation the projected AABB center can still
+    // drift (asymmetric mesh). Nudge the pivot so the logo sits optically centered.
+    pivot.position.set(0, 0, 0);
+    pivot.updateMatrixWorld(true);
+    const opticalCenter = new THREE.Box3()
+      .setFromObject(pivot)
+      .getCenter(new THREE.Vector3());
+    pivotData.layoutOffset.copy(opticalCenter.negate());
+    pivot.position.copy(pivotData.layoutOffset);
   }, [pivotGroup, compactViewport]);
 
   useFrame((state, delta) => {
@@ -307,26 +360,30 @@ function NCIModelMesh({
       7.5,
       delta,
     );
+    const { layoutOffset, baseScale } = logoPivotUserData(pivotGroup);
+    pivotGroup.position.x = layoutOffset.x;
+    pivotGroup.position.z = layoutOffset.z;
     pivotGroup.position.y = THREE.MathUtils.damp(
       pivotGroup.position.y,
-      idleBounce,
+      layoutOffset.y + idleBounce,
       6.5,
       delta,
     );
     pivotGroup.scale.setScalar(
-      THREE.MathUtils.damp(
-        pivotGroup.scale.x,
-        pivotGroup.userData.baseScale as number,
-        10,
-        delta,
-      ),
+      THREE.MathUtils.damp(pivotGroup.scale.x, baseScale, 10, delta),
     );
   });
 
   return <primitive object={pivotGroup} />;
 }
 
-function HeroScene({ compactViewport }: { compactViewport: boolean }) {
+function HeroScene({
+  compactLogoScale,
+  splitLayout,
+}: {
+  readonly compactLogoScale: boolean;
+  readonly splitLayout: boolean;
+}) {
   const reducedMotion = usePrefersReducedMotion();
   const logoUniforms = useMemo<HeroUniforms>(
     () => ({
@@ -338,13 +395,13 @@ function HeroScene({ compactViewport }: { compactViewport: boolean }) {
 
   return (
     <>
-      <HeroIndexField />
+      <HeroIndexField splitLayout={splitLayout} />
 
       <Suspense fallback={null}>
         <NCIModelMesh
           uniforms={logoUniforms}
           reducedMotion={reducedMotion}
-          compactViewport={compactViewport}
+          compactViewport={compactLogoScale}
         />
       </Suspense>
 
@@ -367,7 +424,7 @@ function HeroScene({ compactViewport }: { compactViewport: boolean }) {
 }
 
 export function HeroCanvas() {
-  const isMaxSm = useMediaQuery("(max-width: 639px)");
+  const isBelowMd = useMediaQuery(HERO_BELOW_MD_MEDIA);
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -383,7 +440,7 @@ export function HeroCanvas() {
         }}
       >
         <color attach="background" args={["#ffffff"]} />
-        <HeroScene compactViewport={isMaxSm} />
+        <HeroScene compactLogoScale={isBelowMd} splitLayout={!isBelowMd} />
       </Canvas>
     </div>
   );

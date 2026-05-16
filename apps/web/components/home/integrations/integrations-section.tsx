@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { FeatureCard } from "../features/feature-card";
+import { FeatureCardHoverGroup } from "../features/feature-card-hover-group";
 
 const docLinkClass =
-  "inline-flex text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2";
+  "inline-flex text-sm font-semibold text-primary underline-offset-4 group-hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2";
 
 export function IntegrationsSection() {
   return (
@@ -18,8 +19,9 @@ export function IntegrationsSection() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <FeatureCardHoverGroup className="grid gap-6 md:grid-cols-2">
           <FeatureCard
+            cardHoverId="cli"
             title="CLI"
             body="Initialize, index, and query your declaration graph with a single native binary. Built for sub-millisecond response times and zero-config setup."
             icon={
@@ -50,6 +52,7 @@ export function IntegrationsSection() {
             }
           />
           <FeatureCard
+            cardHoverId="mcp"
             title="MCP"
             body="Bridge the gap between code and intelligence. Connect AI agents directly to your local index via the Model Context Protocol."
             icon={
@@ -79,7 +82,7 @@ export function IntegrationsSection() {
               </Link>
             }
           />
-        </div>
+        </FeatureCardHoverGroup>
       </div>
     </section>
   );

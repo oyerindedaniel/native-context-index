@@ -60,7 +60,7 @@ function useTerminalShellContext(): TerminalShellContextValue {
   const context = React.useContext(TerminalShellContext);
   if (!context) {
     throw new Error(
-      "Terminal shell components must be used inside Terminal.Root or Terminal.Sequence.Root",
+      "Terminal shell components must be used inside Terminal.Frame, Terminal.Root, or Terminal.Sequence.Root",
     );
   }
   return context;
@@ -187,7 +187,7 @@ function TerminalTabBar({
         role="tablist"
         aria-label={ariaLabel}
         className={cn(
-          "flex items-center gap-1 overflow-x-auto border-b border-white/5 bg-[#0c0e13] px-3 py-2",
+          "flex h-9 items-stretch gap-0 overflow-x-auto border-b border-white/5 bg-[#0c0e13]",
           className,
         )}
         {...props}
@@ -203,7 +203,7 @@ function TerminalTabBar({
               aria-selected={isActive}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                "relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.8125rem] font-medium tracking-tight outline-none transition-[color] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45",
+                "relative inline-flex h-full shrink-0 items-center gap-2 px-3 text-[0.8125rem] font-medium tracking-tight outline-none transition-[color] duration-150 ease-out focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-[#7A63F5]/45",
                 isActive
                   ? "text-white/92"
                   : "text-white/45 hover:bg-white/[0.04] hover:text-white/70",
@@ -212,13 +212,13 @@ function TerminalTabBar({
               {isActive ? (
                 prefersReducedMotion ? (
                   <span
-                    className="absolute inset-0 rounded-lg bg-white/10"
+                    className="absolute inset-0 bg-white/10"
                     aria-hidden="true"
                   />
                 ) : (
                   <motion.span
                     layoutId={layoutId}
-                    className="absolute inset-0 rounded-lg bg-white/10 shadow-[inset_0_1px_rgb(255_255_255/0.06)]"
+                    className="absolute inset-0 bg-white/10 shadow-[inset_0_1px_rgb(255_255_255/0.06)]"
                     transition={{
                       type: "spring",
                       stiffness: 440,
@@ -327,6 +327,58 @@ function TerminalShellFloatingCopy() {
   return null;
 }
 
+type TerminalFrameProps = Omit<React.ComponentProps<"div">, "children"> & {
+  readonly children: React.ReactNode;
+  readonly mode: TerminalMode;
+  readonly commandCopyPlacement?: TerminalCommandCopyPlacement;
+  readonly chromeless?: boolean;
+};
+
+/** Persistent shell (chrome, tab bar, copy control). Use with `embed` roots for the body. */
+function TerminalFrame({
+  mode,
+  children,
+  commandCopyPlacement = "inline",
+  chromeless = false,
+  className,
+  ref,
+  ...props
+}: TerminalFrameProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion() === true;
+  const { showInlineCommandCopy, useFloatingCommandCopyLayout } =
+    resolveTerminalCommandCopyLayout(
+      commandCopyPlacement,
+      prefersReducedMotion,
+    );
+
+  const shellValue = React.useMemo<TerminalShellContextValue>(
+    () => ({
+      mode,
+      containerRef,
+      useFloatingCommandCopyLayout,
+      showInlineCommandCopy,
+      chromeless,
+    }),
+    [mode, useFloatingCommandCopyLayout, showInlineCommandCopy, chromeless],
+  );
+
+  return (
+    <TerminalShellContext.Provider value={shellValue}>
+      <TerminalShell
+        className={className}
+        chromeless={chromeless}
+        ref={mergeRefs(containerRef, ref)}
+        {...props}
+      >
+        {children}
+        <TerminalShellFloatingCopy />
+      </TerminalShell>
+    </TerminalShellContext.Provider>
+  );
+}
+TerminalFrame.displayName = "Terminal.Frame";
+
 type TerminalRootProps = Omit<React.ComponentProps<"div">, "children"> & {
   readonly children: React.ReactNode;
   readonly typeMs?: number;
@@ -340,6 +392,8 @@ type TerminalRootProps = Omit<React.ComponentProps<"div">, "children"> & {
   /** Docs shorthand when omitting `<Terminal.Chrome />`. */
   readonly title?: string;
   readonly cwd?: string;
+  /** Body-only mode inside `<Terminal.Frame />` (no nested shell or tab bar). */
+  readonly embed?: boolean;
 };
 
 function TerminalRoot({
@@ -350,22 +404,38 @@ function TerminalRoot({
   outputDelayMs = DEFAULT_OUTPUT_DELAY_MS,
   commandCopyPlacement = "inline",
   inViewAmount = 0.4,
+  embed = false,
   children,
   ref,
   ...shellProps
 }: TerminalRootProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const parentShell = React.useContext(TerminalShellContext);
+  if (embed && !parentShell) {
+    throw new Error(
+      "Terminal.Root with embed must be used inside Terminal.Frame",
+    );
+  }
+  const localContainerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef =
+    embed && parentShell ? parentShell.containerRef : localContainerRef;
   const inViewOptions = React.useMemo(
     () => ({ once: true as const, amount: inViewAmount }),
     [inViewAmount],
   );
   const inView = useInView(containerRef, inViewOptions);
   const prefersReducedMotion = useReducedMotion() === true;
-  const { showInlineCommandCopy, useFloatingCommandCopyLayout } =
-    resolveTerminalCommandCopyLayout(
-      commandCopyPlacement,
-      prefersReducedMotion,
-    );
+  const resolvedCopyLayout = resolveTerminalCommandCopyLayout(
+    commandCopyPlacement,
+    prefersReducedMotion,
+  );
+  const showInlineCommandCopy =
+    embed && parentShell
+      ? parentShell.showInlineCommandCopy
+      : resolvedCopyLayout.showInlineCommandCopy;
+  const useFloatingCommandCopyLayout =
+    embed && parentShell
+      ? parentShell.useFloatingCommandCopyLayout
+      : resolvedCopyLayout.useFloatingCommandCopyLayout;
 
   const [command, setCommand] = React.useState("");
   const [revealedCommand, setRevealedCommand] = React.useState("");
@@ -448,8 +518,16 @@ function TerminalRoot({
       showInlineCommandCopy,
       chromeless: false,
     }),
-    [useFloatingCommandCopyLayout, showInlineCommandCopy],
+    [containerRef, useFloatingCommandCopyLayout, showInlineCommandCopy],
   );
+
+  if (embed) {
+    return (
+      <TerminalSingleContext.Provider value={singleValue}>
+        {body}
+      </TerminalSingleContext.Provider>
+    );
+  }
 
   return (
     <TerminalShellContext.Provider value={shellValue}>
@@ -610,6 +688,8 @@ type TerminalSequenceRootProps = Omit<
   /** Docs shorthand when omitting `<Terminal.Chrome />`. */
   readonly title?: string;
   readonly cwd?: string;
+  /** Body-only mode inside `<Terminal.Frame />` (no nested shell or tab bar). */
+  readonly embed?: boolean;
 };
 
 function TerminalSequenceAnimatedBody({
@@ -878,17 +958,33 @@ function TerminalSequenceRoot({
   commandCopyPlacement = "inline",
   inViewAmount = 0.35,
   chromeless = false,
+  embed = false,
   children,
   ref,
   ...shellProps
 }: TerminalSequenceRootProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion() === true;
-  const { showInlineCommandCopy, useFloatingCommandCopyLayout } =
-    resolveTerminalCommandCopyLayout(
-      commandCopyPlacement,
-      prefersReducedMotion,
+  const parentShell = React.useContext(TerminalShellContext);
+  if (embed && !parentShell) {
+    throw new Error(
+      "Terminal.Sequence.Root with embed must be used inside Terminal.Frame",
     );
+  }
+  const localContainerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef =
+    embed && parentShell ? parentShell.containerRef : localContainerRef;
+  const prefersReducedMotion = useReducedMotion() === true;
+  const resolvedCopyLayout = resolveTerminalCommandCopyLayout(
+    commandCopyPlacement,
+    prefersReducedMotion,
+  );
+  const showInlineCommandCopy =
+    embed && parentShell
+      ? parentShell.showInlineCommandCopy
+      : resolvedCopyLayout.showInlineCommandCopy;
+  const useFloatingCommandCopyLayout =
+    embed && parentShell
+      ? parentShell.useFloatingCommandCopyLayout
+      : resolvedCopyLayout.useFloatingCommandCopyLayout;
 
   const layout = partitionTerminalLayout(children);
   const chrome = layout.chrome ?? <TerminalChrome title={title} cwd={cwd} />;
@@ -909,7 +1005,12 @@ function TerminalSequenceRoot({
       showInlineCommandCopy,
       chromeless,
     }),
-    [useFloatingCommandCopyLayout, showInlineCommandCopy, chromeless],
+    [
+      containerRef,
+      useFloatingCommandCopyLayout,
+      showInlineCommandCopy,
+      chromeless,
+    ],
   );
 
   if (steps.length === 0) {
@@ -931,6 +1032,10 @@ function TerminalSequenceRoot({
   const body = (
     <TerminalBody className={bodyClassNameMerged}>{animatedBody}</TerminalBody>
   );
+
+  if (embed) {
+    return body;
+  }
 
   return (
     <TerminalShellContext.Provider value={shellValue}>
@@ -958,6 +1063,7 @@ export type {
 } from "@/components/docs/widgets/terminal-layout";
 
 export {
+  TerminalFrame,
   TerminalRoot,
   TerminalChrome,
   TerminalTabBar,
@@ -970,6 +1076,7 @@ export {
 };
 
 export interface TerminalNamespace {
+  Frame: typeof TerminalFrame;
   Root: typeof TerminalRoot;
   Chrome: typeof TerminalChrome;
   TabBar: typeof TerminalTabBar;
@@ -985,6 +1092,7 @@ export interface TerminalNamespace {
 }
 
 export const Terminal: TerminalNamespace = {
+  Frame: TerminalFrame,
   Root: TerminalRoot,
   Chrome: TerminalChrome,
   TabBar: TerminalTabBar,
