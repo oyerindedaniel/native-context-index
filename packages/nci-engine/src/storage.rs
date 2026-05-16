@@ -3,8 +3,11 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use rusqlite::types::ValueRef;
-use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+use rusqlite::types::{Value as SqliteValue, ValueRef};
+use rusqlite::{
+    Connection, Error as RusqliteError, OpenFlags, OptionalExtension, Result as SqliteResult, Row,
+    Statement, ToSql, Transaction, TransactionBehavior, params, params_from_iter,
+};
 use serde::Serialize;
 use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
@@ -103,7 +106,7 @@ pub enum StorageError {
     SchemaTooNew { found: u32, max: u32 },
 
     #[error(transparent)]
-    Sqlite(#[from] rusqlite::Error),
+    Sqlite(#[from] RusqliteError),
 
     #[error("only read-only SQL is allowed (for example SELECT or EXPLAIN QUERY PLAN)")]
     StatementNotReadOnly,
@@ -325,7 +328,7 @@ fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
             }
             transaction.execute(
                 "INSERT OR REPLACE INTO nci_meta (key, value) VALUES (?1, ?2)",
-                rusqlite::params![META_SCHEMA_KEY, migration.version.to_string(),],
+                params![META_SCHEMA_KEY, migration.version.to_string(),],
             )?;
             debug!(applied = migration.version, "migration applied");
         }
@@ -376,7 +379,7 @@ fn apply_ro_connection_pragmas(
 }
 
 fn flush_two_column_junction_batch(
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Transaction<'_>,
     insert_prefix: &str,
     pending_rows: &mut Vec<(i64, String)>,
     chunk_size: usize,
@@ -392,16 +395,16 @@ fn flush_two_column_junction_batch(
             .collect::<Vec<_>>()
             .join(", ");
         let sql = format!("{insert_prefix}{value_placeholders}");
-        let sql_params: Vec<rusqlite::types::Value> = chunk
+        let sql_params: Vec<SqliteValue> = chunk
             .into_iter()
             .flat_map(|(symbol_row_id, text_value)| {
                 [
-                    rusqlite::types::Value::from(symbol_row_id),
-                    rusqlite::types::Value::from(text_value),
+                    SqliteValue::from(symbol_row_id),
+                    SqliteValue::from(text_value),
                 ]
             })
             .collect();
-        transaction.execute(&sql, rusqlite::params_from_iter(sql_params.iter()))?;
+        transaction.execute(&sql, params_from_iter(sql_params.iter()))?;
     }
     Ok(())
 }
@@ -420,16 +423,16 @@ const MODIFIER_JUNCTION_INSERT_PREFIX: &str =
 
 fn record_two_column_junction(
     save_mode: SavePackageMode,
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Transaction<'_>,
     insert_prefix: &str,
-    baseline_statement: &mut rusqlite::Statement<'_>,
+    baseline_statement: &mut Statement<'_>,
     pending_rows: &mut Vec<(i64, String)>,
     symbol_row_id: i64,
     text_value: &str,
 ) -> StorageResult<()> {
     match save_mode {
         SavePackageMode::Baseline => {
-            baseline_statement.execute(rusqlite::params![symbol_row_id, text_value])?;
+            baseline_statement.execute(params![symbol_row_id, text_value])?;
         }
         SavePackageMode::JunctionBatch { chunk_size } => {
             pending_rows.push((symbol_row_id, text_value.to_string()));
@@ -448,8 +451,8 @@ fn record_two_column_junction(
 
 fn record_decorator_junction(
     save_mode: SavePackageMode,
-    transaction: &rusqlite::Transaction<'_>,
-    baseline_statement: &mut rusqlite::Statement<'_>,
+    transaction: &Transaction<'_>,
+    baseline_statement: &mut Statement<'_>,
     pending_rows: &mut Vec<(i64, String, Option<String>)>,
     symbol_row_id: i64,
     decorator_name: &str,
@@ -457,7 +460,7 @@ fn record_decorator_junction(
 ) -> StorageResult<()> {
     match save_mode {
         SavePackageMode::Baseline => {
-            baseline_statement.execute(rusqlite::params![
+            baseline_statement.execute(params![
                 symbol_row_id,
                 decorator_name,
                 arguments_json.as_deref()
@@ -474,7 +477,7 @@ fn record_decorator_junction(
 }
 
 fn flush_decorator_junction_batch(
-    transaction: &rusqlite::Transaction<'_>,
+    transaction: &Transaction<'_>,
     pending_rows: &mut Vec<(i64, String, Option<String>)>,
     chunk_size: usize,
 ) -> StorageResult<()> {
@@ -491,19 +494,19 @@ fn flush_decorator_junction_batch(
         let sql = format!(
             "INSERT INTO symbol_decorators (symbol_id, name, arguments) VALUES {value_placeholders}"
         );
-        let sql_params: Vec<rusqlite::types::Value> = chunk
+        let sql_params: Vec<SqliteValue> = chunk
             .into_iter()
             .flat_map(|(symbol_row_id, decorator_name, arguments_json)| {
                 [
-                    rusqlite::types::Value::from(symbol_row_id),
-                    rusqlite::types::Value::from(decorator_name),
+                    SqliteValue::from(symbol_row_id),
+                    SqliteValue::from(decorator_name),
                     arguments_json
-                        .map(rusqlite::types::Value::from)
-                        .unwrap_or(rusqlite::types::Value::Null),
+                        .map(SqliteValue::from)
+                        .unwrap_or(SqliteValue::Null),
                 ]
             })
             .collect();
-        transaction.execute(&sql, rusqlite::params_from_iter(sql_params.iter()))?;
+        transaction.execute(&sql, params_from_iter(sql_params.iter()))?;
     }
     Ok(())
 }
@@ -550,7 +553,7 @@ const SYMBOL_SEARCH_HIT_SELECT_COLS: &str = "indexed_symbol.symbol_id,
             indexed_symbol.source_file_path";
 
 /// Maps a row produced by [`SYMBOL_SEARCH_HIT_SELECT_COLS`] to a [`SymbolSearchHit`].
-fn read_symbol_search_hit_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SymbolSearchHit> {
+fn read_symbol_search_hit_row(row: &Row<'_>) -> SqliteResult<SymbolSearchHit> {
     let symbol_row_id: i64 = row.get(0)?;
     let package_name: String = row.get(1)?;
     let package_version: String = row.get(2)?;
@@ -736,7 +739,7 @@ impl NciDatabase {
         self.connection
             .query_row(
                 "SELECT 1 FROM packages WHERE name = ?1 AND version = ?2 AND engine_version = ?3 LIMIT 1",
-                rusqlite::params![
+                params![
                     package_info.name.as_ref(),
                     package_info.version.as_ref(),
                     engine_version,
@@ -758,7 +761,7 @@ impl NciDatabase {
                 "SELECT total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
                  WHERE name = ?1 AND version = ?2",
-                rusqlite::params![package_info.name.as_ref(), package_info.version.as_ref(),],
+                params![package_info.name.as_ref(), package_info.version.as_ref(),],
                 |package_row| {
                     Ok(PackageIndexMetadata {
                         package: package_info.name.clone(),
@@ -797,9 +800,7 @@ impl NciDatabase {
         let mut statement = self
             .connection
             .prepare("SELECT version FROM packages WHERE name = ?1 ORDER BY version")?;
-        let rows = statement.query_map(rusqlite::params![package_name], |row| {
-            row.get::<_, String>(0)
-        })?;
+        let rows = statement.query_map(params![package_name], |row| row.get::<_, String>(0))?;
         let mut out = Vec::new();
         for row in rows {
             out.push(row?);
@@ -819,10 +820,9 @@ impl NciDatabase {
              WHERE packages.name = ?1 AND packages.version = ?2
              ORDER BY package_dependencies.dependency_name",
         )?;
-        let rows = statement
-            .query_map(rusqlite::params![package_name, package_version], |row| {
-                row.get::<_, String>(0)
-            })?;
+        let rows = statement.query_map(params![package_name, package_version], |row| {
+            row.get::<_, String>(0)
+        })?;
         let mut out = Vec::new();
         for row in rows {
             out.push(row?);
@@ -842,10 +842,9 @@ impl NciDatabase {
              WHERE package_info.name = ?1 AND package_info.version = ?2
              ORDER BY indexed_symbol.source_package_name",
         )?;
-        let rows = statement
-            .query_map(rusqlite::params![package_name, package_version], |row| {
-                row.get::<_, String>(0)
-            })?;
+        let rows = statement.query_map(params![package_name, package_version], |row| {
+            row.get::<_, String>(0)
+        })?;
         let mut out = Vec::new();
         for row in rows {
             out.push(row?);
@@ -862,7 +861,7 @@ impl NciDatabase {
                 "SELECT package_id, total_symbols, total_files, crawl_duration_ms, build_duration_ms
                  FROM packages
                  WHERE name = ?1 AND version = ?2",
-                rusqlite::params![
+                params![
                     package_info.name.as_ref(),
                     package_info.version.as_ref(),
                 ],
@@ -877,7 +876,7 @@ impl NciDatabase {
                 },
             ) {
             Ok(row_data) => row_data,
-            Err(rusqlite::Error::QueryReturnedNoRows) => return None,
+            Err(RusqliteError::QueryReturnedNoRows) => return None,
             Err(_) => return None,
         };
 
@@ -941,7 +940,7 @@ impl NciDatabase {
             .ok()?;
 
         let symbol_rows = symbol_stmt
-            .query_map(rusqlite::params![package_id], |symbol_row| {
+            .query_map(params![package_id], |symbol_row| {
                 Ok((
                     symbol_row.get::<_, i64>(0)?,
                     symbol_row.get::<_, String>(1)?,
@@ -1149,7 +1148,7 @@ impl NciDatabase {
 
         transaction.execute(
             "DELETE FROM packages WHERE name = ?1 AND version = ?2",
-            rusqlite::params![package_info.name.as_ref(), package_info.version.as_ref()],
+            params![package_info.name.as_ref(), package_info.version.as_ref()],
         )?;
 
         let crawl_ms = graph.crawl_duration_ms as i64;
@@ -1157,7 +1156,7 @@ impl NciDatabase {
         transaction.execute(
             "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, engine_version)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![
+            params![
                 package_info.name.as_ref(),
                 package_info.version.as_ref(),
                 graph.total_symbols as i64,
@@ -1223,8 +1222,7 @@ impl NciDatabase {
             )?;
 
             for dependency_name in package_info.declared_dependencies.iter() {
-                insert_declared_dependency
-                    .execute(rusqlite::params![package_id, dependency_name])?;
+                insert_declared_dependency.execute(params![package_id, dependency_name])?;
             }
 
             for symbol_node in &graph.symbols {
@@ -1250,7 +1248,7 @@ impl NciDatabase {
                     symbol_node.file_path.as_ref(),
                 );
 
-                insert_symbol.execute(rusqlite::params![
+                insert_symbol.execute(params![
                     package_id,
                     symbol_node.id.as_ref(),
                     symbol_node.name.as_ref(),
@@ -1467,7 +1465,7 @@ impl NciDatabase {
             .connection
             .query_row(
                 "SELECT package_id FROM packages WHERE name = ?1 AND version = ?2",
-                rusqlite::params![package_name, package_version],
+                params![package_name, package_version],
                 |package_row| package_row.get::<_, i64>(0),
             )
             .optional()?;
@@ -1489,7 +1487,7 @@ impl NciDatabase {
              LIMIT ?2 OFFSET ?3",
         )?;
         let symbol_id_rows = symbol_id_stmt.query_map(
-            rusqlite::params![package_row_id, limit as i64, offset as i64],
+            params![package_row_id, limit as i64, offset as i64],
             |symbol_id_row| symbol_id_row.get::<_, i64>(0),
         )?;
 
@@ -1516,10 +1514,10 @@ impl NciDatabase {
              WHERE symbols_fts MATCH ?1
              LIMIT ?2",
         )?;
-        let symbol_id_rows = statement.query_map(
-            rusqlite::params![fts_match_query, limit as i64],
-            |match_row| match_row.get::<_, i64>(0),
-        )?;
+        let symbol_id_rows = statement
+            .query_map(params![fts_match_query, limit as i64], |match_row| {
+                match_row.get::<_, i64>(0)
+            })?;
 
         for symbol_id_result in symbol_id_rows {
             let symbol_row_id = symbol_id_result?;
@@ -1568,7 +1566,7 @@ impl NciDatabase {
         );
         let mut statement = self.connection.prepare(&sql)?;
         let rows = statement.query_map(
-            rusqlite::params![
+            params![
                 fts_match_query,
                 filters.package_name.as_deref(),
                 filters.package_version.as_deref(),
@@ -1619,7 +1617,7 @@ impl NciDatabase {
         );
         let mut statement = self.connection.prepare(&sql)?;
         let rows = statement.query_map(
-            rusqlite::params![
+            params![
                 symbol_name,
                 filters.package_name.as_deref(),
                 filters.package_version.as_deref(),
@@ -1697,7 +1695,7 @@ impl NciDatabase {
         );
         let mut statement = self.connection.prepare(&sql)?;
         let rows = statement.query_map(
-            rusqlite::params![package_id, name_text, parent_symbol_id_opt.as_deref()],
+            params![package_id, name_text, parent_symbol_id_opt.as_deref()],
             read_symbol_search_hit_row,
         )?;
 
@@ -1752,8 +1750,7 @@ impl NciDatabase {
             let sql =
                 format!("SELECT id, signature, js_doc FROM symbols WHERE id IN ({placeholders})",);
             let mut statement = self.connection.prepare(&sql)?;
-            let bound_params: Vec<&dyn rusqlite::ToSql> =
-                chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+            let bound_params: Vec<&dyn ToSql> = chunk.iter().map(|id| id as &dyn ToSql).collect();
             let rows = statement.query_map(bound_params.as_slice(), |snippet_row| {
                 Ok(SymbolSnippet {
                     id: snippet_row.get::<_, String>(0)?,
@@ -2100,7 +2097,7 @@ impl NciDatabase {
     pub fn delete_package(&self, package_name: &str, package_version: &str) -> StorageResult<()> {
         self.connection.execute(
             "DELETE FROM packages WHERE name = ?1 AND version = ?2",
-            rusqlite::params![package_name, package_version],
+            params![package_name, package_version],
         )?;
         Ok(())
     }
@@ -2112,7 +2109,7 @@ impl NciDatabase {
     ) -> StorageResult<usize> {
         let rows_removed = self.connection.execute(
             "DELETE FROM packages WHERE name = ?1 AND version = ?2",
-            rusqlite::params![package_name, package_version],
+            params![package_name, package_version],
         )?;
         Ok(rows_removed)
     }
@@ -2127,10 +2124,9 @@ impl NciDatabase {
         if pattern == "*" {
             return Err(StorageError::GlobPatternTooBroad);
         }
-        let rows_removed = self.connection.execute(
-            "DELETE FROM packages WHERE name GLOB ?1",
-            rusqlite::params![pattern],
-        )?;
+        let rows_removed = self
+            .connection
+            .execute("DELETE FROM packages WHERE name GLOB ?1", params![pattern])?;
         Ok(rows_removed)
     }
 
@@ -2240,7 +2236,7 @@ fn disambiguate_column_names(raw: &[String]) -> Vec<String> {
     out
 }
 
-fn value_ref_to_json(value_ref: ValueRef<'_>) -> Result<Value, rusqlite::Error> {
+fn value_ref_to_json(value_ref: ValueRef<'_>) -> Result<Value, RusqliteError> {
     Ok(match value_ref {
         ValueRef::Null => Value::Null,
         ValueRef::Integer(i) => Value::Number(i.into()),
@@ -2257,10 +2253,7 @@ fn value_ref_to_json(value_ref: ValueRef<'_>) -> Result<Value, rusqlite::Error> 
     })
 }
 
-fn row_to_json_object(
-    row: &rusqlite::Row<'_>,
-    column_keys: &[String],
-) -> rusqlite::Result<Map<String, Value>> {
+fn row_to_json_object(row: &Row<'_>, column_keys: &[String]) -> SqliteResult<Map<String, Value>> {
     let mut map = Map::new();
     for (index, key) in column_keys.iter().enumerate() {
         map.insert(key.clone(), value_ref_to_json(row.get_ref(index)?)?);
