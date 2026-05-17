@@ -11,6 +11,7 @@ import { DocsBreadcrumbInline } from "@/components/docs/docs-breadcrumb";
 import { DocsScrollToTop } from "@/components/docs/docs-scroll-to-top";
 import { PrevNext } from "@/components/docs/widgets/prev-next";
 import { TocRail } from "@/components/docs/widgets/toc-rail";
+import { DocsSidebarFooter } from "@/components/docs/docs-sidebar-footer";
 import { docsGroups } from "@/lib/docs/registry";
 
 export default function DocsLayout({
@@ -34,22 +35,28 @@ export default function DocsLayout({
           </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-6">
-          <DocsNavRoot>
-            {docsGroups.map((group) => (
-              <DocsNavGroup
-                key={group.id}
-                title={group.title}
-                iconName={group.iconName}
-              >
-                {group.pages.map((page) => (
-                  <DocsNavItem key={page.slug} href={page.slug}>
-                    {page.title}
-                  </DocsNavItem>
-                ))}
-              </DocsNavGroup>
-            ))}
-          </DocsNavRoot>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            data-nci-docs-sidebar-scroll
+            className="min-h-0 flex-1 overflow-y-auto px-3 pt-6 pb-3"
+          >
+            <DocsNavRoot>
+              {docsGroups.map((group) => (
+                <DocsNavGroup
+                  key={group.id}
+                  title={group.title}
+                  iconName={group.iconName}
+                >
+                  {group.pages.map((page) => (
+                    <DocsNavItem key={page.slug} href={page.slug}>
+                      {page.title}
+                    </DocsNavItem>
+                  ))}
+                </DocsNavGroup>
+              ))}
+            </DocsNavRoot>
+          </div>
+          <DocsSidebarFooter />
         </div>
       </aside>
 

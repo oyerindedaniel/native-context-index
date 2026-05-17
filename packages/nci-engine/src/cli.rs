@@ -287,6 +287,7 @@ enum SqlRowsFormat {
 #[command(
     name = "nci",
     version,
+    author = "Oyerinde Daniel",
     about = CLI_ABOUT
 )]
 pub struct Cli {

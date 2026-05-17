@@ -40,7 +40,7 @@ export function DocIntroTile({ tile, cardHoverId }: DocIntroTileProps) {
     <Link
       href={tile.href}
       className={cn(
-        "group relative isolate flex aspect-[2/1] w-full flex-col justify-between gap-4 border border-border bg-elevated p-6",
+        "group relative isolate flex aspect-[2/1] rounded-3xl w-full flex-col justify-between gap-4 border border-border bg-elevated p-6",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
       )}
       onPointerEnter={() => hoverGroup?.setActiveCardId(cardHoverId)}
@@ -48,13 +48,16 @@ export function DocIntroTile({ tile, cardHoverId }: DocIntroTileProps) {
       {isHoverActive && !reduceMotion ? (
         <motion.div
           layoutId={hoverGroup.layoutId}
-          className="absolute inset-0 -z-10 bg-surface"
+          className="absolute inset-0 -z-10 bg-surface rounded-3xl"
           transition={HOVER_HIGHLIGHT_TRANSITION}
           aria-hidden
         />
       ) : null}
       {isHoverActive && reduceMotion ? (
-        <div className="absolute inset-0 -z-10 bg-surface" aria-hidden />
+        <div
+          className="absolute inset-0 -z-10 bg-surface rounded-3xl"
+          aria-hidden
+        />
       ) : null}
 
       <tile.Icon className="size-7 shrink-0 text-accent" aria-hidden="true" />

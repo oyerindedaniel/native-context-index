@@ -13,6 +13,7 @@ import {
   InstallPickerRoot,
   InstallPickerControl,
   defaultManagers,
+  defaultPackageManagerId,
 } from "@/components/docs/widgets/install-picker";
 import {
   DocIntroTileGrid,
@@ -88,7 +89,7 @@ export function DocsIntroHero() {
         <InstallPickerRoot
           managers={defaultManagers}
           storageKey="docs-intro"
-          defaultId="pnpm"
+          defaultId={defaultPackageManagerId}
         >
           <InstallPickerControl />
         </InstallPickerRoot>

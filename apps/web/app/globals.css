@@ -29,6 +29,9 @@
   --nci-z-command-overlay: 100;
   --nci-z-mobile-drawer: 90;
 
+  /* Docs desktop sidebar: pinned footer row (changelog link). Nav scroll area sits above it. */
+  --nci-docs-sidebar-footer-height: 3.25rem;
+
   --nci-shadow-button-primary:
     0 1px 2px rgb(0 0 0 / 0.08), 0 3px 10px -2px rgb(0 0 0 / 0.14),
     inset 0 -2px rgb(0 0 0 / 0.12), inset 0 1px rgb(255 255 255 / 0.38);
@@ -66,6 +69,7 @@
   --color-code-ink: var(--nci-color-code-ink);
 
   --spacing-docs-chrome: 3.5rem;
+  --spacing-docs-sidebar-footer: var(--nci-docs-sidebar-footer-height);
   --spacing-docs-sidebar: 16rem;
   --spacing-docs-content: 50rem;
   --spacing-docs-shell: 80rem;

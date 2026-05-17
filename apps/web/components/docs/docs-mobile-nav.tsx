@@ -7,8 +7,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Transition } from "motion/react";
-import { BookOpenIcon, HomeIcon, XMarkIcon } from "@heroicons/react/20/solid";
+import {
+  BookOpenIcon,
+  ClipboardDocumentListIcon,
+  HomeIcon,
+  XMarkIcon,
+} from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
+import { DOCS_CHANGELOG_HREF } from "@/components/docs/docs-sidebar-footer";
 import { GitHubMark } from "@/components/docs/github-mark";
 import { buttonVariants } from "@/components/ui/button";
 import { MobileHamburgerButton } from "@/components/nav/mobile-hamburger-button";
@@ -206,7 +212,7 @@ function DrawerBody({ pathname }: DrawerBodyProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-3 py-6">
-      <DrawerSection title="Menu">
+      <DrawerSection title="Menu" bleed>
         <DrawerLink
           href="/"
           label="Home"
@@ -219,6 +225,12 @@ function DrawerBody({ pathname }: DrawerBodyProps) {
           icon={BookOpenIcon}
           active={normalizedPath === "/docs"}
         />
+        <DrawerLink
+          href={DOCS_CHANGELOG_HREF}
+          label="Changelog"
+          icon={ClipboardDocumentListIcon}
+          active={normalizedPath === DOCS_CHANGELOG_HREF}
+        />
         <DrawerExternalLink
           href={GITHUB_URL}
           label="GitHub"
@@ -226,7 +238,7 @@ function DrawerBody({ pathname }: DrawerBodyProps) {
         />
       </DrawerSection>
 
-      <DrawerSection title="Sections">
+      <DrawerSection title="Sections" bleed>
         <div className="flex flex-col gap-6">
           {docsGroups.map((group) => (
             <DrawerDocsGroup
@@ -244,15 +256,19 @@ function DrawerBody({ pathname }: DrawerBodyProps) {
 interface DrawerSectionProps {
   title: string;
   children: React.ReactNode;
+  /** Counteract drawer body horizontal padding so row hovers are full-bleed. */
+  bleed?: boolean;
 }
 
-function DrawerSection({ title, children }: DrawerSectionProps) {
+function DrawerSection({ title, children, bleed = false }: DrawerSectionProps) {
   return (
     <section className="flex flex-col gap-2">
       <h4 className="px-3 text-[0.7rem] font-semibold uppercase tracking-[0.11em] text-muted/75">
         {title}
       </h4>
-      <div className="flex flex-col gap-0.5">{children}</div>
+      <div className={cn("flex flex-col gap-0.5", bleed && "-mx-3")}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -269,7 +285,7 @@ function DrawerLink({ href, label, icon: Icon, active }: DrawerLinkProps) {
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+        "flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-base font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
         active
           ? "bg-primary/10 text-primary"
           : "text-ink/85 hover:bg-surface-hover hover:text-ink",
@@ -307,7 +323,7 @@ function DrawerExternalLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-base font-medium text-ink/85 outline-none transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2"
+      className="flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-base font-medium text-ink/85 outline-none transition-colors duration-150 ease-out hover:bg-surface-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2"
     >
       {leading ??
         (Icon ? (
@@ -346,7 +362,7 @@ function DrawerDocsGroup({ group, normalizedPath }: DrawerDocsGroupProps) {
                 href={page.slug}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
+                  "flex w-full items-center gap-2.5 rounded-none px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-ink/85 hover:bg-surface-hover hover:text-ink",

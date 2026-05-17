@@ -17,6 +17,10 @@ import {
   PackageManagerLogo,
   type PackageManagerId,
 } from "@/components/docs/widgets/package-manager-logo";
+import {
+  DEFAULT_PACKAGE_MANAGER_TAB_KEY,
+  PACKAGE_MANAGER_TAB_ORDER,
+} from "@/components/docs/widgets/install-tabs";
 import { cn } from "@/lib/utils";
 
 export interface PackageManagerEntry {
@@ -358,25 +362,34 @@ export const InstallPicker: InstallPickerNamespace = {
   Control: InstallPickerControl,
 };
 
-export const defaultManagers: PackageManagerEntry[] = [
-  {
-    id: "npm",
+const PACKAGE_MANAGER_COMMANDS: Record<
+  PackageManagerId,
+  Pick<PackageManagerEntry, "label" | "install">
+> = {
+  npm: {
     label: "npm",
     install: "npm install -g @nativecontextindex/cli",
   },
-  {
-    id: "pnpm",
+  pnpm: {
     label: "pnpm",
     install: "pnpm add -g @nativecontextindex/cli",
   },
-  {
-    id: "yarn",
+  yarn: {
     label: "yarn",
     install: "yarn global add @nativecontextindex/cli",
   },
-  {
-    id: "bun",
+  bun: {
     label: "bun",
     install: "bun install -g @nativecontextindex/cli",
   },
-];
+};
+
+/** Same order as {@link PACKAGE_MANAGER_TAB_ORDER} in install-tabs (npm first). */
+export const defaultManagers: PackageManagerEntry[] =
+  PACKAGE_MANAGER_TAB_ORDER.map((id) => ({
+    id,
+    ...PACKAGE_MANAGER_COMMANDS[id],
+  }));
+
+export const defaultPackageManagerId: PackageManagerId =
+  DEFAULT_PACKAGE_MANAGER_TAB_KEY;

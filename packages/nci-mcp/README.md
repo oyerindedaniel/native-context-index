@@ -137,4 +137,4 @@ Depending on the host, you can try:
 
 ## License
 
-MIT
+Apache-2.0. See the [repository LICENSE](https://github.com/oyerindedaniel/native-context-index/blob/main/LICENSE).

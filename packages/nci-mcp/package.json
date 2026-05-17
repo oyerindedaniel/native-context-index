@@ -2,11 +2,23 @@
   "name": "@nativecontextindex/mcp",
   "version": "0.1.0",
   "description": "Model Context Protocol (stdio) server for the Native Context Index (nci)",
-  "license": "MIT",
+  "author": "Oyerinde Daniel",
+  "license": "Apache-2.0",
+  "homepage": "https://nativecontextindex.com",
+  "bugs": {
+    "url": "https://github.com/oyerindedaniel/native-context-index/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/oyerindedaniel/native-context-index.git"
   },
+  "keywords": [
+    "nci",
+    "mcp",
+    "model-context-protocol",
+    "typescript",
+    "declarations"
+  ],
   "type": "commonjs",
   "bin": {
     "nci-mcp": "dist/index.js"

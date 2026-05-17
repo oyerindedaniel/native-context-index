@@ -16,5 +16,8 @@ export function isSiteNavHrefActive(href: string, pathname: string): boolean {
   if (href === "/docs/quickstart") {
     return path.startsWith("/docs/quickstart");
   }
+  if (href === "/changelog") {
+    return path === "/changelog" || path.startsWith("/changelog/");
+  }
   return path === href || path.startsWith(`${href}/`);
 }

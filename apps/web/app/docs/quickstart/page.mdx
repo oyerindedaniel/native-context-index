@@ -3,6 +3,7 @@ import {
   InstallPickerRoot,
   InstallPickerControl,
   defaultManagers,
+  defaultPackageManagerId,
 } from "@/components/docs/widgets/install-picker";
 import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
@@ -12,12 +13,26 @@ import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widget
 # Five minutes from zero
 
 <PageLede>
-  Install the CLI, initialise the project, index, and query. By the end of this page you have an indexed `nci.sqlite` your agent can read through MCP.
+  Install the CLI, initialise the project, index, and query. By the end of this page you have an indexed `nci.sqlite` your agent can read through MCP — whether you run the commands or hand the flow to an agent.
 </PageLede>
+
+## For your agent
+
+If you work through Cursor, Claude Code, Codex, or another skills-aware client, you can skip typing the steps below and ask the agent to set NCI up end to end. Install the bundled **nci** and **nci-answer-quality** skills first — they teach the primer workflow, when to call `nci_query` vs `nci_sql`, and how to answer type questions from signatures instead of memory.
+
+<TerminalRoot>
+  <TerminalCommand>npx skills add oyerindedaniel/native-context-index --skill nci --skill nci-answer-quality -y</TerminalCommand>
+</TerminalRoot>
+
+Then point the agent at this repo (or your consumer project) and ask it to install the CLI globally, run `nci init -y`, `nci index`, and wire [MCP](/docs/mcp). Host paths and skill behaviour are documented in [NCI skills](/docs/guides/skills).
+
+## Run it yourself
+
+The numbered steps below are the same path, for when you want to run commands locally or verify what the agent did.
 
 ## 1. Install the CLI
 
-<InstallPickerRoot managers={defaultManagers} storageKey="quickstart" defaultId="pnpm">
+<InstallPickerRoot managers={defaultManagers} storageKey="quickstart" defaultId={defaultPackageManagerId}>
   <InstallPickerControl />
 </InstallPickerRoot>
 

@@ -1,0 +1,32 @@
+<div className="flex flex-col gap-12 sm:gap-14">
+  <div className="flex flex-col gap-4">
+    <div className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">Changelog</div>
+    <h1 className="font-sans text-3xl font-semibold tracking-tight-sub text-ink sm:text-4xl">Release notes</h1>
+    <div className="max-w-prose text-base leading-relaxed tracking-tight-p text-muted">
+      {"One product version covers the indexer, "}
+      <code className="nci-code-chip">nci</code>
+      {" CLI, and MCP server—they ship together on the same semver."}
+    </div>
+  </div>
+
+  <div
+    id="release-0-1-0"
+    className="scroll-mt-28 flex flex-col gap-3 border-t border-border/60 pt-12"
+  >
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className="font-sans text-2xl font-semibold tracking-tight-sub text-ink">
+        0.1.0
+      </div>
+      <time dateTime="2026-05-15" className="text-sm tracking-tight-p text-muted/80">2026-05-15</time>
+    </div>
+
+    <div className="mt-3 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted">Added</div>
+
+    <ul className="my-2 ml-1 flex flex-col gap-2 text-base leading-relaxed tracking-tight-p text-muted [&>li]:relative [&>li]:pl-6 [&>li]:before:absolute [&>li]:before:left-1.5 [&>li]:before:top-[0.65em] [&>li]:before:size-1.5 [&>li]:before:rounded-full [&>li]:before:bg-primary/60">
+      <li>TypeScript declaration indexer with SQLite-backed structured queries.</li>
+      <li><code className="nci-code-chip">nci</code> CLI for indexing workspaces and running <code className="nci-code-chip">query</code> / <code className="nci-code-chip">sql</code> against the graph.</li>
+      <li>MCP server (<code className="nci-code-chip">nci_query</code>, <code className="nci-code-chip">nci_sql</code>) for agent workflows in Cursor and other clients.</li>
+      <li>Documentation site with quickstart, MCP setup guides, and agent skills install flow.</li>
+    </ul>
+  </div>
+</div>

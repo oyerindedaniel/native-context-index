@@ -4,10 +4,20 @@ import * as React from "react";
 import { motion } from "motion/react";
 import {
   PackageManagerLogo,
+  type PackageManagerId,
   isPackageManagerId,
 } from "@/components/docs/widgets/package-manager-logo";
 import { useLocalStorageState } from "@/lib/hooks/use-local-storage-state";
 import { cn } from "@/lib/utils";
+
+export const PACKAGE_MANAGER_TAB_ORDER: readonly PackageManagerId[] = [
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+];
+
+export const DEFAULT_PACKAGE_MANAGER_TAB_KEY = "npm" satisfies PackageManagerId;
 
 interface InstallTabsContextValue {
   activeKey: string;

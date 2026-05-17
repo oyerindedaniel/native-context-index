@@ -15,6 +15,7 @@ import { useCloseDrawerAtMinWidth } from "@/lib/hooks/use-close-drawer-at-min-wi
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
 import { MOBILE_NAV_DESKTOP_MQ } from "@/lib/nav/mobile-drawer-breakpoints";
+import { DOCS_CHANGELOG_HREF } from "@/components/docs/docs-sidebar-footer";
 import { isSiteNavHrefActive } from "@/components/site/site-nav-active";
 
 const FADE_EASE = "easeOut" as const;
@@ -201,6 +202,13 @@ function SiteMobileOverlay({
                   Documentation
                 </SiteNavLink>
                 <SiteNavLink
+                  href={DOCS_CHANGELOG_HREF}
+                  pathname={pathname}
+                  onNavigate={() => onOpenChange(false)}
+                >
+                  Changelog
+                </SiteNavLink>
+                <SiteNavLink
                   href="/docs/quickstart"
                   pathname={pathname}
                   onNavigate={() => onOpenChange(false)}
@@ -209,7 +217,7 @@ function SiteMobileOverlay({
                 </SiteNavLink>
               </nav>
 
-              <div className="mt-auto flex shrink-0 justify-end pt-10 pb-8 sm:pt-12 sm:pb-10">
+              <div className="mt-auto flex w-full shrink-0 justify-end pt-10 pb-8 sm:pt-12 sm:pb-10">
                 <button
                   type="button"
                   onClick={() => onOpenChange(false)}
