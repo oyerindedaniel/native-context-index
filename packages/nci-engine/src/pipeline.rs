@@ -8,7 +8,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
 use tracing::{debug, trace, warn};
@@ -30,6 +30,20 @@ pub enum GraphSource {
     Crawled,
 }
 
+/// Crawl, queue wait (before writer), and SQLite persist durations for one package.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PackageTimingBreakdown {
+    pub crawl: Duration,
+    pub queue_wait: Duration,
+    pub save: Duration,
+}
+
+impl PackageTimingBreakdown {
+    pub fn total(&self) -> Duration {
+        self.crawl + self.queue_wait + self.save
+    }
+}
+
 #[derive(Clone)]
 pub struct PackageProgress {
     pub name: SharedString,
@@ -38,6 +52,111 @@ pub struct PackageProgress {
     pub total_symbols: usize,
     /// True when this package row is already persisted (cache hit or successful save).
     pub persisted: bool,
+    /// Wall time from package work start until this outcome is final (includes queue wait before save).
+    pub elapsed: Duration,
+    /// Set when [`IndexOptions::index_timing_detail`] is true.
+    pub timing_breakdown: Option<PackageTimingBreakdown>,
+}
+
+#[derive(Debug)]
+struct PackageTimingSlot {
+    started: Option<Instant>,
+    crawl_finished: Option<Instant>,
+    save_started: Option<Instant>,
+}
+
+/// End-to-end elapsed and crawl / queue / save split for stderr progress (see `nci index --index-timing-detail`).
+fn compute_package_timing(
+    slot: &PackageTimingSlot,
+    finished_at: Instant,
+) -> (Duration, PackageTimingBreakdown) {
+    let started = slot.started.unwrap_or(finished_at);
+    let crawl_finished = slot.crawl_finished.unwrap_or(finished_at);
+    let crawl = crawl_finished.saturating_duration_since(started);
+    let save_started = slot.save_started.unwrap_or(crawl_finished);
+    let queue_wait = save_started.saturating_duration_since(crawl_finished);
+    let save = finished_at.saturating_duration_since(save_started);
+    let elapsed = finished_at.saturating_duration_since(started);
+    (
+        elapsed,
+        PackageTimingBreakdown {
+            crawl,
+            queue_wait,
+            save,
+        },
+    )
+}
+
+fn mark_package_timing_started(
+    timing_slots: &Arc<Vec<Mutex<PackageTimingSlot>>>,
+    package_index: usize,
+) {
+    let mut slot = timing_slots[package_index]
+        .lock()
+        .expect("package timing mutex poisoned");
+    slot.started = Some(Instant::now());
+}
+
+fn mark_package_crawl_finished(
+    timing_slots: &Arc<Vec<Mutex<PackageTimingSlot>>>,
+    package_index: usize,
+) {
+    let mut slot = timing_slots[package_index]
+        .lock()
+        .expect("package timing mutex poisoned");
+    if slot.crawl_finished.is_none() {
+        slot.crawl_finished = Some(Instant::now());
+    }
+}
+
+fn mark_package_save_started(
+    timing_slots: &Arc<Vec<Mutex<PackageTimingSlot>>>,
+    package_index: usize,
+) {
+    let mut slot = timing_slots[package_index]
+        .lock()
+        .expect("package timing mutex poisoned");
+    if slot.save_started.is_none() {
+        slot.save_started = Some(Instant::now());
+    }
+}
+
+struct FinishPackageProgressArgs {
+    on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
+    timing_slots: Option<Arc<Vec<Mutex<PackageTimingSlot>>>>,
+    index_timing_detail: bool,
+    package_index: usize,
+    name: SharedString,
+    version: SharedString,
+    source: GraphSource,
+    total_symbols: usize,
+    persisted: bool,
+}
+
+fn finish_package_progress(args: FinishPackageProgressArgs) {
+    let Some(callback) = args.on_package_done.as_ref() else {
+        return;
+    };
+    let finished_at = Instant::now();
+    let (elapsed, timing_breakdown) = if let Some(slots) = args.timing_slots.as_ref() {
+        let slot = slots[args.package_index]
+            .lock()
+            .expect("package timing mutex poisoned");
+        let (elapsed, breakdown) = compute_package_timing(&slot, finished_at);
+        let breakdown = args.index_timing_detail.then_some(breakdown);
+        (elapsed, breakdown)
+    } else {
+        (Duration::ZERO, None)
+    };
+    callback(PackageProgress {
+        name: args.name,
+        version: args.version,
+        source: args.source,
+        total_symbols: args.total_symbols,
+        persisted: args.persisted,
+        elapsed,
+        timing_breakdown,
+    });
 }
 
 #[derive(Debug)]
@@ -103,6 +222,9 @@ pub struct IndexOptions {
     /// send failure, or writer finished crawl+SQLite). Used by `nci index` plain output only.
     pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
 
+    /// When true (and `on_package_done` is set), populate [`PackageProgress::timing_breakdown`].
+    pub index_timing_detail: bool,
+
     /// SQLite persist mode for the writer thread (default baseline; bench via `storage_save_bench`).
     pub save_package_mode: crate::storage::SavePackageMode,
 
@@ -126,6 +248,7 @@ impl Default for IndexOptions {
             save_retry_count: 0,
             dependency_stub_packages: Vec::new(),
             on_package_done: None,
+            index_timing_detail: false,
             save_package_mode: crate::storage::SavePackageMode::default(),
             storage_connection_pragmas: crate::storage::StorageConnectionPragmas::baseline(),
         }
@@ -155,6 +278,7 @@ impl Debug for IndexOptions {
                     .map(|_| "<callback>")
                     .unwrap_or("<none>"),
             )
+            .field("index_timing_detail", &self.index_timing_detail)
             .finish()
     }
 }
@@ -361,6 +485,8 @@ pub fn index_packages(
 ) -> Vec<IndexedGraph> {
     let index_opts = options.unwrap_or_default();
     let on_package_done = index_opts.on_package_done.clone();
+    let index_timing_detail = index_opts.index_timing_detail;
+    let track_package_timing = on_package_done.is_some();
     let index_engine_cache_key =
         cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
     let crawl_stub_roots: Arc<HashSet<String>> = Arc::new(
@@ -427,6 +553,22 @@ pub fn index_packages(
     let results: Arc<Vec<Mutex<Option<IndexedGraph>>>> =
         Arc::new((0..package_count).map(|_| Mutex::new(None)).collect());
 
+    let timing_slots: Option<Arc<Vec<Mutex<PackageTimingSlot>>>> = if track_package_timing {
+        Some(Arc::new(
+            (0..package_count)
+                .map(|_| {
+                    Mutex::new(PackageTimingSlot {
+                        started: None,
+                        crawl_finished: None,
+                        save_started: None,
+                    })
+                })
+                .collect(),
+        ))
+    } else {
+        None
+    };
+
     type SaveMsg = (usize, PackageInfo, PackageGraph);
     let (writer_join, save_tx_shared): (
         Option<JoinHandle<()>>,
@@ -441,6 +583,8 @@ pub fn index_packages(
         let save_attempts = index_opts.save_retry_count.saturating_add(1).max(1);
         let engine_cache_key_for_writer = index_engine_cache_key.clone();
         let package_done_writer = on_package_done.clone();
+        let timing_slots_writer = timing_slots.clone();
+        let index_timing_detail_for_writer = index_timing_detail;
         let save_package_mode = index_opts.save_package_mode;
         let storage_connection_pragmas = index_opts.storage_connection_pragmas;
         let join = thread::spawn(move || {
@@ -458,8 +602,11 @@ pub fn index_packages(
                     None
                 }
             };
-            while let Ok((idx, package, graph)) = save_rx.recv() {
-                let slot = &results_thread[idx];
+            while let Ok((package_index, package, graph)) = save_rx.recv() {
+                if let Some(ref slots) = timing_slots_writer {
+                    mark_package_save_started(slots, package_index);
+                }
+                let slot = &results_thread[package_index];
                 let (indexed, persisted) = if let Some(ref mut db) = db_opt {
                     let mut last_err = None;
                     let mut saved = false;
@@ -545,15 +692,17 @@ pub fn index_packages(
                 };
                 let total_symbols = indexed_total_symbols(&indexed);
                 *slot.lock().expect("indexed result mutex poisoned") = Some(indexed);
-                if let Some(cb) = package_done_writer.as_ref() {
-                    cb(PackageProgress {
-                        name: package.name.clone(),
-                        version: package.version.clone(),
-                        source: GraphSource::Crawled,
-                        total_symbols,
-                        persisted,
-                    });
-                }
+                finish_package_progress(FinishPackageProgressArgs {
+                    on_package_done: package_done_writer.clone(),
+                    timing_slots: timing_slots_writer.clone(),
+                    index_timing_detail: index_timing_detail_for_writer,
+                    package_index,
+                    name: package.name.clone(),
+                    version: package.version.clone(),
+                    source: GraphSource::Crawled,
+                    total_symbols,
+                    persisted,
+                });
             }
         });
         (Some(join), Some(save_tx_thread))
@@ -562,7 +711,11 @@ pub fn index_packages(
     };
 
     let hydrate = index_opts.hydrate_cache_hits;
-    let process_index = |i: usize, package: &PackageInfo| {
+    let timing_slots_for_workers = timing_slots.clone();
+    let process_index = |package_index: usize, package: &PackageInfo| {
+        if let Some(ref slots) = timing_slots_for_workers {
+            mark_package_timing_started(slots, package_index);
+        }
         if let Some(ref path) = cache_sqlite_path
             && let Some(indexed) = try_package_cache_hit(
                 package,
@@ -572,39 +725,50 @@ pub fn index_packages(
             )
         {
             let total_symbols = indexed_total_symbols(&indexed);
-            *results[i].lock().expect("indexed result mutex poisoned") = Some(indexed);
-            if let Some(cb) = on_package_done.as_ref() {
-                cb(PackageProgress {
-                    name: package.name.clone(),
-                    version: package.version.clone(),
-                    source: GraphSource::Cached,
-                    total_symbols,
-                    persisted: true,
-                });
-            }
+            *results[package_index]
+                .lock()
+                .expect("indexed result mutex poisoned") = Some(indexed);
+            finish_package_progress(FinishPackageProgressArgs {
+                on_package_done: on_package_done.clone(),
+                timing_slots: timing_slots_for_workers.clone(),
+                index_timing_detail,
+                package_index,
+                name: package.name.clone(),
+                version: package.version.clone(),
+                source: GraphSource::Cached,
+                total_symbols,
+                persisted: true,
+            });
             return;
         }
 
         let graph = build_package_graph(package, crawl_options_factory(package));
+        if let Some(ref slots) = timing_slots_for_workers {
+            mark_package_crawl_finished(slots, package_index);
+        }
 
         let persist_skipped = cache_sqlite_path.is_none() || cache::package_dir_is_symlink(package);
         if persist_skipped {
             let total_symbols = graph.total_symbols;
-            *results[i].lock().expect("indexed result mutex poisoned") = Some(IndexedGraph {
+            *results[package_index]
+                .lock()
+                .expect("indexed result mutex poisoned") = Some(IndexedGraph {
                 graph: Some(graph),
                 source: GraphSource::Crawled,
                 cache_metadata: None,
                 persisted: false,
             });
-            if let Some(cb) = on_package_done.as_ref() {
-                cb(PackageProgress {
-                    name: package.name.clone(),
-                    version: package.version.clone(),
-                    source: GraphSource::Crawled,
-                    total_symbols,
-                    persisted: false,
-                });
-            }
+            finish_package_progress(FinishPackageProgressArgs {
+                on_package_done: on_package_done.clone(),
+                timing_slots: timing_slots_for_workers.clone(),
+                index_timing_detail,
+                package_index,
+                name: package.name.clone(),
+                version: package.version.clone(),
+                source: GraphSource::Crawled,
+                total_symbols,
+                persisted: false,
+            });
             return;
         }
 
@@ -612,28 +776,32 @@ pub fn index_packages(
             .as_ref()
             .expect("save channel when sqlite path set");
         let save_tx = Arc::clone(save_tx);
-        if let Err(send_error) = save_tx.send((i, package.clone(), graph)) {
-            let (_i, _pkg, graph) = send_error.0;
+        if let Err(send_error) = save_tx.send((package_index, package.clone(), graph)) {
+            let (_package_index, _package, graph) = send_error.0;
             let total_symbols = graph.total_symbols;
             warn!(
                 package = %package.name.as_ref(),
                 "save queue disconnected before persist; returning crawled graph without save"
             );
-            *results[i].lock().expect("indexed result mutex poisoned") = Some(IndexedGraph {
+            *results[package_index]
+                .lock()
+                .expect("indexed result mutex poisoned") = Some(IndexedGraph {
                 graph: Some(graph),
                 source: GraphSource::Crawled,
                 cache_metadata: None,
                 persisted: false,
             });
-            if let Some(cb) = on_package_done.as_ref() {
-                cb(PackageProgress {
-                    name: package.name.clone(),
-                    version: package.version.clone(),
-                    source: GraphSource::Crawled,
-                    total_symbols,
-                    persisted: false,
-                });
-            }
+            finish_package_progress(FinishPackageProgressArgs {
+                on_package_done: on_package_done.clone(),
+                timing_slots: timing_slots_for_workers.clone(),
+                index_timing_detail,
+                package_index,
+                name: package.name.clone(),
+                version: package.version.clone(),
+                source: GraphSource::Crawled,
+                total_symbols,
+                persisted: false,
+            });
         }
     };
 
@@ -641,10 +809,10 @@ pub fn index_packages(
         packages
             .par_iter()
             .enumerate()
-            .for_each(|(i, package)| process_index(i, package));
+            .for_each(|(package_index, package)| process_index(package_index, package));
     } else {
-        for (i, package) in packages.iter().enumerate() {
-            process_index(i, package);
+        for (package_index, package) in packages.iter().enumerate() {
+            process_index(package_index, package);
         }
     }
 
@@ -691,6 +859,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::fs;
+    use std::time::{Duration, Instant};
     use tempfile::TempDir;
 
     use crate::cache;
@@ -934,20 +1103,25 @@ mod tests {
         );
         assert_eq!(second_run.len(), 2);
 
-        let cached_n = second_run
+        let cached_count = second_run
             .iter()
-            .filter(|g| g.source == GraphSource::Cached)
+            .filter(|indexed_graph| indexed_graph.source == GraphSource::Cached)
             .count();
-        let crawled_n = second_run
+        let crawled_count = second_run
             .iter()
-            .filter(|g| g.source == GraphSource::Crawled)
+            .filter(|indexed_graph| indexed_graph.source == GraphSource::Crawled)
             .count();
-        assert_eq!(cached_n, 1, "expected one cache hit");
-        assert_eq!(crawled_n, 1, "expected one fresh crawl");
+        assert_eq!(cached_count, 1, "expected one cache hit");
+        assert_eq!(crawled_count, 1, "expected one fresh crawl");
 
         let by_name: HashMap<String, GraphSource> = second_run
             .iter()
-            .map(|g| (indexed_package_name(g).to_string(), g.source))
+            .map(|indexed_graph| {
+                (
+                    indexed_package_name(indexed_graph).to_string(),
+                    indexed_graph.source,
+                )
+            })
             .collect();
         assert_eq!(by_name.get("pkg-a"), Some(&GraphSource::Cached));
         assert_eq!(by_name.get("pkg-b"), Some(&GraphSource::Crawled));
@@ -967,5 +1141,68 @@ mod tests {
                 "expected {name} in sqlite after mixed parallel index"
             );
         }
+    }
+
+    #[test]
+    fn compute_package_timing_splits_crawl_queue_and_save() {
+        let started = Instant::now();
+        let crawl_finished = started + Duration::from_secs(12);
+        let save_started = crawl_finished + Duration::from_secs(3);
+        let finished = save_started + Duration::from_secs(2);
+        let slot = PackageTimingSlot {
+            started: Some(started),
+            crawl_finished: Some(crawl_finished),
+            save_started: Some(save_started),
+        };
+        let (elapsed, breakdown) = compute_package_timing(&slot, finished);
+        assert_eq!(elapsed, Duration::from_secs(17));
+        assert_eq!(breakdown.crawl, Duration::from_secs(12));
+        assert_eq!(breakdown.queue_wait, Duration::from_secs(3));
+        assert_eq!(breakdown.save, Duration::from_secs(2));
+        assert_eq!(breakdown.total(), elapsed);
+    }
+
+    #[test]
+    fn index_packages_callback_includes_positive_elapsed() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        let temp_dir = TempDir::new().unwrap();
+        let node_modules_dir = temp_dir.path();
+        let db_path = temp_dir.path().join("nci.sqlite");
+
+        let pkg_dir = node_modules_dir.join("elapsed-pkg");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            r#"{"name": "elapsed-pkg", "version": "1.0.0", "types": "./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("index.d.ts"),
+            "export declare const ELAPSED: number;",
+        )
+        .unwrap();
+
+        let packages = scan_packages(node_modules_dir).unwrap();
+        let max_elapsed_ms = Arc::new(AtomicU64::new(0));
+        let max_elapsed_for_callback = Arc::clone(&max_elapsed_ms);
+        let _indexed = index_packages(
+            &packages,
+            Some(IndexOptions {
+                parallel: false,
+                enable_package_cache: true,
+                db_path: Some(db_path),
+                on_package_done: Some(Arc::new(move |progress| {
+                    max_elapsed_for_callback
+                        .fetch_max(progress.elapsed.as_millis() as u64, Ordering::Relaxed);
+                })),
+                ..Default::default()
+            }),
+        );
+
+        assert!(
+            max_elapsed_ms.load(Ordering::Relaxed) > 0,
+            "expected per-package elapsed timing in progress callback"
+        );
     }
 }

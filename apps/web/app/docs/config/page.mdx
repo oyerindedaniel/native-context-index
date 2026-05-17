@@ -5,6 +5,9 @@ import {
   ConfigBuilderTextField,
   ConfigBuilderNumberField,
   ConfigBuilderSelectField,
+  ConfigBuilderStringListField,
+  ConfigBuilderPackageFiltersField,
+  ConfigBuilderIndexRootWorkspaceField,
   ConfigBuilderPackageScopeField,
   ConfigBuilderValidationBadge,
   ConfigBuilderPreview,
@@ -15,6 +18,14 @@ import {
   TerminalCommand,
   TerminalOutput,
 } from "@/components/docs/widgets/terminal";
+import {
+  TableRoot,
+  TableHeader,
+  TableHeaderCell,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/docs/widgets/table";
 
 <PageEyebrow>Configuration</PageEyebrow>
 
@@ -23,6 +34,82 @@ import {
 <PageLede>
   Every flag the CLI accepts has a config-file equivalent. Build a config interactively below — the JSON on the right updates live and stays valid against the engine&rsquo;s schema.
 </PageLede>
+
+## Schema at a glance
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Key</TableHeaderCell>
+      <TableHeaderCell>Type</TableHeaderCell>
+      <TableHeaderCell>Role</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>database</code></TableCell>
+      <TableCell>string (path)</TableCell>
+      <TableCell>SQLite file path</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>project_root</code></TableCell>
+      <TableCell>string (path)</TableCell>
+      <TableCell>Consumer repo root (<code>package.json</code>, <code>node_modules</code>)</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>format</code></TableCell>
+      <TableCell><code>plain</code> | <code>json</code> | <code>jsonl</code></TableCell>
+      <TableCell>Default stdout shape for query commands</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>banner</code></TableCell>
+      <TableCell><code>auto</code> | <code>on</code> | <code>off</code></TableCell>
+      <TableCell>Startup banner on stderr</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>progress</code></TableCell>
+      <TableCell><code>auto</code> | <code>on</code> | <code>off</code></TableCell>
+      <TableCell>Progress lines on stderr</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>max_hops</code></TableCell>
+      <TableCell>integer</TableCell>
+      <TableCell>Re-export follow depth (<code>0</code>, <code>10</code> default, <code>-1</code> unlimited)</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>packages</code></TableCell>
+      <TableCell>object</TableCell>
+      <TableCell><code>include</code> / <code>exclude</code> package-name globs</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>package_scope</code></TableCell>
+      <TableCell>array or <code>&quot;all_installed&quot;</code></TableCell>
+      <TableCell>Which manifest sections gate indexing</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>dependency_stub_packages</code></TableCell>
+      <TableCell>string[]</TableCell>
+      <TableCell>Crawl-skip list → <code>npm::…</code> stub edges</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>workspaces</code></TableCell>
+      <TableCell>string[]</TableCell>
+      <TableCell>Monorepo workspace directory globs</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>index_root_workspace</code></TableCell>
+      <TableCell>boolean</TableCell>
+      <TableCell>Scan <code>&lt;project_root&gt;/node_modules</code> (default <code>true</code>)</TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+<CalloutRoot variant="warning">
+  <CalloutTitle>Only documented keys are read.</CalloutTitle>
+  <CalloutBody>
+    Extra JSON properties are ignored — they do not enable internal pipeline flags (<code>parallel</code>, save modes, bench pragmas, etc.). If a behaviour is not listed here or on the CLI, it is not configurable from the file.
+  </CalloutBody>
+</CalloutRoot>
 
 ## Build it
 
@@ -36,19 +123,26 @@ import {
         fieldKey="project_root"
         label="project_root"
         placeholder="."
-        description="The directory that contains your package.json. Defaults to the directory you ran nci from."
+        description="Directory with your package.json. Relative paths resolve against the config file's directory."
       />
       <ConfigBuilderTextField
         fieldKey="database"
         label="database"
         placeholder="nci.sqlite"
-        description="Custom path for the SQLite file. Useful when you keep tooling out of the repo root."
+        description="Custom path for the SQLite file. Omit to use the OS cache default."
       />
+      <ConfigBuilderStringListField
+        fieldKey="workspaces"
+        label="workspaces"
+        placeholder={"apps/*\npackages/*"}
+        description="One glob per line under project_root. Each match adds its own node_modules install root."
+      />
+      <ConfigBuilderIndexRootWorkspaceField />
     </ConfigBuilderGroupSection>
 
     <ConfigBuilderGroupSection
       title="Output"
-      description="Defaults for commands that print to stdout."
+      description="Defaults for commands that print to stdout or stderr."
     >
       <ConfigBuilderSelectField
         fieldKey="format"
@@ -58,7 +152,7 @@ import {
           { id: "json", label: "json" },
           { id: "jsonl", label: "jsonl" },
         ]}
-        description="The default for query commands. CLI flags still override per-call."
+        description="Default for query commands. CLI --format overrides per call."
       />
       <ConfigBuilderSelectField
         fieldKey="banner"
@@ -68,6 +162,7 @@ import {
           { id: "on", label: "on" },
           { id: "off", label: "off" },
         ]}
+        description="auto = banner on TTY stderr only."
       />
       <ConfigBuilderSelectField
         fieldKey="progress"
@@ -77,12 +172,13 @@ import {
           { id: "on", label: "on" },
           { id: "off", label: "off" },
         ]}
+        description="auto = progress lines on TTY stderr only (plain index lines)."
       />
     </ConfigBuilderGroupSection>
 
     <ConfigBuilderGroupSection
       title="Indexing scope"
-      description="Whose dependencies are read, and how deeply re-exports are followed."
+      description="Whose dependencies are read, how deeply re-exports are followed, and optional filters."
     >
       <ConfigBuilderPackageScopeField />
       <ConfigBuilderNumberField
@@ -90,6 +186,13 @@ import {
         label="max_hops"
         description="0 = entry only. -1 = unlimited. Default = 10."
         min={-1}
+      />
+      <ConfigBuilderPackageFiltersField />
+      <ConfigBuilderStringListField
+        fieldKey="dependency_stub_packages"
+        label="dependency_stub_packages"
+        placeholder={"zod\n@aws-sdk/client-s3"}
+        description="One package name per line. Imports become npm:: stub edges instead of crawling that package."
       />
     </ConfigBuilderGroupSection>
 
@@ -102,15 +205,33 @@ import {
 <CalloutRoot variant="info">
   <CalloutTitle>The CLI always wins.</CalloutTitle>
   <CalloutBody>
-    Merge order is <code>defaults → nci.config.json → CLI flags</code>. A flag like `--max-hops 0` overrides the file&rsquo;s value for that one run.
+    Merge order is <code>defaults → nci.config.json → CLI flags</code>. A flag like <code>--max-hops 0</code> overrides the file&rsquo;s value for that one run.
   </CalloutBody>
 </CalloutRoot>
 
 ## Field deep-dives
 
+### database
+
+Path to the SQLite index file. Relative paths resolve against the directory that contains `nci.config.json`. When omitted, NCI uses the OS cache layout (overridable with `NCI_CACHE_DIR` — see [Environment variables](/docs/reference/env-vars)).
+
+CLI equivalent: `--database <PATH>`.
+
 ### project_root
 
 The directory whose `package.json` and `node_modules` are scanned. Relative paths resolve against the file containing the config — not against `cwd`. If you run `nci index` from a workspace, the file&rsquo;s `project_root` still wins unless `--project-root` is passed.
+
+### format
+
+Default output encoding for `nci query` (and related commands): `plain`, `json`, or `jsonl`. Does not change how indexing works — only how results are printed. Per-command `--format` overrides.
+
+### banner
+
+Controls the startup banner on stderr: `auto` (TTY only), `on`, or `off`.
+
+### progress
+
+Controls index/query progress lines on stderr: `auto` (TTY only), `on`, or `off`. Plain `nci index` per-package lines show **end-to-end time per package** (`in 1m20s` from work start through SQLite insert). Add CLI `--index-timing-detail` for a crawl / queue / save split; the final summary line includes total **wall** time for the run.
 
 ### package_scope
 
@@ -122,7 +243,7 @@ Either an array of sections or the sentinel.
 }
 ```
 
-Indexes packages listed in the consumer manifest&rsquo;s `dependencies`. Add `"dev_dependencies"` to include build tools.
+Indexes packages listed in the consumer manifest&rsquo;s `dependencies`. Add `"dev_dependencies"` to include build tools. **Omit** = `["dependencies"]` only.
 
 ```json
 {
@@ -131,6 +252,8 @@ Indexes packages listed in the consumer manifest&rsquo;s `dependencies`. Add `"d
 ```
 
 Disables the manifest gate. Every installed package is indexed regardless of how it got there. Use sparingly — large transitive trees are not free.
+
+CLI: `--package-scope dependencies,dev-dependencies` or `--package-scope all-installed`.
 
 ### max_hops
 
@@ -143,6 +266,24 @@ The depth of re-export resolution.
 | `10`  | Default — covers practically every real lib    |
 | `-1`  | Unlimited — only useful for diagnostics        |
 
+### packages
+
+Optional package-name globs applied **after** `package_scope` narrows the install set.
+
+```json
+{
+  "packages": {
+    "include": ["@my-org/*"],
+    "exclude": ["eslint*", "@types/*"]
+  }
+}
+```
+
+- **`include`**: keep only names matching at least one glob (if non-empty).
+- **`exclude`**: drop names matching any pattern.
+
+CLI `--package` globs are **unioned** with `packages.include` for one-off runs. See [Monorepo guide](/docs/guides/monorepo) for incremental indexing patterns.
+
 ### workspaces
 
 Glob list, relative to `project_root`. Each entry contributes its own `node_modules` install root.
@@ -153,9 +294,17 @@ Glob list, relative to `project_root`. Each entry contributes its own `node_modu
 }
 ```
 
+Patterns ending in `/*` expand to immediate child directories; a path without `/*` must exist as a single directory.
+
 ### dependency_stub_packages
 
-Names a dependency that should be persisted as `npm::…` stub edges instead of being crawled. Whenever a crawled file imports a listed name (or a subpath of it), NCI records the edge as `npm::<specifier>::<member>` and skips its `.d.ts`. Use it for shared validators or heavy SDKs (`zod`, `@aws-sdk/client-s3`, `googleapis`) that you reference but do not need walked.
+Package names (bare or scoped) whose `.d.ts` trees are **not crawled**. Consumer imports become `npm::<specifier>::<member>` stub edges instead. Merged with CLI `-s` / `--dependency-stub-package` (union, not replace).
+
+### index_root_workspace
+
+When `true` or omitted, `<project_root>/node_modules` is scanned. When `false`, the root install root is skipped — you must list at least one `workspaces` entry so another `…/node_modules` remains.
+
+CLI: `--skip-root-workspace` forces off; `--include-root-workspace` forces on for one run (overrides `false` in the file).
 
 ## Verify
 
@@ -165,4 +314,4 @@ Names a dependency that should be persisted as `npm::…` stub edges instead of 
 would write 13.4 MiB to nci.sqlite`}</TerminalOutput>
 </TerminalRoot>
 
-If the package count surprises you, narrow `package_scope`, add `packages.exclude` globs, or turn on `--skip-root-workspace`.
+If the package count surprises you, narrow `package_scope`, add `packages.exclude` globs, or set `index_root_workspace` / `--skip-root-workspace` for monorepos that hoist only in workspaces.

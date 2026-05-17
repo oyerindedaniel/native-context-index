@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { isSiteNavHrefActive } from "@/components/site/site-nav-active";
 
 const linkBase =
-  "inline-flex border-b-2 border-transparent pb-1 text-base font-semibold tracking-tight text-ink/75 transition-[color,border-color] duration-150 ease-out hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary";
+  "inline-flex items-center border-b-2 border-transparent py-1 text-base font-semibold leading-none tracking-tight text-ink/75 transition-[color,border-color] duration-150 ease-out hover:text-ink focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary";
 
 const linkActive = "border-primary text-primary hover:text-dark";
 
@@ -15,7 +15,7 @@ export function SitePrimaryNav() {
 
   return (
     <nav
-      className="flex min-w-0 items-center justify-center gap-5 sm:gap-10"
+      className="flex h-full min-w-0 items-center justify-center self-center gap-5 sm:gap-10"
       aria-label="Primary"
     >
       <Link

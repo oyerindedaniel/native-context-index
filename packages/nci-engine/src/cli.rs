@@ -4,7 +4,7 @@ use std::io::{self, BufReader, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
@@ -15,7 +15,7 @@ use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
 use nci_engine::filter::{DepKindFilter, FilterConfig};
-use nci_engine::pipeline::{self, GraphSource, IndexOptions};
+use nci_engine::pipeline::{self, GraphSource, IndexOptions, IndexedGraph, PackageProgress};
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, ScanError};
 use nci_engine::storage::{
@@ -479,6 +479,10 @@ struct BulkIndexArgs {
 
     #[arg(long)]
     dry_run: bool,
+
+    /// Per-package index lines show crawl + queue wait + save splits (plain progress only).
+    #[arg(long = "index-timing-detail")]
+    index_timing_detail: bool,
 }
 
 #[derive(Subcommand)]
@@ -1922,11 +1926,30 @@ fn build_index_options(
     })
 }
 
+fn format_package_index_timing(progress: &PackageProgress) -> String {
+    let total_label = format_elapsed(progress.elapsed);
+    let Some(breakdown) = progress.timing_breakdown else {
+        return format!("in {total_label}");
+    };
+    format!(
+        "in {total_label} (crawl {} + wait {} + save {})",
+        format_elapsed(breakdown.crawl),
+        format_elapsed(breakdown.queue_wait),
+        format_elapsed(breakdown.save),
+    )
+}
+
 /// Per-package stderr progress for `nci index` plain output only ([`OutputFormat::Plain`]).
-fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool) -> IndexOptions {
+fn with_plain_index_progress(
+    mut opts: IndexOptions,
+    total: usize,
+    enabled: bool,
+    index_timing_detail: bool,
+) -> IndexOptions {
     if !enabled || total == 0 {
         return opts;
     }
+    opts.index_timing_detail = index_timing_detail;
     fn status_token(raw_status: &str) -> String {
         raw_status
             .trim()
@@ -1940,27 +1963,25 @@ fn with_plain_index_progress(mut opts: IndexOptions, total: usize, enabled: bool
             })
             .collect()
     }
-    let start = Instant::now();
     let packages_completed = Arc::new(AtomicUsize::new(0));
     let packages_completed_for_callback = Arc::clone(&packages_completed);
-    opts.on_package_done = Some(Arc::new(move |progress: pipeline::PackageProgress| {
+    opts.on_package_done = Some(Arc::new(move |progress: PackageProgress| {
         let one_based_index = packages_completed_for_callback.fetch_add(1, Ordering::Relaxed) + 1;
-        let elapsed = start.elapsed();
         let (source_label, tone) = match progress.source {
             GraphSource::Cached => ("CACHED", ProgressTone::Note),
             GraphSource::Crawled if progress.persisted => ("INDEXED", ProgressTone::Done),
             GraphSource::Crawled => ("NOT_PERSISTED", ProgressTone::Error),
         };
+        let timing_label = format_package_index_timing(&progress);
         emit_progress_line(
             "index package",
             tone,
             &format!(
-                "[{one_based_index}/{total}] [{}] {} {} symbols={} +{}",
+                "[{one_based_index}/{total}] [{}] {} {} symbols={} {timing_label}",
                 status_token(source_label),
                 progress.name,
                 progress.version,
                 progress.total_symbols,
-                format_elapsed(elapsed),
             ),
         );
     }));
@@ -2075,17 +2096,18 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 );
             }
             let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
-            let opts = with_plain_index_progress(opts, 1, show_progress);
+            let opts = with_plain_index_progress(opts, 1, show_progress, bulk.index_timing_detail);
             let index_tail_spinner = if show_progress {
                 TtyProgressSpinner::try_start()
             } else {
                 None
             };
+            let index_wall_started = Instant::now();
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
             if let Some(spinner_handle) = index_tail_spinner {
                 spinner_handle.finish();
             }
-            print_index_summary(fmt, &out)?;
+            print_index_summary(fmt, &out, Some(index_wall_started.elapsed()))?;
         }
         None => {
             let scan_started = Instant::now();
@@ -2140,17 +2162,23 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                     ),
                 );
             }
-            let opts = with_plain_index_progress(opts, packages.len(), show_progress);
+            let opts = with_plain_index_progress(
+                opts,
+                packages.len(),
+                show_progress,
+                bulk.index_timing_detail,
+            );
             let index_tail_spinner = if show_progress {
                 TtyProgressSpinner::try_start()
             } else {
                 None
             };
+            let index_wall_started = Instant::now();
             let indexed = pipeline::index_packages(&packages, Some(opts));
             if let Some(spinner_handle) = index_tail_spinner {
                 spinner_handle.finish();
             }
-            print_index_summary(fmt, &indexed)?;
+            print_index_summary(fmt, &indexed, Some(index_wall_started.elapsed()))?;
         }
     }
 
@@ -2159,7 +2187,8 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
 
 fn print_index_summary(
     fmt: OutputFormat,
-    indexed: &[pipeline::IndexedGraph],
+    indexed: &[IndexedGraph],
+    wall_elapsed: Option<Duration>,
 ) -> Result<(), String> {
     let total_packages = indexed.len();
     let cached = indexed
@@ -2174,13 +2203,16 @@ fn print_index_summary(
         .iter()
         .filter(|indexed| indexed.source == GraphSource::Crawled && !indexed.persisted)
         .count();
+    let wall_suffix = wall_elapsed
+        .map(|elapsed| format!(" | wall {}", format_elapsed(elapsed)))
+        .unwrap_or_default();
     match fmt {
         OutputFormat::Plain => {
             emit_ui_line_stdout(
                 ProgressTone::Summary,
                 "index",
                 &format!(
-                    "{total_packages} package(s) complete | cached={cached} indexed={indexed_now} not_persisted={not_persisted}"
+                    "{total_packages} package(s) complete | cached={cached} indexed={indexed_now} not_persisted={not_persisted}{wall_suffix}"
                 ),
             );
         }
@@ -3301,4 +3333,51 @@ fn run_sql(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod index_progress_format_tests {
+    use super::{GraphSource, PackageProgress, format_package_index_timing};
+    use nci_engine::pipeline::PackageTimingBreakdown;
+    use nci_engine::types::SharedString;
+    use std::time::Duration;
+
+    fn sample_progress(
+        elapsed: Duration,
+        timing_breakdown: Option<PackageTimingBreakdown>,
+    ) -> PackageProgress {
+        PackageProgress {
+            name: SharedString::from("pkg"),
+            version: SharedString::from("1.0.0"),
+            source: GraphSource::Crawled,
+            total_symbols: 1,
+            persisted: true,
+            elapsed,
+            timing_breakdown,
+        }
+    }
+
+    #[test]
+    fn format_package_index_timing_default_is_end_to_end_only() {
+        let label = format_package_index_timing(&sample_progress(Duration::from_secs(5), None));
+        assert_eq!(label, "in 5.00s");
+        assert!(!label.contains('+'));
+        assert!(!label.contains("crawl"));
+    }
+
+    #[test]
+    fn format_package_index_timing_detail_includes_breakdown() {
+        let label = format_package_index_timing(&sample_progress(
+            Duration::from_secs(17),
+            Some(PackageTimingBreakdown {
+                crawl: Duration::from_secs(12),
+                queue_wait: Duration::from_secs(3),
+                save: Duration::from_secs(2),
+            }),
+        ));
+        assert!(label.starts_with("in "));
+        assert!(label.contains("crawl 12.0s"));
+        assert!(label.contains("wait 3.00s"));
+        assert!(label.contains("save 2.00s"));
+    }
 }

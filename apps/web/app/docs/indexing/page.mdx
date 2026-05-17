@@ -104,6 +104,8 @@ A `grep` over `node_modules` returns lines. NCI returns symbols — merged graph
 
 `--dry-run` walks scan + filter only and stops. Use it as a CI sanity gate: if the count drops, your `package_scope` or filters regressed.
 
+With `progress` on (see [Configuration](/docs/config)), each indexed package prints **`in …`** — per-package wall time from start through persist (queue wait included). Use **`--index-timing-detail`** to add `crawl` / `wait` / `save` splits. The closing summary includes **`wall`** for the whole `nci index` run.
+
 <TerminalRoot>
   <TerminalCommand>nci index --package "@my-org/*"</TerminalCommand>
 </TerminalRoot>

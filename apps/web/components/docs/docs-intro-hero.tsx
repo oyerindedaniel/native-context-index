@@ -1,6 +1,5 @@
 "use client";
 
-import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import {
   ArrowLongRightIcon,
@@ -15,19 +14,13 @@ import {
   InstallPickerControl,
   defaultManagers,
 } from "@/components/docs/widgets/install-picker";
+import {
+  DocIntroTileGrid,
+  type DocIntroTileData,
+} from "@/components/docs/doc-intro-tile";
 import { cn } from "@/lib/utils";
 
-type Icon = ComponentType<SVGProps<SVGSVGElement>>;
-
-type DocTile = {
-  href: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  Icon: Icon;
-};
-
-const docTiles: DocTile[] = [
+const docTiles: DocIntroTileData[] = [
   {
     href: "/docs/quickstart",
     eyebrow: "5 minutes",
@@ -128,39 +121,7 @@ export function DocsIntroHero() {
         </Link>
       </div>
 
-      <div className="grid gap-4 pt-6 sm:grid-cols-2">
-        {docTiles.map((tile) => (
-          <Link
-            key={tile.href}
-            href={tile.href}
-            className={cn(
-              "group relative flex min-h-60 flex-col gap-5 rounded-2xl border border-border bg-elevated p-7 transition-colors duration-150 ease-out",
-              "hover:border-primary/35",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
-            )}
-          >
-            <tile.Icon
-              className="size-7 shrink-0 text-accent"
-              aria-hidden="true"
-            />
-            <div className="flex flex-1 flex-col gap-2">
-              <span className="text-[0.7rem] font-medium uppercase tracking-[0.1em] text-muted/85">
-                {tile.eyebrow}
-              </span>
-              <span className="flex items-start justify-between gap-3 text-lg font-semibold tracking-tight-sub text-ink">
-                <span>{tile.title}</span>
-                <ArrowLongRightIcon
-                  className="mt-1 size-4 shrink-0 text-muted/70 transition-transform duration-150 ease-out group-hover:translate-x-0.5 group-hover:text-primary"
-                  aria-hidden="true"
-                />
-              </span>
-              <p className="text-base leading-relaxed tracking-tight-p text-muted">
-                {tile.description}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <DocIntroTileGrid tiles={docTiles} />
     </section>
   );
 }

@@ -7,8 +7,8 @@ import { SplitButton } from "@/components/ui/split-button";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
-export const HERO_NPM_INSTALL_COMMAND =
-  "npm install -g @nativecontextindex/cli" as const;
+export const HERO_SKILLS_INSTALL_COMMAND =
+  "npx skills add oyerindedaniel/native-context-index --skill nci --skill nci-answer-quality -y" as const;
 
 export function HeroGetStartedButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -28,9 +28,11 @@ export function HeroGetStartedButton({ className }: { className?: string }) {
       </SplitButton.Main>
       <SplitButton.IconTrigger
         type="button"
-        onClick={() => void copy(HERO_NPM_INSTALL_COMMAND)}
+        onClick={() => void copy(HERO_SKILLS_INSTALL_COMMAND)}
         aria-label={
-          copied ? "Copied install command" : "Copy npm install command"
+          copied
+            ? "Copied skills install command"
+            : "Copy skills install command"
         }
       >
         <CopyStatusIcon

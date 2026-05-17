@@ -254,6 +254,178 @@ export function ConfigBuilderSelectField({
   );
 }
 
+function parseLinesToStringList(raw: string): string[] | undefined {
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return lines.length === 0 ? undefined : lines;
+}
+
+function stringListToLines(values: string[] | undefined): string {
+  return values?.join("\n") ?? "";
+}
+
+interface ConfigBuilderStringListFieldProps {
+  fieldKey: "workspaces" | "dependency_stub_packages";
+  label: string;
+  placeholder?: string;
+  description?: string;
+}
+
+export function ConfigBuilderStringListField({
+  fieldKey,
+  label,
+  placeholder,
+  description,
+}: ConfigBuilderStringListFieldProps) {
+  const { config, setField } = useConfigBuilderContext();
+  const value = stringListToLines(config[fieldKey]);
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
+        {label}
+      </span>
+      <textarea
+        value={value}
+        rows={3}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setField(fieldKey, parseLinesToStringList(event.target.value));
+        }}
+        className="min-h-[4.5rem] resize-y rounded-xl border border-border bg-elevated px-3 py-2 font-mono text-sm tracking-tight-p text-ink placeholder:text-muted/60 transition-[border-color,box-shadow] duration-150 ease-out focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/25"
+      />
+      {description ? (
+        <span className="text-xs leading-snug tracking-tight-p text-muted">
+          {description}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+export function ConfigBuilderPackageFiltersField() {
+  const { config, setField } = useConfigBuilderContext();
+  const filters = config.packages ?? {};
+
+  const setInclude = (raw: string) => {
+    const include = parseLinesToStringList(raw);
+    const next = { ...filters, include };
+    const hasExclude = next.exclude !== undefined && next.exclude.length > 0;
+    if (include === undefined && !hasExclude) {
+      setField("packages", undefined);
+      return;
+    }
+    setField("packages", next);
+  };
+
+  const setExclude = (raw: string) => {
+    const exclude = parseLinesToStringList(raw);
+    const next = { ...filters, exclude };
+    const hasInclude = next.include !== undefined && next.include.length > 0;
+    if (exclude === undefined && !hasInclude) {
+      setField("packages", undefined);
+      return;
+    }
+    setField("packages", next);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
+        packages
+      </span>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[0.7rem] font-medium uppercase tracking-[0.08em] text-muted/90">
+          include
+        </span>
+        <textarea
+          value={stringListToLines(filters.include)}
+          rows={2}
+          placeholder="@my-org/*"
+          onChange={(event) => setInclude(event.target.value)}
+          className="min-h-[3.25rem] resize-y rounded-xl border border-border bg-elevated px-3 py-2 font-mono text-sm tracking-tight-p text-ink placeholder:text-muted/60 transition-[border-color,box-shadow] duration-150 ease-out focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/25"
+        />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[0.7rem] font-medium uppercase tracking-[0.08em] text-muted/90">
+          exclude
+        </span>
+        <textarea
+          value={stringListToLines(filters.exclude)}
+          rows={2}
+          placeholder="eslint*"
+          onChange={(event) => setExclude(event.target.value)}
+          className="min-h-[3.25rem] resize-y rounded-xl border border-border bg-elevated px-3 py-2 font-mono text-sm tracking-tight-p text-ink placeholder:text-muted/60 transition-[border-color,box-shadow] duration-150 ease-out focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/25"
+        />
+      </label>
+      <span className="text-xs leading-snug tracking-tight-p text-muted">
+        Package-name globs applied after{" "}
+        <code className="text-ink/90">package_scope</code>. CLI{" "}
+        <code className="text-ink/90">--package</code> globs are unioned with{" "}
+        <code className="text-ink/90">include</code>.
+      </span>
+    </div>
+  );
+}
+
+type IndexRootWorkspaceMode = "default" | "true" | "false";
+
+export function ConfigBuilderIndexRootWorkspaceField() {
+  const { config, setField } = useConfigBuilderContext();
+  const mode: IndexRootWorkspaceMode =
+    config.index_root_workspace === undefined
+      ? "default"
+      : config.index_root_workspace
+        ? "true"
+        : "false";
+
+  const options: { id: IndexRootWorkspaceMode; label: string }[] = [
+    { id: "default", label: "default (scan root)" },
+    { id: "true", label: "true" },
+    { id: "false", label: "false" },
+  ];
+
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted">
+        index_root_workspace
+      </span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {options.map((option) => {
+          const isActive = option.id === mode;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => {
+                if (option.id === "default") {
+                  setField("index_root_workspace", undefined);
+                  return;
+                }
+                setField("index_root_workspace", option.id === "true");
+              }}
+              className={cn(
+                "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out",
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted hover:bg-surface-hover hover:text-ink",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-xs leading-snug tracking-tight-p text-muted">
+        When <code className="text-ink/90">false</code>, skip{" "}
+        <code className="text-ink/90">&lt;project_root&gt;/node_modules</code> —
+        requires non-empty <code className="text-ink/90">workspaces</code>.
+      </span>
+    </label>
+  );
+}
+
 export function ConfigBuilderPackageScopeField() {
   const { config, setField } = useConfigBuilderContext();
   const scope = config.package_scope;
@@ -437,6 +609,11 @@ ConfigBuilderGroupSection.displayName = "ConfigBuilder.GroupSection";
 ConfigBuilderTextField.displayName = "ConfigBuilder.TextField";
 ConfigBuilderNumberField.displayName = "ConfigBuilder.NumberField";
 ConfigBuilderSelectField.displayName = "ConfigBuilder.SelectField";
+ConfigBuilderStringListField.displayName = "ConfigBuilder.StringListField";
+ConfigBuilderPackageFiltersField.displayName =
+  "ConfigBuilder.PackageFiltersField";
+ConfigBuilderIndexRootWorkspaceField.displayName =
+  "ConfigBuilder.IndexRootWorkspaceField";
 ConfigBuilderPackageScopeField.displayName = "ConfigBuilder.PackageScopeField";
 ConfigBuilderPreview.displayName = "ConfigBuilder.Preview";
 ConfigBuilderValidationBadge.displayName = "ConfigBuilder.ValidationBadge";
@@ -447,6 +624,9 @@ export interface ConfigBuilderNamespace {
   TextField: typeof ConfigBuilderTextField;
   NumberField: typeof ConfigBuilderNumberField;
   SelectField: typeof ConfigBuilderSelectField;
+  StringListField: typeof ConfigBuilderStringListField;
+  PackageFiltersField: typeof ConfigBuilderPackageFiltersField;
+  IndexRootWorkspaceField: typeof ConfigBuilderIndexRootWorkspaceField;
   PackageScopeField: typeof ConfigBuilderPackageScopeField;
   Preview: typeof ConfigBuilderPreview;
   ValidationBadge: typeof ConfigBuilderValidationBadge;
@@ -458,6 +638,9 @@ export const ConfigBuilder: ConfigBuilderNamespace = {
   TextField: ConfigBuilderTextField,
   NumberField: ConfigBuilderNumberField,
   SelectField: ConfigBuilderSelectField,
+  StringListField: ConfigBuilderStringListField,
+  PackageFiltersField: ConfigBuilderPackageFiltersField,
+  IndexRootWorkspaceField: ConfigBuilderIndexRootWorkspaceField,
   PackageScopeField: ConfigBuilderPackageScopeField,
   Preview: ConfigBuilderPreview,
   ValidationBadge: ConfigBuilderValidationBadge,
