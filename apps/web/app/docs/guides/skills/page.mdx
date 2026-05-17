@@ -22,7 +22,17 @@ skills/
     SKILL.md
 ```
 
-Hosts that understand the open [Agent Skills](https://agentskills.io/) shape each discover `SKILL.md` from their own paths — there is no single global folder. The table below is a map; check each product&rsquo;s docs when they ship an update.
+## Install
+
+Install both shipped skills from git with <a href="https://github.com/vercel-labs/skills" target="_blank" rel="noopener noreferrer">npx skills</a>:
+
+<TerminalRoot>
+  <TerminalCommand>npx skills add oyerindedaniel/native-context-index --skill nci --skill nci-answer-quality -y</TerminalCommand>
+</TerminalRoot>
+
+`nci-answer-quality` sets `disable-model-invocation: true` so the protocol is not paraphrased when it fires. `nci` leaves invocation flexible for onboarding judgment.
+
+Hosts that understand the open [Agent Skills](https://agentskills.io/) shape each discover `SKILL.md` from their own paths — there is no single global folder. The host map below is a reference; check each product&rsquo;s docs when they ship an update.
 
 ## Where each host looks
 
@@ -127,14 +137,6 @@ Hosts that understand the open [Agent Skills](https://agentskills.io/) shape eac
     </TableRow>
   </TableBody>
 </TableRoot>
-
-Install from git with <a href="https://github.com/vercel-labs/skills" target="_blank" rel="noopener noreferrer">npx skills</a>:
-
-<TerminalRoot>
-  <TerminalCommand>npx skills add oyerindedaniel/native-context-index --skill nci --skill nci-answer-quality -y</TerminalCommand>
-</TerminalRoot>
-
-`nci-answer-quality` sets `disable-model-invocation: true` so the protocol is not paraphrased when it fires. `nci` leaves invocation flexible for onboarding judgment.
 
 <CalloutRoot variant="info">
   <CalloutTitle>Primer stays in sync.</CalloutTitle>

@@ -105,6 +105,7 @@ export function TableCell({
         "px-4 py-3",
         align === "right" ? "text-right" : "text-left",
         variantClass,
+        "[&_p]:my-0 [&_p]:text-sm [&_p]:leading-normal [&_p]:tracking-tight-p [&_p]:text-inherit",
         "[&_code]:rounded-md [&_code]:bg-surface [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.85em] [&_code]:text-ink",
         className,
       )}
