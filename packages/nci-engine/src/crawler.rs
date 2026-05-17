@@ -26,8 +26,14 @@ pub struct CrawlOptions {
     pub max_hops: usize,
     /// When built with `--features phase-profile` and `NCI_PROFILE=1`, prepends this label to crawl phase timings for this run.
     pub profile_as: Option<SharedString>,
-    /// When true, resolve `SymbolNode` dependency ids in parallel during graph build.
+    /// When true, resolve `SymbolNode` dependency ids in parallel during graph build when the
+    /// symbol batch is large enough for [`Self::min_symbols_for_dep_parallel`].
     pub parallel_resolve_deps: bool,
+    /// When true, BFS crawl layers may use Rayon when the layer has at least
+    /// [`Self::min_layer_files_for_parallel`] files.
+    pub parallel_parse_layers: bool,
+    pub min_layer_files_for_parallel: usize,
+    pub min_symbols_for_dep_parallel: usize,
     /// Normalized npm package roots for dependency stubbing.
     pub dependency_stub_roots: Arc<HashSet<String>>,
     /// When set, bare imports whose [`crate::resolver::npm_package_root`] equals this string are not stubbed
@@ -45,6 +51,9 @@ impl Default for CrawlOptions {
             max_hops: DEFAULT_MAX_HOPS,
             profile_as: None,
             parallel_resolve_deps: true,
+            parallel_parse_layers: true,
+            min_layer_files_for_parallel: 2,
+            min_symbols_for_dep_parallel: 2,
             dependency_stub_roots: Arc::new(HashSet::new()),
             dependency_stub_self_exempt_root: None,
             package_dir_for_relative_paths: None,
@@ -66,6 +75,8 @@ pub fn crawl(entry_file_paths: &[SharedString], options: Option<CrawlOptions>) -
         crawl_options.max_hops,
         Arc::clone(&crawl_options.dependency_stub_roots),
         crawl_options.dependency_stub_self_exempt_root.clone(),
+        crawl_options.parallel_parse_layers,
+        crawl_options.min_layer_files_for_parallel,
     );
 
     let primary_entry = entry_file_paths.first().cloned().unwrap_or_default();
@@ -331,6 +342,9 @@ struct CrawlSession {
     dependency_stub_roots: Arc<HashSet<String>>,
 
     dependency_stub_self_exempt_root: Option<String>,
+
+    parallel_parse_layers: bool,
+    min_layer_files_for_parallel: usize,
 }
 
 impl CrawlSession {
@@ -338,6 +352,8 @@ impl CrawlSession {
         max_hops: usize,
         dependency_stub_roots: Arc<HashSet<String>>,
         dependency_stub_self_exempt_root: Option<String>,
+        parallel_parse_layers: bool,
+        min_layer_files_for_parallel: usize,
     ) -> Self {
         Self {
             visited: HashSet::new(),
@@ -355,6 +371,8 @@ impl CrawlSession {
             max_hops,
             dependency_stub_roots,
             dependency_stub_self_exempt_root,
+            parallel_parse_layers,
+            min_layer_files_for_parallel,
         }
     }
 
@@ -394,6 +412,9 @@ impl CrawlSession {
             if !Path::new(normalized_entry.as_ref()).exists() {
                 continue;
             }
+            if !is_declaration_file_path(Path::new(normalized_entry.as_ref())) {
+                continue;
+            }
             if hop.insert(normalized_entry.clone(), 0).is_none() {
                 self.visited.insert(normalized_entry.clone());
                 current_layer.push(normalized_entry);
@@ -403,13 +424,19 @@ impl CrawlSession {
         current_layer.dedup();
 
         while !current_layer.is_empty() {
-            let parsed: Vec<(SharedString, Option<ParseResult>)> = current_layer
-                .par_iter()
-                .map(|declaration_path| {
-                    let parse_result = parser::parse_file(declaration_path.as_ref());
-                    (declaration_path.clone(), parse_result)
-                })
-                .collect();
+            let use_parallel_parse = self.parallel_parse_layers
+                && current_layer.len() >= self.min_layer_files_for_parallel;
+            let parse_one = |declaration_path: &SharedString| {
+                (
+                    declaration_path.clone(),
+                    parser::parse_file(declaration_path.as_ref()),
+                )
+            };
+            let parsed: Vec<(SharedString, Option<ParseResult>)> = if use_parallel_parse {
+                current_layer.par_iter().map(parse_one).collect()
+            } else {
+                current_layer.iter().map(parse_one).collect()
+            };
 
             let mut parsed_sorted = parsed;
             parsed_sorted.sort_by(|pair_left, pair_right| pair_left.0.cmp(&pair_right.0));
@@ -1161,6 +1188,18 @@ mod tests {
                 .any(|visited_path| { visited_path.as_ref().contains("@stub-listed/core") }),
             "stub-listed roots must not add stub package files to visited set: {:?}",
             stubbed.visited_files
+        );
+    }
+
+    #[test]
+    fn crawl_skips_non_declaration_entry_paths() {
+        let fixture_root = fixture_dir("types-field-implementation-js");
+        let implementation_js = normalize_path(&fixture_root.join("index.js"));
+        let result = crawl(&[implementation_js], None);
+        assert!(
+            result.visited_files.is_empty(),
+            "implementation .js must not be parsed as an entry: {:?}",
+            result.visited_files
         );
     }
 

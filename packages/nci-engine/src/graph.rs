@@ -485,7 +485,7 @@ fn index_imports_by_local_name(
     out
 }
 
-fn dash_norm_abs(
+fn parallel_norm_abs_cache(
     cache: &DashMap<SharedString, SharedString>,
     file_path: &SharedString,
     package_dir_str: &str,
@@ -494,15 +494,15 @@ fn dash_norm_abs(
     if let Some(entry) = cache.get(file_path) {
         return entry.value().clone();
     }
-    let normalized_abs = rel_to_abs
+    let resolved_abs_path = rel_to_abs
         .get(file_path)
         .map(|abs| normalize_path(Path::new(abs.as_ref())))
         .unwrap_or_else(|| normalize_path(&Path::new(package_dir_str).join(file_path.as_ref())));
-    cache.insert(file_path.clone(), normalized_abs.clone());
-    normalized_abs
+    cache.insert(file_path.clone(), resolved_abs_path.clone());
+    resolved_abs_path
 }
 
-fn dash_module_paths(
+fn parallel_module_paths_cache(
     cache: &DashMap<(SharedString, SharedString), Vec<SharedString>>,
     key: (SharedString, SharedString),
     abs_lookup_str: &str,
@@ -515,7 +515,7 @@ fn dash_module_paths(
     resolved_paths
 }
 
-fn dash_triple_closure(
+fn parallel_triple_closure_cache(
     cache: &DashMap<SharedString, Vec<SharedString>>,
     file_rel: &SharedString,
     abs: SharedString,
@@ -529,14 +529,66 @@ fn dash_triple_closure(
     reachable_files
 }
 
+fn sequential_norm_abs_cache(
+    cache: &mut HashMap<SharedString, SharedString>,
+    file_path: &SharedString,
+    package_dir_str: &str,
+    rel_to_abs: &HashMap<SharedString, SharedString>,
+) -> SharedString {
+    if let Some(cached) = cache.get(file_path) {
+        return cached.clone();
+    }
+    let resolved_abs_path = rel_to_abs
+        .get(file_path)
+        .map(|abs| normalize_path(Path::new(abs.as_ref())))
+        .unwrap_or_else(|| normalize_path(&Path::new(package_dir_str).join(file_path.as_ref())));
+    cache.insert(file_path.clone(), resolved_abs_path.clone());
+    resolved_abs_path
+}
+
+fn sequential_module_paths_cache(
+    cache: &mut HashMap<(SharedString, SharedString), Vec<SharedString>>,
+    key: (SharedString, SharedString),
+    abs_lookup_str: &str,
+) -> Vec<SharedString> {
+    if let Some(cached) = cache.get(&key) {
+        return cached.clone();
+    }
+    let resolved_paths = resolve_module_specifier(key.1.as_ref(), abs_lookup_str);
+    cache.insert(key, resolved_paths.clone());
+    resolved_paths
+}
+
+fn sequential_triple_closure_cache(
+    cache: &mut HashMap<SharedString, Vec<SharedString>>,
+    file_rel: &SharedString,
+    abs: SharedString,
+    edges: &HashMap<SharedString, Vec<SharedString>>,
+) -> Vec<SharedString> {
+    if let Some(cached) = cache.get(file_rel) {
+        return cached.clone();
+    }
+    let reachable_files = triple_slash_reachable(abs, edges);
+    cache.insert(file_rel.clone(), reachable_files.clone());
+    reachable_files
+}
+
 #[allow(clippy::too_many_arguments)]
 fn resolve_dependency_ids_for_symbol(
     symbol_node: &SymbolNode,
     package_dir_str: &str,
     normalized_pkg_dir: &str,
-    normalized_abs_cache: &DashMap<SharedString, SharedString>,
-    module_specifier_cache: &DashMap<(SharedString, SharedString), Vec<SharedString>>,
-    closure_cache: &DashMap<SharedString, Vec<SharedString>>,
+    mut norm_abs_cache: impl FnMut(
+        &SharedString,
+        &str,
+        &HashMap<SharedString, SharedString>,
+    ) -> SharedString,
+    mut module_paths_cache: impl FnMut((SharedString, SharedString), &str) -> Vec<SharedString>,
+    mut triple_closure_cache: impl FnMut(
+        &SharedString,
+        SharedString,
+        &HashMap<SharedString, Vec<SharedString>>,
+    ) -> Vec<SharedString>,
     file_local_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     file_local_member_tail_to_ids: &HashMap<SharedString, Vec<SharedString>>,
     name_to_ids: &HashMap<SharedString, Vec<SharedString>>,
@@ -551,12 +603,7 @@ fn resolve_dependency_ids_for_symbol(
     ambient_qualified_node_stub_index: &HashMap<SharedString, SharedString>,
     rel_to_abs: &HashMap<SharedString, SharedString>,
 ) -> Vec<SharedString> {
-    let abs_lookup = dash_norm_abs(
-        normalized_abs_cache,
-        &symbol_node.file_path,
-        package_dir_str,
-        rel_to_abs,
-    );
+    let abs_lookup = norm_abs_cache(&symbol_node.file_path, package_dir_str, rel_to_abs);
     let abs_lookup_str: &str = abs_lookup.as_ref();
 
     let stub_roots_nonempty = dependency_stub_roots.filter(|roots| !roots.is_empty());
@@ -623,7 +670,7 @@ fn resolve_dependency_ids_for_symbol(
         // (typical barrel re-export to a definition file).
         if let Some(import_path) = &raw_dep.import_path {
             let cache_key = (symbol_node.file_path.clone(), import_path.clone());
-            let abs_paths = dash_module_paths(module_specifier_cache, cache_key, abs_lookup_str);
+            let abs_paths = module_paths_cache(cache_key, abs_lookup_str);
             import_path_dedup.clear();
             for abs_path in abs_paths.iter() {
                 let rel_path = make_relative_to_package(
@@ -683,8 +730,7 @@ fn resolve_dependency_ids_for_symbol(
                     symbol_node.file_path.clone(),
                     matching_import.source.clone(),
                 );
-                let abs_source_paths =
-                    dash_module_paths(module_specifier_cache, source_cache_key, abs_lookup_str);
+                let abs_source_paths = module_paths_cache(source_cache_key, abs_lookup_str);
                 if !abs_source_paths.is_empty() {
                     let rel_source_path = make_relative_to_package(
                         &abs_source_paths[0],
@@ -717,8 +763,7 @@ fn resolve_dependency_ids_for_symbol(
                 && let Some(ns_import) = import_map.get(qualifier)
             {
                 let ns_cache_key = (symbol_node.file_path.clone(), ns_import.source.clone());
-                let abs_source_paths =
-                    dash_module_paths(module_specifier_cache, ns_cache_key, abs_lookup_str);
+                let abs_source_paths = module_paths_cache(ns_cache_key, abs_lookup_str);
                 namespace_target_files_resolved = !abs_source_paths.is_empty();
                 namespace_fallback_roots.clear();
                 for absolute_source_path in &abs_source_paths {
@@ -746,8 +791,7 @@ fn resolve_dependency_ids_for_symbol(
             }
 
             if target_ids.is_empty() && has_ref_edges {
-                let closure = dash_triple_closure(
-                    closure_cache,
+                let closure = triple_closure_cache(
                     &symbol_node.file_path,
                     abs_lookup.clone(),
                     triple_slash_edges,
@@ -940,10 +984,15 @@ pub fn build_package_graph(
     package_info: &PackageInfo,
     crawl_options: Option<CrawlOptions>,
 ) -> PackageGraph {
-    let parallel_resolve_deps = crawl_options
+    let (parallel_resolve_deps, min_symbols_for_dep_parallel) = crawl_options
         .as_ref()
-        .map(|options| options.parallel_resolve_deps)
-        .unwrap_or(true);
+        .map(|options| {
+            (
+                options.parallel_resolve_deps,
+                options.min_symbols_for_dep_parallel,
+            )
+        })
+        .unwrap_or((true, 2));
 
     let entry_phase_start = Instant::now();
     let entry = resolve_types_entry(Path::new(package_info.dir.as_ref())).unwrap_or_else(|_| {
@@ -1358,8 +1407,11 @@ pub fn build_package_graph(
         HashMap::with_capacity(symbols.len().min(65536));
     let mut id_to_file_path: HashMap<SharedString, SharedString> =
         HashMap::with_capacity(symbols.len().min(65536));
+    let mut id_to_symbol_index: HashMap<SharedString, usize> =
+        HashMap::with_capacity(symbols.len().min(65536));
     let mut ambient_qualified_node_stub_index: HashMap<SharedString, SharedString> = HashMap::new();
-    for symbol_node in &symbols {
+    for (symbol_index, symbol_node) in symbols.iter().enumerate() {
+        id_to_symbol_index.insert(symbol_node.id.clone(), symbol_index);
         id_to_kind.insert(symbol_node.id.clone(), symbol_node.kind);
         id_to_file_path.insert(symbol_node.id.clone(), symbol_node.file_path.clone());
         if !symbol_node.name.as_ref().starts_with("NodeJS.")
@@ -1399,25 +1451,46 @@ pub fn build_package_graph(
     let stub_self_exempt_for_resolve = stub_self_exempt_root.as_deref();
 
     let resolve_deps_phase_start = Instant::now();
-    let normalized_abs_cache: DashMap<SharedString, SharedString> = DashMap::new();
-    let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
-    let module_specifier_cache: DashMap<(SharedString, SharedString), Vec<SharedString>> =
-        DashMap::new();
-    if parallel_resolve_deps {
-        let indexed: Vec<(usize, Vec<SharedString>)> = symbols
-            .iter()
-            .enumerate()
-            .filter(|(_symbol_index, symbol_node)| !symbol_node.raw_dependencies.is_empty())
-            .collect::<Vec<_>>()
+    let dep_symbol_indices: Vec<usize> = symbols
+        .iter()
+        .enumerate()
+        .filter_map(|(symbol_index, symbol_node)| {
+            (!symbol_node.raw_dependencies.is_empty()).then_some(symbol_index)
+        })
+        .collect();
+    let use_parallel_dep_resolve =
+        parallel_resolve_deps && dep_symbol_indices.len() >= min_symbols_for_dep_parallel;
+    if use_parallel_dep_resolve {
+        let normalized_abs_cache: DashMap<SharedString, SharedString> = DashMap::new();
+        let closure_cache: DashMap<SharedString, Vec<SharedString>> = DashMap::new();
+        let module_specifier_cache: DashMap<(SharedString, SharedString), Vec<SharedString>> =
+            DashMap::new();
+        let indexed: Vec<(usize, Vec<SharedString>)> = dep_symbol_indices
             .into_par_iter()
-            .map(|(symbol_index, symbol_node)| {
+            .map(|symbol_index| {
+                let symbol_node = &symbols[symbol_index];
                 let deps = resolve_dependency_ids_for_symbol(
                     symbol_node,
                     package_dir_str,
                     normalized_pkg_dir.as_str(),
-                    &normalized_abs_cache,
-                    &module_specifier_cache,
-                    &closure_cache,
+                    |file_path, package_dir, rel_to_abs| {
+                        parallel_norm_abs_cache(
+                            &normalized_abs_cache,
+                            file_path,
+                            package_dir,
+                            rel_to_abs,
+                        )
+                    },
+                    |cache_key, abs_lookup_str| {
+                        parallel_module_paths_cache(
+                            &module_specifier_cache,
+                            cache_key,
+                            abs_lookup_str,
+                        )
+                    },
+                    |file_rel, abs, edges| {
+                        parallel_triple_closure_cache(&closure_cache, file_rel, abs, edges)
+                    },
                     &file_local_to_ids,
                     &file_local_member_tail_to_ids,
                     &name_to_ids,
@@ -1440,17 +1513,34 @@ pub fn build_package_graph(
             symbols[symbol_index].raw_dependencies.clear();
         }
     } else {
-        for symbol_node in &mut symbols {
-            if symbol_node.raw_dependencies.is_empty() {
-                continue;
-            }
+        let mut normalized_abs_cache: HashMap<SharedString, SharedString> = HashMap::new();
+        let mut closure_cache: HashMap<SharedString, Vec<SharedString>> = HashMap::new();
+        let mut module_specifier_cache: HashMap<(SharedString, SharedString), Vec<SharedString>> =
+            HashMap::new();
+        for symbol_index in dep_symbol_indices {
+            let symbol_node = &symbols[symbol_index];
             let deps = resolve_dependency_ids_for_symbol(
                 symbol_node,
                 package_dir_str,
                 normalized_pkg_dir.as_str(),
-                &normalized_abs_cache,
-                &module_specifier_cache,
-                &closure_cache,
+                |file_path, package_dir, rel_to_abs| {
+                    sequential_norm_abs_cache(
+                        &mut normalized_abs_cache,
+                        file_path,
+                        package_dir,
+                        rel_to_abs,
+                    )
+                },
+                |cache_key, abs_lookup_str| {
+                    sequential_module_paths_cache(
+                        &mut module_specifier_cache,
+                        cache_key,
+                        abs_lookup_str,
+                    )
+                },
+                |file_rel, abs, edges| {
+                    sequential_triple_closure_cache(&mut closure_cache, file_rel, abs, edges)
+                },
                 &file_local_to_ids,
                 &file_local_member_tail_to_ids,
                 &name_to_ids,
@@ -1465,8 +1555,8 @@ pub fn build_package_graph(
                 &ambient_qualified_node_stub_index,
                 rel_to_abs,
             );
-            symbol_node.dependencies = SharedVec::from(deps);
-            symbol_node.raw_dependencies.clear();
+            symbols[symbol_index].dependencies = SharedVec::from(deps);
+            symbols[symbol_index].raw_dependencies.clear();
         }
     }
     profile::profile_log(
@@ -1479,6 +1569,7 @@ pub fn build_package_graph(
     flatten_inherited_members(
         &mut symbols,
         &name_to_id,
+        &id_to_symbol_index,
         &package_info.name,
         &package_info.version,
     );
@@ -1879,12 +1970,10 @@ fn heritage_lookup_key(heritage: &str) -> String {
 fn flatten_inherited_members(
     symbols: &mut Vec<SymbolNode>,
     name_to_id: &HashMap<SharedString, SharedString>,
+    id_to_symbol_index: &HashMap<SharedString, usize>,
     pkg_name: &SharedString,
     pkg_version: &SharedString,
 ) {
-    let id_to_node: HashMap<SharedString, &SymbolNode> =
-        symbols.iter().map(|node| (node.id.clone(), node)).collect();
-
     let mut members_by_parent_name: HashMap<SharedString, Vec<&SymbolNode>> =
         HashMap::with_capacity(symbols.len().min(8192));
 
@@ -1949,7 +2038,8 @@ fn flatten_inherited_members(
                 None => continue,
             };
 
-            if let Some(parent_node) = id_to_node.get(parent_id) {
+            if let Some(&parent_index) = id_to_symbol_index.get(parent_id) {
+                let parent_node = &symbols[parent_index];
                 for grandparent in parent_node.heritage.iter() {
                     parents_to_visit.push_back(heritage_lookup_key(grandparent.as_ref()));
                 }
@@ -3099,13 +3189,13 @@ fn index_imports_by_local_name_keeps_first_binding_per_name() {
 #[cfg(test)]
 #[test]
 fn dash_norm_abs_prefers_rel_to_abs_over_package_dir_join() {
-    let cache = DashMap::new();
+    let parallel_cache = DashMap::new();
     let package_dir = "/workspace/pkg";
     let encoded: SharedString = "__nci_external__/other/types.d.ts".into();
     let crawl_absolute: SharedString = "/hoisted/other/types.d.ts".into();
     let mut rel_to_abs = HashMap::new();
     rel_to_abs.insert(encoded.clone(), crawl_absolute.clone());
-    let normalized = dash_norm_abs(&cache, &encoded, package_dir, &rel_to_abs);
+    let normalized = parallel_norm_abs_cache(&parallel_cache, &encoded, package_dir, &rel_to_abs);
     assert_eq!(
         normalized.as_ref(),
         normalize_path(Path::new(crawl_absolute.as_ref())).as_ref()

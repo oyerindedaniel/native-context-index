@@ -1,0 +1,30 @@
+{
+  "package": "types-field-js-adjacent-dts",
+  "version": "1.0.0",
+  "symbols": [
+    {
+      "id": "types-field-js-adjacent-dts@1.0.0::cacheableStatus",
+      "name": "cacheableStatus",
+      "kind": 244,
+      "kindName": "VariableStatement",
+      "package": "types-field-js-adjacent-dts",
+      "filePath": "index.d.ts",
+      "sourcePackageName": "types-field-js-adjacent-dts",
+      "sourcePackageVersion": "1.0.0",
+      "sourceFilePath": "index.d.ts",
+      "signature": "declare const cacheableStatus: ReadonlySet<number>",
+      "isTypeOnly": false,
+      "symbolSpace": "value",
+      "dependencies": [],
+      "isInternal": false,
+      "modifiers": [
+        "export",
+        "declare"
+      ]
+    }
+  ],
+  "totalSymbols": 1,
+  "totalFiles": 1,
+  "crawlDurationMs": 0,
+  "buildDurationMs": 0
+}

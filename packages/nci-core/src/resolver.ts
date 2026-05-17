@@ -40,7 +40,7 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
 
   // 3. types field (Standard TS field)
   if ((typesEntries.length === 0 || subpaths["."] === undefined) && pkg.types) {
-    const resolved = resolveFile(packageDir, pkg.types);
+    const resolved = resolveDeclarationTypesPath(packageDir, pkg.types);
     if (resolved) {
       if (!typesEntries.includes(resolved)) {
         typesEntries.push(resolved);
@@ -54,7 +54,7 @@ export function resolveTypesEntry(packageDir: string): PackageEntry {
     (typesEntries.length === 0 || subpaths["."] === undefined) &&
     pkg.typings
   ) {
-    const resolved = resolveFile(packageDir, pkg.typings);
+    const resolved = resolveDeclarationTypesPath(packageDir, pkg.typings);
     if (resolved) {
       if (!typesEntries.includes(resolved)) {
         typesEntries.push(resolved);
@@ -96,16 +96,10 @@ function resolveAllExports(
   const seen = new Set<string>();
 
   if (typeof exports === "string") {
-    if (
-      exports.endsWith(".d.ts") ||
-      exports.endsWith(".d.mts") ||
-      exports.endsWith(".d.cts")
-    ) {
-      const resolved = resolveFile(packageDir, exports);
-      if (resolved) {
-        entries.push(resolved);
-        if (!subpaths["."]) subpaths["."] = resolved;
-      }
+    const resolved = resolveDeclarationTypesPath(packageDir, exports);
+    if (resolved) {
+      entries.push(resolved);
+      if (!subpaths["."]) subpaths["."] = resolved;
     }
     return entries;
   }
@@ -179,14 +173,7 @@ function resolveExportCondition(
   entry: unknown,
 ): string | null {
   if (typeof entry === "string") {
-    if (
-      entry.endsWith(".d.ts") ||
-      entry.endsWith(".d.mts") ||
-      entry.endsWith(".d.cts")
-    ) {
-      return resolveFile(packageDir, entry);
-    }
-    return null;
+    return resolveDeclarationTypesPath(packageDir, entry);
   }
 
   if (Array.isArray(entry)) {
@@ -251,7 +238,7 @@ function resolveTypesVersions(
       const dotPaths = pathMap["."];
       if (dotPaths && dotPaths.length > 0) {
         for (const dotPath of dotPaths) {
-          const resolved = resolveFile(packageDir, dotPath);
+          const resolved = resolveDeclarationTypesPath(packageDir, dotPath);
           if (resolved) return resolved;
         }
       }
@@ -317,6 +304,68 @@ function matchesVersionRange(version: string, range: string): boolean {
 function resolveFile(packageDir: string, relativePath: string): string | null {
   const absPath = path.resolve(packageDir, relativePath);
   return isFileSafe(absPath) ? normalizePath(absPath) : null;
+}
+
+const JS_EXT_RE = /\.(js|mjs|cjs)$/;
+
+function declarationTypesPathCandidates(
+  baseDir: string,
+  relativePath: string,
+): string[] {
+  const paths = [path.resolve(baseDir, relativePath)];
+  const norm = relativePath.replace(/\\/g, "/");
+  if (
+    !norm.endsWith(".d.ts") &&
+    !norm.endsWith(".d.mts") &&
+    !norm.endsWith(".d.cts")
+  ) {
+    paths.push(path.resolve(baseDir, `${relativePath}.d.ts`));
+    paths.push(path.resolve(baseDir, `${relativePath}.d.mts`));
+    paths.push(path.resolve(baseDir, `${relativePath}.d.cts`));
+  }
+  paths.push(...jsSuffixDeclarationSiblingPaths(baseDir, relativePath));
+  paths.push(path.resolve(baseDir, relativePath, "index.d.ts"));
+  return paths;
+}
+
+function jsSuffixDeclarationSiblingPaths(
+  baseDir: string,
+  specifier: string,
+): string[] {
+  const extMatch = specifier.match(JS_EXT_RE);
+  if (!extMatch) return [];
+  const base = specifier.slice(0, -extMatch[0].length);
+  const matchedExt = extMatch[0];
+  const paths = [path.resolve(baseDir, `${base}.d.ts`)];
+  if (matchedExt === ".mjs") {
+    paths.push(path.resolve(baseDir, `${base}.d.mts`));
+  } else if (matchedExt === ".cjs") {
+    paths.push(path.resolve(baseDir, `${base}.d.cts`));
+  } else if (matchedExt === ".js") {
+    paths.push(path.resolve(baseDir, `${base}.d.mts`));
+    paths.push(path.resolve(baseDir, `${base}.d.cts`));
+  }
+  paths.push(path.resolve(baseDir, base, "index.d.ts"));
+  return paths;
+}
+
+function firstExistingDeclarationPath(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    if (isFileSafe(candidate) && isDeclarationFilePath(candidate)) {
+      return normalizePath(candidate);
+    }
+  }
+  return null;
+}
+
+/** Resolves a package-relative `types` / `typings` path to an existing declaration file. */
+function resolveDeclarationTypesPath(
+  packageDir: string,
+  relativePath: string,
+): string | null {
+  return firstExistingDeclarationPath(
+    declarationTypesPathCandidates(packageDir, relativePath),
+  );
 }
 
 /**
@@ -466,42 +515,10 @@ export function resolveModuleSpecifier(
 
     const JS_EXT_RE = /\.(js|mjs|cjs)$/;
 
-    const extMatch = specifier.match(JS_EXT_RE);
-    if (extMatch) {
-      const base = specifier.slice(0, -extMatch[0].length);
-      resolved = path.resolve(dir, base + ".d.ts");
-      if (isFileSafe(resolved)) return [normalizePath(resolved)];
-
-      if (extMatch[1] === "mjs") {
-        resolved = path.resolve(dir, base + ".d.mts");
-        if (isFileSafe(resolved)) return [normalizePath(resolved)];
-      }
-      if (extMatch[1] === "cjs") {
-        resolved = path.resolve(dir, base + ".d.cts");
-        if (isFileSafe(resolved)) return [normalizePath(resolved)];
-      }
-
-      if (extMatch[1] === "js") {
-        resolved = path.resolve(dir, base + ".d.mts");
-        if (isFileSafe(resolved)) return [normalizePath(resolved)];
-        resolved = path.resolve(dir, base + ".d.cts");
-        if (isFileSafe(resolved)) return [normalizePath(resolved)];
-      }
-
-      resolved = path.resolve(dir, base, "index.d.ts");
-      if (isFileSafe(resolved)) return [normalizePath(resolved)];
-    }
-
-    resolved = path.resolve(dir, specifier + ".d.ts");
-    if (isFileSafe(resolved)) return [normalizePath(resolved)];
-
-    resolved = path.resolve(dir, specifier);
-    if (isFileSafe(resolved) && isDeclarationFilePath(resolved)) {
-      return [normalizePath(resolved)];
-    }
-
-    resolved = path.resolve(dir, specifier, "index.d.ts");
-    if (isFileSafe(resolved)) return [normalizePath(resolved)];
+    const mapped = firstExistingDeclarationPath(
+      declarationTypesPathCandidates(dir, specifier),
+    );
+    if (mapped) return [mapped];
 
     return [];
   }

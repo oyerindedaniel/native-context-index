@@ -484,6 +484,24 @@ struct BulkIndexArgs {
     /// Per-package index lines show crawl + queue wait + save splits (plain progress only).
     #[arg(long = "index-timing-detail")]
     index_timing_detail: bool,
+
+    #[arg(
+        long,
+        help = "Index packages one at a time (inner crawl/graph may still parallelize)"
+    )]
+    sequential: bool,
+
+    #[arg(
+        long = "no-parallel-resolve-deps",
+        help = "Resolve symbol dependencies sequentially during graph build"
+    )]
+    no_parallel_resolve_deps: bool,
+
+    #[arg(
+        long = "no-parallel-crawl-layers",
+        help = "Parse each BFS crawl layer sequentially"
+    )]
+    no_parallel_crawl_layers: bool,
 }
 
 #[derive(Subcommand)]
@@ -1916,12 +1934,17 @@ fn build_index_options(
 
     Ok(IndexOptions {
         max_hops,
-        parallel: true,
+        parallel: !bulk.sequential,
         enable_package_cache: true,
         db_path,
         project_root: Some(project_root),
         filter,
-        parallel_resolve_deps: true,
+        parallel_resolve_deps: !bulk.no_parallel_resolve_deps,
+        parallel_crawl_layers: if bulk.no_parallel_crawl_layers {
+            Some(false)
+        } else {
+            None
+        },
         dependency_stub_packages,
         ..Default::default()
     })

@@ -223,7 +223,7 @@ pub fn package_entry_from_parsed_pkg(
 
     if (types_entries.is_empty() || !subpaths.contains_key("."))
         && let Some(types_value) = parsed_pkg["types"].as_str()
-        && let Some(resolved) = resolve_file(package_dir, types_value)
+        && let Some(resolved) = resolve_declaration_types_path(package_dir, types_value)
     {
         if !types_entries
             .iter()
@@ -236,7 +236,7 @@ pub fn package_entry_from_parsed_pkg(
 
     if (types_entries.is_empty() || !subpaths.contains_key("."))
         && let Some(typings_value) = parsed_pkg["typings"].as_str()
-        && let Some(resolved) = resolve_file(package_dir, typings_value)
+        && let Some(resolved) = resolve_declaration_types_path(package_dir, typings_value)
     {
         if !types_entries
             .iter()
@@ -304,9 +304,7 @@ fn resolve_all_exports(
 
     match exports {
         serde_json::Value::String(export_string) => {
-            if is_declaration_file(export_string)
-                && let Some(resolved) = resolve_file(package_dir, export_string)
-            {
+            if let Some(resolved) = resolve_declaration_types_path(package_dir, export_string) {
                 entries.push(resolved.clone());
                 subpaths.entry(".".into()).or_insert(resolved);
             }
@@ -370,11 +368,7 @@ fn resolve_all_exports(
 fn resolve_export_condition(package_dir: &Path, entry: &serde_json::Value) -> Option<SharedString> {
     match entry {
         serde_json::Value::String(path_string) => {
-            if is_declaration_file(path_string) {
-                resolve_file(package_dir, path_string)
-            } else {
-                None
-            }
+            resolve_declaration_types_path(package_dir, path_string)
         }
 
         serde_json::Value::Array(condition_array) => condition_array
@@ -422,7 +416,7 @@ fn resolve_types_versions(
         {
             for dot_candidate in dot_candidates {
                 if let Some(path_str) = dot_candidate.as_str()
-                    && let Some(resolved) = resolve_file(package_dir, path_str)
+                    && let Some(resolved) = resolve_declaration_types_path(package_dir, path_str)
                 {
                     return Some(resolved);
                 }
@@ -435,22 +429,10 @@ fn resolve_types_versions(
             for wildcard_candidate in wildcard_candidates {
                 if let Some(pattern_str) = wildcard_candidate.as_str() {
                     let redirect_path = pattern_str.replace('*', "index");
-                    if let Some(resolved) = resolve_file(package_dir, &redirect_path) {
+                    if let Some(resolved) =
+                        resolve_declaration_types_path(package_dir, &redirect_path)
+                    {
                         return Some(resolved);
-                    }
-                    if !is_declaration_file(&redirect_path) {
-                        let with_dts = format!("{redirect_path}.d.ts");
-                        if let Some(resolved) = resolve_file(package_dir, &with_dts) {
-                            return Some(resolved);
-                        }
-                        let with_dmts = format!("{redirect_path}.d.mts");
-                        if let Some(resolved) = resolve_file(package_dir, &with_dmts) {
-                            return Some(resolved);
-                        }
-                        let with_dcts = format!("{redirect_path}.d.cts");
-                        if let Some(resolved) = resolve_file(package_dir, &with_dcts) {
-                            return Some(resolved);
-                        }
                     }
                 }
             }
@@ -592,11 +574,54 @@ fn extract_wildcard_pattern(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-/// Converts a glob-style pattern (e.g., `"dist/*.d.ts"`) into a compiled `Regex`.
 fn glob_to_regexp(pattern: &str) -> Regex {
     let escaped = regex::escape(pattern);
     let regex_str = escaped.replace(r"\*", "([^/]+)");
     Regex::new(&format!("^{}$", regex_str)).unwrap()
+}
+
+fn declaration_types_path_candidates(base_dir: &Path, relative_path: &str) -> Vec<PathBuf> {
+    let mut paths = Vec::with_capacity(8);
+    paths.push(base_dir.join(relative_path));
+    if !is_declaration_file(relative_path) {
+        paths.push(base_dir.join(format!("{relative_path}.d.ts")));
+        paths.push(base_dir.join(format!("{relative_path}.d.mts")));
+        paths.push(base_dir.join(format!("{relative_path}.d.cts")));
+    }
+    paths.extend(js_suffix_declaration_sibling_paths(base_dir, relative_path));
+    paths.push(base_dir.join(relative_path).join("index.d.ts"));
+    paths
+}
+
+/// Declaration paths to probe when a specifier uses a `.js` / `.mjs` / `.cjs` suffix.
+fn js_suffix_declaration_sibling_paths(base_dir: &Path, specifier: &str) -> Vec<PathBuf> {
+    let Some(ext_match) = JS_EXT_REGEX.find(specifier) else {
+        return Vec::new();
+    };
+    let base = &specifier[..ext_match.start()];
+    let matched_ext = ext_match.as_str();
+    let mut paths = Vec::with_capacity(5);
+    paths.push(base_dir.join(format!("{base}.d.ts")));
+    match matched_ext {
+        ".mjs" => paths.push(base_dir.join(format!("{base}.d.mts"))),
+        ".cjs" => paths.push(base_dir.join(format!("{base}.d.cts"))),
+        ".js" => {
+            paths.push(base_dir.join(format!("{base}.d.mts")));
+            paths.push(base_dir.join(format!("{base}.d.cts")));
+        }
+        _ => {}
+    }
+    paths.push(base_dir.join(base).join("index.d.ts"));
+    paths
+}
+
+fn first_existing_declaration_path(
+    paths: impl IntoIterator<Item = PathBuf>,
+) -> Option<SharedString> {
+    paths
+        .into_iter()
+        .find(|path| is_file_safe(path) && is_declaration_file_path(path))
+        .map(|path| normalize_path(&path))
 }
 
 /// Resolves a relative specifier (e.g., `"./foo"`, `"../bar"`) to `.d.ts` files.
@@ -605,49 +630,11 @@ fn resolve_relative_specifier(specifier: &str, current_file: &str) -> Vec<Shared
         .parent()
         .unwrap_or_else(|| Path::new("."));
 
-    // Try JS extension replacement (.js → .d.ts, .mjs → .d.mts, .cjs → .d.cts)
-    let js_ext_regex = &*JS_EXT_REGEX;
-
-    if let Some(ext_match) = js_ext_regex.find(specifier) {
-        let base = &specifier[..ext_match.start()];
-        let matched_ext = ext_match.as_str();
-
-        // Try .d.ts replacement
-        let dts_path = current_dir.join(format!("{}.d.ts", base));
-        if is_file_safe(&dts_path) {
-            return vec![normalize_path(&dts_path)];
-        }
-
-        // Try module-specific replacements
-        if matched_ext == ".mjs" {
-            let dmts_path = current_dir.join(format!("{}.d.mts", base));
-            if is_file_safe(&dmts_path) {
-                return vec![normalize_path(&dmts_path)];
-            }
-        }
-        if matched_ext == ".cjs" {
-            let dcts_path = current_dir.join(format!("{}.d.cts", base));
-            if is_file_safe(&dcts_path) {
-                return vec![normalize_path(&dcts_path)];
-            }
-        }
-
-        if matched_ext == ".js" {
-            let dmts_path = current_dir.join(format!("{}.d.mts", base));
-            if is_file_safe(&dmts_path) {
-                return vec![normalize_path(&dmts_path)];
-            }
-            let dcts_path = current_dir.join(format!("{}.d.cts", base));
-            if is_file_safe(&dcts_path) {
-                return vec![normalize_path(&dcts_path)];
-            }
-        }
-
-        // Try index.d.ts fallback
-        let index_path = current_dir.join(base).join("index.d.ts");
-        if is_file_safe(&index_path) {
-            return vec![normalize_path(&index_path)];
-        }
+    if let Some(resolved) = first_existing_declaration_path(
+        std::iter::once(current_dir.join(specifier))
+            .chain(js_suffix_declaration_sibling_paths(current_dir, specifier)),
+    ) {
+        return vec![resolved];
     }
 
     // Try appending .d.ts
@@ -865,7 +852,6 @@ fn find_package_dir(package_name: &str, start_dir: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Resolves a relative file path against the package root and verifies existence.
 pub fn resolve_triple_slash_ref(reference: &str, current_file: &str) -> Option<SharedString> {
     let current_dir = Path::new(current_file).parent()?;
     let ref_path = current_dir.join(reference);
@@ -876,7 +862,6 @@ pub fn resolve_triple_slash_ref(reference: &str, current_file: &str) -> Option<S
     }
 }
 
-/// Resolves a relative file path against the package root and verifies existence.
 fn resolve_file(package_dir: &Path, relative_path: &str) -> Option<SharedString> {
     let absolute_path = package_dir.join(relative_path);
     if is_file_safe(&absolute_path) {
@@ -886,7 +871,13 @@ fn resolve_file(package_dir: &Path, relative_path: &str) -> Option<SharedString>
     }
 }
 
-/// If a path is a regular file.
+fn resolve_declaration_types_path(package_dir: &Path, relative_path: &str) -> Option<SharedString> {
+    first_existing_declaration_path(declaration_types_path_candidates(
+        package_dir,
+        relative_path,
+    ))
+}
+
 pub fn is_file_safe(file_path: &Path) -> bool {
     fs::metadata(file_path)
         .map(|metadata| metadata.is_file())
@@ -942,12 +933,10 @@ pub fn normalize_path_with_dashmap(
     result
 }
 
-/// Checks if a path string ends with a `.d.ts` / `.d.mts` / `.d.cts` extension.
 fn is_declaration_file(path_str: &str) -> bool {
     path_str.ends_with(".d.ts") || path_str.ends_with(".d.mts") || path_str.ends_with(".d.cts")
 }
 
-/// `true` when `path` is a `.d.ts` / `.d.mts` / `.d.cts` file (declaration surface only).
 pub fn is_declaration_file_path(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     is_declaration_file(&path_str)
@@ -1112,11 +1101,18 @@ mod tests {
     }
 
     #[test]
-    fn resolve_export_condition_rejects_js() {
-        let fixture_path = fixture_dir("simple-export");
-        let value = serde_json::json!("./index.js");
-        let result = resolve_export_condition(&fixture_path, &value);
-        assert!(result.is_none());
+    fn resolve_export_condition_ignores_implementation_js_without_dts() {
+        let fixture_path = fixture_dir("types-field-implementation-js");
+        let value = serde_json::json!("index.js");
+        assert!(resolve_export_condition(&fixture_path, &value).is_none());
+    }
+
+    #[test]
+    fn resolve_export_condition_maps_js_to_adjacent_dts() {
+        let fixture_path = fixture_dir("types-field-js-adjacent-dts");
+        let value = serde_json::json!("index.js");
+        let result = resolve_export_condition(&fixture_path, &value).unwrap();
+        assert!(result.as_ref().replace('\\', "/").ends_with("index.d.ts"));
     }
 
     #[test]
@@ -1150,6 +1146,33 @@ mod tests {
         let entry = resolve_types_entry(&fixture_path).unwrap();
         assert_eq!(entry.types_entries.len(), 1);
         assert!(entry.types_entries[0].contains("index.d.ts"));
+    }
+
+    #[test]
+    fn resolve_types_entry_ignores_types_field_implementation_js_without_dts() {
+        let fixture_path = fixture_dir("types-field-implementation-js");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(entry.name, "types-field-implementation-js".into());
+        assert!(
+            entry.types_entries.is_empty(),
+            "expected no declaration entry: {:?}",
+            entry.types_entries
+        );
+    }
+
+    #[test]
+    fn resolve_types_entry_maps_types_field_js_to_adjacent_dts() {
+        let fixture_path = fixture_dir("types-field-js-adjacent-dts");
+        let entry = resolve_types_entry(&fixture_path).unwrap();
+        assert_eq!(entry.types_entries.len(), 1);
+        assert!(
+            entry.types_entries[0]
+                .as_ref()
+                .replace('\\', "/")
+                .ends_with("index.d.ts"),
+            "expected adjacent index.d.ts: {:?}",
+            entry.types_entries
+        );
     }
 
     #[test]

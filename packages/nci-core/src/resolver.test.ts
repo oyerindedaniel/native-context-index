@@ -65,6 +65,23 @@ describe("resolveTypesEntry", () => {
     expect(result.typesEntries).toHaveLength(0);
   });
 
+  it("ignores types field pointing at implementation JS without a .d.ts sibling", () => {
+    const result = resolveTypesEntry(
+      path.join(FIXTURES_DIR, "types-field-implementation-js"),
+    );
+    expect(result.name).toBe("types-field-implementation-js");
+    expect(result.typesEntries).toHaveLength(0);
+  });
+
+  it("maps types field index.js to adjacent index.d.ts", () => {
+    const fixturePath = path.join(FIXTURES_DIR, "types-field-js-adjacent-dts");
+    const result = resolveTypesEntry(fixturePath);
+    expect(result.typesEntries).toHaveLength(1);
+    expect(result.typesEntries[0]!.replace(/\\/g, "/")).toMatch(
+      /index\.d\.ts$/,
+    );
+  });
+
   it("handles a missing package.json gracefully", () => {
     const result = resolveTypesEntry(path.join(FIXTURES_DIR, "nonexistent"));
     expect(result.typesEntries).toHaveLength(0);

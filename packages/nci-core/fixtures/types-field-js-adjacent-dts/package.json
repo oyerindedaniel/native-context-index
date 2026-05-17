@@ -1,0 +1,5 @@
+{
+  "name": "types-field-js-adjacent-dts",
+  "version": "1.0.0",
+  "types": "./index.js"
+}

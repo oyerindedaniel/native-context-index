@@ -1,0 +1,6 @@
+{
+  "name": "types-field-implementation-js",
+  "version": "1.0.0",
+  "main": "index.js",
+  "types": "index.js"
+}

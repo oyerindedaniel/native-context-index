@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::fmt::Debug;
 use std::fs;
 use std::panic;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use tracing::{debug, trace, warn};
 
 use crate::cache;
-use crate::constants::DEFAULT_MAX_HOPS;
+use crate::concurrency::{log_index_concurrency_plan, resolve_index_concurrency_plan};
 use crate::crawler::CrawlOptions;
 use crate::filter::FilterConfig;
 use crate::graph::build_package_graph;
@@ -24,39 +24,9 @@ use crate::scanner::{ScanError, scan_packages};
 use crate::storage::NciDatabase;
 use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo, SharedString, SharedVec};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GraphSource {
-    Cached,
-    Crawled,
-}
-
-/// Crawl, queue wait (before writer), and SQLite persist durations for one package.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PackageTimingBreakdown {
-    pub crawl: Duration,
-    pub queue_wait: Duration,
-    pub save: Duration,
-}
-
-impl PackageTimingBreakdown {
-    pub fn total(&self) -> Duration {
-        self.crawl + self.queue_wait + self.save
-    }
-}
-
-#[derive(Clone)]
-pub struct PackageProgress {
-    pub name: SharedString,
-    pub version: SharedString,
-    pub source: GraphSource,
-    pub total_symbols: usize,
-    /// True when this package row is already persisted (cache hit or successful save).
-    pub persisted: bool,
-    /// Wall time from package work start until this outcome is final (includes queue wait before save).
-    pub elapsed: Duration,
-    /// Set when [`IndexOptions::index_timing_detail`] is true.
-    pub timing_breakdown: Option<PackageTimingBreakdown>,
-}
+pub use crate::index_options::{
+    GraphSource, IndexOptions, PackageProgress, PackageTimingBreakdown,
+};
 
 #[derive(Debug)]
 struct PackageTimingSlot {
@@ -167,122 +137,6 @@ pub struct IndexedGraph {
     pub persisted: bool,
 }
 
-#[derive(Clone)]
-pub struct IndexOptions {
-    /// Upper bound on discovery edges from each package entry (default: 10).
-    /// Use [`usize::MAX`] for no hop cap (CLI / `nci.config.json` use `max_hops = -1` → [`crate::constants::MAX_HOPS_UNLIMITED`]).
-    pub max_hops: usize,
-
-    /// Whether to run in parallel (default: true).
-    pub parallel: bool,
-
-    /// Read/write per-package graphs to SQLite under the OS cache dir (`NCI_CACHE_DIR` overrides).
-    /// Disable in tests to avoid stale hits and shared-cache pollution.
-    pub enable_package_cache: bool,
-
-    /// Path to `nci.sqlite`. When `None`, uses [`crate::cache::nci_sqlite_path`].
-    pub db_path: Option<PathBuf>,
-
-    /// When set, `.nciignore` is loaded from this root before [`Self::filter`] is applied.
-    pub project_root: Option<PathBuf>,
-
-    /// Package-name filtering (ignore patterns, dep sections, CLI globs).
-    pub filter: FilterConfig,
-
-    /// Parallel symbol dependency resolution in graph build (see [`crate::crawler::CrawlOptions`]).
-    pub parallel_resolve_deps: bool,
-
-    /// When the SQLite per-package cache hits, load the full [`PackageGraph`] from the database.
-    /// Default is **`false`**: only [`PackageIndexMetadata`] is read. Set **`true`**
-    /// for tooling that needs symbols in RAM on a cache hit (e.g. demo JSON export, tests).
-    pub hydrate_cache_hits: bool,
-
-    /// After a **successful** SQLite persist of a freshly crawled package, keep the full
-    /// [`PackageGraph`] in [`IndexedGraph`].
-    ///
-    /// Default **`false`**: only [`PackageIndexMetadata`] is attached (`graph: None`) to lower RAM
-    /// for production-style indexing. Ignored when [`Self::enable_package_cache`] is false or when
-    /// no save ran (e.g. symlink packages). After all save attempts fail, the graph is dropped.
-    pub retain_graph_after_save: bool,
-
-    /// Capacity of the bounded channel from crawl workers to the SQLite writer thread.
-    ///
-    /// When `None`, uses `max(4, rayon_max_threads * 2)` at call time for backpressure against
-    /// slow `save_package` without queuing an unbounded number of full graphs in memory.
-    pub save_queue_capacity: Option<usize>,
-
-    /// Extra `save_package` attempts after the first try fails (writer thread). **`0`** = one try
-    /// only. Backoff between retries is fixed internally (bounded ms + clock jitter).
-    pub save_retry_count: u32,
-
-    /// Normalized npm package roots for dependency stubbing (merged from `nci.config.json` and CLI).
-    pub dependency_stub_packages: Vec<String>,
-
-    /// Optional hook after each package’s index outcome is final (cache hit, persist skipped,
-    /// send failure, or writer finished crawl+SQLite). Used by `nci index` plain output only.
-    pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
-
-    /// When true (and `on_package_done` is set), populate [`PackageProgress::timing_breakdown`].
-    pub index_timing_detail: bool,
-
-    /// SQLite persist mode for the writer thread (default baseline; bench via `storage_save_bench`).
-    pub save_package_mode: crate::storage::SavePackageMode,
-
-    /// Connection pragmas for SQLite open on the writer (and initial migrate open).
-    pub storage_connection_pragmas: crate::storage::StorageConnectionPragmas,
-}
-
-impl Default for IndexOptions {
-    fn default() -> Self {
-        Self {
-            max_hops: DEFAULT_MAX_HOPS,
-            parallel: true,
-            enable_package_cache: true,
-            db_path: None,
-            project_root: None,
-            filter: FilterConfig::default(),
-            parallel_resolve_deps: true,
-            hydrate_cache_hits: false,
-            retain_graph_after_save: false,
-            save_queue_capacity: None,
-            save_retry_count: 0,
-            dependency_stub_packages: Vec::new(),
-            on_package_done: None,
-            index_timing_detail: false,
-            save_package_mode: crate::storage::SavePackageMode::default(),
-            storage_connection_pragmas: crate::storage::StorageConnectionPragmas::baseline(),
-        }
-    }
-}
-
-impl Debug for IndexOptions {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_struct("IndexOptions")
-            .field("max_hops", &self.max_hops)
-            .field("parallel", &self.parallel)
-            .field("enable_package_cache", &self.enable_package_cache)
-            .field("db_path", &self.db_path)
-            .field("project_root", &self.project_root)
-            .field("filter", &self.filter)
-            .field("parallel_resolve_deps", &self.parallel_resolve_deps)
-            .field("hydrate_cache_hits", &self.hydrate_cache_hits)
-            .field("retain_graph_after_save", &self.retain_graph_after_save)
-            .field("save_queue_capacity", &self.save_queue_capacity)
-            .field("save_retry_count", &self.save_retry_count)
-            .field("dependency_stub_packages", &self.dependency_stub_packages)
-            .field(
-                "on_package_done",
-                &self
-                    .on_package_done
-                    .as_ref()
-                    .map(|_| "<callback>")
-                    .unwrap_or("<none>"),
-            )
-            .field("index_timing_detail", &self.index_timing_detail)
-            .finish()
-    }
-}
-
 fn sleep_after_failed_save_attempt() {
     const BASE_MS: u64 = 35;
     const SPAN_MS: u64 = 40;
@@ -291,10 +145,6 @@ fn sleep_after_failed_save_attempt() {
         .map(|elapsed| (elapsed.subsec_nanos() as u64) % (SPAN_MS + 1))
         .unwrap_or(0);
     thread::sleep(Duration::from_millis(BASE_MS + extra));
-}
-
-fn default_save_queue_depth() -> usize {
-    rayon::current_num_threads().saturating_mul(2).max(4)
 }
 
 fn index_metadata_from_graph(graph: &PackageGraph) -> PackageIndexMetadata {
@@ -496,8 +346,20 @@ pub fn index_packages(
             .cloned()
             .collect(),
     );
+    let package_count = packages.len();
+    if package_count == 0 {
+        return Vec::new();
+    }
+
+    let concurrency_plan = resolve_index_concurrency_plan(&index_opts, package_count);
+    log_index_concurrency_plan(&concurrency_plan, package_count);
+
     let crawl_max_hops = index_opts.max_hops;
-    let crawl_parallel_resolve_deps = index_opts.parallel_resolve_deps;
+    let crawl_parallel_resolve_deps =
+        index_opts.parallel_resolve_deps && concurrency_plan.graph_dep_parallel_allowed;
+    let crawl_parallel_parse_layers = concurrency_plan.crawl_layer_parallel_allowed;
+    let crawl_min_layer_files = concurrency_plan.min_layer_files_for_parallel;
+    let crawl_min_symbols = concurrency_plan.min_symbols_for_dep_parallel;
     let crawl_profile_phases = phases_enabled();
     let crawl_options_factory = move |package: &PackageInfo| {
         Some(CrawlOptions {
@@ -508,15 +370,13 @@ pub fn index_packages(
                 None
             },
             parallel_resolve_deps: crawl_parallel_resolve_deps,
+            parallel_parse_layers: crawl_parallel_parse_layers,
+            min_layer_files_for_parallel: crawl_min_layer_files,
+            min_symbols_for_dep_parallel: crawl_min_symbols,
             dependency_stub_roots: Arc::clone(&crawl_stub_roots),
             ..Default::default()
         })
     };
-
-    let package_count = packages.len();
-    if package_count == 0 {
-        return Vec::new();
-    }
 
     // `None` means no SQLite sidecar for this run (probes + saves disabled).
     // Open once here to create/migrate before parallel read-only probes; the writer opens the same path again.
@@ -548,7 +408,7 @@ pub fn index_packages(
 
     let queue_capacity = index_opts
         .save_queue_capacity
-        .unwrap_or_else(default_save_queue_depth);
+        .unwrap_or(concurrency_plan.save_queue_capacity);
 
     let results: Arc<Vec<Mutex<Option<IndexedGraph>>>> =
         Arc::new((0..package_count).map(|_| Mutex::new(None)).collect());
@@ -805,7 +665,7 @@ pub fn index_packages(
         }
     };
 
-    if index_opts.parallel {
+    if concurrency_plan.package_parallel {
         packages
             .par_iter()
             .enumerate()
@@ -1141,6 +1001,17 @@ mod tests {
                 "expected {name} in sqlite after mixed parallel index"
             );
         }
+    }
+
+    #[test]
+    fn default_multi_package_index_plan_suppresses_inner_rayon() {
+        use crate::concurrency::resolve_index_concurrency_plan;
+
+        let index_options = IndexOptions::default();
+        let plan = resolve_index_concurrency_plan(&index_options, 3);
+        assert!(plan.package_parallel);
+        assert!(!plan.crawl_layer_parallel_allowed);
+        assert!(!plan.graph_dep_parallel_allowed);
     }
 
     #[test]

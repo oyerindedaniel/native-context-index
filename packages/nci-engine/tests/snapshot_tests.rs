@@ -555,6 +555,14 @@ snapshot_test!(
     snapshot_merged_namespace_plain_type_refs,
     "merged-namespace-plain-type-refs"
 );
+snapshot_test!(
+    snapshot_types_field_implementation_js,
+    "types-field-implementation-js"
+);
+snapshot_test!(
+    snapshot_types_field_js_adjacent_dts,
+    "types-field-js-adjacent-dts"
+);
 
 #[test]
 fn all_oracles_have_tests() {

@@ -270,6 +270,7 @@ export function crawl(
     for (const entryPath of entries) {
       const normalizedEntry = normalizePath(entryPath);
       if (!fs.existsSync(normalizedEntry)) continue;
+      if (!isDeclarationFilePath(normalizedEntry)) continue;
       if (!hop.has(normalizedEntry)) {
         hop.set(normalizedEntry, 0);
         visited.add(normalizedEntry);
