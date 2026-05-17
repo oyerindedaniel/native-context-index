@@ -24,7 +24,7 @@ import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { CopyStatusIcon } from "@/components/docs/widgets/copy-status-icon";
 import { cn } from "@/lib/utils";
 
-type PrimerVariantId = "compact" | "live" | "reference";
+type PrimerVariantId = "compact" | "reference";
 
 interface PrimerVariant {
   id: PrimerVariantId;
@@ -40,12 +40,6 @@ const PRIMER_VARIANTS: PrimerVariant[] = [
     hint: "What nci-mcp returns at nci://primer/agent",
     build: buildNciFirstAgentPrimerCompact,
   },
-  // {
-  //   id: "live",
-  //   label: "Live",
-  //   hint: "Full prose body — same module, longer form",
-  //   build: buildNciFirstAgentPrimer,
-  // },
   {
     id: "reference",
     label: "Reference",

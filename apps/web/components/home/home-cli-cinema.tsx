@@ -177,7 +177,7 @@ export function HomeCliCinema() {
                   className="relative min-h-0 min-w-0"
                 >
                   <div ref={terminalMeasureRef} className="min-h-0 min-w-0">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="popLayout">
                       <motion.div
                         key={activeScene.sceneKey}
                         {...SCENE_SWITCH_MOTION}

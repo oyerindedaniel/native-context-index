@@ -48,6 +48,169 @@ fn not_found_hint(id: &str) -> String {
     )
 }
 
+/// Inputs for deciding whether to attach `meta.suggestions` after a query finishes.
+#[derive(Clone, Copy, Debug, Default)]
+struct QueryGuidanceInput {
+    hits_returned: usize,
+    snippet_count: usize,
+    empty_anchor_count: usize,
+    total_anchor_count: usize,
+}
+
+const DEFAULT_SLOW_QUERY_MS: u64 = 750;
+
+fn slow_query_threshold_ms() -> u64 {
+    std::env::var("NCI_SLOW_QUERY_MS")
+        .ok()
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .unwrap_or(DEFAULT_SLOW_QUERY_MS)
+}
+
+fn query_cost_label(query_name: &'static str) -> &'static str {
+    match query_name {
+        "evidence" => "heavy",
+        "find" | "symbols" | "active-package" => "moderate",
+        _ => "light",
+    }
+}
+
+fn query_suggestion(subcommand: &str, example: &str) -> serde_json::Value {
+    serde_json::json!({
+        "subcommand": subcommand,
+        "example": example,
+    })
+}
+
+fn build_query_suggestions(
+    query_name: &'static str,
+    duration_ms: u64,
+    guidance_input: QueryGuidanceInput,
+) -> Option<Vec<serde_json::Value>> {
+    if duration_ms < slow_query_threshold_ms() {
+        return None;
+    }
+
+    let evidence_succeeded = guidance_input.hits_returned > 0 && guidance_input.snippet_count > 0;
+    if query_name == "evidence" && evidence_succeeded {
+        return None;
+    }
+
+    let all_anchors_empty = guidance_input.total_anchor_count > 0
+        && guidance_input.empty_anchor_count >= guidance_input.total_anchor_count;
+    let low_yield_evidence =
+        guidance_input.hits_returned == 0 || guidance_input.snippet_count == 0 || all_anchors_empty;
+
+    match query_name {
+        "evidence" if low_yield_evidence => Some(vec![
+            query_suggestion(
+                "symbol",
+                "nci query symbol <Name> --package <IndexedPackage> --package-version <V> -n 10",
+            ),
+            query_suggestion(
+                "find",
+                "nci query find <phrase> --package <IndexedPackage> --package-version <V> -n 10",
+            ),
+            query_suggestion("snippet", "nci query snippet \"<symbols.id>\""),
+            query_suggestion(
+                "evidence",
+                "nci query evidence --package <IndexedPackage> --package-version <V> --phrase \"<terms>\" -n 10",
+            ),
+        ]),
+        "find" if guidance_input.hits_returned == 0 => Some(vec![
+            query_suggestion(
+                "symbol",
+                "nci query symbol <Name> --package <IndexedPackage> --package-version <V> -n 10",
+            ),
+            query_suggestion(
+                "evidence",
+                "nci query evidence --package <IndexedPackage> --package-version <V> --phrase \"<terms>\" -n 10",
+            ),
+        ]),
+        "symbol" if guidance_input.hits_returned == 0 => Some(vec![
+            query_suggestion(
+                "find",
+                "nci query find <phrase> --package <IndexedPackage> --package-version <V> -n 10",
+            ),
+            query_suggestion(
+                "evidence",
+                "nci query evidence --package <IndexedPackage> --package-version <V> --phrase \"<terms>\" -n 10",
+            ),
+        ]),
+        _ => None,
+    }
+}
+
+fn merge_timing_into_meta(
+    query_name: &'static str,
+    meta_extra: serde_json::Value,
+    query_started_at: Instant,
+    guidance_input: QueryGuidanceInput,
+) -> serde_json::Value {
+    let duration_ms = query_started_at.elapsed().as_millis() as u64;
+    let mut meta_map = match meta_extra {
+        serde_json::Value::Object(existing) => existing,
+        _ => serde_json::Map::new(),
+    };
+    meta_map.insert(
+        "durationMs".into(),
+        serde_json::Value::Number(serde_json::Number::from(duration_ms)),
+    );
+    meta_map.insert(
+        "cost".into(),
+        serde_json::Value::String(query_cost_label(query_name).to_string()),
+    );
+    if let Some(suggestions) = build_query_suggestions(query_name, duration_ms, guidance_input) {
+        meta_map.insert("suggestions".into(), serde_json::Value::Array(suggestions));
+    }
+    serde_json::Value::Object(meta_map)
+}
+
+#[cfg(test)]
+mod query_guidance_tests {
+    use super::*;
+
+    #[test]
+    fn evidence_with_snippets_never_suggests_even_when_slow() {
+        let input = QueryGuidanceInput {
+            hits_returned: 2,
+            snippet_count: 2,
+            empty_anchor_count: 0,
+            total_anchor_count: 1,
+        };
+        assert!(build_query_suggestions("evidence", 5_000, input).is_none());
+    }
+
+    #[test]
+    fn evidence_empty_hits_suggests_when_slow() {
+        let input = QueryGuidanceInput {
+            hits_returned: 0,
+            snippet_count: 0,
+            empty_anchor_count: 1,
+            total_anchor_count: 1,
+        };
+        let suggestions = build_query_suggestions("evidence", 1_000, input).expect("suggestions");
+        assert!(suggestions.len() >= 3);
+    }
+
+    #[test]
+    fn find_zero_hits_suggests_when_slow() {
+        let input = QueryGuidanceInput {
+            hits_returned: 0,
+            ..QueryGuidanceInput::default()
+        };
+        assert!(build_query_suggestions("find", 1_000, input).is_some());
+    }
+
+    #[test]
+    fn fast_query_skips_suggestions() {
+        let input = QueryGuidanceInput {
+            hits_returned: 0,
+            ..QueryGuidanceInput::default()
+        };
+        assert!(build_query_suggestions("find", 10, input).is_none());
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum BannerMode {
     Auto,
@@ -489,7 +652,7 @@ enum QueryCommands {
         #[arg(
             long = "phrase",
             value_name = "TEXT",
-            help = "FTS phrase fallback (repeatable); used when exact returns nothing for an anchor"
+            help = "Repeatable FTS anchor (runs alongside --symbol). Use for architectural or vague discovery, not only when an exact name misses"
         )]
         phrases: Vec<String>,
         #[arg(
@@ -871,27 +1034,35 @@ fn query_meta_merge(query: &'static str, extra: serde_json::Value) -> serde_json
 }
 
 fn print_query_json_success(
-    query: &'static str,
+    query_name: &'static str,
     data: serde_json::Value,
     meta_extra: serde_json::Value,
+    query_started_at: Instant,
+    guidance_input: QueryGuidanceInput,
 ) -> Result<(), String> {
+    let merged_meta =
+        merge_timing_into_meta(query_name, meta_extra, query_started_at, guidance_input);
     print_json(&serde_json::json!({
         "ok": true,
         "data": data,
-        "meta": query_meta_merge(query, meta_extra),
+        "meta": query_meta_merge(query_name, merged_meta),
     }))
 }
 
 fn print_query_json_success_with_hint(
-    query: &'static str,
+    query_name: &'static str,
     data: serde_json::Value,
     meta_extra: serde_json::Value,
+    query_started_at: Instant,
+    guidance_input: QueryGuidanceInput,
     hint: &str,
 ) -> Result<(), String> {
+    let merged_meta =
+        merge_timing_into_meta(query_name, meta_extra, query_started_at, guidance_input);
     print_json(&serde_json::json!({
         "ok": true,
         "data": data,
-        "meta": query_meta_merge(query, meta_extra),
+        "meta": query_meta_merge(query_name, merged_meta),
         "hint": hint,
     }))
 }
@@ -2128,6 +2299,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             public_only,
             fts_query,
         } => {
+            let query_started_at = Instant::now();
             let filters = build_symbol_search_filters(
                 package_name,
                 package_version,
@@ -2172,6 +2344,11 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "truncated": truncated,
                             "returned": returned,
                         }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
@@ -2187,6 +2364,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             file_path_contains,
             public_only,
         } => {
+            let query_started_at = Instant::now();
             let filters = build_symbol_search_filters(
                 package_name,
                 package_version,
@@ -2221,12 +2399,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "truncated": truncated,
                             "returned": returned,
                         }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
             CliExit::Success
         }
         QueryCommands::Show { id } => {
+            let query_started_at = Instant::now();
             let search_hit = database
                 .load_symbol_search_hit_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
@@ -2241,11 +2425,17 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
+                    let guidance_input = QueryGuidanceInput {
+                        hits_returned: usize::from(!miss),
+                        ..QueryGuidanceInput::default()
+                    };
                     if miss {
                         print_query_json_success_with_hint(
                             "show",
                             serde_json::json!({ "symbol": serde_json::Value::Null }),
                             serde_json::json!({ "found": false }),
+                            query_started_at,
+                            guidance_input,
                             &hint_text,
                         )?;
                     } else {
@@ -2253,6 +2443,8 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "show",
                             serde_json::json!({ "symbol": search_hit }),
                             serde_json::json!({ "found": true }),
+                            query_started_at,
+                            guidance_input,
                         )?;
                     }
                 }
@@ -2264,6 +2456,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             }
         }
         QueryCommands::Overloads { id } => {
+            let query_started_at = Instant::now();
             let siblings = database
                 .find_overload_siblings_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
@@ -2283,15 +2476,21 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
+                    let returned = siblings.len();
+                    let guidance_input = QueryGuidanceInput {
+                        hits_returned: returned,
+                        ..QueryGuidanceInput::default()
+                    };
                     if miss {
                         print_query_json_success_with_hint(
                             "overloads",
                             serde_json::json!({ "symbols": siblings }),
                             serde_json::json!({ "found": false, "returned": 0 }),
+                            query_started_at,
+                            guidance_input,
                             &hint_text,
                         )?;
                     } else {
-                        let returned = siblings.len();
                         print_query_json_success(
                             "overloads",
                             serde_json::json!({ "symbols": siblings }),
@@ -2299,6 +2498,8 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                                 "found": true,
                                 "returned": returned,
                             }),
+                            query_started_at,
+                            guidance_input,
                         )?;
                     }
                 }
@@ -2310,6 +2511,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             }
         }
         QueryCommands::Snippet { id } => {
+            let query_started_at = Instant::now();
             let snippet = database
                 .load_symbol_snippet_by_stable_id(id)
                 .map_err(|err| err.to_string())?;
@@ -2335,11 +2537,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 },
                 OutputFormat::Json | OutputFormat::Jsonl => {
+                    let guidance_input = QueryGuidanceInput {
+                        hits_returned: usize::from(!miss),
+                        snippet_count: usize::from(!miss),
+                        ..QueryGuidanceInput::default()
+                    };
                     if miss {
                         print_query_json_success_with_hint(
                             "snippet",
                             serde_json::json!({ "snippet": serde_json::Value::Null }),
                             serde_json::json!({ "found": false }),
+                            query_started_at,
+                            guidance_input,
                             &hint_text,
                         )?;
                     } else {
@@ -2349,6 +2558,8 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                                 "snippet": snippet
                             }),
                             serde_json::json!({ "found": true }),
+                            query_started_at,
+                            guidance_input,
                         )?;
                     }
                 }
@@ -2360,6 +2571,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             }
         }
         QueryCommands::Packages => {
+            let query_started_at = Instant::now();
             let rows = database
                 .list_indexed_packages()
                 .map_err(|err| err.to_string())?;
@@ -2381,12 +2593,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                         "packages",
                         serde_json::json!({ "packages": list }),
                         serde_json::json!({ "returned": total }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: total,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
             CliExit::Success
         }
         QueryCommands::PackageVersions { name } => {
+            let query_started_at = Instant::now();
             let versions = database
                 .list_package_versions(name)
                 .map_err(|err| err.to_string())?;
@@ -2415,12 +2633,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                         "package-versions",
                         serde_json::json!({ "name": name, "versions": versions }),
                         serde_json::json!({ "returned": returned }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
             CliExit::Success
         }
         QueryCommands::PackageDeps { name, version } => {
+            let query_started_at = Instant::now();
             let dependency_names = database
                 .list_package_dependencies(name, version)
                 .map_err(|err| err.to_string())?;
@@ -2456,12 +2680,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "dependencies": dependency_names,
                         }),
                         serde_json::json!({ "returned": returned }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
             CliExit::Success
         }
         QueryCommands::SourcePackages { name, version } => {
+            let query_started_at = Instant::now();
             let source_packages = database
                 .list_source_packages_for_indexed_package(name, version)
                 .map_err(|err| err.to_string())?;
@@ -2477,12 +2707,18 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                         "source-packages",
                         serde_json::json!({ "source_packages": source_packages }),
                         serde_json::json!({ "returned": returned }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
             CliExit::Success
         }
         QueryCommands::ActivePackage { name } => {
+            let query_started_at = Instant::now();
             let package_manager = detect_project_package_manager(
                 context.project_root.as_path(),
                 Some(context.config_dir.as_path()),
@@ -2560,6 +2796,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                     }
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
+                    let candidate_count = candidates.len();
                     print_query_json_success(
                         "active-package",
                         serde_json::json!({
@@ -2567,15 +2804,20 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "packageManager": package_manager,
                             "selected": selected,
                             "alternates": alternates,
-                            "count": candidates.len(),
+                            "count": candidate_count,
                         }),
                         serde_json::json!({
                             "rootsChecked": node_modules_roots.len(),
-                            "candidatesTotal": candidates.len(),
+                            "candidatesTotal": candidate_count,
                             "activePackageResolution": active_package_resolution_label(resolution_mode),
                             "alternatesTruncated": false,
                             "alternatesOmitted": 0,
                         }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: candidate_count,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
@@ -2587,6 +2829,7 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
             limit,
             offset,
         } => {
+            let query_started_at = Instant::now();
             let (total_symbols, symbols) = database
                 .list_package_symbols_page(name, version, *limit, *offset)
                 .map_err(|err| err.to_string())?;
@@ -2627,6 +2870,11 @@ fn run_query(cli: &Cli, command: &QueryCommands) -> Result<CliExit, String> {
                             "returned": returned,
                             "hasMore": has_more,
                         }),
+                        query_started_at,
+                        QueryGuidanceInput {
+                            hits_returned: returned,
+                            ..QueryGuidanceInput::default()
+                        },
                     )?;
                 }
             }
@@ -2731,6 +2979,8 @@ fn run_query_evidence(
         );
     }
 
+    let query_started_at = Instant::now();
+    let total_anchor_count = request.symbols.len() + request.phrases.len();
     let filters = build_evidence_filters(&request);
     // Over-fetch by 1 per anchor so we can detect truncation without a count query.
     let per_anchor_cap = request.limit.saturating_add(1);
@@ -2896,6 +3146,7 @@ fn run_query_evidence(
             } else {
                 combined_hits.len()
             };
+            let snippet_count = snippets_json.len();
             print_query_json_success(
                 "evidence",
                 serde_json::json!({
@@ -2918,6 +3169,13 @@ fn run_query_evidence(
                     "uniqueHitsReturned": unique_hits_returned,
                     "uniqueHitsBeforeDedupeCap": total_unique_hits,
                 }),
+                query_started_at,
+                QueryGuidanceInput {
+                    hits_returned: unique_hits_returned,
+                    snippet_count,
+                    empty_anchor_count: empty_anchors.len(),
+                    total_anchor_count,
+                },
             )?;
         }
     }

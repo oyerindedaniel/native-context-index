@@ -697,6 +697,12 @@ fn query_evidence_returns_symbols_and_snippets_in_one_call() {
 
     let parsed: Value = serde_json::from_slice(&json_output).expect("valid json envelope");
     assert_eq!(parsed["ok"], serde_json::Value::Bool(true));
+    assert!(
+        parsed["meta"]["durationMs"].is_number(),
+        "meta.durationMs missing: {}",
+        parsed["meta"]
+    );
+    assert_eq!(parsed["meta"]["cost"], "heavy");
 
     let symbols = parsed["data"]["symbols"]
         .as_array()
@@ -1752,6 +1758,8 @@ fn query_active_package_prefers_root_node_modules_then_workspace_json() {
     assert_eq!(parsed["ok"], true);
     assert_eq!(parsed["meta"]["envelopeVersion"], 1);
     assert_eq!(parsed["meta"]["query"], "active-package");
+    assert!(parsed["meta"]["durationMs"].is_number());
+    assert_eq!(parsed["meta"]["cost"], "moderate");
     assert_eq!(
         parsed["meta"]["activePackageResolution"],
         "directInstallPath"

@@ -34,7 +34,7 @@ export const HOME_FAQ_ITEMS: readonly HomeFaqItem[] = [
     id: "disk-ci",
     question: "What does it cost in disk space and CI?",
     answer:
-      "You keep one nci.sqlite per project config; size grows with indexed packages. In CI you can run a dry scan (nci index --dry-run) as a gate, or index once and cache the artifact. Query paths stay read-only.",
+      "One shared nci.sqlite lives in your OS cache by default (set database or NCI_CACHE_DIR to override). Size grows with indexed packages—nci db status reports it; nci db clear wipes rows. Queries stay read-only.",
   },
   {
     id: "when-not",

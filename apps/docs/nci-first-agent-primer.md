@@ -1,60 +1,20 @@
-You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node_modules` and stores a **graph of symbols** in **SQLite**: one database file, read-only from your perspective. The point is fast **symbol discovery** (what exists, where, what it references) and **relational checks** (joins across packages, dependencies, merge metadata)—not a full TypeScript typechecker. The CLI gives you:
+# NCI SQLite reference
 
-- **`query`** — text search / listing over the indexed symbol set (convenient for names and paths).
-- **`sql`** — the same data as relations: `SELECT` over `packages`, `symbols`, and the `symbol_*` tables.
-- **Shell invocation (Windows PowerShell):** Always run the binary as **`& "<path-to-nci.exe>" <subcommand> …args…`** (call operator). A quoted path immediately followed by a bare token like `sql` or `query` is **not** parsed as a subcommand—the shell treats the quoted string as a value, then errors on the next word.
-- **Row caps:** **`--max-rows`** applies **only** to **`nci sql`**. For **`nci query find <phrase>`**, cap how many hits are returned with **`-n` / `--limit`** (default **20**). **`--max-rows` is not valid on `query find`**; use `sql` when you need that cap.
-- **MCP `nci_sql`:** defaults **`max_rows`** to **500**; when **`schema: true`**, the MCP omits **`--max-rows`** because **`nci sql --schema`** prints DDL only and never applies a row cap.
+CLI workflow, fast path, and tool choice are in the **agent primer** (`nci://primer/agent` / compact skill **PRIMER.md**). This document covers **schema and column semantics** for `nci sql` and MCP `nci://primer/reference`.
 
-**Fast path for declaration evidence:**
+Run **`nci sql --schema`** for authoritative DDL. If anything below disagrees with that output, **believe the schema**.
 
-1. Start with exact symbols when you know the API name:
-   - Resolve active installed package context first when multiple versions may exist in the DB:
-   - `query active-package <IndexedPackageName>`
-   - "example": `query active-package <IndexedPackageName>`
-   - JSON output includes **`packageManager`** (hint from root `package.json` **`packageManager`** or lockfiles).
-   - With **`index_root_workspace: false`** and non-empty **`workspaces`** in `nci.config.json`, repo-root **`node_modules`** is excluded from active-package candidate roots (config only for `query`; not overridden by `nci index --skip-root-workspace`).
-   - Use the selected `package_version` from active-package output to pin downstream `query symbol` / `query find` calls unless intentionally comparing versions.
-   - `query symbol <ExactSymbolName> --package <IndexedPackageName> -n 10`
-   - "example": `query symbol Client --package <IndexedPackageName> -n 10`
-   - `query symbol <ExactSymbolName> --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`
-   - "example": `query symbol Client --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`
-   - Add `--package-version <IndexedPackageVersion>` when multiple versions of the indexed package exist in the DB.
-   - "example": `query symbol Client --package <IndexedPackageName> --package-version <IndexedPackageVersion> -n 10`
-2. Use scoped FTS for discovery:
-   - `query find <SearchPhrase> --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`
-   - "example": `query find timeout --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`
-   - `query find <SearchPhrase> --package <IndexedPackageName> --kind <KindName> -n 10`
-   - "example": `query find timeout --package <IndexedPackageName> --kind FunctionDeclaration -n 10`
-   - If your phrase contains punctuation (for example `Output.apply`), retry with tokenized terms (`Output apply`) when needed.
-   - "example": `query find Result map --package <IndexedPackageName> --source-package <SourcePackageName> -n 10`
-   - Add `--package-version <IndexedPackageVersion>` for deterministic version-scoped results.
-   - "example": `query find timeout --package <IndexedPackageName> --package-version <IndexedPackageVersion> -n 10`
-   - Discover available source packages quickly with `query source-packages <IndexedPackageName> <IndexedPackageVersion>`.
-   - "example": `query source-packages <IndexedPackageName> <IndexedPackageVersion>`
-3. Use the returned `id` as the handle for cite-ready detail:
-   - `query show "<symbol-id>"`
-   - "example": `query show "<symbol-id-from-query-find-or-symbol>"`
-   - `query snippet "<symbol-id>"`
-   - "example": `query snippet "<symbol-id-from-query-find-or-symbol>"`
-   - "example": if you see ids like `...::Client#2` / `...::Client#3`, treat each `#` id as a distinct disambiguated symbol row (not overload-only) and run `query snippet` on each id before concluding equivalence.
-   - `query snippet` accepts a **single positional `<symbol-id>`** (no flags). For many snippets in one CLI process, use `query evidence` — the JSON envelope returns `data.snippets` as an object keyed by `symbols.id`, and `--snippet-limit` defaults to `--limit`.
-4. Use file tools only after `query show` / `query snippet` lacks the declaration text needed for the final answer. `query` search/show rows carry a signature preview (currently capped), while `query snippet` returns stored full signature/JSDoc text from SQLite for the selected symbol id.
-5. Avoid ad-hoc compile probes unless the task explicitly requires compilation evidence. "example": do not run `tsc -e`; rely on `query`/`snippet` declaration evidence first.
+## Package-relative path encoding
 
-**After confirmation, widen with SQL (only when needed):** Once you confirm the right symbol/package via `query`, use `sql` for broader relational checks (same-name collisions, cross-version comparisons, dependency fan-in/out, inheritance/source provenance). Keep `query` for fast narrowing and use `sql` only for wider-scope architectural/evidence checks where set-level joins matter.
+When a declaration resolves **outside** the indexed package root, stored paths do **not** use raw `../` segments. The index uses a **canonical encoding**: each parent hop outside the package root adds **`__nci_external__`** plus one **`__up__`** segment (repeat for multiple hops). Example shape: `__nci_external__/__up__/other/x.d.ts`. That encoded string is for **stable SQLite keys and joins**, not a literal directory tree to walk under `node_modules`. **`symbols.file_path`** and symbol **`id`** strings (`pkg@version::file_path::name`) may contain these tokens. For ownership, use **`source_package_name`** + **`source_file_path`** (and `source_package_version` when non-null), not reverse-parsed `../` paths or `id` split on `::` alone.
 
-- Example: after confirming `Output` in one package version, run SQL scoped by package + version + source package to inspect sibling rows and avoid false assumptions from a single hit.
+## Table `packages`
 
-**Authoritative column list:** run `sql --schema` on the NCI binary. If anything below disagrees with that DDL, **believe the schema**.
+`package_id`, `name`, `version`, index stats, timestamps. To filter symbols by package, use `symbols.package_id = packages.package_id` and `packages.name` / `packages.version`.
 
-**Package-relative path encoding (`__nci_external__`, `__up__`):** When a declaration resolves **outside** the indexed package root, stored paths do **not** use raw `../` segments. The index uses a **canonical encoding**: each parent hop outside the package root adds **`__nci_external__`** plus one **`__up__`** segment (repeat for multiple hops). Example shape: `__nci_external__/__up__/other/x.d.ts`. That encoded string is for **stable SQLite keys and joins**, not a literal directory tree to walk under `node_modules`. **`symbols.file_path`** and internal symbol **`id`** values (`pkg@version::file_path::name`) may contain these tokens. For package/file ownership semantics, use **`source_package_name`** + **`source_file_path`** (and `source_package_version` when non-null) instead of reverse-parsing encoded folders. Prefer entry/public surfaces (`types`/`exports`, **`entry_visibility_json`** when present) and relational lookups over reconstructing disk paths from `../../` heuristics or by splitting `id` on `::` alone.
+## Table `symbols`
 
----
-
-**Table `packages`:** `package_id`, `name`, `version`, index stats, timestamps. To filter symbols by package, use `symbols.package_id = packages.package_id` and `packages.name` / `packages.version`.
-
-**Table `symbols` (one row per **graph symbol** after the merge phase):**
+One row per **graph symbol** after the merge phase:
 
 - **`symbol_id`:** integer row id.
 - **`package_id`:** which package this symbol belongs to.
@@ -68,7 +28,7 @@ You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node
 - **`file_path`:** path to the **primary declaration site** for this graph row—package-relative. Merge may fold other sites into the same row; those extra physical files are recorded in **`symbol_additional_files`**, not by repeating them as extra `file_path` columns.
 - **`source_package_name`:** npm package that owns the declaration (`packages.name` for in-tree symbols; dependency package id parsed from the first `node_modules/<pkg>/` segment for `__nci_external__` paths). This is the canonical field for `--source-package` filters.
 - **`source_package_version`:** semver of the source package **only** when the source package is the indexed package. For external dependency declarations this is usually **NULL** by design; folder names like `@scope+pkg@x.y.z` are install-layout artifacts and are not treated as authoritative source semver.
-- **`source_file_path`:** path relative to `source_package_name` (mirrors `file_path` for in-package symbols; dependency-local path for external symbols). DDL stores it **NOT NULL**; use this when citing where the declaration lives inside the owning package. If disk navigation still fails, use **`query snippet`** rather than guessing.
+- **`source_file_path`:** path relative to `source_package_name` (mirrors `file_path` for in-package symbols; dependency-local path for external symbols). DDL stores it **NOT NULL**; use this when citing where the declaration lives inside the owning package.
 - **`entry_visibility_json` (TEXT, optional):** JSON array text of package-relative paths—**which package entry / barrel files make this symbol reachable on the public export surface** (`types` / `exports` roots and re-export traversal). This is the persisted SQL form of entry-surface visibility metadata. Populated when the symbol’s file (or the file resolved from package entry re-export) is one of the indexed **entry files**. **Not** the same as **`file_path`**: a symbol may be **defined** in `dist/foo.d.ts` but **reachable** only via `dist/index.d.ts`—then `file_path` is `foo`, while **`entry_visibility_json`** lists index/barrel paths that surface it. **Not** the same as **`symbol_additional_files`**: those are **extra declaration merge sites** for the same merged symbol, not “which entry re-exported this name.” If the only entry path equals **`file_path`** alone, the engine often omits the field as redundant—**NULL / absent** does not mean “not exported”; use **`is_internal`** plus this column when present.
 - **`signature`:** declaration signature / export text. **After merge,** the engine may **fuse** several normalized-distinct signature bodies into one field (newline-separated blocks), not “first file only.” If two overloads collapse when their normalized signatures match, you will not see duplicate raw text for the same normalized overload key.
 - **`js_doc`:** JSDoc when present.
@@ -86,26 +46,44 @@ You have access to the NCI CLI. NCI crawls TypeScript declaration files in `node
 - **`is_type_only`**, **`symbol_space`:** distinguish type-only declarations vs value namespace (`type` vs `value`).
 - **`re_exported_from`, deprecation fields, since-tag columns:** metadata per schema; see **`sql --schema`**.
 
-**Table `symbol_additional_files`:** (`symbol_id`, `file_path`) — **additional** package-relative declaration files that contributed to **this** merged/folded symbol row. Non-empty means “more than one physical declaration site”; combine with **`merge_provenance_json`** and **`signature`** to interpret provenance.
+## Table `symbol_additional_files`
 
-**Table `symbol_dependencies`:** (`from_symbol_id`, `to_symbol_id_text`) — **resolved dependency edges** after graph resolution: “from symbol **uses** target symbol id (string).” Resolution follows policy **`nci-dep-v1`** (strongest first): explicit module specifier → same file → import alias in file → files reachable via **`/// <reference path="…" />`** closure → weakest: package-wide bare-name fallback (can tie homonyms—documented limitation). **`is_internal` does not block an edge.**
+(`symbol_id`, `file_path`) — **additional** package-relative declaration files that contributed to **this** merged/folded symbol row. Non-empty means “more than one physical declaration site”; combine with **`merge_provenance_json`** and **`signature`** to interpret provenance.
 
-**Table `symbol_surface_dependencies`:** same id shape as above but semantics are **namespace/module surface rollup**—aggregated dependencies for container symbols—not a substitute for **`symbol_dependencies`** on an arbitrary member row. Use **`symbol_dependencies`** when following “what does this declaration reference”; use surface rollup only when you intentionally care about the rolled-up namespace view.
+## Table `symbol_dependencies`
 
-**Table `symbol_inherited_from_sources`:** (`symbol_id`, `source_symbol_id_text`) — for **synthesized inherited members** (`is_inherited = 1`), lists **which base/source symbol ids** contributed to this member’s flattening. Join `symbol_id` to `symbols.symbol_id` for the inherited row; **`source_symbol_id_text`** matches **`symbols.id`** strings of parents/interfaces bases. Use this when tracing **why** an inherited member exists; use **`symbol_dependencies`** for ordinary type/value references on non-inherited symbols.
+(`from_symbol_id`, `to_symbol_id_text`) — resolved "uses". **`to_symbol_id_text`**: **`symbols.id`**, or stub **`npm::<specifier>::<member>`** (`dependency_stub_packages` / `nci index -s`), **`node::NodeJS::…`**, **`node::<builtin>::…`**, **`protocol::…`** (no `symbols` row). Resolution order: module specifier → same file → import alias → `/// <reference … />` closure → bare-name fallback. **`is_internal` does not block an edge.**
 
-**Table `symbol_heritage`:** (`symbol_id`, `heritage`) — verbatim **`extends` / `implements`** clause fragments for human-readable provenance; **do not** treat `heritage` text as the machine edge set—prefer **`symbol_dependencies`** for resolved targets.
+## Table `symbol_surface_dependencies`
 
-**Tables `symbol_modifiers`, `symbol_decorators`:** structured modifiers and decorators attached to a symbol row—see **`sql --schema`**.
+Same id shape as above but semantics are **namespace/module surface rollup**—aggregated dependencies for container symbols—not a substitute for **`symbol_dependencies`** on an arbitrary member row. Use **`symbol_dependencies`** when following “what does this declaration reference”; use surface rollup only when you intentionally care about the rolled-up namespace view.
 
-**Table `package_dependencies`:** declared npm dependency names per indexed package—package-level, not symbol edges.
+## Table `symbol_inherited_from_sources`
 
-**FTS `symbols_fts`:** full-text search over symbol name/signature/js_doc; **`query`** may use this indirectly—relational joins usually start from **`symbols`** / **`packages`**.
+(`symbol_id`, `source_symbol_id_text`) — for **synthesized inherited members** (`is_inherited = 1`), lists **which base/source symbol ids** contributed to this member’s flattening. Join `symbol_id` to `symbols.symbol_id` for the inherited row; **`source_symbol_id_text`** matches **`symbols.id`** strings of parents/interfaces bases. Use this when tracing **why** an inherited member exists; use **`symbol_dependencies`** for ordinary type/value references on non-inherited symbols.
+
+## Table `symbol_heritage`
+
+(`symbol_id`, `heritage`) — verbatim **`extends` / `implements`** clause fragments for human-readable provenance; **do not** treat `heritage` text as the machine edge set—prefer **`symbol_dependencies`** for resolved targets.
+
+## Tables `symbol_modifiers`, `symbol_decorators`
+
+Structured modifiers and decorators attached to a symbol row—see **`sql --schema`**.
+
+## Table `package_dependencies`
+
+Declared npm dependency names per indexed package—package-level, not symbol edges.
+
+## FTS `symbols_fts`
+
+Full-text search over symbol name/signature/js_doc; **`query`** may use this indirectly—relational joins usually start from **`symbols`** / **`packages`**.
 
 ---
 
-**Overload and merge (how to avoid wrong conclusions):**
+## Overload and merge
+
+How to avoid wrong conclusions:
 
 - **Merge** reduces many declaration AST nodes to **one `symbols` row** when keys collide (same merge scope for declaration kinds, or overload keys for members). **Identical fold** merges **different files** when name/kind/normalized-signature match. Always check **`merge_provenance_json`** and **`symbol_additional_files`** before assuming a single file or a single overload site.
-- **Overloads:** Multiple overload signatures may appear as **one fused `signature`** string when merged, or as **separate `symbols` rows** when keys stay distinct. Counting rows named `v7` without reading **`kind_name`** and **`signature`** can mis-count overloads vs re-exports vs merged overload blocks. **Separate overload rows** often share a base name and differ by **`#n`** in **`id`** when the engine needed distinct rows—pair **`id`** with **`signature`** and **`merge_provenance_json`** to interpret them. **`query overloads "<symbols.id>"`** returns the full sibling set in one call (identity is **same `package_id` + `name` + `parent_symbol_id`**, including the input row), so you do not need to enumerate **`#n`** suffixes by hand.
-- **`[]` from `nci sql --format json`:** output is a **JSON array** of row objects. **`[]`** means **no rows matched** your WHERE/JOIN—adjust filters (e.g. wrong `package_id`, wrong `name`, typo in path). It does **not** mean “NCI has no types.” Join **`packages`** first when selecting by package name/version.
+- **Overloads:** Multiple overload signatures may appear as **one fused `signature`** string when merged, or as **separate `symbols` rows** when keys stay distinct. Counting rows by **`name`** alone without **`kind_name`** and **`signature`** mis-counts overloads vs re-exports. Rows that share a base name may differ by **`#n`** in **`id`**—pair **`id`**, **`signature`**, and **`merge_provenance_json`**. CLI **`query overloads "<symbols.id>"`** returns the full sibling set (**same `package_id` + `name` + `parent_symbol_id`**, including the input row).
+- **`[]` from `nci sql --format json`:** output is a **JSON array** of row objects. **`[]`** means **no rows matched** your WHERE/JOIN—adjust filters (e.g. wrong `package_id`, wrong `name`, typo in path). It does **not** mean the index is empty. Join **`packages`** first when filtering by package name/version.

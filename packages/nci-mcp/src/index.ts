@@ -36,7 +36,7 @@ async function main(): Promise<void> {
       instructions:
         "NCI indexes TypeScript declarations from `node_modules` into SQLite. " +
         "**START HERE: read the `nci://primer/agent` resource on first use.** It is the operating manual for these tools — how to think with NCI, when to use `nci_query` vs `nci_sql`, package version pinning, source-package vs indexed package, and disk-path discipline. Treat it as the source of truth for workflow; refer to `nci://primer/reference` only for deeper SQLite/table details. " +
-        "Tools: `nci_query` (structured search/list) and `nci_sql` (read-only SQL). Successful `query --format json` responses always include **`meta`** (`envelopeVersion`, `query`, limits, truncation) next to **`data`**. " +
+        "Tools: `nci_query` (structured search/list) and `nci_sql` (read-only SQL). Successful `query --format json` responses include **`meta`** (`envelopeVersion`, `query`, `durationMs`, `cost`, limits, truncation, optional `suggestions`) next to **`data`**. " +
         "Resources: `nci://primer/agent` (workflow primer, read first), `nci://primer/reference` (schema/table reference), `nci://database/active` (read-only status). " +
         "The `database` field on each tool is optional: omit it to use the database path the `nci` CLI already resolves from your NCI config and working directory; pass it only to override for a specific call.",
     },
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     {
       title: "NCI Reference Doc",
       description:
-        "Longer reference: SQLite schema, key tables (symbols, packages, source_files), and example queries for `nci_sql`.",
+        "Longer reference: SQLite schema, key tables (symbols, packages, source_files).",
       mimeType: "text/markdown",
     },
     async (uri) => ({

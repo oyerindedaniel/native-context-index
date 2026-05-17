@@ -3,15 +3,15 @@
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Environment } from "@react-three/drei";
 import {
+  type RefObject,
   Suspense,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { useReducedMotion } from "motion/react";
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 
 const indexFieldVertexShader = `
@@ -24,8 +24,6 @@ void main() {
 `;
 
 const indexFieldFragmentShader = `
-uniform float uSplitLayout;
-
 varying vec2 vUv;
 
 float hash(vec2 p) {
@@ -47,23 +45,8 @@ void main() {
   float grain = hash(cell);
   float edge = 1.0 - smoothstep(0.018, 0.055, min(min(cellUv.x, 1.0 - cellUv.x), min(cellUv.y, 1.0 - cellUv.y)));
   float modelFocus = smoothstep(0.95, 0.08, length(p - vec2(-0.08, 0.04)));
-  float textClear = smoothstep(0.48, 0.66, uv.x) * (1.0 - smoothstep(0.20, 0.48, uv.y));
-  float textFade = smoothstep(0.52, 0.84, uv.x) * (1.0 - smoothstep(0.18, 0.46, uv.y));
   float vignette = smoothstep(1.12, 0.18, length(p));
-
-  float mobileClearZone = clamp(textClear * 1.18 + textFade * 0.58, 0.0, 1.0);
-  float mobileCheckerMask =
-    (0.44 + modelFocus * 0.16) * (1.0 - mobileClearZone * 0.98) * vignette;
-
-  // md+ split: checker only in a soft halo under the logo — not across the canvas panel.
-  vec2 splitAnchor = vec2(0.0, 0.02);
-  float splitDist = length((p - splitAnchor) * vec2(1.02, 1.1));
-  float logoHalo = 1.0 - smoothstep(0.26, 0.5, splitDist);
-  float seamFade = smoothstep(0.52, 0.14, uv.x);
-  float splitCheckerMask = logoHalo * seamFade * vignette;
-
-  float checkerMask = mix(mobileCheckerMask, splitCheckerMask, uSplitLayout);
-  float clearZone = mix(mobileClearZone, 0.0, uSplitLayout);
+  float checkerMask = (0.44 + modelFocus * 0.16) * vignette;
   float indexBands = smoothstep(0.985, 1.0, sin((p.x * 3.2 + p.y * 4.4) * 7.0));
 
   vec3 lightTile = vec3(0.995, 0.993, 1.0);
@@ -72,9 +55,7 @@ void main() {
   vec3 color = mix(paper, tileColor, checkerMask);
   color = mix(color, violet, checker * checkerMask * (0.014 + grain * 0.005));
   color = mix(color, slate, edge * checkerMask * 0.015);
-  color = mix(color, violet, indexBands * 0.006 * vignette * mix(1.0 - textFade, 1.0, uSplitLayout));
-  color = mix(color, paper, smoothstep(0.16, 0.82, clearZone) * 0.94);
-  color = mix(color, paper, uSplitLayout * (1.0 - logoHalo * seamFade) * 0.97);
+  color = mix(color, violet, indexBands * 0.006 * vignette);
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -86,12 +67,19 @@ type HeroUniforms = {
 };
 
 const BASE_LOGO_ROTATION = new THREE.Euler(0.06, -0.12, -0.72);
+/** Radians added at pointer extremes (mesh-local hit mapped to ±1). */
+const LOGO_TILT_MAX_X = 0.09;
+const LOGO_TILT_MAX_Y = 0.11;
+const LOGO_TILT_MAX_Z = 0.028;
+const LOGO_TILT_DAMP = 9;
 
 /** Set on the logo pivot in `NCIModelMesh` before layout runs. */
 interface LogoPivotUserData {
   longestAxis: number;
   baseScale: number;
   layoutOffset: THREE.Vector3;
+  tiltHalfWidth: number;
+  tiltHalfHeight: number;
 }
 
 function logoPivotUserData(pivot: THREE.Object3D): LogoPivotUserData {
@@ -99,24 +87,7 @@ function logoPivotUserData(pivot: THREE.Object3D): LogoPivotUserData {
 }
 
 const LOGO_TARGET_SPAN_COMPACT = 1.32;
-const LOGO_TARGET_SPAN_DEFAULT = 1.88;
-
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    setPrefersReducedMotion(mediaQuery.matches);
-
-    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  return prefersReducedMotion;
-}
+const LOGO_TARGET_SPAN_DEFAULT = 1.52;
 
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
@@ -188,18 +159,11 @@ gl_FragColor.rgb += vec3(0.05, 0.04, 0.15) * sin(uTime * 1.35 + vDissolveWorldPo
 
 export const HERO_BELOW_MD_MEDIA = "(max-width: 767px)";
 
-function HeroIndexField({ splitLayout }: { readonly splitLayout: boolean }) {
-  const uniformsRef = useRef({ uSplitLayout: { value: 0 } });
-
-  useLayoutEffect(() => {
-    uniformsRef.current.uSplitLayout.value = splitLayout ? 1 : 0;
-  }, [splitLayout]);
-
+function HeroIndexField() {
   return (
     <mesh position={[0, 0, -2.5]} scale={[30, 30, 1]}>
       <planeGeometry args={[1, 1, 1, 1]} />
       <shaderMaterial
-        uniforms={uniformsRef.current}
         vertexShader={indexFieldVertexShader}
         fragmentShader={indexFieldFragmentShader}
       />
@@ -207,24 +171,74 @@ function HeroIndexField({ splitLayout }: { readonly splitLayout: boolean }) {
   );
 }
 
+function HeroLogoLights({ tiltRef }: { tiltRef: RefObject<THREE.Vector2> }) {
+  const keyLightRef = useRef<THREE.DirectionalLight>(null);
+  const fillLightRef = useRef<THREE.DirectionalLight>(null);
+
+  useFrame((_, delta) => {
+    const tx = tiltRef.current.x;
+    const ty = tiltRef.current.y;
+    const focus = Math.min(Math.hypot(tx, ty), 1);
+
+    if (keyLightRef.current) {
+      keyLightRef.current.position.set(2.4 + ty * 1.1, 3.2 + tx * 0.85, 3.8);
+      keyLightRef.current.intensity = THREE.MathUtils.damp(
+        keyLightRef.current.intensity,
+        1.55 + focus * 0.42,
+        8,
+        delta,
+      );
+    }
+
+    if (fillLightRef.current) {
+      fillLightRef.current.position.set(
+        -2.2 - ty * 0.65,
+        -0.85 - tx * 0.45,
+        2.2,
+      );
+      fillLightRef.current.intensity = THREE.MathUtils.damp(
+        fillLightRef.current.intensity,
+        0.48 + focus * 0.14,
+        8,
+        delta,
+      );
+    }
+  });
+
+  return (
+    <>
+      <ambientLight intensity={0.66} />
+      <directionalLight
+        ref={keyLightRef}
+        position={[2.4, 3.2, 3.8]}
+        intensity={1.55}
+        color="#ffffff"
+      />
+      <directionalLight
+        ref={fillLightRef}
+        position={[-2.2, -0.85, 2.2]}
+        intensity={0.48}
+        color="#e8ecf8"
+      />
+    </>
+  );
+}
+
 function NCIModelMesh({
   uniforms,
   reducedMotion,
   compactViewport,
+  hoverTiltRef,
 }: {
   uniforms: HeroUniforms;
   reducedMotion: boolean;
   compactViewport: boolean;
+  hoverTiltRef: RefObject<THREE.Vector2>;
 }) {
   const rawObject = useLoader(OBJLoader, "/nci.obj");
   const introStartRef = useRef<number | null>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const localHitRef = useRef(new THREE.Vector3());
-  const entryTiltRef = useRef(new THREE.Vector2());
-  const entryImpulseRef = useRef(0);
-  const wasHittingRef = useRef(false);
-  const logoPlaneRef = useRef(new THREE.Plane());
-  const planeHitRef = useRef(new THREE.Vector3());
 
   const pivotGroup = useMemo(() => {
     const model = rawObject.clone(true);
@@ -255,6 +269,8 @@ function NCIModelMesh({
       longestAxis,
       baseScale: 1,
       layoutOffset: new THREE.Vector3(),
+      tiltHalfWidth: 1,
+      tiltHalfHeight: 1,
     };
     pivot.userData = pivotData;
     pivot.rotation.copy(BASE_LOGO_ROTATION);
@@ -282,6 +298,12 @@ function NCIModelMesh({
       .getCenter(new THREE.Vector3());
     pivotData.layoutOffset.copy(opticalCenter.negate());
     pivot.position.copy(pivotData.layoutOffset);
+    pivot.updateMatrixWorld(true);
+
+    const tiltBox = new THREE.Box3().setFromObject(pivot);
+    const tiltSize = tiltBox.getSize(new THREE.Vector3());
+    pivotData.tiltHalfWidth = Math.max(tiltSize.x * 0.5, 0.001);
+    pivotData.tiltHalfHeight = Math.max(tiltSize.y * 0.5, 0.001);
   }, [pivotGroup, compactViewport]);
 
   useFrame((state, delta) => {
@@ -289,56 +311,51 @@ function NCIModelMesh({
     const elapsed = state.clock.getElapsedTime() - introStartRef.current;
     const reveal = Math.min(elapsed / 1.6, 1);
     pivotGroup.updateWorldMatrix(true, true);
-    logoPlaneRef.current.setFromNormalAndCoplanarPoint(
-      state.camera.getWorldDirection(logoPlaneRef.current.normal).negate(),
-      pivotGroup.getWorldPosition(planeHitRef.current),
-    );
 
-    state.raycaster.setFromCamera(state.pointer, state.camera);
-    const hit = state.raycaster.intersectObject(pivotGroup, true)[0];
-    const planeHit = state.raycaster.ray.intersectPlane(
-      logoPlaneRef.current,
-      planeHitRef.current,
-    );
-    const fallbackLocalHit = planeHit
-      ? pivotGroup.worldToLocal(planeHit.clone())
-      : null;
-    const fallbackHit =
-      fallbackLocalHit &&
-      Math.abs(fallbackLocalHit.x) < 0.72 &&
-      Math.abs(fallbackLocalHit.y) < 0.55;
-    if (hit || fallbackHit) {
-      const hitPoint = hit?.point ?? planeHitRef.current;
-      localHitRef.current.copy(pivotGroup.worldToLocal(hitPoint.clone()));
+    const pivotData = logoPivotUserData(pivotGroup);
+    let targetTiltX = 0;
+    let targetTiltY = 0;
 
-      if (!wasHittingRef.current && !reducedMotion) {
-        entryTiltRef.current.set(
-          THREE.MathUtils.clamp(localHitRef.current.x / 0.72, -1, 1),
-          THREE.MathUtils.clamp(localHitRef.current.y / 0.55, -1, 1),
+    if (!reducedMotion) {
+      state.raycaster.setFromCamera(state.pointer, state.camera);
+      const hit = state.raycaster.intersectObject(pivotGroup, true)[0];
+      if (hit) {
+        localHitRef.current.copy(hit.point);
+        pivotGroup.worldToLocal(localHitRef.current);
+        targetTiltY = THREE.MathUtils.clamp(
+          localHitRef.current.x / pivotData.tiltHalfWidth,
+          -1,
+          1,
         );
-        entryImpulseRef.current = 1;
+        targetTiltX = THREE.MathUtils.clamp(
+          localHitRef.current.y / pivotData.tiltHalfHeight,
+          -1,
+          1,
+        );
       }
     }
 
-    wasHittingRef.current = Boolean(hit || fallbackHit);
-
-    entryImpulseRef.current = THREE.MathUtils.damp(
-      entryImpulseRef.current,
-      0,
-      4.8,
+    hoverTiltRef.current.x = THREE.MathUtils.damp(
+      hoverTiltRef.current.x,
+      targetTiltX,
+      LOGO_TILT_DAMP,
+      delta,
+    );
+    hoverTiltRef.current.y = THREE.MathUtils.damp(
+      hoverTiltRef.current.y,
+      targetTiltY,
+      LOGO_TILT_DAMP,
       delta,
     );
 
-    const tiltImpulse = reducedMotion ? 0 : entryImpulseRef.current;
     const idleBounce = reducedMotion
       ? 0
       : Math.sin(state.clock.getElapsedTime() * 1.65) * 0.026 * reveal;
-    const targetRotationX =
-      BASE_LOGO_ROTATION.x + entryTiltRef.current.y * 0.075 * tiltImpulse;
-    const targetRotationY =
-      BASE_LOGO_ROTATION.y + entryTiltRef.current.x * 0.095 * tiltImpulse;
-    const targetRotationZ =
-      BASE_LOGO_ROTATION.z - entryTiltRef.current.x * 0.03 * tiltImpulse;
+    const tiltX = hoverTiltRef.current.x;
+    const tiltY = hoverTiltRef.current.y;
+    const targetRotationX = BASE_LOGO_ROTATION.x + tiltX * LOGO_TILT_MAX_X;
+    const targetRotationY = BASE_LOGO_ROTATION.y + tiltY * LOGO_TILT_MAX_Y;
+    const targetRotationZ = BASE_LOGO_ROTATION.z - tiltX * LOGO_TILT_MAX_Z;
 
     uniforms.uTime.value = reducedMotion ? 2 : elapsed;
     uniforms.uReveal.value = reducedMotion ? 1 : easeOutCubic(reveal);
@@ -360,7 +377,7 @@ function NCIModelMesh({
       7.5,
       delta,
     );
-    const { layoutOffset, baseScale } = logoPivotUserData(pivotGroup);
+    const { layoutOffset, baseScale } = pivotData;
     pivotGroup.position.x = layoutOffset.x;
     pivotGroup.position.z = layoutOffset.z;
     pivotGroup.position.y = THREE.MathUtils.damp(
@@ -379,12 +396,11 @@ function NCIModelMesh({
 
 function HeroScene({
   compactLogoScale,
-  splitLayout,
 }: {
   readonly compactLogoScale: boolean;
-  readonly splitLayout: boolean;
 }) {
-  const reducedMotion = usePrefersReducedMotion();
+  const reducedMotion = useReducedMotion() === true;
+  const hoverTiltRef = useRef(new THREE.Vector2());
   const logoUniforms = useMemo<HeroUniforms>(
     () => ({
       uTime: { value: 0 },
@@ -395,27 +411,18 @@ function HeroScene({
 
   return (
     <>
-      <HeroIndexField splitLayout={splitLayout} />
+      <HeroIndexField />
 
       <Suspense fallback={null}>
         <NCIModelMesh
           uniforms={logoUniforms}
           reducedMotion={reducedMotion}
           compactViewport={compactLogoScale}
+          hoverTiltRef={hoverTiltRef}
         />
       </Suspense>
 
-      <ambientLight intensity={0.7} />
-      <directionalLight
-        position={[2.5, 3.5, 3.5]}
-        intensity={1.6}
-        color="#ffffff"
-      />
-      <directionalLight
-        position={[-2.5, -1.0, 2.0]}
-        intensity={0.55}
-        color="#dde3f0"
-      />
+      <HeroLogoLights tiltRef={hoverTiltRef} />
       <Suspense fallback={null}>
         <Environment preset="studio" />
       </Suspense>
@@ -440,7 +447,7 @@ export function HeroCanvas() {
         }}
       >
         <color attach="background" args={["#ffffff"]} />
-        <HeroScene compactLogoScale={isBelowMd} splitLayout={!isBelowMd} />
+        <HeroScene compactLogoScale={isBelowMd} />
       </Canvas>
     </div>
   );

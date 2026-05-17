@@ -25,8 +25,8 @@ export function DocsHeader({ className }: DocsHeaderProps) {
     >
       <div className="flex h-docs-chrome min-w-0 items-center gap-2 px-4 sm:gap-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center">
-          <DocsBreadcrumbStatic className="hidden lg:flex" />
-          <DocsMobileNav className="lg:hidden" />
+          <DocsBreadcrumbStatic className="hidden md:flex" />
+          <DocsMobileNav className="md:hidden" />
         </div>
 
         <DocsSearch />

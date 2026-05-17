@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # NCI Answer Quality Guardrails
 
+**Prerequisite:** NCI CLI installed and the project indexed (`nci init`, `nci index`). For workflow and primer, use skill **`nci`** or MCP resource `nci://primer/agent` first.
+
 ## Goal
 
 Prevent incorrect type-level claims by requiring evidence-first reasoning from NCI declarations.

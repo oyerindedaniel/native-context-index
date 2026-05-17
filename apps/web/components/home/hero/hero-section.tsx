@@ -12,6 +12,8 @@ import { HeroGetStartedButton } from "./hero-get-started-button";
 
 const COPY_ENTRANCE_EASE = [0.16, 1, 0.3, 1] as const;
 
+const SECTION_SHELL = "mx-auto w-full max-w-[1050px] px-6";
+
 export function HeroSection() {
   const isBelowMd = useMediaQuery(HERO_BELOW_MD_MEDIA);
   const isDesktopLayout = !isBelowMd;
@@ -19,7 +21,7 @@ export function HeroSection() {
   return (
     <div className="relative bg-elevated text-ink">
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20">
-        <div className="pointer-events-auto mx-auto max-w-[1050px] px-4 sm:px-6">
+        <div className={cn("pointer-events-auto", SECTION_SHELL)}>
           <SiteMarketingHeaderMobileRow className="md:hidden" />
           <SiteMarketingHeaderDesktop className="hidden md:grid" logoPriority />
         </div>
@@ -39,9 +41,9 @@ export function HeroSection() {
 
         <motion.div
           className={cn(
-            "pointer-events-none relative z-10 flex min-h-screen w-full flex-col px-4 pb-6 sm:pl-6 sm:pr-0 sm:pb-14",
+            "pointer-events-none relative z-10 flex min-h-screen w-full flex-col pb-6 sm:pb-14",
             "items-end justify-end text-right",
-            "md:max-w-xl md:items-start md:justify-center md:pb-0 md:text-left",
+            "md:items-start md:justify-center md:pb-0 md:text-left",
           )}
           initial="hidden"
           animate="visible"
@@ -55,7 +57,7 @@ export function HeroSection() {
             },
           }}
         >
-          <div className="mx-auto flex w-full max-w-[1050px] flex-col md:mx-0 md:px-6 md:pl-6 lg:pl-10">
+          <div className={cn("flex flex-col", SECTION_SHELL)}>
             <div className="ml-auto flex w-full max-w-xl flex-col md:ml-0">
               <motion.span
                 className="mb-3 font-inter-tight text-sm font-medium tracking-[0.11em] text-ink/90 uppercase sm:text-base"
@@ -96,7 +98,7 @@ export function HeroSection() {
               </motion.h1>
 
               <motion.p
-                className="mt-3 text-base leading-snug tracking-tight-p text-muted sm:text-lg"
+                className="mt-3 max-w-[34rem] text-base text-pretty leading-relaxed tracking-tight-p text-muted sm:text-lg"
                 variants={{
                   hidden: isDesktopLayout
                     ? { opacity: 0, x: -22, filter: "blur(8px)" }
@@ -110,9 +112,9 @@ export function HeroSection() {
                   },
                 }}
               >
-                NCI indexes symbols, dependencies, and versions across packages
-                so agents move quickly with context that matches the latest APIs
-                you ship against.
+                NCI indexes symbols, dependencies, and versions across
+                packages—so agents move quickly with context that matches the
+                latest APIs you ship against.
               </motion.p>
 
               <motion.div

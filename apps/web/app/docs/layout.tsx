@@ -21,7 +21,7 @@ export default function DocsLayout({
   return (
     <div className="flex min-h-screen bg-surface">
       <DocsScrollToTop />
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-docs-sidebar flex-col border-r border-border bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-docs-sidebar flex-col border-r border-border bg-white md:flex">
         <div className="flex h-docs-chrome shrink-0 items-center border-b border-border px-5">
           <Link href="/" className="flex items-center gap-2">
             <Image
@@ -53,9 +53,9 @@ export default function DocsLayout({
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 lg:pl-docs-sidebar">
+      <div className="min-w-0 flex-1 md:pl-docs-sidebar">
         <DocsHeader />
-        <div className="mx-auto flex w-full max-w-docs-shell gap-12 px-4 py-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-docs-shell gap-12 px-4 py-6 md:px-8">
           <main id="docs-main" className="min-w-0 flex-1">
             <article className="docs-prose mx-auto w-full min-w-0 max-w-docs-content">
               <DocsBreadcrumbInline className="xl:hidden" />

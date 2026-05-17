@@ -1,6 +1,7 @@
 import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
 
 <PageEyebrow>Guides · Skills</PageEyebrow>
 
@@ -104,6 +105,17 @@ Hosts that understand the open [Agent Skills](https://agentskills.io/) shape eac
   <TableBody>
     <TableRow>
       <TableCell>
+        <code>nci</code>
+      </TableCell>
+      <TableCell>
+        Fresh context, first NCI use in a repo, or &ldquo;how do I use NCI?&rdquo; before any query.
+      </TableCell>
+      <TableCell>
+        Verify CLI (<code>nci --version</code>), <code>nci init -y</code>, <code>nci index</code>, then read the compact primer (<code>nci://primer/agent</code> or bundled <code>PRIMER.md</code>) and run <code>active-package</code> → <code>evidence</code>.
+      </TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>
         <code>nci-answer-quality</code>
       </TableCell>
       <TableCell>
@@ -116,12 +128,18 @@ Hosts that understand the open [Agent Skills](https://agentskills.io/) shape eac
   </TableBody>
 </TableRoot>
 
-The skill&rsquo;s `disable-model-invocation: true` flag means the agent runs it deterministically when the trigger fires — it does not paraphrase the protocol.
+Install from git with <a href="https://github.com/vercel-labs/skills" target="_blank" rel="noopener noreferrer">npx skills</a>:
+
+<TerminalRoot>
+  <TerminalCommand>npx skills add oyerindedaniel/native-context-index --skill nci --skill nci-answer-quality -y</TerminalCommand>
+</TerminalRoot>
+
+`nci-answer-quality` sets `disable-model-invocation: true` so the protocol is not paraphrased when it fires. `nci` leaves invocation flexible for onboarding judgment.
 
 <CalloutRoot variant="info">
-  <CalloutTitle>One skill today, more later.</CalloutTitle>
+  <CalloutTitle>Primer stays in sync.</CalloutTitle>
   <CalloutBody>
-    `nci-answer-quality` is the only skill that ships with NCI right now. A general &ldquo;NCI&rdquo; skill that sets up the agent for first contact is on the roadmap. Adding skills is additive — drop a new folder under `skills/` with a `SKILL.md`, then copy or symlink that tree into the discovery path for the host you use (see the table above).
+    <code>skills/nci/PRIMER.md</code> is generated from the same package that powers <code>nci://primer/agent</code> and the <a href="/docs/primer">Agent primer</a> compact tab. After editing <code>@repo/nci-agent-primer</code>, run <code>pnpm sync:skill-primer</code> from the monorepo root.
   </CalloutBody>
 </CalloutRoot>
 

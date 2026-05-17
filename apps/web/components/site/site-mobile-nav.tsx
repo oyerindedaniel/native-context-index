@@ -11,8 +11,10 @@ import { XMarkIcon } from "@heroicons/react/20/solid";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { MobileHamburgerButton } from "@/components/nav/mobile-hamburger-button";
+import { useCloseDrawerAtMinWidth } from "@/lib/hooks/use-close-drawer-at-min-width";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { useDocumentScrollLock } from "@/lib/hooks/use-document-scroll-lock";
+import { MOBILE_NAV_DESKTOP_MQ } from "@/lib/nav/mobile-drawer-breakpoints";
 import { isSiteNavHrefActive } from "@/components/site/site-nav-active";
 
 const FADE_EASE = "easeOut" as const;
@@ -75,6 +77,8 @@ function SiteMobileOverlay({
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  useCloseDrawerAtMinWidth(MOBILE_NAV_DESKTOP_MQ, onOpenChange);
 
   React.useEffect(() => {
     if (previousPath.current !== pathname) {

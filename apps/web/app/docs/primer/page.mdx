@@ -6,7 +6,7 @@ import { PrimerView } from "@/components/docs/primer-view";
 # Agent primer
 
 <PageLede>
-  This is the same text the MCP server returns at the URI `nci://primer/agent`. It is the operating manual a fresh agent reads before its first NCI call. The `compact` variant is what `nci-mcp` actually emits at `nci://primer/agent`; the `reference` variant is the longer schema reference served at `nci://primer/reference`.
+  This is the same text the MCP server returns at `nci://primer/agent` and `nci://primer/reference`. **Compact** is the workflow primer (fast path, tools, stubs, graph semantics). **Reference** is schema-only — SQLite tables and columns; read compact first.
 </PageLede>
 
 <PrimerView />

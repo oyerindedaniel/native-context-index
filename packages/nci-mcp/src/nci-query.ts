@@ -223,7 +223,7 @@ export const nciQueryInputSchema = z.preprocess(
       subcommand: z
         .literal("evidence")
         .describe(
-          "Bundled evidence in ONE call: exact-name hits + FTS phrase fallback + batched signature/JSDoc snippets, all from a single SQLite open. Replaces chained `find` + `symbol` + per-id `snippet` for 'find these symbols and cite them'. JSON: `data.symbols` (deduped hits, last entry may be `<truncated>` sentinel) and `data.snippets` keyed by `symbols.id`; **`meta.truncated`** mirrors the sentinel for structured clients.",
+          "Bundled evidence in ONE call: exact-name hits (`symbols`) + FTS phrase anchors (`phrases`) + batched signature/JSDoc snippets. Use `phrases` for architectural or vague discovery, not only when exact names miss. JSON: `data.symbols` and `data.snippets` keyed by `symbols.id`. Read `meta.durationMs`, `meta.cost` (heavy), `meta.truncated`, and `meta.suggestions` when slow and low-yield — if `data.snippets` already answers the task, cite from there and ignore suggestions.",
         ),
       database: databaseField,
       package_name: z
@@ -253,7 +253,7 @@ export const nciQueryInputSchema = z.preprocess(
         .array(z.string())
         .optional()
         .describe(
-          "FTS phrase anchors (CLI: repeatable `--phrase`). Use when exact-name lookup may miss the symbol.",
+          "FTS phrase anchors (CLI: repeatable `--phrase`). Use for architectural or vague discovery; runs alongside `symbols`, not only as a fallback.",
         ),
       kind_name: z
         .string()
@@ -293,7 +293,7 @@ export type NciQueryInput = z.infer<typeof nciQueryInputSchema>;
 export const nciQueryDescription =
   "Query the NCI index for symbols, packages, and source packages (CLI equivalent: `nci query <subcommand>`). " +
   "Subcommands: evidence (bundled exact + FTS hits + batched snippets — preferred for 'find these symbols and cite them'), find (FTS), symbol (exact), show, snippet, overloads, packages, package_versions, package_deps, source_packages, active_package, symbols (paginated). " +
-  'JSON output uses `{"ok":true,"data":...,"meta":...}` on success: **`meta`** always includes **`envelopeVersion`** and **`query`**, plus limits/truncation hints (see CLI). ' +
+  'JSON output uses `{"ok":true,"data":...,"meta":...}` on success: **`meta`** includes **`envelopeVersion`**, **`query`**, **`durationMs`**, **`cost`**, limits/truncation, and optional **`suggestions`** (lighter commands when a call was slow and unproductive). ' +
   "Use `nci_sql` for relational joins. `nci sql` uses `--max-rows` (not `--limit`).";
 
 type SymbolFilterInput = {
