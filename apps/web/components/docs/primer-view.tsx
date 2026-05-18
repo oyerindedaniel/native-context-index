@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
@@ -189,18 +188,9 @@ export function PrimerView() {
         {active.hint}
       </p>
 
-      <AnimatePresence mode="wait">
-        <motion.pre
-          key={active.id}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="max-h-[32rem] overflow-y-auto rounded-2xl border border-border bg-code-surface px-5 py-4 font-mono text-[0.78rem] leading-relaxed whitespace-pre-wrap text-white/85 shadow-[inset_0_1px_#ffffff10]"
-        >
-          {text}
-        </motion.pre>
-      </AnimatePresence>
+      <pre className="max-h-[32rem] overflow-y-auto rounded-2xl border border-border bg-code-surface px-5 py-4 font-mono text-[0.78rem] leading-relaxed whitespace-pre-wrap text-white/85 shadow-[inset_0_1px_#ffffff10]">
+        {text}
+      </pre>
     </section>
   );
 }

@@ -3,6 +3,11 @@ import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widget
 import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/terminal";
 import { IntegrationAgentLoopDemo } from "./agent-loop-demo";
 
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/integration");
+
+
 <PageEyebrow>Agent Integration</PageEyebrow>
 
 # Drop NCI into the loop

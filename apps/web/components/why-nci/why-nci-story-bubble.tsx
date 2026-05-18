@@ -1,9 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ORIGIN_SCENE_CAPTIONS } from "@/lib/why-nci/origin-cinema-script";
-import { useWhyNciStory } from "@/components/why-nci/why-nci-story-context";
 import { cn } from "@/lib/utils";
 
 const BUBBLE_MOTION = {
@@ -22,46 +20,32 @@ const BUBBLE_MOTION = {
   },
 };
 
+const CAPTION_IDLE_HINT =
+  "Short captions appear here between steps while the trace pauses so you can read what changed.";
+
 export interface WhyNciStoryBubbleProps {
+  readonly sceneIndex: number;
+  readonly scrollArmed: boolean;
   readonly className?: string;
 }
 
-export function WhyNciStoryBubble({ className }: WhyNciStoryBubbleProps) {
-  const { narrationSceneIndex, originCinemaUserPaused } = useWhyNciStory();
-  const lastNarrationIndexRef = React.useRef<number | null>(null);
+export function WhyNciStoryBubble({
+  sceneIndex,
+  scrollArmed,
+  className,
+}: WhyNciStoryBubbleProps) {
+  const clampedSceneIndex = Math.min(
+    Math.max(0, sceneIndex),
+    ORIGIN_SCENE_CAPTIONS.length - 1,
+  );
+  const sceneTotal = ORIGIN_SCENE_CAPTIONS.length;
+  const sceneNumber = clampedSceneIndex + 1;
 
-  const currentNarrationSceneIndex = narrationSceneIndex;
-  if (
-    currentNarrationSceneIndex !== null &&
-    currentNarrationSceneIndex >= 0 &&
-    currentNarrationSceneIndex < ORIGIN_SCENE_CAPTIONS.length
-  ) {
-    lastNarrationIndexRef.current = currentNarrationSceneIndex;
-  }
+  const captionText = scrollArmed
+    ? ORIGIN_SCENE_CAPTIONS[clampedSceneIndex]
+    : null;
 
-  const activeCaptionIndex = React.useMemo(() => {
-    if (
-      currentNarrationSceneIndex !== null &&
-      currentNarrationSceneIndex >= 0 &&
-      currentNarrationSceneIndex < ORIGIN_SCENE_CAPTIONS.length
-    ) {
-      return currentNarrationSceneIndex;
-    }
-    if (
-      originCinemaUserPaused &&
-      lastNarrationIndexRef.current !== null &&
-      lastNarrationIndexRef.current >= 0 &&
-      lastNarrationIndexRef.current < ORIGIN_SCENE_CAPTIONS.length
-    ) {
-      return lastNarrationIndexRef.current;
-    }
-    return null;
-  }, [currentNarrationSceneIndex, originCinemaUserPaused]);
-
-  const captionText =
-    activeCaptionIndex !== null
-      ? ORIGIN_SCENE_CAPTIONS[activeCaptionIndex]
-      : null;
+  const captionKey = captionText !== null ? `cap-${clampedSceneIndex}` : "idle";
 
   return (
     <aside
@@ -71,7 +55,7 @@ export function WhyNciStoryBubble({ className }: WhyNciStoryBubbleProps) {
       <AnimatePresence mode="wait" initial={false}>
         {captionText !== null ? (
           <motion.div
-            key={`cap-${activeCaptionIndex}`}
+            key={captionKey}
             layout
             {...BUBBLE_MOTION}
             className="relative will-change-transform"
@@ -82,8 +66,16 @@ export function WhyNciStoryBubble({ className }: WhyNciStoryBubbleProps) {
                 "border-l-[3px] border-l-primary/35 pl-[calc(1rem-3px)]",
               )}
             >
-              <div className="text-[0.875rem] leading-relaxed tracking-tight-p text-muted">
-                {captionText}
+              <div className="flex gap-3">
+                <span
+                  className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-semibold tabular-nums tracking-tight text-primary"
+                  aria-label={`Step ${sceneNumber} of ${sceneTotal}`}
+                >
+                  {sceneNumber}
+                </span>
+                <p className="min-w-0 flex-1 pt-0.5 text-[0.875rem] leading-relaxed tracking-tight-p text-muted">
+                  {captionText}
+                </p>
               </div>
             </div>
           </motion.div>
@@ -94,8 +86,7 @@ export function WhyNciStoryBubble({ className }: WhyNciStoryBubbleProps) {
             animate={{ opacity: 1 }}
             className="rounded-xl border border-dashed border-border/80 bg-surface/50 px-4 py-3 text-[0.8125rem] leading-snug tracking-tight-p text-muted/85"
           >
-            Short captions appear here between steps while the trace pauses so
-            you can read what changed.
+            {CAPTION_IDLE_HINT}
           </motion.div>
         )}
       </AnimatePresence>

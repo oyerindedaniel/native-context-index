@@ -4,7 +4,7 @@ This workspace uses Tailwind CSS v4 with tokens defined in `app/globals.css` und
 
 ## Font system
 
-- Fonts: `Inter` (Sans), `Geist Mono` (Monospace / code), `Inter Tight` (Display Sans — single hero use only), and `Instrument Serif` (Display Serif).
+- Fonts: `Inter` (sans), `Geist Mono` (monospace / code), and `Inter Tight` (display sans — **only** for the primary hero label `Native Context Index`).
 - The fonts are configured in `app/layout.tsx` and exposed via `@theme` in `app/globals.css`.
 - Global aliases: `--font-sans: var(--font-inter)`, `--font-mono: var(--font-geist-mono), …` — use Tailwind `font-mono` for all code, terminals, JSON snippets, and inline `<code>` in MDX.
 - **Note**: `Inter Tight` is strictly reserved for the primary hero label (`Native Context Index`) and is not to be used elsewhere. All other uppercase labels should use standard `Inter` with appropriate tracking.
@@ -45,7 +45,7 @@ This workspace uses Tailwind CSS v4 with tokens defined in `app/globals.css` und
   - `h1-h3`: `letter-spacing: -0.05em`, `line-height: 0.9`
   - `h4-h6`: `letter-spacing: -0.025em`, `line-height: 1.1`
 - Body copy (`p`) uses tight tracking (`-0.025em`) with `line-height: 1.6` for readability.
-- This creates hierarchy using a mix of Sans, Tight, and Serif variants to create a sophisticated, high-contrast product feel.
+- This creates hierarchy using Inter for almost all UI and copy, with Inter Tight reserved for the hero product name only.
 
 ## Letter-spacing tokens
 

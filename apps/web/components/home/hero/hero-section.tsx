@@ -58,7 +58,7 @@ export function HeroSection() {
           }}
         >
           <div className={cn("flex flex-col", SECTION_SHELL)}>
-            <div className="ml-auto flex w-full max-w-xl flex-col md:ml-0">
+            <div className="ml-auto flex w-full max-w-lg flex-col md:ml-0">
               <motion.span
                 className="mb-3 font-inter-tight text-sm font-medium tracking-[0.11em] text-ink/90 uppercase sm:text-base"
                 variants={{
@@ -98,7 +98,7 @@ export function HeroSection() {
               </motion.h1>
 
               <motion.p
-                className="mt-3 max-w-[34rem] text-base text-pretty leading-relaxed tracking-tight-p text-muted sm:text-lg"
+                className="mt-3 max-w-[34rem] ml-auto md:ml-0 text-base text-pretty leading-relaxed tracking-tight-p text-muted sm:text-lg"
                 variants={{
                   hidden: isDesktopLayout
                     ? { opacity: 0, x: -22, filter: "blur(8px)" }

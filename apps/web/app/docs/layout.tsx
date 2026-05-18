@@ -1,5 +1,6 @@
 import * as React from "react";
 import Image from "next/image";
+import { createDocsSectionMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import {
   DocsNavRoot,
@@ -13,6 +14,8 @@ import { PrevNext } from "@/components/docs/widgets/prev-next";
 import { TocRail } from "@/components/docs/widgets/toc-rail";
 import { DocsSidebarFooter } from "@/components/docs/docs-sidebar-footer";
 import { docsGroups } from "@/lib/docs/registry";
+
+export const metadata = createDocsSectionMetadata();
 
 export default function DocsLayout({
   children,

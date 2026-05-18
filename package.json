@@ -10,6 +10,7 @@
     "check-types": "turbo run check-types",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
+    "prebuild": "pnpm run release:sync-versions && pnpm run sync:skill-primer",
     "release:sync-versions": "tsx scripts/sync-publish-versions.ts",
     "release:verify-versions": "tsx scripts/verify-publish-versions.ts",
     "sync:skill-primer": "tsx packages/nci-agent-primer/scripts/sync-skill-primer.ts",

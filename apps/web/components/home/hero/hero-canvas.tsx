@@ -72,6 +72,12 @@ const LOGO_TILT_MAX_X = 0.09;
 const LOGO_TILT_MAX_Y = 0.11;
 const LOGO_TILT_MAX_Z = 0.028;
 const LOGO_TILT_DAMP = 9;
+/** Idle sway (radians) layered under pointer tilt — keeps motion after pointer leaves. */
+const IDLE_TILT_AMP_X = 0.4;
+const IDLE_TILT_AMP_Y = 0.34;
+const IDLE_TILT_SPEED_X = 1.15;
+const IDLE_TILT_SPEED_Y = 0.92;
+const POINTER_TILT_BLEND = 0.55;
 
 /** Set on the logo pivot in `NCIModelMesh` before layout runs. */
 interface LogoPivotUserData {
@@ -236,7 +242,8 @@ function NCIModelMesh({
   hoverTiltRef: RefObject<THREE.Vector2>;
 }) {
   const rawObject = useLoader(OBJLoader, "/nci.obj");
-  const introStartRef = useRef<number | null>(null);
+  const animTimeRef = useRef(0);
+  const introAnchorRef = useRef<number | null>(null);
   const meshesRef = useRef<THREE.Mesh[]>([]);
   const localHitRef = useRef(new THREE.Vector3());
 
@@ -307,14 +314,23 @@ function NCIModelMesh({
   }, [pivotGroup, compactViewport]);
 
   useFrame((state, delta) => {
-    introStartRef.current ??= state.clock.getElapsedTime();
-    const elapsed = state.clock.getElapsedTime() - introStartRef.current;
+    animTimeRef.current += delta;
+    introAnchorRef.current ??= animTimeRef.current;
+    const elapsed = animTimeRef.current - introAnchorRef.current;
+    const animTime = animTimeRef.current;
     const reveal = Math.min(elapsed / 1.6, 1);
     pivotGroup.updateWorldMatrix(true, true);
 
     const pivotData = logoPivotUserData(pivotGroup);
-    let targetTiltX = 0;
-    let targetTiltY = 0;
+    const idleTiltX = reducedMotion
+      ? 0
+      : Math.sin(animTime * IDLE_TILT_SPEED_X) * IDLE_TILT_AMP_X * reveal;
+    const idleTiltY = reducedMotion
+      ? 0
+      : Math.cos(animTime * IDLE_TILT_SPEED_Y) * IDLE_TILT_AMP_Y * reveal;
+
+    let targetTiltX = idleTiltX;
+    let targetTiltY = idleTiltY;
 
     if (!reducedMotion) {
       state.raycaster.setFromCamera(state.pointer, state.camera);
@@ -322,16 +338,18 @@ function NCIModelMesh({
       if (hit) {
         localHitRef.current.copy(hit.point);
         pivotGroup.worldToLocal(localHitRef.current);
-        targetTiltY = THREE.MathUtils.clamp(
+        const pointerTiltY = THREE.MathUtils.clamp(
           localHitRef.current.x / pivotData.tiltHalfWidth,
           -1,
           1,
         );
-        targetTiltX = THREE.MathUtils.clamp(
+        const pointerTiltX = THREE.MathUtils.clamp(
           localHitRef.current.y / pivotData.tiltHalfHeight,
           -1,
           1,
         );
+        targetTiltX = idleTiltX + pointerTiltX * POINTER_TILT_BLEND;
+        targetTiltY = idleTiltY + pointerTiltY * POINTER_TILT_BLEND;
       }
     }
 
@@ -444,6 +462,10 @@ export function HeroCanvas() {
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
+        }}
+        onCreated={({ gl }) => {
+          // ANGLE/D3D often logs benign float-precision warnings for MeshPhysicalMaterial.
+          gl.debug.checkShaderErrors = false;
         }}
       >
         <color attach="background" args={["#ffffff"]} />

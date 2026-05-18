@@ -45,7 +45,6 @@ export function WhyNciStoryProvider({
     }
     setNarrationSceneIndex(null);
     setTimelineSuspended(false);
-    setOriginCinemaUserPaused(false);
   }, []);
 
   const scheduleBetweenScenes = React.useCallback(

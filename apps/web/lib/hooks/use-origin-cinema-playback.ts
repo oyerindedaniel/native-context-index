@@ -101,10 +101,6 @@ export function useOriginCinemaPlayback() {
     sceneIndex: 0,
     beatIndex: 0,
   });
-  const playbackCursorRef = React.useRef(playbackCursor);
-  React.useLayoutEffect(() => {
-    playbackCursorRef.current = playbackCursor;
-  }, [playbackCursor]);
 
   const [pendingBetweenScenesSceneIndex, setPendingBetweenScenesSceneIndex] =
     React.useState<number | null>(null);
@@ -150,11 +146,10 @@ export function useOriginCinemaPlayback() {
     !story.timelineSuspended &&
     !story.originCinemaUserPaused;
 
-  const appendSettledAndAdvance = React.useCallback(
-    (_completedBeat: OriginBeat) => {
-      setSettledEntries((previous) => [...previous, _completedBeat]);
-      const previousCursor = playbackCursorRef.current;
-      const outcome = computePlaybackOutcomeAfterBeatCompletes(previousCursor);
+  const appendSettledAndAdvance = React.useEffectEvent(
+    (completedBeat: OriginBeat) => {
+      setSettledEntries((previous) => [...previous, completedBeat]);
+      const outcome = computePlaybackOutcomeAfterBeatCompletes(playbackCursor);
       setPlaybackCursor(outcome.nextCursor);
       if (outcome.pendingBetweenScenesSceneIndex !== null) {
         setPendingBetweenScenesSceneIndex(
@@ -165,7 +160,6 @@ export function useOriginCinemaPlayback() {
         setCinemaComplete(true);
       }
     },
-    [],
   );
 
   const jumpToScene = React.useCallback(
@@ -180,7 +174,6 @@ export function useOriginCinemaPlayback() {
       setSettledEntries([]);
       resetPartials();
       setCinemaComplete(false);
-      story.setOriginCinemaUserPaused(false);
     },
     [resetPartials, story],
   );
@@ -188,14 +181,15 @@ export function useOriginCinemaPlayback() {
   const restartFromBeginning = React.useCallback(() => {
     jumpToScene(0);
     story.setOriginCinemaScrollArmed(true);
+    story.setOriginCinemaUserPaused(false);
   }, [jumpToScene, story]);
 
   const stepSceneBackward = React.useCallback(() => {
-    jumpToScene(playbackCursorRef.current.sceneIndex - 1);
-  }, [jumpToScene]);
+    jumpToScene(playbackCursor.sceneIndex - 1);
+  }, [jumpToScene, playbackCursor.sceneIndex]);
 
   const stepSceneForward = React.useCallback(() => {
-    const nextSceneIndex = playbackCursorRef.current.sceneIndex + 1;
+    const nextSceneIndex = playbackCursor.sceneIndex + 1;
     if (nextSceneIndex >= ORIGIN_SCENES.length) {
       const lastScene = ORIGIN_SCENES[ORIGIN_SCENES.length - 1];
       story.clearBetweenScenes();
@@ -210,7 +204,7 @@ export function useOriginCinemaPlayback() {
       return;
     }
     jumpToScene(nextSceneIndex);
-  }, [jumpToScene, resetPartials, story]);
+  }, [jumpToScene, playbackCursor.sceneIndex, resetPartials, story]);
 
   const togglePlayPause = React.useCallback(() => {
     if (cinemaComplete) {
@@ -242,6 +236,7 @@ export function useOriginCinemaPlayback() {
     return () => window.clearTimeout(timeoutId);
   }, [timelineRunning, currentBeat, monoRevealLength]);
 
+  /* eslint-disable react-hooks/exhaustive-deps -- `appendSettledAndAdvance` is `useEffectEvent`; omit from deps */
   React.useEffect(() => {
     if (!timelineRunning) {
       return;
@@ -257,7 +252,7 @@ export function useOriginCinemaPlayback() {
       appendSettledAndAdvance(monoBeat);
     }, MONO_HOLD_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [timelineRunning, currentBeat, monoRevealLength, appendSettledAndAdvance]);
+  }, [timelineRunning, currentBeat, monoRevealLength]);
 
   React.useEffect(() => {
     if (!timelineRunning) {
@@ -270,7 +265,7 @@ export function useOriginCinemaPlayback() {
       appendSettledAndAdvance(currentBeat);
     }, PILL_DWELL_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [timelineRunning, currentBeat, appendSettledAndAdvance]);
+  }, [timelineRunning, currentBeat]);
 
   React.useEffect(() => {
     if (!timelineRunning) {
@@ -327,7 +322,8 @@ export function useOriginCinemaPlayback() {
       appendSettledAndAdvance(cardBeat);
     }, CARD_BODY_DWELL_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [timelineRunning, currentBeat, cardBodyVisible, appendSettledAndAdvance]);
+  }, [timelineRunning, currentBeat, cardBodyVisible]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const partialMonoText =
     currentBeat?.beatKind === "mono"
@@ -384,3 +380,5 @@ export function useOriginCinemaPlayback() {
     isLastScene,
   };
 }
+
+export type OriginCinemaPlayback = ReturnType<typeof useOriginCinemaPlayback>;

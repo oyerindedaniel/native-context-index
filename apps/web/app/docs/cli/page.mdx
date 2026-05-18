@@ -13,6 +13,11 @@ import {
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { cliFlags, cliSubcommands } from "@/lib/docs/cli-flags";
 
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/cli");
+
+
 <PageEyebrow>CLI API</PageEyebrow>
 
 # Every flag, in one searchable table

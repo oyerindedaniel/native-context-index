@@ -46,7 +46,6 @@
     var(--font-geist-mono), ui-monospace, SFMono-Regular, "JetBrains Mono",
     Menlo, Consolas, monospace;
   --font-inter-tight: var(--font-inter-tight);
-  --font-instrument-serif: var(--font-instrument-serif);
 
   --tracking-tight-sub: -0.05em;
   --tracking-tight-p: -0.025em;

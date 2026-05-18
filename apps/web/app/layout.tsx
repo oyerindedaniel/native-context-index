@@ -1,9 +1,11 @@
-import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Inter, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
-import "./globals.css";
-import { cn } from "../lib/utils";
 import Script from "next/script";
+
+import { createRootMetadata } from "@/lib/site-metadata";
+import { cn } from "../lib/utils";
+import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,26 +25,7 @@ const interTight = localFont({
   weight: "400",
 });
 
-const instrumentSerif = localFont({
-  src: [
-    {
-      path: "./fonts/InstrumentSerif-Regular.woff",
-      weight: "400",
-      style: "normal",
-    },
-    {
-      path: "./fonts/InstrumentSerif-Italic.woff",
-      weight: "400",
-      style: "italic",
-    },
-  ],
-  variable: "--font-instrument-serif",
-});
-
-export const metadata: Metadata = {
-  title: "Native Context Index",
-  description: "Native Context Index design system workspace",
-};
+export const metadata = createRootMetadata();
 
 export default function RootLayout({
   children,
@@ -52,12 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        inter.variable,
-        geistMono.variable,
-        interTight.variable,
-        instrumentSerif.variable,
-      )}
+      className={cn(inter.variable, geistMono.variable, interTight.variable)}
     >
       <body className="font-sans">
         {process.env.NODE_ENV === "development" && (
@@ -70,6 +48,7 @@ export default function RootLayout({
           />
         )}
         {children}
+        <Analytics />
       </body>
     </html>
   );

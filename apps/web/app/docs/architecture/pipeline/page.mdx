@@ -3,6 +3,11 @@ import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widget
 import { PipelineFlow } from "@/components/docs/widgets/pipeline-flow";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/architecture/pipeline");
+
+
 <PageEyebrow>Architecture · Pipeline</PageEyebrow>
 
 # Pipeline internals

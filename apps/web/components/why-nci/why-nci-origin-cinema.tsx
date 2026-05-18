@@ -4,7 +4,7 @@ import * as React from "react";
 import { motion } from "motion/react";
 import { StagedDemo } from "@/components/marketing/staged-demo";
 import { cn } from "@/lib/utils";
-import { useOriginCinemaPlayback } from "@/lib/hooks/use-origin-cinema-playback";
+import type { OriginCinemaPlayback } from "@/lib/hooks/use-origin-cinema-playback";
 import {
   CinemaReducedMotionSummary,
   OriginCinemaStageContent,
@@ -26,15 +26,15 @@ const TEMP_CALIPER_DISABLE_PAUSE_OVERLAY = false;
 export type OriginCinemaVariant = "overlay" | "player";
 
 export interface WhyNciOriginCinemaProps {
+  readonly playback: OriginCinemaPlayback;
   /** `overlay` = tap-to-pause with resume/replay sheet. `player` = hover-reveal bottom chrome. */
-  variant?: OriginCinemaVariant;
+  readonly variant?: OriginCinemaVariant;
 }
 
 export function WhyNciOriginCinema({
+  playback,
   variant = "player",
 }: WhyNciOriginCinemaProps) {
-  const playback = useOriginCinemaPlayback();
-
   const {
     prefersReducedMotion,
     rootRef,

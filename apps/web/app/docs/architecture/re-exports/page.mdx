@@ -2,6 +2,11 @@ import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/architecture/re-exports");
+
+
 <PageEyebrow>Architecture · Re-exports</PageEyebrow>
 
 # Re-export and dependency resolution

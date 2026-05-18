@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
 import { ChangelogShell } from "@/components/changelog/changelog-shell";
+import { createMarketingPageMetadata } from "@/lib/site-metadata";
 import { SiteMarketingFooter } from "@/components/marketing/site-marketing-footer";
 import { SiteHeader } from "@/components/site/site-header";
 
-export const metadata: Metadata = {
-  title: "Changelog — Native Context Index",
+export const metadata = createMarketingPageMetadata({
+  title: "Changelog",
   description: "Release notes and updates for Native Context Index.",
-};
+  pathname: "/changelog",
+});
 
 export default function ChangelogLayout({
   children,

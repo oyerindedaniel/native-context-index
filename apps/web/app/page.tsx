@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+
+import { createMarketingPageMetadata } from "@/lib/site-metadata";
+
 import { HeroSection } from "../components/home/hero/hero-section";
 import { HomeCliCinema } from "../components/home/home-cli-cinema";
 import { FeaturesSection } from "../components/home/features/features-section";
@@ -5,6 +9,13 @@ import { HomeBenchmarkSection } from "../components/home/benchmark/home-benchmar
 import { IntegrationsSection } from "../components/home/integrations/integrations-section";
 import { HomeFaqSection } from "../components/home/faq/home-faq-section";
 import { SiteMarketingFooter } from "../components/marketing/site-marketing-footer";
+
+export const metadata: Metadata = createMarketingPageMetadata({
+  title: "Native Context Index",
+  description:
+    "Index TypeScript declarations from your node_modules into a local SQLite database. Query exact signatures, overloads, and dependency edges from the CLI or MCP.",
+  pathname: "/",
+});
 
 export default function Home() {
   return (

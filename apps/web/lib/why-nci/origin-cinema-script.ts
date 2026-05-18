@@ -49,23 +49,6 @@ export const ORIGIN_SCENES: readonly OriginScene[] = [
     ],
   },
   {
-    sceneKey: "fetch-docs",
-    beats: [
-      {
-        beatKind: "mono",
-        text: "Fetched page https://docs.expo.dev/versions/latest/sdk/camera/",
-      },
-      {
-        beatKind: "card",
-        title: "docs.expo.dev /versions/latest/sdk/camera/",
-        body:
-          "# Expo Camera\n\n" +
-          "A React component that renders a preview for the device's front or back camera. Android (device only), iOS (device only), Web, Included in Expo Go.\n\n" +
-          "> For the complete documentation index, see llms.txt.",
-      },
-    ],
-  },
-  {
     sceneKey: "read-types",
     beats: [
       { beatKind: "mono", text: "Read types.d.ts L1–7" },
@@ -110,6 +93,14 @@ export const ORIGIN_SCENES: readonly OriginScene[] = [
         typingMsPerChar: 7,
       },
       {
+        beatKind: "card",
+        title: "docs.expo.dev /versions/latest/sdk/camera/",
+        body:
+          "# Expo Camera\n\n" +
+          "A React component that renders a preview for the device's front or back camera. Android (device only), iOS (device only), Web, Included in Expo Go.\n\n" +
+          "> For the complete documentation index, see llms.txt.",
+      },
+      {
         beatKind: "mono",
         text: "Grepped useCameraPermissions|getPermission in …",
         typingMsPerChar: 8,
@@ -126,8 +117,7 @@ export const ORIGIN_SCENES: readonly OriginScene[] = [
 /** Short narration shown beside the trace after each scene finishes. */
 export const ORIGIN_SCENE_CAPTIONS: readonly string[] = [
   "The agent searched generated modules for permission hooks and came back empty. That mismatch is common when names live behind re-exports or build stubs.",
-  "A second pattern search for factory-style hooks also missed. At this point the trace is still entirely local — nothing has indexed the graph yet.",
-  "With local hits exhausted, the next step is often public docs: accurate for orientation, but not tied to the exact build on disk.",
+  "A second pattern search for factory-style hooks also missed. At this point the trace is still entirely local.",
   "The agent then opens small declaration slices and narrows the search toward the camera package, still line by line.",
-  "After more reads and retries, the shape of the API becomes clear from the types themselves — the same conclusion NCI is built to surface in one indexed pass.",
+  "After more reads and retries, the next step is often public docs: accurate for orientation. The shape of the API becomes clear — the same conclusion NCI is built to surface in one indexed pass.",
 ];

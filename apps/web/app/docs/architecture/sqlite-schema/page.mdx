@@ -3,6 +3,11 @@ import { TerminalRoot, TerminalCommand } from "@/components/docs/widgets/termina
 import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
 import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
 
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/architecture/sqlite-schema");
+
+
 <PageEyebrow>Architecture · SQLite schema</PageEyebrow>
 
 # The on-disk schema

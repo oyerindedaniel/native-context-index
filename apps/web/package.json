@@ -5,6 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
+    "sync-docs-metadata": "node ./scripts/sync-docs-metadata.mjs",
+    "prebuild": "pnpm run sync-docs-metadata",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
@@ -27,6 +29,7 @@
     "@repo/nci-agent-primer": "workspace:^",
     "@repo/ui": "workspace:*",
     "@types/mdx": "^2.0.13",
+    "@vercel/analytics": "^2.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "github-slugger": "^2.0.0",
