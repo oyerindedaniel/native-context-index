@@ -1,128 +1,36 @@
-# nci-mcp
+<p align="center">
+  <a href="https://nativecontextindex.com">
+    <img src="https://nativecontextindex.com/nci-full-logo.svg" alt="Native Context Index" width="320" />
+  </a>
+</p>
 
-Stdio MCP server for the Native Context Index CLI (`nci`). Exposes two tools that spawn the **native** `nci` executable directly:
+# @nativecontextindex/mcp
 
-| Tool        | CLI equivalent |
-| ----------- | -------------- |
-| `nci_sql`   | `nci sql …`    |
-| `nci_query` | `nci query …`  |
-
-**Output shapes**
-
-- **`nci_sql`** with `format: json` (default): stdout from `nci` is a **raw JSON array** of row objects (no `{"ok":…}` wrapper).
-- **`nci_query`** (always JSON): same envelope as the CLI: `{"ok":true,"data":…}` or `{"ok":false,…}`.
-
-## Optional `database` on tools
-
-There is **no MCP-specific environment variable** for the SQLite path. Behavior matches the CLI:
-
-- **Omit `database`** on `nci_sql` / `nci_query` so `nci` uses the database it already resolves from **NCI config**, `--database` defaults, and the **process working directory** (same as running `nci sql` / `nci query` in a shell without `--database`).
-- **Pass `database`** only when you need to **override** which file is used for that single tool call (multiple DBs, scripts, or debugging).
-- To **discover** the resolved path from inside MCP, read the **`nci://database/active`** resource (stdout of `nci db status --format json`). No extra MCP wiring is required beyond normal `nci` setup.
+Stdio MCP server for the [Native Context Index](https://nativecontextindex.com). It runs the native **`nci`** binary and exposes query tools plus primer resources for agents.
 
 ## Requirements
 
 - Node.js 18+
-- A native **`nci` binary** on your machine (see below)
+- A native **`nci`** executable from [`@nativecontextindex/cli`](https://www.npmjs.com/package/@nativecontextindex/cli)
 
-## Native binary (`NCI_BINARY`)
-
-Resolution matches the `nci` npm CLI wrapper:
-
-1. If **`NCI_BINARY`** is set, that path is used.
-2. Otherwise **`vendor/nci`** or **`vendor/nci.exe`** next to this package (under `node_modules/nci-mcp/vendor/` when installed).
-
-**Typical setup:** install both packages so the CLI downloads the binary, then point MCP at that file:
+## Install the CLI
 
 ```bash
-npm install nci nci-mcp
+npm install -g @nativecontextindex/cli
 ```
 
-**Scoped installs (recommended):** from the project where `nci` is a dependency, print the exact native path the CLI is using, then paste it into MCP `env.NCI_BINARY`:
+`pnpm`, `yarn`, and `bun`: [Installation](https://nativecontextindex.com/docs/installation).
 
-```bash
-pnpm exec nci binary-path
-# or: npx nci binary-path
-```
+## MCP config
 
-The `which` alias is the same as `binary-path`.
-
-You can still locate the file by hand (examples):
-
-- Unix-like: `node_modules/nci/vendor/nci`
-- Windows: `node_modules\nci\vendor\nci.exe`
-
-Set `NCI_BINARY` in the MCP config `env` to that absolute path.
-
-## Install
-
-From npm (when published):
-
-```bash
-npm install -g nci-mcp
-# also install `nci` (or build from source) and set NCI_BINARY
-```
-
-From this monorepo:
-
-```bash
-pnpm install
-pnpm --filter nci-mcp build
-```
-
-## Cursor / IDE MCP config
-
-MCP runs **`nci-mcp` as a local process** (stdio). The host does not clone the repo; you choose the command and environment.
-
-### Using global `nci-mcp` and `NCI_BINARY`
-
-```json
-{
-  "mcpServers": {
-    "nci": {
-      "command": "nci-mcp",
-      "env": {
-        "NCI_BINARY": "/absolute/path/to/nci"
-      }
-    }
-  }
-}
-```
-
-On Windows, use a Windows path for `NCI_BINARY`, e.g. `C:\\path\\to\\nci.exe`.
-
-### Monorepo / dev: `node` + built `dist/index.js`
-
-A ready-to-paste sample lives at **[`mcp.local.sample.json`](./mcp.local.sample.json)** — copy it into your IDE's MCP config (Cursor: `~/.cursor/mcp.json` or `<repo>/.cursor/mcp.json`) and adjust the two absolute paths to match your machine.
-
-```json
-{
-  "mcpServers": {
-    "nci": {
-      "command": "node",
-      "args": [
-        "C:/path/to/native-context-modules/packages/nci-mcp/dist/index.js"
-      ],
-      "env": {
-        "NCI_BINARY": "C:/path/to/native-context-modules/target/debug/nci.exe"
-      }
-    }
-  }
-}
-```
-
-Both paths must be **absolute** — the MCP host launches the process from its own working directory, so relative paths will not resolve. Run `pnpm --filter nci-mcp build` first so `dist/index.js` exists, and build the Rust crate (e.g. `cargo build -p nci-engine`) so `target/debug/nci.exe` exists.
-
-### `npx` (optional)
-
-Depending on the host, you can try:
+Add to your editor’s MCP settings (e.g. `~/.cursor/mcp.json`). Details: [MCP docs](https://nativecontextindex.com/docs/mcp) · [Cursor](https://nativecontextindex.com/docs/integrations/cursor) · [Claude](https://nativecontextindex.com/docs/integrations/claude)
 
 ```json
 {
   "mcpServers": {
     "nci": {
       "command": "npx",
-      "args": ["-y", "nci-mcp"],
+      "args": ["-y", "@nativecontextindex/mcp"],
       "env": {
         "NCI_BINARY": "/absolute/path/to/nci"
       }
@@ -131,10 +39,33 @@ Depending on the host, you can try:
 }
 ```
 
-## Publishing
+Set **`NCI_BINARY`** when the IDE’s PATH does not include `nci`. Run `nci binary-path` in a terminal to get the path.
 
-`nci-mcp` is a **separate** npm package from `nci`. Publish from `packages/nci-mcp` after `pnpm run build` (see `prepublishOnly` in `package.json`).
+In the workspace, run `nci init -y` and `nci index` before querying.
+
+## Tools
+
+| Tool        | Purpose                                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| `nci_query` | Structured search (`query find`, `query symbol`, `query evidence`, …) — JSON envelope `{"ok":true,"data":…,"meta":…}` |
+| `nci_sql`   | Read-only SQL on the index database — default `format: json` returns a JSON array of rows                             |
+
+Optional **`database`** on either tool overrides the SQLite path for that call; omit it to use the same resolution as the CLI (`nci.config.json`, cwd, cache dir).
+
+## Resources
+
+| URI                      | Use                                                       |
+| ------------------------ | --------------------------------------------------------- |
+| `nci://primer/agent`     | Read first — workflow for NCI tools                       |
+| `nci://primer/reference` | Schema / table reference                                  |
+| `nci://database/active`  | Active DB path and status (`nci db status --format json`) |
+
+## Docs
+
+- [MCP reference](https://nativecontextindex.com/docs/mcp) — tools, resources, wiring
+- [CLI reference](https://nativecontextindex.com/docs/cli) — flags and subcommands
+- [Quickstart](https://nativecontextindex.com/docs/quickstart) — install, init, index
 
 ## License
 
-Apache-2.0. See the [repository LICENSE](https://github.com/oyerindedaniel/native-context-index/blob/main/LICENSE).
+Apache-2.0

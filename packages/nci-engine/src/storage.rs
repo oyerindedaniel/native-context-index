@@ -374,12 +374,12 @@ fn apply_ro_connection_pragmas(
 fn flush_two_column_junction_batch(
     transaction: &Transaction<'_>,
     insert_prefix: &str,
-    pending_rows: &mut Vec<(i64, String)>,
+    pending_rows: &mut Vec<(i64, SharedString)>,
     chunk_size: usize,
 ) -> StorageResult<()> {
     while !pending_rows.is_empty() {
         let row_count = chunk_size.min(pending_rows.len());
-        let chunk: Vec<(i64, String)> = pending_rows.drain(..row_count).collect();
+        let chunk: Vec<(i64, SharedString)> = pending_rows.drain(..row_count).collect();
         let value_placeholders: String = (0..chunk.len())
             .map(|row_index| {
                 let param_base = row_index * 2 + 1;
@@ -393,7 +393,7 @@ fn flush_two_column_junction_batch(
             .flat_map(|(symbol_row_id, text_value)| {
                 [
                     SqliteValue::from(symbol_row_id),
-                    SqliteValue::from(text_value),
+                    SqliteValue::Text(text_value.to_string()),
                 ]
             })
             .collect();
@@ -419,16 +419,16 @@ fn record_two_column_junction(
     transaction: &Transaction<'_>,
     insert_prefix: &str,
     baseline_statement: &mut Statement<'_>,
-    pending_rows: &mut Vec<(i64, String)>,
+    pending_rows: &mut Vec<(i64, SharedString)>,
     symbol_row_id: i64,
-    text_value: &str,
+    text_value: SharedString,
 ) -> StorageResult<()> {
     match save_mode {
         SavePackageMode::Baseline => {
-            baseline_statement.execute(params![symbol_row_id, text_value])?;
+            baseline_statement.execute(params![symbol_row_id, text_value.as_ref()])?;
         }
         SavePackageMode::JunctionBatch { chunk_size } => {
-            pending_rows.push((symbol_row_id, text_value.to_string()));
+            pending_rows.push((symbol_row_id, text_value));
             if pending_rows.len() >= chunk_size {
                 flush_two_column_junction_batch(
                     transaction,
@@ -446,21 +446,21 @@ fn record_decorator_junction(
     save_mode: SavePackageMode,
     transaction: &Transaction<'_>,
     baseline_statement: &mut Statement<'_>,
-    pending_rows: &mut Vec<(i64, String, Option<String>)>,
+    pending_rows: &mut Vec<(i64, SharedString, Option<String>)>,
     symbol_row_id: i64,
-    decorator_name: &str,
+    decorator_name: SharedString,
     arguments_json: Option<String>,
 ) -> StorageResult<()> {
     match save_mode {
         SavePackageMode::Baseline => {
             baseline_statement.execute(params![
                 symbol_row_id,
-                decorator_name,
+                decorator_name.as_ref(),
                 arguments_json.as_deref()
             ])?;
         }
         SavePackageMode::JunctionBatch { chunk_size } => {
-            pending_rows.push((symbol_row_id, decorator_name.to_string(), arguments_json));
+            pending_rows.push((symbol_row_id, decorator_name, arguments_json));
             if pending_rows.len() >= chunk_size {
                 flush_decorator_junction_batch(transaction, pending_rows, chunk_size)?;
             }
@@ -471,12 +471,13 @@ fn record_decorator_junction(
 
 fn flush_decorator_junction_batch(
     transaction: &Transaction<'_>,
-    pending_rows: &mut Vec<(i64, String, Option<String>)>,
+    pending_rows: &mut Vec<(i64, SharedString, Option<String>)>,
     chunk_size: usize,
 ) -> StorageResult<()> {
     while !pending_rows.is_empty() {
         let row_count = chunk_size.min(pending_rows.len());
-        let chunk: Vec<(i64, String, Option<String>)> = pending_rows.drain(..row_count).collect();
+        let chunk: Vec<(i64, SharedString, Option<String>)> =
+            pending_rows.drain(..row_count).collect();
         let value_placeholders: String = (0..chunk.len())
             .map(|row_index| {
                 let param_base = row_index * 3 + 1;
@@ -492,7 +493,7 @@ fn flush_decorator_junction_batch(
             .flat_map(|(symbol_row_id, decorator_name, arguments_json)| {
                 [
                     SqliteValue::from(symbol_row_id),
-                    SqliteValue::from(decorator_name),
+                    SqliteValue::Text(decorator_name.to_string()),
                     arguments_json
                         .map(SqliteValue::from)
                         .unwrap_or(SqliteValue::Null),
@@ -502,6 +503,43 @@ fn flush_decorator_junction_batch(
         transaction.execute(&sql, params_from_iter(sql_params.iter()))?;
     }
     Ok(())
+}
+
+struct PackageJunctionMaps {
+    dependencies: HashMap<i64, Vec<SharedString>>,
+    surface_dependencies: HashMap<i64, Vec<SharedString>>,
+    additional_files: HashMap<i64, Vec<SharedString>>,
+    heritage: HashMap<i64, Vec<SharedString>>,
+    modifiers: HashMap<i64, Vec<SharedString>>,
+    inherited_from_sources: HashMap<i64, Vec<SharedString>>,
+}
+
+fn take_junction_shared_vec(
+    map: &mut HashMap<i64, Vec<SharedString>>,
+    symbol_row_id: i64,
+) -> SharedVec<SharedString> {
+    match map.remove(&symbol_row_id) {
+        Some(values) => SharedVec::from(values.into_boxed_slice()),
+        None => SharedVec::from(Vec::new().into_boxed_slice()),
+    }
+}
+
+fn take_optional_junction_shared_vec(
+    map: &mut HashMap<i64, Vec<SharedString>>,
+    symbol_row_id: i64,
+) -> Option<SharedVec<SharedString>> {
+    map.remove(&symbol_row_id)
+        .map(|values| SharedVec::from(values.into_boxed_slice()))
+}
+
+fn take_junction_decorators(
+    map: &mut HashMap<i64, Vec<DecoratorMetadata>>,
+    symbol_row_id: i64,
+) -> SharedVec<DecoratorMetadata> {
+    match map.remove(&symbol_row_id) {
+        Some(values) => SharedVec::from(values.into_boxed_slice()),
+        None => SharedVec::from(Vec::new().into_boxed_slice()),
+    }
 }
 
 fn signature_snippet(signature_text: Option<&str>) -> Option<String> {
@@ -873,50 +911,8 @@ impl NciDatabase {
             Err(_) => return None,
         };
 
-        let deps_map = self.bulk_load_string_junction(
-            "SELECT from_symbol_id, to_symbol_id_text FROM symbol_dependencies
-             JOIN symbols ON symbols.symbol_id = from_symbol_id
-             WHERE symbols.package_id = ?1",
-            package_id,
-        );
-        let surface_deps_map = self.bulk_load_string_junction(
-            "SELECT from_symbol_id, to_symbol_id_text FROM symbol_surface_dependencies
-             JOIN symbols ON symbols.symbol_id = from_symbol_id
-             WHERE symbols.package_id = ?1",
-            package_id,
-        );
-
-        let additional_map = self.bulk_load_string_junction(
-            "SELECT symbol_additional_files.symbol_id, file_path FROM symbol_additional_files
-             JOIN symbols ON symbols.symbol_id = symbol_additional_files.symbol_id
-             WHERE symbols.package_id = ?1",
-            package_id,
-        );
-
-        let heritage_map = self.bulk_load_string_junction(
-            "SELECT symbol_heritage.symbol_id, heritage FROM symbol_heritage
-             JOIN symbols ON symbols.symbol_id = symbol_heritage.symbol_id
-             WHERE symbols.package_id = ?1",
-            package_id,
-        );
-
-        let modifier_map = self.bulk_load_string_junction(
-            "SELECT symbol_modifiers.symbol_id, modifier FROM symbol_modifiers
-             JOIN symbols ON symbols.symbol_id = symbol_modifiers.symbol_id
-             WHERE symbols.package_id = ?1",
-            package_id,
-        );
-
-        let decorator_map = self.bulk_load_decorators(package_id);
-
-        let inherited_map = self.bulk_load_string_junction(
-            "SELECT symbol_inherited_from_sources.symbol_id, source_symbol_id_text
-             FROM symbol_inherited_from_sources
-             JOIN symbols ON symbols.symbol_id = symbol_inherited_from_sources.symbol_id
-             WHERE symbols.package_id = ?1
-             ORDER BY symbol_inherited_from_sources.symbol_id, source_symbol_id_text",
-            package_id,
-        );
+        let mut junction_maps = self.bulk_load_package_junction_maps(package_id);
+        let mut decorator_map = self.bulk_load_decorators(package_id);
 
         let mut symbol_stmt = self
             .connection
@@ -967,8 +963,6 @@ impl NciDatabase {
             })
             .ok()?;
 
-        let empty_string_vec: Vec<SharedString> = Vec::new();
-        let empty_decorator_vec: Vec<DecoratorMetadata> = Vec::new();
         let mut symbols: Vec<SymbolNode> = Vec::with_capacity(stored_total_symbols as usize);
 
         for row_result in symbol_rows.flatten() {
@@ -1006,48 +1000,17 @@ impl NciDatabase {
             let merge_provenance = merge_provenance_from_db(merge_provenance_json_opt);
             let entry_visibility = entry_visibility_from_db(entry_visibility_json_opt);
 
-            let dependencies = SharedVec::from(
-                deps_map
-                    .get(&symbol_row_id)
-                    .unwrap_or(&empty_string_vec)
-                    .clone()
-                    .into_boxed_slice(),
+            let dependencies =
+                take_junction_shared_vec(&mut junction_maps.dependencies, symbol_row_id);
+            let surface_dependencies =
+                take_junction_shared_vec(&mut junction_maps.surface_dependencies, symbol_row_id);
+            let additional_files = take_optional_junction_shared_vec(
+                &mut junction_maps.additional_files,
+                symbol_row_id,
             );
-            let surface_dependencies = SharedVec::from(
-                surface_deps_map
-                    .get(&symbol_row_id)
-                    .unwrap_or(&empty_string_vec)
-                    .clone()
-                    .into_boxed_slice(),
-            );
-
-            let additional_files = additional_map
-                .get(&symbol_row_id)
-                .map(|file_vec| SharedVec::from(file_vec.clone().into_boxed_slice()));
-
-            let heritage = SharedVec::from(
-                heritage_map
-                    .get(&symbol_row_id)
-                    .unwrap_or(&empty_string_vec)
-                    .clone()
-                    .into_boxed_slice(),
-            );
-
-            let modifiers = SharedVec::from(
-                modifier_map
-                    .get(&symbol_row_id)
-                    .unwrap_or(&empty_string_vec)
-                    .clone()
-                    .into_boxed_slice(),
-            );
-
-            let decorators = SharedVec::from(
-                decorator_map
-                    .get(&symbol_row_id)
-                    .unwrap_or(&empty_decorator_vec)
-                    .clone()
-                    .into_boxed_slice(),
-            );
+            let heritage = take_junction_shared_vec(&mut junction_maps.heritage, symbol_row_id);
+            let modifiers = take_junction_shared_vec(&mut junction_maps.modifiers, symbol_row_id);
+            let decorators = take_junction_decorators(&mut decorator_map, symbol_row_id);
 
             let deprecated = deprecation_from_columns(deprecated_flag, deprecated_message);
             let visibility = visibility_opt.and_then(parse_visibility_from_db);
@@ -1085,12 +1048,9 @@ impl NciDatabase {
                 is_global_augmentation: is_global_augmentation_int != 0,
                 decorators,
                 is_inherited: is_inherited_int != 0,
-                inherited_from_sources: SharedVec::from(
-                    inherited_map
-                        .get(&symbol_row_id)
-                        .unwrap_or(&empty_string_vec)
-                        .clone()
-                        .into_boxed_slice(),
+                inherited_from_sources: take_junction_shared_vec(
+                    &mut junction_maps.inherited_from_sources,
+                    symbol_row_id,
                 ),
                 heritage,
                 modifiers,
@@ -1163,13 +1123,13 @@ impl NciDatabase {
         let package_id = transaction.last_insert_rowid();
 
         let use_junction_batch = matches!(save_mode, SavePackageMode::JunctionBatch { .. });
-        let mut inherited_pending: Vec<(i64, String)> = Vec::new();
-        let mut dependency_pending: Vec<(i64, String)> = Vec::new();
-        let mut surface_dependency_pending: Vec<(i64, String)> = Vec::new();
-        let mut additional_file_pending: Vec<(i64, String)> = Vec::new();
-        let mut heritage_pending: Vec<(i64, String)> = Vec::new();
-        let mut modifier_pending: Vec<(i64, String)> = Vec::new();
-        let mut decorator_pending: Vec<(i64, String, Option<String>)> = Vec::new();
+        let mut inherited_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut dependency_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut surface_dependency_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut additional_file_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut heritage_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut modifier_pending: Vec<(i64, SharedString)> = Vec::new();
+        let mut decorator_pending: Vec<(i64, SharedString, Option<String>)> = Vec::new();
         let junction_chunk_size = match save_mode {
             SavePackageMode::Baseline => 1,
             SavePackageMode::JunctionBatch { chunk_size } => chunk_size.max(1),
@@ -1295,7 +1255,7 @@ impl NciDatabase {
                         &mut insert_inherited,
                         &mut inherited_pending,
                         symbol_row_id,
-                        source_id.as_ref(),
+                        source_id.clone(),
                     )?;
                 }
 
@@ -1307,7 +1267,7 @@ impl NciDatabase {
                         &mut insert_dependency,
                         &mut dependency_pending,
                         symbol_row_id,
-                        dependency_id.as_ref(),
+                        dependency_id.clone(),
                     )?;
                 }
                 for surface_dependency_id in symbol_node.surface_dependencies.iter() {
@@ -1318,7 +1278,7 @@ impl NciDatabase {
                         &mut insert_surface_dependency,
                         &mut surface_dependency_pending,
                         symbol_row_id,
-                        surface_dependency_id.as_ref(),
+                        surface_dependency_id.clone(),
                     )?;
                 }
 
@@ -1331,7 +1291,7 @@ impl NciDatabase {
                             &mut insert_additional,
                             &mut additional_file_pending,
                             symbol_row_id,
-                            additional_path.as_ref(),
+                            additional_path.clone(),
                         )?;
                     }
                 }
@@ -1344,7 +1304,7 @@ impl NciDatabase {
                         &mut insert_heritage,
                         &mut heritage_pending,
                         symbol_row_id,
-                        heritage_name.as_ref(),
+                        heritage_name.clone(),
                     )?;
                 }
 
@@ -1356,7 +1316,7 @@ impl NciDatabase {
                         &mut insert_modifier,
                         &mut modifier_pending,
                         symbol_row_id,
-                        modifier_name.as_ref(),
+                        modifier_name.clone(),
                     )?;
                 }
 
@@ -1371,7 +1331,7 @@ impl NciDatabase {
                         &mut insert_decorator,
                         &mut decorator_pending,
                         symbol_row_id,
-                        decorator.name.as_ref(),
+                        decorator.name.clone(),
                         arguments_json,
                     )?;
                 }
@@ -2020,30 +1980,85 @@ impl NciDatabase {
         }))
     }
 
-    fn bulk_load_string_junction(
-        &self,
-        sql: &str,
-        package_id: i64,
-    ) -> HashMap<i64, Vec<SharedString>> {
-        let mut map: HashMap<i64, Vec<SharedString>> = HashMap::new();
+    fn bulk_load_package_junction_maps(&self, package_id: i64) -> PackageJunctionMaps {
+        let mut maps = PackageJunctionMaps {
+            dependencies: HashMap::new(),
+            surface_dependencies: HashMap::new(),
+            additional_files: HashMap::new(),
+            heritage: HashMap::new(),
+            modifiers: HashMap::new(),
+            inherited_from_sources: HashMap::new(),
+        };
+        let sql = "\
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'dependencies' AS junction_kind, d.from_symbol_id AS symbol_id, d.to_symbol_id_text AS text_value
+                FROM symbol_dependencies d
+                JOIN symbols s ON s.symbol_id = d.from_symbol_id
+                WHERE s.package_id = ?1
+            ) AS junction_rows
+            UNION ALL
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'surface_dependencies' AS junction_kind, sd.from_symbol_id AS symbol_id, sd.to_symbol_id_text AS text_value
+                FROM symbol_surface_dependencies sd
+                JOIN symbols s ON s.symbol_id = sd.from_symbol_id
+                WHERE s.package_id = ?1
+            ) AS junction_rows
+            UNION ALL
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'additional_files' AS junction_kind, af.symbol_id AS symbol_id, af.file_path AS text_value
+                FROM symbol_additional_files af
+                JOIN symbols s ON s.symbol_id = af.symbol_id
+                WHERE s.package_id = ?1
+            ) AS junction_rows
+            UNION ALL
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'heritage' AS junction_kind, h.symbol_id AS symbol_id, h.heritage AS text_value
+                FROM symbol_heritage h
+                JOIN symbols s ON s.symbol_id = h.symbol_id
+                WHERE s.package_id = ?1
+            ) AS junction_rows
+            UNION ALL
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'modifiers' AS junction_kind, m.symbol_id AS symbol_id, m.modifier AS text_value
+                FROM symbol_modifiers m
+                JOIN symbols s ON s.symbol_id = m.symbol_id
+                WHERE s.package_id = ?1
+            ) AS junction_rows
+            UNION ALL
+            SELECT junction_kind, symbol_id, text_value FROM (
+                SELECT 'inherited_from_sources' AS junction_kind, i.symbol_id AS symbol_id, i.source_symbol_id_text AS text_value
+                FROM symbol_inherited_from_sources i
+                JOIN symbols s ON s.symbol_id = i.symbol_id
+                WHERE s.package_id = ?1
+                ORDER BY i.symbol_id, i.source_symbol_id_text
+            ) AS junction_rows";
         let Ok(mut statement) = self.connection.prepare(sql) else {
-            return map;
+            return maps;
         };
         let Ok(rows) = statement.query_map([package_id], |junction_row| {
             Ok((
-                junction_row.get::<_, i64>(0)?,
-                junction_row.get::<_, String>(1)?,
+                junction_row.get::<_, String>(0)?,
+                junction_row.get::<_, i64>(1)?,
+                junction_row.get::<_, String>(2)?,
             ))
         }) else {
-            return map;
+            return maps;
         };
         for row_result in rows.flatten() {
-            let (symbol_id, value) = row_result;
-            map.entry(symbol_id)
-                .or_default()
-                .push(SharedString::from(value));
+            let (junction_kind, symbol_id, value) = row_result;
+            let shared_value = SharedString::from(value);
+            let target = match junction_kind.as_str() {
+                "dependencies" => &mut maps.dependencies,
+                "surface_dependencies" => &mut maps.surface_dependencies,
+                "additional_files" => &mut maps.additional_files,
+                "heritage" => &mut maps.heritage,
+                "modifiers" => &mut maps.modifiers,
+                "inherited_from_sources" => &mut maps.inherited_from_sources,
+                _ => continue,
+            };
+            target.entry(symbol_id).or_default().push(shared_value);
         }
-        map
+        maps
     }
 
     fn bulk_load_decorators(&self, package_id: i64) -> HashMap<i64, Vec<DecoratorMetadata>> {
