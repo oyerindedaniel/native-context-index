@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isIndexExcludedToolchainPackage } from "./constants.js";
 import type { PackageInfo } from "./types.js";
 
 /** Determine if a directory entry is a directory or a symbolic link pointing to a directory. */
@@ -51,7 +52,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
           pkgDir,
           `${entry.name}/${scopedEntry.name}`,
         );
-        if (info) {
+        if (info && !isIndexExcludedToolchainPackage(info.name)) {
           packages.push(info);
         }
       }
@@ -60,7 +61,7 @@ export function scanPackages(nodeModulesPath: string): PackageInfo[] {
       const symlinkPath = path.join(nodeModulesPath, entry.name);
       const pkgDir = fs.realpathSync(symlinkPath);
       const info = readPackageInfo(pkgDir, entry.name);
-      if (info) {
+      if (info && !isIndexExcludedToolchainPackage(info.name)) {
         packages.push(info);
       }
     }

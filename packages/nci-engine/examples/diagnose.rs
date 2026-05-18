@@ -56,6 +56,10 @@ fn main() {
     println!("=======================");
     println!("crate_version (engine): {}", NCI_ENGINE_VERSION);
     println!("embedded SCHEMA_VERSION: {}", nci_engine::SCHEMA_VERSION);
+    println!(
+        "embedded INDEXER_OUTPUT_REVISION: {}",
+        nci_engine::INDEXER_OUTPUT_REVISION
+    );
 
     match env::var("NCI_CACHE_DIR") {
         Ok(value) => println!("NCI_CACHE_DIR: {}", value),

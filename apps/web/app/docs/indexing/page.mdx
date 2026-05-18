@@ -111,6 +111,8 @@ A `grep` over `node_modules` returns lines. NCI returns symbols — merged graph
 
 With `progress` on (see [Configuration](/docs/config)), each indexed package prints **`in …`** — per-package wall time from start through persist (queue wait included). Use **`--index-timing-detail`** to add `crawl` / `wait` / `save` splits. The closing summary includes **`wall`** for the whole `nci index` run.
 
+Packages whose `index_cache_key` still matches are skipped (no re-crawl). Pending symbol backfills run on the writer connection before those cache probes.
+
 <TerminalRoot>
   <TerminalCommand>nci index --package "@my-org/*"</TerminalCommand>
 </TerminalRoot>

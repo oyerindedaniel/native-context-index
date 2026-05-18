@@ -61,6 +61,27 @@ describe("scanPackages", () => {
     expect(scoped?.version).toBe("3.0.0");
   });
 
+  it("skips package manager toolchain installs", () => {
+    const nodeModules = makeTmpDir("toolchain-skip");
+    const pnpmDir = path.join(nodeModules, "pnpm");
+    fs.mkdirSync(pnpmDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pnpmDir, "package.json"),
+      JSON.stringify({ name: "pnpm", version: "10.33.2" }),
+    );
+    const lodashDir = path.join(nodeModules, "lodash");
+    fs.mkdirSync(lodashDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(lodashDir, "package.json"),
+      JSON.stringify({ name: "lodash", version: "4.17.21" }),
+    );
+
+    const packages = scanPackages(nodeModules);
+    const names = packages.map((packageItem) => packageItem.name);
+    expect(names).not.toContain("pnpm");
+    expect(names).toContain("lodash");
+  });
+
   it("skips .cache and other non-package directories", () => {
     const packages = scanPackages(FAKE_NODE_MODULES);
     const names = packages.map((packageItem) => packageItem.name);

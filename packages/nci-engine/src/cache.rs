@@ -1,18 +1,59 @@
-use std::collections::hash_map::DefaultHasher;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::types::PackageInfo;
 
-/// Engine version baked at compile time; bumping invalidates rows where `packages.engine_version` differs.
+/// Crate version baked at compile time (diagnostics only — not used in [`index_engine_cache_key`]).
 pub const NCI_ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Bump when crawl/build output stored in SQLite changes (extractor fields, merge rules, symbol ids).
+///
+/// Independent of [`crate::storage_migrations::SCHEMA_VERSION`] and [`NCI_ENGINE_VERSION`].
+pub const INDEXER_OUTPUT_REVISION: u32 = 1;
+
+/// FNV-1a 64-bit offset basis
+const FNV1A64_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
+
+const FNV1A64_PRIME: u64 = 0x00000100000001B3;
+
+/// Fingerprint stored on `packages.index_cache_key` for indexer cache hits.
+///
+/// Format: `i{INDEXER_OUTPUT_REVISION}+{stub_roots_fingerprint:x}`
+///
+/// `stub_roots_fingerprint` is FNV-1a over stub names sorted lexicographically and joined with `\n`.
+///
+/// Schema migrations and crate releases do not invalidate this key. Bump [`INDEXER_OUTPUT_REVISION`]
+/// when TS indexer output changes; use [`crate::storage_migrations::MigrationKind::Backfill`] when
+/// symbol rows can be patched in SQL without a recrawl.
 pub fn index_engine_cache_key(stub_roots_normalized: &[String]) -> String {
-    let mut hasher = DefaultHasher::new();
-    stub_roots_normalized.hash(&mut hasher);
-    format!("{}+{:x}", NCI_ENGINE_VERSION, hasher.finish())
+    format!(
+        "i{}+{:x}",
+        INDEXER_OUTPUT_REVISION,
+        stub_roots_fingerprint(stub_roots_normalized)
+    )
+}
+
+fn fnv1a64(mut hash: u64, bytes: &[u8]) -> u64 {
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV1A64_PRIME);
+    }
+    hash
+}
+
+fn stub_roots_fingerprint(stub_roots_normalized: &[String]) -> u64 {
+    let mut sorted_stubs: Vec<&str> = stub_roots_normalized.iter().map(String::as_str).collect();
+    sorted_stubs.sort_unstable();
+    sorted_stubs.dedup();
+    let mut hash = FNV1A64_OFFSET_BASIS;
+    for (index, stub) in sorted_stubs.iter().enumerate() {
+        if index > 0 {
+            hash = fnv1a64(hash, b"\n");
+        }
+        hash = fnv1a64(hash, stub.as_bytes());
+    }
+    hash
 }
 
 const CACHE_SUBDIR: &str = "nci";
@@ -61,6 +102,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
+    use crate::storage_migrations::SCHEMA_VERSION;
     use crate::types::{SharedString, SharedVec};
 
     static CACHE_ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -91,6 +133,48 @@ mod tests {
             }
         }
         output
+    }
+
+    #[test]
+    fn index_cache_key_uses_indexer_output_revision_only() {
+        let cache_key = index_engine_cache_key(&[]);
+        assert!(
+            cache_key.starts_with(&format!("i{INDEXER_OUTPUT_REVISION}+")),
+            "expected indexer prefix, got {cache_key}"
+        );
+        assert!(
+            !cache_key.contains(NCI_ENGINE_VERSION),
+            "crate version must not be in cache key"
+        );
+        assert!(
+            !cache_key.contains(&format!("s{SCHEMA_VERSION}")),
+            "schema version must not be in cache key"
+        );
+    }
+
+    #[test]
+    fn index_cache_key_changes_when_stub_roots_differ() {
+        let empty_roots = index_engine_cache_key(&[]);
+        let with_stub = index_engine_cache_key(&["@types/node".to_string()]);
+        assert_ne!(empty_roots, with_stub);
+    }
+
+    #[test]
+    fn index_cache_key_is_independent_of_stub_root_order() {
+        let forward = index_engine_cache_key(&["@types/node".to_string(), "zod".to_string()]);
+        let reverse = index_engine_cache_key(&["zod".to_string(), "@types/node".to_string()]);
+        assert_eq!(forward, reverse);
+    }
+
+    #[test]
+    fn stub_roots_fingerprint_is_stable_for_known_input() {
+        let first = stub_roots_fingerprint(&["zod".to_string()]);
+        let second = stub_roots_fingerprint(&["zod".to_string()]);
+        assert_eq!(first, second);
+        assert_eq!(
+            first,
+            stub_roots_fingerprint(&["zod".to_string(), "zod".to_string()])
+        );
     }
 
     #[test]

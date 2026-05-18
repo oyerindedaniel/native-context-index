@@ -25,7 +25,7 @@ use crate::storage::NciDatabase;
 use crate::types::{PackageGraph, PackageIndexMetadata, PackageInfo, SharedString, SharedVec};
 
 pub use crate::index_options::{
-    GraphSource, IndexOptions, PackageProgress, PackageTimingBreakdown,
+    GraphSource, IndexOptions, IndexPhaseEvent, PackageProgress, PackageTimingBreakdown,
 };
 
 #[derive(Debug)]
@@ -253,7 +253,7 @@ fn try_package_cache_hit(
             }
             trace!(
                 package = %package.name.as_ref(),
-                "package cache miss (stale engine_version or load failed)"
+                "package cache miss (index_cache_key mismatch or load failed)"
             );
             None
         } else if let Some(meta) = db.load_package_index_metadata(package) {
@@ -271,7 +271,7 @@ fn try_package_cache_hit(
         } else {
             trace!(
                 package = %package.name.as_ref(),
-                "package cache miss (stale engine_version or load failed)"
+                "package cache miss (index_cache_key mismatch or load failed)"
             );
             None
         }
@@ -387,7 +387,62 @@ pub fn index_packages(
             }
             debug!(path = %path.display(), "package cache enabled");
             match NciDatabase::open_with_pragmas(&path, index_opts.storage_connection_pragmas) {
-                Ok(_) => Some(path),
+                Ok(mut database) => {
+                    let phase_callback = index_opts.on_index_phase.clone();
+                    match database.count_packages_pending_backfill() {
+                        Ok(pending_count) if pending_count > 0 => {
+                            let packages_in_scope = database
+                                .count_packages_pending_in_scope(packages)
+                                .unwrap_or(0);
+                            if let Some(callback) = phase_callback.as_ref() {
+                                callback(IndexPhaseEvent::ForegroundBackfillStart {
+                                    pending_global: pending_count,
+                                    packages_in_scope,
+                                });
+                            }
+                            trace!(
+                                pending_packages = pending_count,
+                                index_scope = package_count,
+                                packages_in_scope,
+                                "foreground package backfill before cache probes"
+                            );
+                            let backfill_started = std::time::Instant::now();
+                            match database.foreground_backfill_for_packages(packages) {
+                                Ok(backfill_result) => {
+                                    if let Some(callback) = phase_callback.as_ref() {
+                                        callback(IndexPhaseEvent::ForegroundBackfillDone {
+                                            elapsed: backfill_started.elapsed(),
+                                            packages_backfilled: backfill_result
+                                                .packages_backfilled,
+                                            symbol_rows_updated: backfill_result
+                                                .symbol_rows_updated,
+                                        });
+                                    }
+                                }
+                                Err(backfill_error) => {
+                                    warn!(
+                                        error = %backfill_error,
+                                        "foreground package backfill failed; continuing index"
+                                    );
+                                    if let Some(callback) = phase_callback.as_ref() {
+                                        callback(IndexPhaseEvent::ForegroundBackfillFailed {
+                                            elapsed: backfill_started.elapsed(),
+                                            message: backfill_error.to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(count_error) => {
+                            warn!(
+                                error = %count_error,
+                                "could not count pending package backfill"
+                            );
+                        }
+                    }
+                    Some(path)
+                }
                 Err(open_error) => {
                     warn!(
                         path = %path.display(),
@@ -665,6 +720,10 @@ pub fn index_packages(
         }
     };
 
+    if let Some(callback) = index_opts.on_index_phase.as_ref() {
+        callback(IndexPhaseEvent::IndexPackagesStarted);
+    }
+
     if concurrency_plan.package_parallel {
         packages
             .par_iter()
@@ -684,7 +743,7 @@ pub fn index_packages(
         panic::resume_unwind(join_error);
     }
 
-    Arc::try_unwrap(results)
+    let indexed_graphs: Vec<IndexedGraph> = Arc::try_unwrap(results)
         .expect("results Arc still held")
         .into_iter()
         .map(|mutex| {
@@ -693,7 +752,9 @@ pub fn index_packages(
                 .expect("indexed result mutex poisoned")
                 .expect("indexed slot empty")
         })
-        .collect()
+        .collect();
+
+    indexed_graphs
 }
 
 /// Index a single package by its directory path.
@@ -724,6 +785,7 @@ mod tests {
 
     use crate::cache;
     use crate::scanner::scan_packages;
+    use crate::storage::NciDatabase;
 
     fn indexed_package_name(indexed: &IndexedGraph) -> SharedString {
         indexed
@@ -1075,5 +1137,91 @@ mod tests {
             max_elapsed_ms.load(Ordering::Relaxed) > 0,
             "expected per-package elapsed timing in progress callback"
         );
+    }
+
+    /// Foreground backfill runs before cache probes: pending symbol SQL must complete so a
+    /// matching `index_cache_key` still yields `GraphSource::Cached` without recrawl.
+    #[test]
+    fn index_packages_foreground_backfill_before_cache_avoids_recrawl() {
+        use crate::package_backfill::{
+            TEST_PENDING_BACKFILL_VERSION, read_pending_backfill_version,
+            set_pending_backfill_for_tests,
+        };
+
+        let temp_dir = TempDir::new().unwrap();
+        let node_modules_dir = temp_dir.path();
+        let db_path = temp_dir.path().join("nci.sqlite");
+
+        let pkg_dir = node_modules_dir.join("backfill-pkg");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("package.json"),
+            r#"{"name": "backfill-pkg", "version": "1.0.0", "types": "./index.d.ts"}"#,
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("index.d.ts"),
+            "export declare const BackfillTarget: number;",
+        )
+        .unwrap();
+
+        let packages = scan_packages(node_modules_dir).unwrap();
+        assert_eq!(packages.len(), 1);
+
+        let first_run = index_packages(
+            &packages,
+            Some(IndexOptions {
+                parallel: false,
+                enable_package_cache: true,
+                db_path: Some(db_path.clone()),
+                ..Default::default()
+            }),
+        );
+        assert_eq!(first_run.len(), 1);
+        assert_eq!(first_run[0].source, GraphSource::Crawled);
+
+        let database = NciDatabase::open_with_pragmas(&db_path, Default::default()).unwrap();
+        let connection = database.connection_for_tests();
+        set_pending_backfill_for_tests(connection, TEST_PENDING_BACKFILL_VERSION).unwrap();
+        connection
+            .execute(
+                "UPDATE packages SET backfill_revision = 0 WHERE name = 'backfill-pkg'",
+                [],
+            )
+            .unwrap();
+        drop(database);
+
+        let second_run = index_packages(
+            &packages,
+            Some(IndexOptions {
+                parallel: false,
+                enable_package_cache: true,
+                db_path: Some(db_path.clone()),
+                ..Default::default()
+            }),
+        );
+        assert_eq!(second_run.len(), 1);
+        assert_eq!(
+            second_run[0].source,
+            GraphSource::Cached,
+            "foreground backfill should satisfy pending gate so indexer cache hits"
+        );
+
+        let verify_db = NciDatabase::open_with_pragmas(&db_path, Default::default()).unwrap();
+        let verify_connection = verify_db.connection_for_tests();
+        assert!(
+            read_pending_backfill_version(verify_connection)
+                .unwrap()
+                .is_none(),
+            "pending_backfill cleared after foreground backfill in index"
+        );
+        let package_revision: i64 = verify_connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE name = 'backfill-pkg'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(package_revision >= TEST_PENDING_BACKFILL_VERSION as i64);
     }
 }

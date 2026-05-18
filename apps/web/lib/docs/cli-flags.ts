@@ -8,6 +8,8 @@ export const cliSubcommands = [
   "query symbol",
   "query evidence",
   "query symbols",
+  "db migrate",
+  "db backfill",
   "db status",
   "db clear",
   "db remove",
@@ -253,6 +255,14 @@ export const cliFlags: FlagDescriptor[] = [
     valuePlaceholder: "<N>",
     subcommand: "query symbols",
     description: "Skip this many rows before returning.",
+  },
+  {
+    id: "db-backfill-max-packages",
+    long: "--max-packages",
+    valuePlaceholder: "<N>",
+    subcommand: "db backfill",
+    description:
+      "Stop after updating this many packages (default: drain the full pending queue).",
   },
   {
     id: "db-status-check",

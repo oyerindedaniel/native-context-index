@@ -37,7 +37,7 @@ That command prints the live `CREATE TABLE` statements straight from the open da
   <TableBody>
     <TableRow>
       <TableCell><code>packages</code></TableCell>
-      <TableCell>One row per indexed package install: <code>name</code>, <code>version</code>, install root, timestamps.</TableCell>
+      <TableCell>One row per indexed package install: <code>name</code>, <code>version</code>, <code>index_cache_key</code> (per-package crawl cache), <code>backfill_revision</code> (symbol SQL migrations).</TableCell>
       <TableCell><code>symbols.package_id = packages.package_id</code></TableCell>
     </TableRow>
     <TableRow>
@@ -105,4 +105,10 @@ That command prints the live `CREATE TABLE` statements straight from the open da
 
 ## Migrations and journaling
 
-The CLI applies pending migrations on `nci db init` and on the first `nci index`. Use `nci db status --check` for a quick `PRAGMA quick_check`, `--deep` for the full integrity check, and `nci db wal-checkpoint` to truncate the WAL after a long indexing run.
+The CLI applies pending schema migrations on `nci db init`, `nci db migrate`, and the first `nci index`. Symbol-only work after a <code>Backfill</code> migration runs during <code>nci index</code> or via <code>nci db backfill</code>.
+
+<TerminalRoot>
+  <TerminalCommand>nci db status</TerminalCommand>
+</TerminalRoot>
+
+Plain output includes <code>schema_version</code> (stored DDL), <code>indexer_output_revision</code> (embedded crawl fingerprint), and <code>engine_version</code> (crate release). Use <code>--check</code> for <code>PRAGMA quick_check</code>, <code>--deep</code> for full <code>integrity_check</code>, and <code>nci db wal-checkpoint</code> to truncate the WAL after a long indexing run.

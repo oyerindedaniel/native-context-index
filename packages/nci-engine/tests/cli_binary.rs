@@ -1,11 +1,20 @@
 //! Integration tests for the `nci` binary.
+//!
+//! **Build / run:** this crate sets `required-features = ["test-support"]` on this test target.
+//! The `nci` binary must be built with that feature or backfill integration tests hang or fail
+//! (`TEST_PENDING_BACKFILL_VERSION` has no registered step). Always use:
+//! `cargo test -p nci-engine --features test-support --test cli_binary`
+//! (or `cargo test -p nci-engine --features test-support` for all engine tests).
 
 use std::fs;
 use std::path::Path;
 
 use assert_cmd::Command;
+use nci_engine::{
+    META_PENDING_BACKFILL_KEY, TEST_PENDING_BACKFILL_VERSION, index_engine_cache_key,
+};
 use predicates::prelude::*;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use serde_json::Value;
 use tempfile::tempdir;
 
@@ -58,7 +67,9 @@ fn db_status_json_ok_envelope() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"ok\": true"))
-        .stdout(predicate::str::contains("schema_version"));
+        .stdout(predicate::str::contains("schema_version"))
+        .stdout(predicate::str::contains("indexer_output_revision"))
+        .stdout(predicate::str::contains("engine_version"));
 }
 
 #[test]
@@ -186,11 +197,81 @@ fn seed_indexed_package_row(db_path: &Path, package_name: &str, package_version:
     let connection = Connection::open(db_path).expect("open sqlite");
     connection
         .execute(
-            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, engine_version)
-             VALUES (?1, ?2, 0, 0, 0, 0, 'test')",
+            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+             VALUES (?1, ?2, 0, 0, 0, 0, 'test', 1)",
             [package_name, package_version],
         )
         .expect("insert package");
+}
+
+fn init_db_path(proj: &Path, cache: &Path) -> std::path::PathBuf {
+    let db_path = cache.join("cli.sqlite");
+    nci_cmd()
+        .current_dir(proj)
+        .env("NCI_CACHE_DIR", cache)
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+    db_path
+}
+
+fn set_pending_backfill_meta(db_path: &Path, backfill_version: u32) {
+    let connection = Connection::open(db_path).expect("open sqlite");
+    connection
+        .execute(
+            "INSERT OR REPLACE INTO nci_meta (key, value) VALUES (?1, ?2)",
+            rusqlite::params![META_PENDING_BACKFILL_KEY, backfill_version.to_string()],
+        )
+        .expect("pending meta");
+}
+
+fn seed_package_with_backfill_revision(
+    db_path: &Path,
+    package_name: &str,
+    package_version: &str,
+    backfill_revision: u32,
+) {
+    seed_package_with_cache_and_backfill_revision(
+        db_path,
+        package_name,
+        package_version,
+        index_engine_cache_key(&[]).as_str(),
+        backfill_revision,
+    );
+}
+
+fn seed_package_with_cache_and_backfill_revision(
+    db_path: &Path,
+    package_name: &str,
+    package_version: &str,
+    index_cache_key: &str,
+    backfill_revision: u32,
+) {
+    let connection = Connection::open(db_path).expect("open sqlite");
+    connection
+        .execute(
+            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+             VALUES (?1, ?2, 0, 0, 0, 0, ?3, ?4)",
+            rusqlite::params![
+                package_name,
+                package_version,
+                index_cache_key,
+                backfill_revision as i64
+            ],
+        )
+        .expect("insert package");
+}
+
+fn count_packages_below_backfill_revision(db_path: &Path, backfill_version: u32) -> i64 {
+    let connection = Connection::open(db_path).expect("open sqlite");
+    connection
+        .query_row(
+            "SELECT COUNT(*) FROM packages WHERE backfill_revision < ?1",
+            [backfill_version],
+            |row| row.get(0),
+        )
+        .expect("count")
 }
 
 fn write_pkg_with_dependencies(
@@ -2136,4 +2217,312 @@ fn query_snippet_unknown_stable_id_plain_stdout_hint_line() {
         stdout.contains("noSuchSymbol") && stdout.contains("query find"),
         "expected recovery hint: {stdout}"
     );
+}
+
+#[test]
+fn db_migrate_json_reports_no_deferred_backfill_on_fresh_db() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "migrate",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["deferred_backfill"], false);
+    assert_eq!(
+        parsed["data"]["applied_versions"].as_array().unwrap().len(),
+        0
+    );
+}
+
+#[test]
+fn db_backfill_json_no_pending_on_fresh_db() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "backfill",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["pending_packages_before"], 0);
+    assert_eq!(parsed["data"]["pending_packages_after"], 0);
+    assert_eq!(parsed["data"]["symbol_rows_updated"], 0);
+}
+
+#[test]
+fn db_backfill_drains_all_seeded_pending_packages() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    set_pending_backfill_meta(&db_path, TEST_PENDING_BACKFILL_VERSION);
+    seed_package_with_backfill_revision(&db_path, "pkg-alpha", "1.0.0", 0);
+    seed_package_with_backfill_revision(&db_path, "pkg-beta", "2.0.0", 0);
+
+    assert_eq!(
+        count_packages_below_backfill_revision(&db_path, TEST_PENDING_BACKFILL_VERSION),
+        2
+    );
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "backfill",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["pending_packages_before"], 2);
+    assert_eq!(parsed["data"]["pending_packages_after"], 0);
+
+    let connection = Connection::open(&db_path).expect("open");
+    let pending_meta: Option<String> = connection
+        .query_row(
+            "SELECT value FROM nci_meta WHERE key = ?1",
+            [META_PENDING_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("query");
+    assert!(pending_meta.is_none());
+
+    let completed: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM packages WHERE backfill_revision >= ?1",
+            [TEST_PENDING_BACKFILL_VERSION],
+            |row| row.get(0),
+        )
+        .expect("count");
+    assert_eq!(completed, 2);
+}
+
+#[test]
+fn db_backfill_max_packages_leaves_remainder_pending() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    set_pending_backfill_meta(&db_path, TEST_PENDING_BACKFILL_VERSION);
+    for index in 0..4 {
+        seed_package_with_backfill_revision(&db_path, &format!("pkg-{index}"), "1.0.0", 0);
+    }
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "backfill",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--max-packages",
+            "2",
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["data"]["pending_packages_before"], 4);
+    assert_eq!(parsed["data"]["pending_packages_after"], 2);
+
+    let connection = Connection::open(&db_path).expect("open");
+    let pending_meta: Option<String> = connection
+        .query_row(
+            "SELECT value FROM nci_meta WHERE key = ?1",
+            [META_PENDING_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("query");
+    assert!(pending_meta.is_some());
+}
+
+#[test]
+fn db_backfill_plain_reports_pending_counts() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    set_pending_backfill_meta(&db_path, TEST_PENDING_BACKFILL_VERSION);
+    seed_package_with_backfill_revision(&db_path, "plain-pkg", "1.0.0", 0);
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args(["db", "backfill", "--database", db_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pending before: 1"))
+        .stdout(predicate::str::contains("Pending after: 0"));
+}
+
+#[test]
+fn db_backfill_is_noop_when_packages_already_current() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    set_pending_backfill_meta(&db_path, TEST_PENDING_BACKFILL_VERSION);
+    seed_package_with_backfill_revision(
+        &db_path,
+        "current",
+        "1.0.0",
+        TEST_PENDING_BACKFILL_VERSION,
+    );
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "backfill",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["data"]["pending_packages_before"], 0);
+    assert_eq!(parsed["data"]["pending_packages_after"], 0);
+
+    let connection = Connection::open(&db_path).expect("open");
+    let pending_meta: Option<String> = connection
+        .query_row(
+            "SELECT value FROM nci_meta WHERE key = ?1",
+            [META_PENDING_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("query");
+    assert!(pending_meta.is_none());
+}
+
+/// Index runs foreground backfill before cache probes: second index must not recrawl when
+/// `index_cache_key` still matches and only `pending_backfill` lagged.
+#[test]
+fn index_foreground_backfill_clears_pending_without_recrawl() {
+    let proj = tempdir().unwrap();
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_minimal_pkg(proj.path(), "backfill-index-pkg", "1.0.0");
+
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    let engine_cache_key = index_engine_cache_key(&[]);
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "backfill-index-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    let connection = Connection::open(&db_path).expect("open");
+    let indexed_at_before: i64 = connection
+        .query_row(
+            "SELECT indexed_at FROM packages WHERE name = 'backfill-index-pkg'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("indexed_at");
+    drop(connection);
+
+    set_pending_backfill_meta(&db_path, TEST_PENDING_BACKFILL_VERSION);
+    let connection = Connection::open(&db_path).expect("open");
+    connection
+        .execute(
+            "UPDATE packages SET backfill_revision = 0, index_cache_key = ?1 WHERE name = 'backfill-index-pkg'",
+            [engine_cache_key.as_str()],
+        )
+        .expect("simulate pending backfill lag");
+    drop(connection);
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "backfill-index-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    let connection = Connection::open(&db_path).expect("open");
+    let indexed_at_after: i64 = connection
+        .query_row(
+            "SELECT indexed_at FROM packages WHERE name = 'backfill-index-pkg'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("indexed_at");
+    assert_eq!(
+        indexed_at_before, indexed_at_after,
+        "cache hit should not rewrite package row via save_package"
+    );
+
+    let pending_meta: Option<String> = connection
+        .query_row(
+            "SELECT value FROM nci_meta WHERE key = ?1",
+            [META_PENDING_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("query");
+    assert!(pending_meta.is_none());
+
+    let package_revision: i64 = connection
+        .query_row(
+            "SELECT backfill_revision FROM packages WHERE name = 'backfill-index-pkg'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("revision");
+    assert!(package_revision >= TEST_PENDING_BACKFILL_VERSION as i64);
 }

@@ -117,6 +117,18 @@ export const NODE_BUILTINS = new Set([
 /** Visibility tag names used in JSDoc */
 export const VISIBILITY_TAGS = new Set(["public", "internal", "alpha", "beta"]);
 
+export const INDEX_EXCLUDED_TOOLCHAIN_PACKAGES = new Set([
+  "pnpm",
+  "npm",
+  "yarn",
+  "bun",
+  "corepack",
+]);
+
+export function isIndexExcludedToolchainPackage(packageName: string): boolean {
+  return INDEX_EXCLUDED_TOOLCHAIN_PACKAGES.has(packageName);
+}
+
 /**
  * The set of SyntaxKind values that represent direct declarations we extract.
  */

@@ -111,6 +111,44 @@ pub(crate) fn format_elapsed(elapsed: Duration) -> String {
     format!("{whole_minutes}m {remainder_seconds:.1}s")
 }
 
+/// In-progress backfill status on one stderr row; finished with [`emit_index_backfill_progress_done`].
+pub(crate) fn emit_index_backfill_progress_start(scope: &str, message: &str) {
+    let tag = if should_color(Stream::Stderr) {
+        colorize_line(
+            progress_tag(ProgressTone::Step),
+            progress_tag_color(ProgressTone::Step),
+        )
+    } else {
+        progress_tag(ProgressTone::Step).to_string()
+    };
+    let stderr = io::stderr();
+    let mut handle = stderr.lock();
+    if io::stderr().is_terminal() {
+        let _ignored = write!(handle, "{ERASE_LINE}");
+    }
+    let _ignored = write!(handle, "{tag} {scope}: {message}");
+    let _ignored = handle.flush();
+}
+
+/// Replaces the in-progress backfill row and commits it as a normal stderr line.
+pub(crate) fn emit_index_backfill_progress_done(scope: &str, message: &str) {
+    let tag = if should_color(Stream::Stderr) {
+        colorize_line(
+            progress_tag(ProgressTone::Done),
+            progress_tag_color(ProgressTone::Done),
+        )
+    } else {
+        progress_tag(ProgressTone::Done).to_string()
+    };
+    let stderr = io::stderr();
+    let mut handle = stderr.lock();
+    if io::stderr().is_terminal() {
+        let _ignored = write!(handle, "{ERASE_LINE}");
+    }
+    let _ignored = writeln!(handle, "{tag} {scope}: {message}");
+    let _ignored = handle.flush();
+}
+
 pub(crate) fn emit_progress_line(scope: &str, tone: ProgressTone, message: &str) {
     let tag = if should_color(Stream::Stderr) {
         colorize_line(progress_tag(tone), progress_tag_color(tone))

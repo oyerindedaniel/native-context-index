@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self, BufReader, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
@@ -15,12 +16,14 @@ use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
 use nci_engine::filter::{DepKindFilter, FilterConfig};
-use nci_engine::pipeline::{self, GraphSource, IndexOptions, IndexedGraph, PackageProgress};
+use nci_engine::pipeline::{
+    self, GraphSource, IndexOptions, IndexPhaseEvent, IndexedGraph, PackageProgress,
+};
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, ScanError};
 use nci_engine::storage::{
-    DatabaseStatusReport, NciDatabase, StorageError, SymbolSearchFilters, SymbolSearchHit,
-    verify_sqlite_file_header,
+    BackfillDrainLimits, DatabaseStatusReport, NciDatabase, StorageConnectionPragmas, StorageError,
+    SymbolSearchFilters, SymbolSearchHit, verify_sqlite_file_header,
 };
 use serde_json::Value;
 
@@ -28,7 +31,8 @@ const CLI_ABOUT: &str = "Native Context Index — index and query TypeScript dec
 mod spinner_draw_line;
 mod style;
 use style::{
-    ProgressTone, TtyProgressSpinner, emit_progress_line, emit_ui_line_stdout, format_elapsed,
+    ProgressTone, TtyProgressSpinner, emit_index_backfill_progress_done,
+    emit_index_backfill_progress_start, emit_progress_line, emit_ui_line_stdout, format_elapsed,
     init_prompt_theme, print_banner,
 };
 
@@ -308,7 +312,7 @@ pub struct Cli {
     format: Option<OutputFormat>,
 
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -381,6 +385,16 @@ enum Commands {
 enum DbCommands {
     #[command(about = "Open the database and run migrations (non-interactive)")]
     Init,
+    #[command(about = "Apply pending SQLite schema migrations and report what changed")]
+    Migrate,
+    #[command(about = "Run deferred per-package symbol backfill for all pending packages")]
+    Backfill {
+        #[arg(
+            long,
+            help = "Stop after this many packages (default: drain entire queue)"
+        )]
+        max_packages: Option<usize>,
+    },
     #[command(about = "Database path/size and health checks (optional)")]
     Status {
         #[arg(
@@ -717,39 +731,60 @@ struct ActivePackageCandidate {
 
 pub fn run() -> Result<CliExit, String> {
     let raw_args: Vec<String> = std::env::args().collect();
-    if is_top_level_help_request(&raw_args) {
+    if should_show_top_level_help(&raw_args) {
         run_top_level_help()?;
         return Ok(CliExit::Success);
     }
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Init { defaults } => {
+        None => {
+            run_top_level_help()?;
+            Ok(CliExit::Success)
+        }
+        Some(Commands::Init { defaults }) => {
             run_init(*defaults, cli.database.clone()).map(|_| CliExit::Success)
         }
-        Commands::Db { command } => run_db(&cli, command).map(|_| CliExit::Success),
-        Commands::Index { target, args } => {
+        Some(Commands::Db { command }) => run_db(&cli, command).map(|_| CliExit::Success),
+        Some(Commands::Index { target, args }) => {
             run_index(&cli, target.as_ref(), args).map(|_| CliExit::Success)
         }
-        Commands::Query { command } => run_query(&cli, command),
-        Commands::Sql {
+        Some(Commands::Query { command }) => run_query(&cli, command),
+        Some(Commands::Sql {
             schema,
             sql,
             max_rows,
             sql_parts,
-        } => run_sql(&cli, *schema, sql.clone(), sql_parts, *max_rows).map(|_| CliExit::Success),
-        Commands::Completions { shell } => {
+        }) => run_sql(&cli, *schema, sql.clone(), sql_parts, *max_rows).map(|_| CliExit::Success),
+        Some(Commands::Completions { shell }) => {
             let mut cmd = Cli::command();
             let bin_name = cmd.get_name().to_string();
             generate(*shell, &mut cmd, bin_name, &mut io::stdout());
             Ok(CliExit::Success)
         }
-        Commands::BinaryPath => run_binary_path().map(|_| CliExit::Success),
+        Some(Commands::BinaryPath) => run_binary_path().map(|_| CliExit::Success),
     }
 }
 
-fn is_top_level_help_request(args: &[String]) -> bool {
-    args.len() == 2 && (args[1] == "--help" || args[1] == "-h")
+fn should_show_top_level_help(args: &[String]) -> bool {
+    match args.len() {
+        0 | 1 => true,
+        2 => args[1] == "--help" || args[1] == "-h",
+        _ => false,
+    }
+}
+
+fn with_scan_progress_spinner<T>(show_progress: bool, scan_work: impl FnOnce() -> T) -> T {
+    let scan_spinner = if show_progress {
+        TtyProgressSpinner::try_start()
+    } else {
+        None
+    };
+    let result = scan_work();
+    if let Some(spinner) = scan_spinner {
+        spinner.finish();
+    }
+    result
 }
 
 fn run_top_level_help() -> Result<(), String> {
@@ -1176,6 +1211,11 @@ fn print_status_plain(status_report: &DatabaseStatusReport) {
     );
     println!("journal_mode: {}", status_report.journal_mode);
     println!("schema_version: {}", status_report.schema_version);
+    println!(
+        "indexer_output_revision: {}",
+        status_report.indexer_output_revision
+    );
+    println!("engine_version: {}", status_report.engine_version);
     if let (Some(check_kind), Some(check_value)) = (
         &status_report.integrity_check_kind,
         &status_report.integrity_check,
@@ -1329,6 +1369,149 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
                         "data": {
                             "path": path,
                             "schema_version": schema,
+                        }
+                    }))?;
+                }
+            }
+            Ok(())
+        }
+        DbCommands::Migrate => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db migrate", ProgressTone::Step, "starting");
+            }
+            let path = resolve_database_path(cli, file, config_dir)?;
+            let spinner = if show_progress && io::stderr().is_terminal() {
+                TtyProgressSpinner::try_start()
+            } else {
+                None
+            };
+            if show_progress && spinner.is_none() {
+                emit_progress_line("db migrate", ProgressTone::Step, "applying migrations");
+            }
+            let pragmas = StorageConnectionPragmas::baseline();
+            let (database, migration_report) =
+                NciDatabase::open_with_migration_report(&path, pragmas)
+                    .map_err(|err| err.to_string())?;
+            if let Some(tty_progress_spinner) = spinner {
+                tty_progress_spinner.finish();
+            }
+            let schema = database
+                .stored_schema_version()
+                .map_err(|err| err.to_string())?;
+            if show_progress {
+                emit_progress_line(
+                    "db migrate",
+                    ProgressTone::Done,
+                    &format!("done +{}", format_elapsed(started.elapsed())),
+                );
+            }
+            match fmt {
+                OutputFormat::Plain => {
+                    emit_ui_line_stdout(ProgressTone::Done, "db migrate", "migrations checked");
+                    println!("Database: {}", display_path(&path));
+                    println!(
+                        "Schema: v{} → v{}",
+                        migration_report.schema_version_before, schema
+                    );
+                    if migration_report.applied_versions.is_empty() {
+                        println!("Applied: (none — already up to date)");
+                    } else {
+                        println!(
+                            "Applied: v{}",
+                            migration_report
+                                .applied_versions
+                                .iter()
+                                .map(|version| version.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", v")
+                        );
+                    }
+                    if migration_report.purged_all_packages {
+                        println!("Indexed packages: purged (rebuild migration)");
+                    }
+                    if migration_report.deferred_backfill {
+                        println!("Backfill: deferred to index / db backfill");
+                    }
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": {
+                            "path": path,
+                            "schema_version": schema,
+                            "schema_version_before": migration_report.schema_version_before,
+                            "schema_version_after": migration_report.schema_version_after,
+                            "applied_versions": migration_report.applied_versions,
+                            "purged_all_packages": migration_report.purged_all_packages,
+                            "deferred_backfill": migration_report.deferred_backfill,
+                            "elapsed_ms": started.elapsed().as_millis(),
+                        }
+                    }))?;
+                }
+            }
+            Ok(())
+        }
+        DbCommands::Backfill { max_packages } => {
+            let started = Instant::now();
+            if show_progress {
+                emit_progress_line("db backfill", ProgressTone::Step, "starting");
+            }
+            let path = resolve_database_path(cli, file, config_dir)?;
+            let spinner = if show_progress && io::stderr().is_terminal() {
+                TtyProgressSpinner::try_start()
+            } else {
+                None
+            };
+            if show_progress && spinner.is_none() {
+                emit_progress_line(
+                    "db backfill",
+                    ProgressTone::Step,
+                    "draining pending packages",
+                );
+            }
+            let mut database =
+                NciDatabase::open_with_pragmas(&path, StorageConnectionPragmas::baseline())
+                    .map_err(|err| err.to_string())?;
+            let pending_before = database
+                .count_packages_pending_backfill()
+                .map_err(|err| err.to_string())?;
+            let updated_rows = database
+                .drain_pending_package_backfill(BackfillDrainLimits {
+                    max_packages: *max_packages,
+                })
+                .map_err(|err| err.to_string())?;
+            let pending_after = database
+                .count_packages_pending_backfill()
+                .map_err(|err| err.to_string())?;
+            if let Some(tty_progress_spinner) = spinner {
+                tty_progress_spinner.finish();
+            }
+            if show_progress {
+                emit_progress_line(
+                    "db backfill",
+                    ProgressTone::Done,
+                    &format!("done +{}", format_elapsed(started.elapsed())),
+                );
+            }
+            match fmt {
+                OutputFormat::Plain => {
+                    emit_ui_line_stdout(ProgressTone::Done, "db backfill", "drain finished");
+                    println!("Database: {}", display_path(&path));
+                    println!("Pending before: {pending_before}");
+                    println!("Pending after: {pending_after}");
+                    println!("Symbol rows updated: {updated_rows}");
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": {
+                            "path": path,
+                            "pending_packages_before": pending_before,
+                            "pending_packages_after": pending_after,
+                            "symbol_rows_updated": updated_rows,
+                            "max_packages": max_packages,
+                            "elapsed_ms": started.elapsed().as_millis(),
                         }
                     }))?;
                 }
@@ -1963,17 +2146,69 @@ fn format_package_index_timing(progress: &PackageProgress) -> String {
     )
 }
 
+fn finish_index_spinner(index_spinner: &Arc<Mutex<Option<TtyProgressSpinner>>>) {
+    if let Ok(mut guard) = index_spinner.lock()
+        && let Some(spinner) = guard.take()
+    {
+        spinner.finish();
+    }
+}
+
 /// Per-package stderr progress for `nci index` plain output only ([`OutputFormat::Plain`]).
 fn with_plain_index_progress(
     mut opts: IndexOptions,
     total: usize,
     enabled: bool,
     index_timing_detail: bool,
+    index_spinner: Arc<Mutex<Option<TtyProgressSpinner>>>,
 ) -> IndexOptions {
     if !enabled || total == 0 {
         return opts;
     }
     opts.index_timing_detail = index_timing_detail;
+    let index_spinner_for_phase = Arc::clone(&index_spinner);
+    opts.on_index_phase = Some(Arc::new(
+        move |phase_event: IndexPhaseEvent| match phase_event {
+            IndexPhaseEvent::ForegroundBackfillStart {
+                pending_global,
+                packages_in_scope,
+            } => {
+                emit_index_backfill_progress_start(
+                    "index backfill",
+                    &format!(
+                        "pending {pending_global} package(s), backfilling {packages_in_scope} in scope"
+                    ),
+                );
+            }
+            IndexPhaseEvent::ForegroundBackfillDone {
+                elapsed,
+                packages_backfilled,
+                symbol_rows_updated,
+            } => {
+                emit_index_backfill_progress_done(
+                    "index backfill",
+                    &format!(
+                        "{packages_backfilled} package(s), {symbol_rows_updated} symbol row(s) +{}",
+                        format_elapsed(elapsed)
+                    ),
+                );
+            }
+            IndexPhaseEvent::ForegroundBackfillFailed { message, .. } => {
+                emit_progress_line(
+                    "index backfill",
+                    ProgressTone::Warn,
+                    &format!("failed (continuing index): {message}"),
+                );
+            }
+            IndexPhaseEvent::IndexPackagesStarted => {
+                if let Ok(mut guard) = index_spinner_for_phase.lock()
+                    && guard.is_none()
+                {
+                    *guard = TtyProgressSpinner::try_start();
+                }
+            }
+        },
+    ));
     fn status_token(raw_status: &str) -> String {
         raw_status
             .trim()
@@ -2045,8 +2280,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
             .filter
             .with_nciignore_file(&config_dir)
             .with_workspace_manifest_dirs(workspace_manifest_dirs.clone());
-        let filtered = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
-            .map_err(|scan_err: ScanError| scan_err.to_string())?;
+        let filtered = with_scan_progress_spinner(show_progress, || {
+            scan_filtered_packages_across_roots(&node_modules_roots, &opts)
+                .map_err(|scan_err: ScanError| scan_err.to_string())
+        })?;
         if show_progress {
             emit_progress_line(
                 "index dry-run",
@@ -2120,17 +2357,17 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 );
             }
             let opts = build_index_options(cli, file, &config_dir, project_root.clone(), bulk)?;
-            let opts = with_plain_index_progress(opts, 1, show_progress, bulk.index_timing_detail);
-            let index_tail_spinner = if show_progress {
-                TtyProgressSpinner::try_start()
-            } else {
-                None
-            };
+            let index_spinner = Arc::new(Mutex::new(None));
+            let opts = with_plain_index_progress(
+                opts,
+                1,
+                show_progress,
+                bulk.index_timing_detail,
+                Arc::clone(&index_spinner),
+            );
             let index_wall_started = Instant::now();
             let out = pipeline::index_packages(std::slice::from_ref(&package), Some(opts));
-            if let Some(spinner_handle) = index_tail_spinner {
-                spinner_handle.finish();
-            }
+            finish_index_spinner(&index_spinner);
             print_index_summary(fmt, &out, Some(index_wall_started.elapsed()))?;
         }
         None => {
@@ -2147,8 +2384,10 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                 .filter
                 .with_nciignore_file(&config_dir)
                 .with_workspace_manifest_dirs(workspace_manifest_dirs.clone());
-            let packages = scan_filtered_packages_across_roots(&node_modules_roots, &opts)
-                .map_err(|scan_err: ScanError| scan_err.to_string())?;
+            let packages = with_scan_progress_spinner(show_progress, || {
+                scan_filtered_packages_across_roots(&node_modules_roots, &opts)
+                    .map_err(|scan_err: ScanError| scan_err.to_string())
+            })?;
             if packages.is_empty() {
                 match fmt {
                     OutputFormat::Plain => {
@@ -2186,22 +2425,17 @@ fn run_index(cli: &Cli, target: Option<&IndexTarget>, bulk: &BulkIndexArgs) -> R
                     ),
                 );
             }
+            let index_spinner = Arc::new(Mutex::new(None));
             let opts = with_plain_index_progress(
                 opts,
                 packages.len(),
                 show_progress,
                 bulk.index_timing_detail,
+                Arc::clone(&index_spinner),
             );
-            let index_tail_spinner = if show_progress {
-                TtyProgressSpinner::try_start()
-            } else {
-                None
-            };
             let index_wall_started = Instant::now();
             let indexed = pipeline::index_packages(&packages, Some(opts));
-            if let Some(spinner_handle) = index_tail_spinner {
-                spinner_handle.finish();
-            }
+            finish_index_spinner(&index_spinner);
             print_index_summary(fmt, &indexed, Some(index_wall_started.elapsed()))?;
         }
     }

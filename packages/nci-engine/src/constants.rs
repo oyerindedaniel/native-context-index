@@ -55,6 +55,18 @@ pub static VISIBILITY_TAGS: phf::Set<&'static str> = phf_set! {
     "public", "internal", "alpha", "beta",
 };
 
+pub static INDEX_EXCLUDED_TOOLCHAIN_PACKAGES: phf::Set<&'static str> = phf_set! {
+    "pnpm",
+    "npm",
+    "yarn",
+    "bun",
+    "corepack",
+};
+
+pub fn is_index_excluded_toolchain_package(package_name: &str) -> bool {
+    INDEX_EXCLUDED_TOOLCHAIN_PACKAGES.contains(package_name)
+}
+
 /// Signature-leading modifier tokens accepted by parser fallback extraction.
 ///
 /// This is used only when an extraction path does not carry direct AST modifier fields
@@ -130,6 +142,16 @@ mod tests {
         assert!(VISIBILITY_TAGS.contains("internal"));
         assert!(VISIBILITY_TAGS.contains("alpha"));
         assert!(VISIBILITY_TAGS.contains("beta"));
+    }
+
+    #[test]
+    fn index_excluded_toolchain_includes_pnpm() {
+        assert!(super::is_index_excluded_toolchain_package("pnpm"));
+    }
+
+    #[test]
+    fn index_excluded_toolchain_allows_typescript() {
+        assert!(!super::is_index_excluded_toolchain_package("typescript"));
     }
 
     #[test]

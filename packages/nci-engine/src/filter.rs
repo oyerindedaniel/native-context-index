@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+use crate::constants::is_index_excluded_toolchain_package;
 use crate::types::PackageInfo;
 
 /// Which dependency sections from the **consumer** `package.json` count as "in scope" for filtering.
@@ -102,6 +103,9 @@ impl FilterConfig {
             .into_iter()
             .filter(|package_info| {
                 let name = package_info.name.as_ref();
+                if is_index_excluded_toolchain_package(name) {
+                    return false;
+                }
                 if !self.include_names.is_empty() && !self.include_names.contains(name) {
                     return false;
                 }
@@ -654,6 +658,18 @@ mod tests {
         assert!(names.contains(&"react"));
         assert!(names.contains(&"react-dom"));
         assert!(!names.contains(&"lodash"));
+    }
+
+    #[test]
+    fn apply_excludes_toolchain_package_managers() {
+        let packages = vec![sample_package("pnpm"), sample_package("lodash")];
+        let filtered = FilterConfig::default().apply(packages);
+        let names: Vec<&str> = filtered
+            .iter()
+            .map(|package| package.name.as_ref())
+            .collect();
+        assert!(!names.contains(&"pnpm"));
+        assert!(names.contains(&"lodash"));
     }
 
     #[test]

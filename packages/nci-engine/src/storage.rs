@@ -12,7 +12,15 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use tracing::{info, trace, warn};
 
-use crate::storage_migrations::{META_SCHEMA_KEY, MIGRATIONS, read_schema_version};
+use crate::cache::{INDEXER_OUTPUT_REVISION, NCI_ENGINE_VERSION};
+use crate::migration_backfill::BackfillBatchOptions;
+use crate::package_backfill::{
+    self, count_packages_pending_backfill, read_pending_backfill_version,
+    required_backfill_revision,
+};
+use crate::storage_migrations::{
+    MIGRATIONS, read_schema_version, run_migrations as apply_storage_migrations,
+};
 use crate::symbol_source_identity::symbol_source_row_from_encoded_path;
 use crate::types::{
     DecoratorMetadata, Deprecation, MergeProvenance, PackageGraph, PackageIndexMetadata,
@@ -37,6 +45,8 @@ pub struct DatabaseStatusReport {
     pub database_size_bytes_approx: u64,
     pub journal_mode: String,
     pub schema_version: u32,
+    pub indexer_output_revision: u32,
+    pub engine_version: String,
     pub integrity_check: Option<String>,
     pub integrity_check_kind: Option<String>,
     /// Value of `NCI_CACHE_DIR` when that env var is set in this process.
@@ -126,7 +136,8 @@ pub enum StorageError {
 
 pub type StorageResult<T> = Result<T, StorageError>;
 
-pub use crate::storage_migrations::SCHEMA_VERSION;
+pub use crate::package_backfill::BackfillDrainLimits;
+pub use crate::storage_migrations::{MigrationApplyReport, SCHEMA_VERSION};
 
 /// Connection-level SQLite tuning (bench / experiments). Production [`NciDatabase::open`] uses
 /// [`StorageConnectionPragmas::baseline`].
@@ -273,62 +284,26 @@ pub fn verify_sqlite_file_header(path: &Path) -> StorageResult<()> {
     Ok(())
 }
 
-fn run_migrations(connection: &mut Connection) -> StorageResult<()> {
-    use tracing::debug;
-
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute(
-        "CREATE TABLE IF NOT EXISTS nci_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )",
-        [],
-    )?;
-
-    let current = read_schema_version(&transaction)?;
+fn run_migrations(connection: &mut Connection) -> StorageResult<MigrationApplyReport> {
+    let schema_version_before = read_schema_version(connection)?;
     let max_known = MIGRATIONS
         .last()
         .map(|migration| migration.version)
         .unwrap_or(0);
 
-    debug!(
-        current_schema_version = current,
-        max_known_migration = max_known,
-        "nci migration check"
-    );
-
-    if current > max_known {
+    if schema_version_before > max_known {
         warn!(
-            current_schema_version = current,
+            current_schema_version = schema_version_before,
             max_known_migration = max_known,
             "database schema newer than this nci-engine build"
         );
         return Err(StorageError::SchemaTooNew {
-            found: current,
+            found: schema_version_before,
             max: max_known,
         });
     }
 
-    for migration in MIGRATIONS {
-        if migration.version > current {
-            if let Err(sqlite_error) = transaction.execute_batch(migration.sql) {
-                tracing::error!(
-                    migration_version = migration.version,
-                    error = %sqlite_error,
-                    "migration batch failed"
-                );
-                return Err(sqlite_error.into());
-            }
-            transaction.execute(
-                "INSERT OR REPLACE INTO nci_meta (key, value) VALUES (?1, ?2)",
-                params![META_SCHEMA_KEY, migration.version.to_string(),],
-            )?;
-            debug!(applied = migration.version, "migration applied");
-        }
-    }
-
-    transaction.commit()?;
-    Ok(())
+    apply_storage_migrations(connection).map_err(Into::into)
 }
 
 pub struct NciDatabase {
@@ -347,6 +322,7 @@ fn apply_rw_connection_pragmas(
         PRAGMA synchronous = NORMAL;
         PRAGMA temp_store = MEMORY;
         PRAGMA cache_size = -64000;
+        PRAGMA busy_timeout = 30000;
         ",
     )?;
     if let Some(mmap_size_bytes) = pragmas.mmap_size_bytes {
@@ -615,7 +591,27 @@ fn read_symbol_search_hit_row(row: &Row<'_>) -> SqliteResult<SymbolSearchHit> {
     })
 }
 
+fn open_read_write_connection(
+    path_ref: &Path,
+    pragmas: StorageConnectionPragmas,
+) -> StorageResult<(Connection, MigrationApplyReport)> {
+    let database_is_new = !path_ref.exists();
+    info!(path = %path_ref.display(), "opening nci sqlite database");
+    let mut connection = Connection::open(path_ref)?;
+    if database_is_new && let Some(page_size) = pragmas.page_size {
+        connection.execute_batch(&format!("PRAGMA page_size = {page_size};"))?;
+    }
+    apply_rw_connection_pragmas(&connection, pragmas)?;
+    let migration_report = run_migrations(&mut connection)?;
+    Ok((connection, migration_report))
+}
+
 impl NciDatabase {
+    #[cfg(test)]
+    pub(crate) fn connection_for_tests(&self) -> &Connection {
+        &self.connection
+    }
+
     pub fn open(path: impl AsRef<Path>) -> StorageResult<Self> {
         Self::open_with_pragmas(path, StorageConnectionPragmas::baseline())
     }
@@ -624,19 +620,24 @@ impl NciDatabase {
         path: impl AsRef<Path>,
         pragmas: StorageConnectionPragmas,
     ) -> StorageResult<Self> {
+        let (connection, _migration_report) = Self::open_with_migration_report(path, pragmas)?;
+        Ok(connection)
+    }
+
+    /// Opens read-write and returns the migration report from this open (pending migrations only).
+    pub fn open_with_migration_report(
+        path: impl AsRef<Path>,
+        pragmas: StorageConnectionPragmas,
+    ) -> StorageResult<(Self, MigrationApplyReport)> {
         let path_ref = path.as_ref();
-        let database_is_new = !path_ref.exists();
-        info!(path = %path_ref.display(), "opening nci sqlite database");
-        let mut connection = Connection::open(path_ref)?;
-        if database_is_new && let Some(page_size) = pragmas.page_size {
-            connection.execute_batch(&format!("PRAGMA page_size = {page_size};"))?;
-        }
-        apply_rw_connection_pragmas(&connection, pragmas)?;
-        run_migrations(&mut connection)?;
-        Ok(Self {
-            connection,
-            connection_pragmas: pragmas,
-        })
+        let (connection, migration_report) = open_read_write_connection(path_ref, pragmas)?;
+        Ok((
+            Self {
+                connection,
+                connection_pragmas: pragmas,
+            },
+            migration_report,
+        ))
     }
 
     /// Read-only connection for concurrent cache probes while another connection writes (WAL).
@@ -666,6 +667,11 @@ impl NciDatabase {
 
     pub fn stored_schema_version(&self) -> StorageResult<u32> {
         read_schema_version(&self.connection).map_err(Into::into)
+    }
+
+    /// Applies pending migrations on this connection (no-op when already at [`SCHEMA_VERSION`]).
+    pub fn apply_pending_migrations(&mut self) -> StorageResult<MigrationApplyReport> {
+        run_migrations(&mut self.connection)
     }
 
     pub fn journal_mode_label(&self) -> StorageResult<String> {
@@ -760,27 +766,111 @@ impl NciDatabase {
             database_size_bytes_approx: approx,
             journal_mode,
             schema_version,
+            indexer_output_revision: INDEXER_OUTPUT_REVISION,
+            engine_version: NCI_ENGINE_VERSION.to_string(),
             integrity_check,
             integrity_check_kind,
             nci_cache_dir_env,
         })
     }
 
-    pub fn has_cached_package(&self, package_info: &PackageInfo, engine_version: &str) -> bool {
-        self.connection
-            .query_row(
-                "SELECT 1 FROM packages WHERE name = ?1 AND version = ?2 AND engine_version = ?3 LIMIT 1",
+    pub fn has_cached_package(&self, package_info: &PackageInfo, index_cache_key: &str) -> bool {
+        let required_backfill_revision = match required_backfill_revision(&self.connection) {
+            Ok(revision) => revision,
+            Err(_) => return false,
+        };
+        let query_result = match required_backfill_revision {
+            Some(pending_revision) => self.connection.query_row(
+                "SELECT 1 FROM packages
+                 WHERE name = ?1 AND version = ?2 AND index_cache_key = ?3
+                   AND backfill_revision >= ?4
+                 LIMIT 1",
                 params![
                     package_info.name.as_ref(),
                     package_info.version.as_ref(),
-                    engine_version,
+                    index_cache_key,
+                    pending_revision,
                 ],
                 |_| Ok(()),
+            ),
+            None => self.connection.query_row(
+                "SELECT 1 FROM packages
+                 WHERE name = ?1 AND version = ?2 AND index_cache_key = ?3
+                 LIMIT 1",
+                params![
+                    package_info.name.as_ref(),
+                    package_info.version.as_ref(),
+                    index_cache_key,
+                ],
+                |_| Ok(()),
+            ),
+        };
+        query_result.optional().ok().flatten().is_some()
+    }
+
+    pub fn count_packages_pending_backfill(&self) -> StorageResult<u64> {
+        count_packages_pending_backfill(&self.connection).map_err(Into::into)
+    }
+
+    pub fn count_packages_pending_in_scope(
+        &self,
+        packages: &[PackageInfo],
+    ) -> StorageResult<usize> {
+        package_backfill::count_packages_pending_in_set(&self.connection, packages)
+            .map_err(Into::into)
+    }
+
+    pub fn pending_backfill_version(&self) -> StorageResult<Option<u32>> {
+        read_pending_backfill_version(&self.connection).map_err(Into::into)
+    }
+
+    /// Foreground backfill for packages in the current index scan set only.
+    pub fn foreground_backfill_for_packages(
+        &mut self,
+        packages: &[PackageInfo],
+    ) -> StorageResult<package_backfill::ForegroundBackfillResult> {
+        package_backfill::backfill_packages_in_set(
+            &self.connection,
+            packages,
+            BackfillBatchOptions::default(),
+        )
+        .map_err(Into::into)
+    }
+
+    /// Drain pending packages in `package_id` order (for `nci db backfill`).
+    pub fn drain_pending_package_backfill(
+        &mut self,
+        limits: BackfillDrainLimits,
+    ) -> StorageResult<u64> {
+        package_backfill::drain_pending_package_backfill(
+            &self.connection,
+            BackfillBatchOptions::default(),
+            limits,
+        )
+        .map_err(Into::into)
+    }
+
+    fn ensure_package_backfill_current(&self, package_info: &PackageInfo) -> StorageResult<()> {
+        let Some(package_id) = self.resolve_package_id(package_info)? else {
+            return Ok(());
+        };
+        package_backfill::backfill_single_package(
+            &self.connection,
+            package_id,
+            BackfillBatchOptions::default(),
+        )?;
+        Ok(())
+    }
+
+    fn resolve_package_id(&self, package_info: &PackageInfo) -> StorageResult<Option<i64>> {
+        self.connection
+            .query_row(
+                "SELECT package_id FROM packages WHERE name = ?1 AND version = ?2",
+                params![package_info.name.as_ref(), package_info.version.as_ref()],
+                |row| row.get(0),
             )
             .optional()
-            .ok()
-            .flatten()
-            .is_some()
+            .map_err(Into::into)
     }
 
     pub fn load_package_index_metadata(
@@ -884,8 +974,16 @@ impl NciDatabase {
     }
 
     /// Loads the graph row for `(name, version)` (unique after [`Self::save_package`]). Cache validity is
-    /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `engine_cache_key`, not this `SELECT`.
+    /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `index_cache_key`, not this `SELECT`.
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
+        if let Err(backfill_error) = self.ensure_package_backfill_current(package_info) {
+            trace!(
+                package = %package_info.name.as_ref(),
+                error = %backfill_error,
+                "on-read package backfill failed"
+            );
+            return None;
+        }
         let (package_id, stored_total_symbols, stored_total_files, crawl_ms, build_ms) = match self
             .connection
             .query_row(
@@ -1107,8 +1205,8 @@ impl NciDatabase {
         let crawl_ms = graph.crawl_duration_ms as i64;
         let build_ms = graph.build_duration_ms as i64;
         transaction.execute(
-            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, engine_version)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 package_info.name.as_ref(),
                 package_info.version.as_ref(),
@@ -1117,6 +1215,7 @@ impl NciDatabase {
                 crawl_ms,
                 build_ms,
                 engine_cache_key,
+                SCHEMA_VERSION as i64,
             ],
         )?;
 
@@ -2170,7 +2269,8 @@ impl NciDatabase {
 
         let mut blocks: Vec<String> = vec![
             "             -- NCI index schema (internal; version key `schema_version` in nci_meta).\n\
-             -- `packages.indexed_at` is Unix seconds (INTEGER). `symbols.since_*` is semver-like; sort by since_major/minor/patch.\n\
+             -- `packages.indexed_at` is Unix seconds (INTEGER). `packages.index_cache_key` fingerprints indexer output (`INDEXER_OUTPUT_REVISION` + stub roots).\n\
+             -- `symbols.since_*` is semver-like; sort by since_major/minor/patch.\n\
              -- Package `version` remains the manifest string (lexicographic compare only if you need it).\n\
              -- Example: nci sql -c \"SELECT name, version FROM packages LIMIT 5\"\n"
                 .to_string(),
@@ -2402,7 +2502,6 @@ fn decorator_arguments_json(arguments: &[SharedString]) -> String {
 mod tests {
     use super::*;
     use crate::cache::index_engine_cache_key;
-    use crate::symbol_source_identity::symbol_source_row_from_encoded_path;
     use crate::types::{MergeProvenance, MergeProvenanceKind, PackageGraph};
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -2563,44 +2662,14 @@ mod tests {
     }
 
     fn minimal_symbol(id_str: &str, name_str: &str) -> SymbolNode {
-        let relative_path = "index.d.ts";
-        let source_row = symbol_source_row_from_encoded_path("demo-pkg", "1.0.0", relative_path);
-        SymbolNode {
-            id: SharedString::from(id_str),
-            name: SharedString::from(name_str),
-            parent_symbol_id: None,
-            enclosing_module_declaration_id: None,
-            enclosing_module_declaration_name: None,
-            kind: SymbolKind::Function,
-            kind_name: SharedString::from("FunctionDeclaration"),
-            package: SharedString::from("demo-pkg"),
-            file_path: SharedString::from(relative_path),
-            source_package_name: SharedString::from(source_row.source_package_name),
-            source_package_version: source_row.source_package_version.map(SharedString::from),
-            source_file_path: SharedString::from(source_row.source_file_path),
-            additional_files: None,
-            entry_visibility: None,
-            merge_provenance: None,
-            signature: Some(SharedString::from("declare function demo(): void")),
-            js_doc: Some(SharedString::from("Hello world token")),
-            is_type_only: false,
-            symbol_space: SymbolSpace::Value,
-            dependencies: SharedVec::from(Vec::<SharedString>::new().into_boxed_slice()),
-            surface_dependencies: SharedVec::from(Vec::<SharedString>::new().into_boxed_slice()),
-            re_exported_from: None,
-            deprecated: None,
-            visibility: None,
-            since: None,
-            is_internal: false,
-            is_global_augmentation: false,
-            decorators: SharedVec::from(Vec::new().into_boxed_slice()),
-            is_inherited: false,
-            inherited_from_sources: SharedVec::from(Vec::new().into_boxed_slice()),
-            heritage: SharedVec::from(Vec::new().into_boxed_slice()),
-            modifiers: SharedVec::from(Vec::new().into_boxed_slice()),
-            dep_dedupe_keys: None,
-            raw_dependencies: Vec::new(),
-        }
+        crate::test_fixtures::minimal_test_symbol_with_docs(
+            "demo-pkg",
+            "1.0.0",
+            id_str,
+            name_str,
+            Some("declare function demo(): void"),
+            Some("Hello world token"),
+        )
     }
 
     #[test]
@@ -3257,7 +3326,34 @@ mod tests {
     }
 
     #[test]
-    fn engine_version_invalidation_drops_cache_row() {
+    fn has_cached_package_ignores_backfill_revision_without_pending() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let database = NciDatabase::open(temp.path().join("rev-ignore.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("rev-ignore"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/ignore"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let cache_key = index_engine_cache_key(&[]);
+        database
+            .connection_for_tests()
+            .execute(
+                "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+                 VALUES (?1, ?2, 1, 1, 0, 0, ?3, 0)",
+                params![
+                    package_info.name.as_ref(),
+                    package_info.version.as_ref(),
+                    cache_key.as_str(),
+                ],
+            )
+            .expect("insert");
+        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
+    }
+
+    #[test]
+    fn index_cache_key_invalidation_drops_cache_row() {
         let temp = tempfile::tempdir().expect("tempdir");
         let mut database = NciDatabase::open(temp.path().join("inv.sqlite")).expect("open");
         let package_info = PackageInfo {
@@ -3281,6 +3377,33 @@ mod tests {
             .expect("save");
         let cache_key = index_engine_cache_key(&[]);
         assert!(database.has_cached_package(&package_info, cache_key.as_str()));
-        assert!(!database.has_cached_package(&package_info, "not-a-real-engine-version"));
+        assert!(!database.has_cached_package(&package_info, "not-a-real-index-cache-key"));
+    }
+
+    #[test]
+    fn stale_indexer_cache_key_misses_even_with_matching_schema() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let database = NciDatabase::open(temp.path().join("stale-indexer.sqlite")).expect("open");
+        let package_info = PackageInfo {
+            name: SharedString::from("stale-indexer"),
+            version: SharedString::from("1.0.0"),
+            dir: SharedString::from("/stale"),
+            is_scoped: false,
+            declared_dependencies: SharedVec::from([]),
+        };
+        let current_key = index_engine_cache_key(&[]);
+        database
+            .connection_for_tests()
+            .execute(
+                "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+                 VALUES (?1, ?2, 1, 1, 0, 0, 'i0+deadbeef', 0)",
+                params![
+                    package_info.name.as_ref(),
+                    package_info.version.as_ref(),
+                ],
+            )
+            .expect("insert");
+        assert!(!database.has_cached_package(&package_info, current_key.as_str()));
+        assert!(database.has_cached_package(&package_info, "i0+deadbeef"));
     }
 }

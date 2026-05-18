@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::constants::is_index_excluded_toolchain_package;
 use crate::resolver::normalize_path;
 use crate::types::{PackageInfo, SharedString};
 
@@ -54,7 +55,9 @@ pub fn scan_packages(node_modules_path: &Path) -> Result<Vec<PackageInfo>, ScanE
                 Ok(dir) => dir,
                 Err(_) => continue,
             };
-            if let Some(info) = read_package_info(&resolved_dir, &entry_name_str) {
+            if let Some(info) = read_package_info(&resolved_dir, &entry_name_str)
+                && !is_index_excluded_toolchain_package(info.name.as_ref())
+            {
                 packages.push(info);
             }
         }
@@ -167,7 +170,9 @@ fn scan_scoped_packages(
         };
         let full_name = format!("{}/{}", scope_name, scoped_name.to_string_lossy());
 
-        if let Some(info) = read_package_info(&resolved_dir, &full_name) {
+        if let Some(info) = read_package_info(&resolved_dir, &full_name)
+            && !is_index_excluded_toolchain_package(info.name.as_ref())
+        {
             packages.push(info);
         }
     }

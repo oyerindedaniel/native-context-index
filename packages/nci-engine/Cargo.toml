@@ -2,6 +2,7 @@
 name = "nci-engine"
 version = "0.1.0"
 edition = "2024"
+autotests = false
 description = "High-performance Rust engine for Native Context Indexing of TypeScript declaration files"
 authors = ["Oyerinde Daniel"]
 license = "Apache-2.0"
@@ -35,6 +36,18 @@ enable-ansi-support = "0.3.1"
 [features]
 # Phase/crawl stderr profiling when `NCI_PROFILE=1` (e.g. `cargo run --example demo --features phase-profile -- --profile`).
 phase-profile = []
+# Registers `TEST_PENDING_BACKFILL_VERSION` backfill step for integration tests and `cargo test`.
+# Required for `cli_binary` tests — see module comment in `tests/cli_binary.rs`.
+test-support = []
+
+[[test]]
+name = "cli_binary"
+path = "tests/cli_binary.rs"
+required-features = ["test-support"]
+
+[[test]]
+name = "snapshot_tests"
+path = "tests/snapshot_tests.rs"
 
 [[bin]]
 name = "nci"

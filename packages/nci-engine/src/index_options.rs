@@ -26,6 +26,26 @@ impl PackageTimingBreakdown {
     }
 }
 
+/// Progress hooks for index phases outside per-package crawl/save.
+#[derive(Clone, Debug)]
+pub enum IndexPhaseEvent {
+    ForegroundBackfillStart {
+        pending_global: u64,
+        packages_in_scope: usize,
+    },
+    ForegroundBackfillDone {
+        elapsed: Duration,
+        packages_backfilled: usize,
+        symbol_rows_updated: u64,
+    },
+    ForegroundBackfillFailed {
+        elapsed: Duration,
+        message: String,
+    },
+    /// Emitted immediately before the parallel/sequential package index loop.
+    IndexPackagesStarted,
+}
+
 #[derive(Clone)]
 pub struct PackageProgress {
     pub name: SharedString,
@@ -55,6 +75,7 @@ pub struct IndexOptions {
     pub save_retry_count: u32,
     pub dependency_stub_packages: Vec<String>,
     pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
+    pub on_index_phase: Option<Arc<dyn Fn(IndexPhaseEvent) + Send + Sync>>,
     pub index_timing_detail: bool,
     pub save_package_mode: crate::storage::SavePackageMode,
     pub storage_connection_pragmas: crate::storage::StorageConnectionPragmas,
@@ -77,6 +98,7 @@ impl Default for IndexOptions {
             save_retry_count: 0,
             dependency_stub_packages: Vec::new(),
             on_package_done: None,
+            on_index_phase: None,
             index_timing_detail: false,
             save_package_mode: crate::storage::SavePackageMode::default(),
             storage_connection_pragmas: crate::storage::StorageConnectionPragmas::baseline(),
@@ -105,6 +127,14 @@ impl Debug for IndexOptions {
                 "on_package_done",
                 &self
                     .on_package_done
+                    .as_ref()
+                    .map(|_| "<callback>")
+                    .unwrap_or("<none>"),
+            )
+            .field(
+                "on_index_phase",
+                &self
+                    .on_index_phase
                     .as_ref()
                     .map(|_| "<callback>")
                     .unwrap_or("<none>"),

@@ -55,6 +55,8 @@ Options:
   <TerminalCommand>nci db --help</TerminalCommand>
   <TerminalOutput tone="muted">{`Commands:
   init            Open the database and run migrations (non-interactive)
+  migrate         Apply pending SQLite schema migrations
+  backfill        Run deferred per-package symbol backfill (when pending)
   status          Database path/size and health checks (optional)
   clear           Delete all indexed package rows (prompts unless -y)
   remove          Remove one package from the index (prompts unless -y)
