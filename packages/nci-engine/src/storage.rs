@@ -774,11 +774,17 @@ impl NciDatabase {
         })
     }
 
-    pub fn has_cached_package(&self, package_info: &PackageInfo, index_cache_key: &str) -> bool {
-        let required_backfill_revision = match required_backfill_revision(&self.connection) {
-            Ok(revision) => revision,
-            Err(_) => return false,
-        };
+    pub fn has_cached_package(
+        &self,
+        package_info: &PackageInfo,
+        index_cache_key: &str,
+        pending_backfill_hint: Option<Option<u32>>,
+    ) -> bool {
+        let required_backfill_revision =
+            match required_backfill_revision(&self.connection, pending_backfill_hint) {
+                Ok(revision) => revision,
+                Err(_) => return false,
+            };
         let query_result = match required_backfill_revision {
             Some(pending_revision) => self.connection.query_row(
                 "SELECT 1 FROM packages
@@ -808,16 +814,25 @@ impl NciDatabase {
         query_result.optional().ok().flatten().is_some()
     }
 
-    pub fn count_packages_pending_backfill(&self) -> StorageResult<u64> {
-        count_packages_pending_backfill(&self.connection).map_err(Into::into)
+    pub fn count_packages_pending_backfill(
+        &self,
+        current_index_cache_key: &str,
+    ) -> StorageResult<u64> {
+        count_packages_pending_backfill(&self.connection, current_index_cache_key)
+            .map_err(Into::into)
     }
 
     pub fn count_packages_pending_in_scope(
         &self,
         packages: &[PackageInfo],
+        current_index_cache_key: &str,
     ) -> StorageResult<usize> {
-        package_backfill::count_packages_pending_in_set(&self.connection, packages)
-            .map_err(Into::into)
+        package_backfill::count_packages_pending_in_set(
+            &self.connection,
+            packages,
+            current_index_cache_key,
+        )
+        .map_err(Into::into)
     }
 
     pub fn pending_backfill_version(&self) -> StorageResult<Option<u32>> {
@@ -828,11 +843,13 @@ impl NciDatabase {
     pub fn foreground_backfill_for_packages(
         &mut self,
         packages: &[PackageInfo],
+        current_index_cache_key: &str,
     ) -> StorageResult<package_backfill::ForegroundBackfillResult> {
         package_backfill::backfill_packages_in_set(
             &self.connection,
             packages,
             BackfillBatchOptions::default(),
+            current_index_cache_key,
         )
         .map_err(Into::into)
     }
@@ -841,23 +858,34 @@ impl NciDatabase {
     pub fn drain_pending_package_backfill(
         &mut self,
         limits: BackfillDrainLimits,
+        current_index_cache_key: &str,
     ) -> StorageResult<u64> {
         package_backfill::drain_pending_package_backfill(
             &self.connection,
             BackfillBatchOptions::default(),
             limits,
+            current_index_cache_key,
         )
         .map_err(Into::into)
     }
 
-    fn ensure_package_backfill_current(&self, package_info: &PackageInfo) -> StorageResult<()> {
+    fn ensure_package_backfill_current(
+        &self,
+        package_info: &PackageInfo,
+        current_index_cache_key: &str,
+    ) -> StorageResult<()> {
         let Some(package_id) = self.resolve_package_id(package_info)? else {
+            return Ok(());
+        };
+        let Some(pending_version) = read_pending_backfill_version(&self.connection)? else {
             return Ok(());
         };
         package_backfill::backfill_single_package(
             &self.connection,
             package_id,
+            pending_version,
             BackfillBatchOptions::default(),
+            current_index_cache_key,
         )?;
         Ok(())
     }
@@ -976,7 +1004,10 @@ impl NciDatabase {
     /// Loads the graph row for `(name, version)` (unique after [`Self::save_package`]). Cache validity is
     /// enforced by [`Self::has_cached_package`] + [`Self::save_package`]'s `index_cache_key`, not this `SELECT`.
     pub fn load_package(&self, package_info: &PackageInfo) -> Option<PackageGraph> {
-        if let Err(backfill_error) = self.ensure_package_backfill_current(package_info) {
+        let current_index_cache_key = crate::cache::index_engine_cache_key(&[]);
+        if let Err(backfill_error) =
+            self.ensure_package_backfill_current(package_info, current_index_cache_key.as_str())
+        {
             trace!(
                 package = %package_info.name.as_ref(),
                 error = %backfill_error,
@@ -2701,7 +2732,7 @@ mod tests {
             .expect("save");
 
         let cache_key = index_engine_cache_key(&[]);
-        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
+        assert!(database.has_cached_package(&package_info, cache_key.as_str(), None));
         let loaded = database.load_package(&package_info).expect("load");
         assert_eq!(loaded.symbols.len(), 1);
         assert_eq!(loaded.symbols[0].name.as_ref(), "demo");
@@ -3274,7 +3305,11 @@ mod tests {
             let thread_cache_key = shared_cache_key.clone();
             handles.push(thread::spawn(move || {
                 let guard = clone_mutex.lock().expect("lock");
-                assert!(guard.has_cached_package(&cloned_package_info, thread_cache_key.as_str()));
+                assert!(guard.has_cached_package(
+                    &cloned_package_info,
+                    thread_cache_key.as_str(),
+                    None
+                ));
                 assert!(guard.load_package(&cloned_package_info).is_some());
             }));
         }
@@ -3349,7 +3384,7 @@ mod tests {
                 ],
             )
             .expect("insert");
-        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
+        assert!(database.has_cached_package(&package_info, cache_key.as_str(), None));
     }
 
     #[test]
@@ -3376,8 +3411,8 @@ mod tests {
             .save_package(&package_info, &graph, index_engine_cache_key(&[]).as_str())
             .expect("save");
         let cache_key = index_engine_cache_key(&[]);
-        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
-        assert!(!database.has_cached_package(&package_info, "not-a-real-index-cache-key"));
+        assert!(database.has_cached_package(&package_info, cache_key.as_str(), None));
+        assert!(!database.has_cached_package(&package_info, "not-a-real-index-cache-key", None));
     }
 
     #[test]
@@ -3403,7 +3438,7 @@ mod tests {
                 ],
             )
             .expect("insert");
-        assert!(!database.has_cached_package(&package_info, current_key.as_str()));
-        assert!(database.has_cached_package(&package_info, "i0+deadbeef"));
+        assert!(!database.has_cached_package(&package_info, current_key.as_str(), None));
+        assert!(database.has_cached_package(&package_info, "i0+deadbeef", None));
     }
 }

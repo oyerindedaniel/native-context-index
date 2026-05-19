@@ -11,7 +11,8 @@ use std::path::Path;
 
 use assert_cmd::Command;
 use nci_engine::{
-    META_PENDING_BACKFILL_KEY, TEST_PENDING_BACKFILL_VERSION, index_engine_cache_key,
+    META_PENDING_BACKFILL_KEY, TEST_CHAIN_BACKFILL_V3, TEST_PENDING_BACKFILL_VERSION,
+    index_engine_cache_key,
 };
 use predicates::prelude::*;
 use rusqlite::{Connection, OptionalExtension};
@@ -2391,6 +2392,67 @@ fn db_backfill_drains_all_seeded_pending_packages() {
         )
         .expect("count");
     assert_eq!(completed, 2);
+}
+
+/// Exercises the real `nci db backfill` path when `pending_backfill` targets a version that
+/// requires multiple registered steps (not only the latest step fn).
+#[test]
+fn db_backfill_chains_registered_steps_up_to_pending_target() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = init_db_path(proj.path(), cache.path());
+    set_pending_backfill_meta(&db_path, TEST_CHAIN_BACKFILL_V3);
+    seed_package_with_backfill_revision(
+        &db_path,
+        "chain-cli-pkg",
+        "1.0.0",
+        TEST_PENDING_BACKFILL_VERSION,
+    );
+
+    assert_eq!(
+        count_packages_below_backfill_revision(&db_path, TEST_CHAIN_BACKFILL_V3),
+        1
+    );
+
+    let output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "db",
+            "backfill",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&output).expect("json");
+    assert_eq!(parsed["ok"], true);
+    assert_eq!(parsed["data"]["pending_packages_before"], 1);
+    assert_eq!(parsed["data"]["pending_packages_after"], 0);
+
+    let connection = Connection::open(&db_path).expect("open");
+    let pending_meta: Option<String> = connection
+        .query_row(
+            "SELECT value FROM nci_meta WHERE key = ?1",
+            [META_PENDING_BACKFILL_KEY],
+            |row| row.get(0),
+        )
+        .optional()
+        .expect("query");
+    assert!(pending_meta.is_none());
+
+    let package_revision: i64 = connection
+        .query_row(
+            "SELECT backfill_revision FROM packages WHERE name = 'chain-cli-pkg'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("revision");
+    assert_eq!(package_revision, TEST_CHAIN_BACKFILL_V3 as i64);
 }
 
 #[test]

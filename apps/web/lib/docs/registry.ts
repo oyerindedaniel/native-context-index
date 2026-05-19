@@ -202,6 +202,14 @@ export const docsGroups: DocsGroup[] = [
           "Every table, every column, every index, and the queries that justify each one.",
       },
       {
+        slug: "/docs/architecture/sqlite-migrations",
+        title: "SQLite Migrations",
+        eyebrow: "Architecture",
+        groupId: "architecture",
+        summary:
+          "Instant vs Backfill vs Rebuild, pending_backfill target, and chained per-package steps.",
+      },
+      {
         slug: "/docs/architecture/local-vs-rag",
         title: "Local vs RAG",
         eyebrow: "Architecture",

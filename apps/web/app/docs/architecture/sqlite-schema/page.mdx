@@ -107,6 +107,8 @@ That command prints the live `CREATE TABLE` statements straight from the open da
 
 The CLI applies pending schema migrations on `nci db init`, `nci db migrate`, and the first `nci index`. Symbol-only work after a <code>Backfill</code> migration runs during <code>nci index</code> or via <code>nci db backfill</code>.
 
+Migrate records one <code>pending_backfill</code> target (latest Backfill version in the batch). The engine then runs every registered per-package step with <code>backfill_revision &lt; step_version &lt;= pending_backfill</code> in order — Instant-only versions register no step. See [SQLite migrations contract](/docs/architecture/sqlite-migrations).
+
 <TerminalRoot>
   <TerminalCommand>nci db status</TerminalCommand>
 </TerminalRoot>

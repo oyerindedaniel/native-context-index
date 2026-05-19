@@ -45,3 +45,7 @@ pub use storage::{
 pub use types::PackageIndexMetadata;
 
 pub use package_backfill::{META_PENDING_BACKFILL_KEY, TEST_PENDING_BACKFILL_VERSION};
+#[cfg(feature = "test-support")]
+pub use package_backfill::{
+    TEST_CHAIN_BACKFILL_V1, TEST_CHAIN_BACKFILL_V2, TEST_CHAIN_BACKFILL_V3,
+};

@@ -78,6 +78,8 @@ pub struct IndexOptions {
     pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
     pub on_index_phase: Option<Arc<dyn Fn(IndexPhaseEvent) + Send + Sync>>,
     pub index_timing_detail: bool,
+    /// `None` reads `nci_meta.pending_backfill` per probe; `Some(None)` / `Some(Some(v))` reuse one value for the run.
+    pub pending_backfill_revision: Option<Option<u32>>,
     pub save_package_mode: SavePackageMode,
     pub storage_connection_pragmas: StorageConnectionPragmas,
 }
@@ -101,6 +103,7 @@ impl Default for IndexOptions {
             on_package_done: None,
             on_index_phase: None,
             index_timing_detail: false,
+            pending_backfill_revision: None,
             save_package_mode: SavePackageMode::default(),
             storage_connection_pragmas: StorageConnectionPragmas::baseline(),
         }

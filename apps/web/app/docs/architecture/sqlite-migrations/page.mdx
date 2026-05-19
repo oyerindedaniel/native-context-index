@@ -1,0 +1,48 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/architecture/sqlite-migrations");
+
+
+<PageEyebrow>Architecture · SQLite migrations</PageEyebrow>
+
+# Schema migrations and deferred backfill
+
+<PageLede>
+  How <code>schema_version</code>, <code>pending_backfill</code>, <code>backfill_revision</code>, and <code>index_cache_key</code> interact — for migration authors and agents debugging upgrade paths.
+</PageLede>
+
+## Three axes (do not conflate)
+
+| Axis | Where | Purpose |
+|------|--------|---------|
+| Schema version | <code>nci_meta.schema_version</code> | DDL head applied by <code>nci db migrate</code> |
+| Backfill revision | <code>packages.backfill_revision</code> | Per-package symbol SQL migrations completed |
+| Index cache key | <code>packages.index_cache_key</code> | Crawl/build fingerprint (<code>INDEXER_OUTPUT_REVISION</code>) |
+
+## Migration kinds
+
+- **Instant** — additive DDL always runs; optional <code>package_sql</code> for bulk <code>packages</code> updates (skipped when empty or when a **Rebuild** is in the batch).
+- **Backfill** — DDL at migrate time; symbol transforms deferred. Sets one <code>pending_backfill</code> **target** (latest Backfill version in the batch).
+- **Rebuild** — purges all <code>packages</code> rows; re-index required.
+
+## Backfill chain (agent contract)
+
+Migrate stores a single <code>nci_meta.pending_backfill</code> target. When draining, the engine runs every step in <code>PACKAGE_BACKFILL_STEPS</code> where:
+
+<code>backfill_revision &lt; step_version &lt;= pending_backfill</code>
+
+Steps run in ascending version order; <code>backfill_revision</code> updates after each step. Instant-only schema versions register no step. Fresh <code>nci index</code> writes set <code>backfill_revision</code> to the current <code>SCHEMA_VERSION</code>.
+
+While <code>pending_backfill</code> is set, cache hits require <code>backfill_revision &gt;= pending_backfill</code> in addition to <code>index_cache_key</code> match. Foreground backfill runs before cache probes during <code>nci index</code>, but only for packages whose stored <code>index_cache_key</code> already matches the current engine key — stale-key rows are skipped (recrawl + <code>save_package</code> fixes them).
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Author rule</CalloutTitle>
+  <CalloutBody>
+    Register one backfill step per symbol-transform <code>Backfill</code> migration version. Do not rely on only the latest step unless it composes all earlier transforms.
+  </CalloutBody>
+</CalloutRoot>
+
+Canonical copy for agents also lives in the repo at <code>docs/nci-sqlite-migrations.md</code> (referenced from <code>storage_migrations.rs</code> and <code>package_backfill.rs</code>).

@@ -2,8 +2,22 @@
 //!
 //! DDL runs at migrate time; symbol row updates run per `package_id` during index (foreground),
 //! `nci db backfill`, or on first read of a cold package.
+//!
+//! ## Contract
+//!
+//! - Migrate records a single `nci_meta.pending_backfill` **target** (latest Backfill version in the batch).
+//! - Each symbol-transform Backfill registers one step in [`PACKAGE_BACKFILL_STEPS`] at that migration version.
+//! - Instant-only migrations do not register steps (no per-package symbol work).
+//! - When draining, the engine runs every registered step with
+//!   `package.backfill_revision < step_version <= pending_backfill`, in ascending version order,
+//!   marking `backfill_revision` after each step. Fresh [`crate::storage::NciDatabase::save_package`]
+//!   rows start at [`crate::storage_migrations::SCHEMA_VERSION`] and skip the chain.
+//! - Deferred SQL is skipped when `packages.index_cache_key` differs from the current engine key —
+//!   index will recrawl and [`save_package`] will refresh symbols and `backfill_revision` instead.
+//!
+//! See [`docs/nci-sqlite-migrations.md`].
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, ToSql, params, params_from_iter};
 use tracing::error;
 
 use crate::migration_backfill::BackfillBatchOptions;
@@ -20,8 +34,18 @@ pub struct ForegroundBackfillResult {
 
 pub const META_PENDING_BACKFILL_KEY: &str = "pending_backfill";
 
+const PACKAGE_SCOPE_SQL_BATCH_SIZE: usize = 256;
+
 /// Reserved migration version for tests only (not used by production `MIGRATIONS`).
 pub const TEST_PENDING_BACKFILL_VERSION: u32 = 9_001;
+
+/// Chained backfill test versions (not used by production `MIGRATIONS`).
+#[cfg(any(test, feature = "test-support"))]
+pub const TEST_CHAIN_BACKFILL_V1: u32 = 9_101;
+#[cfg(any(test, feature = "test-support"))]
+pub const TEST_CHAIN_BACKFILL_V2: u32 = 9_102;
+#[cfg(any(test, feature = "test-support"))]
+pub const TEST_CHAIN_BACKFILL_V3: u32 = 9_103;
 
 /// Runs batched symbol updates for one package when `backfill_version` is applied.
 pub(crate) type PackageBackfillStep =
@@ -42,20 +66,62 @@ fn test_backfill_touch_symbols(
     )
 }
 
-/// Registry keyed by migration version. Production [`MigrationKind::Backfill`] migrations register here.
 #[cfg(any(test, feature = "test-support"))]
-const PACKAGE_BACKFILL_STEPS: &[(u32, PackageBackfillStep)] =
-    &[(TEST_PENDING_BACKFILL_VERSION, test_backfill_touch_symbols)];
+fn test_chain_backfill_mark_v1(
+    connection: &Connection,
+    package_id: i64,
+    options: BackfillBatchOptions,
+) -> rusqlite::Result<u64> {
+    run_batched_symbol_update_for_package(
+        connection,
+        package_id,
+        "symbol_space = 'chain-v9101'",
+        None,
+        options,
+    )
+}
+
+#[cfg(any(test, feature = "test-support"))]
+fn test_chain_backfill_mark_v2(
+    connection: &Connection,
+    package_id: i64,
+    options: BackfillBatchOptions,
+) -> rusqlite::Result<u64> {
+    run_batched_symbol_update_for_package(
+        connection,
+        package_id,
+        "symbol_space = 'chain-v9102'",
+        None,
+        options,
+    )
+}
+
+#[cfg(any(test, feature = "test-support"))]
+fn test_chain_backfill_mark_v3(
+    connection: &Connection,
+    package_id: i64,
+    options: BackfillBatchOptions,
+) -> rusqlite::Result<u64> {
+    run_batched_symbol_update_for_package(
+        connection,
+        package_id,
+        "symbol_space = 'chain-v9103'",
+        None,
+        options,
+    )
+}
+
+/// Registry keyed by migration version (ascending). Production [`MigrationKind::Backfill`] migrations register here.
+#[cfg(any(test, feature = "test-support"))]
+const PACKAGE_BACKFILL_STEPS: &[(u32, PackageBackfillStep)] = &[
+    (TEST_PENDING_BACKFILL_VERSION, test_backfill_touch_symbols),
+    (TEST_CHAIN_BACKFILL_V1, test_chain_backfill_mark_v1),
+    (TEST_CHAIN_BACKFILL_V2, test_chain_backfill_mark_v2),
+    (TEST_CHAIN_BACKFILL_V3, test_chain_backfill_mark_v3),
+];
 
 #[cfg(not(any(test, feature = "test-support")))]
 const PACKAGE_BACKFILL_STEPS: &[(u32, PackageBackfillStep)] = &[];
-
-fn package_backfill_step_for_version(backfill_version: u32) -> Option<PackageBackfillStep> {
-    PACKAGE_BACKFILL_STEPS
-        .iter()
-        .find(|(version, _)| *version == backfill_version)
-        .map(|(_, step)| *step)
-}
 
 fn read_package_backfill_revision(
     connection: &Connection,
@@ -116,19 +182,99 @@ fn nci_meta_table_exists(connection: &Connection) -> rusqlite::Result<bool> {
         .is_some())
 }
 
-/// Minimum `packages.backfill_revision` required for cache hits while `pending_backfill` is set.
-pub(crate) fn required_backfill_revision(connection: &Connection) -> rusqlite::Result<Option<u32>> {
-    read_pending_backfill_version(connection)
+pub(crate) fn required_backfill_revision(
+    connection: &Connection,
+    pending_backfill_hint: Option<Option<u32>>,
+) -> rusqlite::Result<Option<u32>> {
+    match pending_backfill_hint {
+        Some(pending_version) => Ok(pending_version),
+        None => read_pending_backfill_version(connection),
+    }
 }
 
-pub(crate) fn count_packages_pending_backfill(connection: &Connection) -> rusqlite::Result<u64> {
-    let Some(required) = read_pending_backfill_version(connection)? else {
+fn append_scope_row_literals(scope_size: usize) -> String {
+    std::iter::repeat_n("(?, ?)", scope_size)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn bind_scope_package_params(
+    chunk: &[PackageInfo],
+    required_revision: u32,
+    current_index_cache_key: &str,
+) -> Vec<Box<dyn ToSql>> {
+    let mut bind_values: Vec<Box<dyn ToSql>> = Vec::with_capacity(chunk.len() * 2 + 2);
+    for package in chunk {
+        bind_values.push(Box::new(package.name.as_ref().to_string()));
+        bind_values.push(Box::new(package.version.as_ref().to_string()));
+    }
+    bind_values.push(Box::new(required_revision as i64));
+    bind_values.push(Box::new(current_index_cache_key.to_string()));
+    bind_values
+}
+
+fn query_package_ids_pending_in_scope(
+    connection: &Connection,
+    packages: &[PackageInfo],
+    required_revision: u32,
+    current_index_cache_key: &str,
+) -> rusqlite::Result<Vec<i64>> {
+    let mut package_ids = Vec::new();
+    for chunk in packages.chunks(PACKAGE_SCOPE_SQL_BATCH_SIZE) {
+        let row_literals = append_scope_row_literals(chunk.len());
+        let sql = format!(
+            "SELECT package_id FROM packages
+             WHERE (name, version) IN ({row_literals})
+               AND backfill_revision < ? AND index_cache_key = ?"
+        );
+        let bind_values =
+            bind_scope_package_params(chunk, required_revision, current_index_cache_key);
+        let mut statement = connection.prepare(&sql)?;
+        let mut rows = statement.query(params_from_iter(bind_values.iter()))?;
+        while let Some(row) = rows.next()? {
+            package_ids.push(row.get(0)?);
+        }
+    }
+    Ok(package_ids)
+}
+
+fn count_packages_pending_in_scope_query(
+    connection: &Connection,
+    packages: &[PackageInfo],
+    required_revision: u32,
+    current_index_cache_key: &str,
+) -> rusqlite::Result<usize> {
+    let mut total_pending = 0usize;
+    for chunk in packages.chunks(PACKAGE_SCOPE_SQL_BATCH_SIZE) {
+        let row_literals = append_scope_row_literals(chunk.len());
+        let sql = format!(
+            "SELECT COUNT(*) FROM packages
+             WHERE (name, version) IN ({row_literals})
+               AND backfill_revision < ? AND index_cache_key = ?"
+        );
+        let bind_values =
+            bind_scope_package_params(chunk, required_revision, current_index_cache_key);
+        let chunk_count: i64 =
+            connection.query_row(&sql, params_from_iter(bind_values.iter()), |count_row| {
+                count_row.get(0)
+            })?;
+        total_pending += chunk_count.max(0) as usize;
+    }
+    Ok(total_pending)
+}
+
+pub(crate) fn count_packages_pending_backfill(
+    connection: &Connection,
+    current_index_cache_key: &str,
+) -> rusqlite::Result<u64> {
+    let Some(required_revision) = read_pending_backfill_version(connection)? else {
         return Ok(0);
     };
     connection
         .query_row(
-            "SELECT COUNT(*) FROM packages WHERE backfill_revision < ?1",
-            [required],
+            "SELECT COUNT(*) FROM packages
+             WHERE backfill_revision < ?1 AND index_cache_key = ?2",
+            params![required_revision, current_index_cache_key],
             |count_row| count_row.get(0),
         )
         .map(|count: i64| count.max(0) as u64)
@@ -137,6 +283,7 @@ pub(crate) fn count_packages_pending_backfill(connection: &Connection) -> rusqli
 pub(crate) fn package_ids_pending_in_set(
     connection: &Connection,
     packages: &[PackageInfo],
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<Vec<i64>> {
     if packages.is_empty() {
         return Ok(Vec::new());
@@ -144,42 +291,28 @@ pub(crate) fn package_ids_pending_in_set(
     let Some(required_revision) = read_pending_backfill_version(connection)? else {
         return Ok(Vec::new());
     };
-    let mut package_ids = Vec::with_capacity(packages.len());
-    let mut lookup = connection.prepare(
-        "SELECT package_id FROM packages
-         WHERE name = ?1 AND version = ?2 AND backfill_revision < ?3",
-    )?;
-    for package in packages {
-        let package_id_opt: Option<i64> = lookup
-            .query_row(
-                params![
-                    package.name.as_ref(),
-                    package.version.as_ref(),
-                    required_revision,
-                ],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let Some(package_id) = package_id_opt {
-            package_ids.push(package_id);
-        }
-    }
-    Ok(package_ids)
+    query_package_ids_pending_in_scope(
+        connection,
+        packages,
+        required_revision,
+        current_index_cache_key,
+    )
 }
 
 pub(crate) fn next_package_id_pending_backfill(
     connection: &Connection,
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<Option<i64>> {
-    let Some(required) = read_pending_backfill_version(connection)? else {
+    let Some(required_revision) = read_pending_backfill_version(connection)? else {
         return Ok(None);
     };
     connection
         .query_row(
             "SELECT package_id FROM packages
-             WHERE backfill_revision < ?1
+             WHERE backfill_revision < ?1 AND index_cache_key = ?2
              ORDER BY package_id ASC
              LIMIT 1",
-            [required],
+            params![required_revision, current_index_cache_key],
             |row| row.get(0),
         )
         .optional()
@@ -197,73 +330,84 @@ pub(crate) fn mark_package_backfill_complete(
     Ok(())
 }
 
-fn maybe_clear_pending_when_all_complete(connection: &Connection) -> rusqlite::Result<()> {
+fn maybe_clear_pending_when_all_complete(
+    connection: &Connection,
+    current_index_cache_key: &str,
+) -> rusqlite::Result<()> {
     if read_pending_backfill_version(connection)?.is_none() {
         return Ok(());
     }
-    if count_packages_pending_backfill(connection)? == 0 {
+    if count_packages_pending_backfill(connection, current_index_cache_key)? == 0 {
         clear_pending_backfill_version(connection)?;
     }
     Ok(())
 }
 
-/// Applies the registered backfill step for the pending migration version, then marks the package.
+/// Applies registered backfill steps through the pending target version, marking revision after each.
+/// Returns symbol rows updated and whether `backfill_revision` reached `pending_version`.
 pub(crate) fn backfill_single_package(
     connection: &Connection,
     package_id: i64,
+    pending_version: u32,
     batch_options: BackfillBatchOptions,
-) -> rusqlite::Result<u64> {
-    let Some(pending_version) = read_pending_backfill_version(connection)? else {
-        return Ok(0);
-    };
-    let current_revision: u32 = connection
-        .query_row(
-            "SELECT backfill_revision FROM packages WHERE package_id = ?1",
-            [package_id],
-            |row| row.get::<_, i64>(0),
-        )
-        .map(|revision| revision as u32)?;
-    if current_revision >= pending_version {
-        return Ok(0);
+    current_index_cache_key: &str,
+) -> rusqlite::Result<(u64, bool)> {
+    let (mut current_revision, stored_cache_key): (u32, String) = connection.query_row(
+        "SELECT backfill_revision, index_cache_key FROM packages WHERE package_id = ?1",
+        [package_id],
+        |row| Ok((row.get::<_, i64>(0)? as u32, row.get(1)?)),
+    )?;
+    if stored_cache_key != current_index_cache_key {
+        return Ok((0, false));
     }
-    let Some(step) = package_backfill_step_for_version(pending_version) else {
+    if current_revision >= pending_version {
+        return Ok((0, true));
+    }
+
+    let mut total_updated_rows = 0u64;
+    for (step_version, step) in PACKAGE_BACKFILL_STEPS {
+        if *step_version <= current_revision || *step_version > pending_version {
+            continue;
+        }
+        total_updated_rows += step(connection, package_id, batch_options)?;
+        mark_package_backfill_complete(connection, package_id, *step_version)?;
+        current_revision = *step_version;
+    }
+
+    if current_revision < pending_version {
         error!(
             pending_version,
             package_id,
-            "pending_backfill is set but PACKAGE_BACKFILL_STEPS has no entry for this version"
+            current_revision,
+            "pending_backfill target not reached; register PACKAGE_BACKFILL_STEPS for each Backfill version or compose transforms into a later step"
         );
-        return Ok(0);
-    };
-    let updated_rows = step(connection, package_id, batch_options)?;
-    mark_package_backfill_complete(connection, package_id, pending_version)?;
-    Ok(updated_rows)
+    }
+
+    Ok((total_updated_rows, current_revision >= pending_version))
 }
 
 pub(crate) fn backfill_packages_by_id(
     connection: &Connection,
     package_ids: &[i64],
+    pending_version: u32,
     batch_options: BackfillBatchOptions,
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<ForegroundBackfillResult> {
-    let Some(pending_version) = read_pending_backfill_version(connection)? else {
-        return Ok(ForegroundBackfillResult::default());
-    };
     let mut result = ForegroundBackfillResult::default();
     for package_id in package_ids {
-        let current_revision: u32 = connection
-            .query_row(
-                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
-                [*package_id],
-                |row| row.get::<_, i64>(0),
-            )
-            .map(|revision| revision as u32)?;
-        if current_revision >= pending_version {
-            continue;
+        let (updated_rows, reached_pending) = backfill_single_package(
+            connection,
+            *package_id,
+            pending_version,
+            batch_options,
+            current_index_cache_key,
+        )?;
+        if reached_pending {
+            result.packages_backfilled += 1;
         }
-        let updated_rows = backfill_single_package(connection, *package_id, batch_options)?;
-        result.packages_backfilled += 1;
         result.symbol_rows_updated += updated_rows;
     }
-    maybe_clear_pending_when_all_complete(connection)?;
+    maybe_clear_pending_when_all_complete(connection, current_index_cache_key)?;
     Ok(result)
 }
 
@@ -280,9 +424,19 @@ pub(crate) fn backfill_packages_in_set(
     connection: &Connection,
     packages: &[PackageInfo],
     batch_options: BackfillBatchOptions,
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<ForegroundBackfillResult> {
-    let package_ids = package_ids_pending_in_set(connection, packages)?;
-    backfill_packages_by_id(connection, &package_ids, batch_options)
+    let Some(pending_version) = read_pending_backfill_version(connection)? else {
+        return Ok(ForegroundBackfillResult::default());
+    };
+    let package_ids = package_ids_pending_in_set(connection, packages, current_index_cache_key)?;
+    backfill_packages_by_id(
+        connection,
+        &package_ids,
+        pending_version,
+        batch_options,
+        current_index_cache_key,
+    )
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -295,11 +449,12 @@ pub(crate) fn drain_pending_package_backfill(
     connection: &Connection,
     batch_options: BackfillBatchOptions,
     limits: BackfillDrainLimits,
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<u64> {
     let Some(pending_version) = read_pending_backfill_version(connection)? else {
         return Ok(0);
     };
-    if count_packages_pending_backfill(connection)? == 0 {
+    if count_packages_pending_backfill(connection, current_index_cache_key)? == 0 {
         clear_pending_backfill_version(connection)?;
         return Ok(0);
     }
@@ -312,13 +467,22 @@ pub(crate) fn drain_pending_package_backfill(
         {
             break;
         }
-        let Some(package_id) = next_package_id_pending_backfill(connection)? else {
+        let Some(package_id) =
+            next_package_id_pending_backfill(connection, current_index_cache_key)?
+        else {
             break;
         };
         let revision_before = read_package_backfill_revision(connection, package_id)?;
-        total_updated += backfill_single_package(connection, package_id, batch_options)?;
-        let revision_after = read_package_backfill_revision(connection, package_id)?;
-        if revision_after < pending_version {
+        let (updated_rows, reached_pending) = backfill_single_package(
+            connection,
+            package_id,
+            pending_version,
+            batch_options,
+            current_index_cache_key,
+        )?;
+        total_updated += updated_rows;
+        if !reached_pending {
+            let revision_after = read_package_backfill_revision(connection, package_id)?;
             error!(
                 package_id,
                 revision_before,
@@ -330,7 +494,7 @@ pub(crate) fn drain_pending_package_backfill(
         }
         packages_processed += 1;
     }
-    maybe_clear_pending_when_all_complete(connection)?;
+    maybe_clear_pending_when_all_complete(connection, current_index_cache_key)?;
     Ok(total_updated)
 }
 
@@ -338,8 +502,20 @@ pub(crate) fn drain_pending_package_backfill(
 pub(crate) fn count_packages_pending_in_set(
     connection: &Connection,
     packages: &[PackageInfo],
+    current_index_cache_key: &str,
 ) -> rusqlite::Result<usize> {
-    Ok(package_ids_pending_in_set(connection, packages)?.len())
+    if packages.is_empty() {
+        return Ok(0);
+    }
+    let Some(required_revision) = read_pending_backfill_version(connection)? else {
+        return Ok(0);
+    };
+    count_packages_pending_in_scope_query(
+        connection,
+        packages,
+        required_revision,
+        current_index_cache_key,
+    )
 }
 
 #[cfg(test)]
@@ -447,6 +623,10 @@ mod integration_tests {
         }
     }
 
+    fn current_engine_cache_key() -> String {
+        index_engine_cache_key(&[])
+    }
+
     #[test]
     fn foreground_backfill_only_touches_index_scope() {
         let temp = tempfile::tempdir().expect("tempdir");
@@ -466,7 +646,7 @@ mod integration_tests {
             sample_package("in-scope-b", "1.0.0"),
         ];
         database
-            .foreground_backfill_for_packages(&scope)
+            .foreground_backfill_for_packages(&scope, current_engine_cache_key().as_str())
             .expect("foreground");
 
         let connection = database.connection_for_tests();
@@ -511,7 +691,7 @@ mod integration_tests {
             )
             .expect("update key");
 
-        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
+        assert!(database.has_cached_package(&package_info, cache_key.as_str(), None));
     }
 
     #[test]
@@ -528,7 +708,7 @@ mod integration_tests {
         )
         .expect("pending");
 
-        assert!(!database.has_cached_package(&package_info, cache_key.as_str()));
+        assert!(!database.has_cached_package(&package_info, cache_key.as_str(), None));
 
         database
             .connection_for_tests()
@@ -539,7 +719,7 @@ mod integration_tests {
             .expect("update");
 
         clear_pending_backfill_version(database.connection_for_tests()).expect("clear");
-        assert!(database.has_cached_package(&package_info, cache_key.as_str()));
+        assert!(database.has_cached_package(&package_info, cache_key.as_str(), None));
     }
 
     #[test]
@@ -557,9 +737,12 @@ mod integration_tests {
         }
 
         database
-            .drain_pending_package_backfill(BackfillDrainLimits {
-                max_packages: Some(2),
-            })
+            .drain_pending_package_backfill(
+                BackfillDrainLimits {
+                    max_packages: Some(2),
+                },
+                current_engine_cache_key().as_str(),
+            )
             .expect("drain");
 
         let connection = database.connection_for_tests();
@@ -590,7 +773,10 @@ mod integration_tests {
         seed_package_row(&database, "only-pkg", "1.0.0", 0);
 
         database
-            .drain_pending_package_backfill(BackfillDrainLimits::default())
+            .drain_pending_package_backfill(
+                BackfillDrainLimits::default(),
+                current_engine_cache_key().as_str(),
+            )
             .expect("drain");
 
         assert!(
@@ -611,19 +797,24 @@ mod integration_tests {
         .expect("pending");
         let package_id = seed_symbols_for_package(&mut database, "idem", "1.0.0", 6);
 
-        let first = backfill_single_package(
+        let cache_key = current_engine_cache_key();
+        let (first, _) = backfill_single_package(
             database.connection_for_tests(),
             package_id,
+            TEST_PENDING_BACKFILL_VERSION,
             BackfillBatchOptions {
                 batch_size: 2,
                 ..Default::default()
             },
+            cache_key.as_str(),
         )
         .expect("first");
-        let second = backfill_single_package(
+        let (second, _) = backfill_single_package(
             database.connection_for_tests(),
             package_id,
+            TEST_PENDING_BACKFILL_VERSION,
             BackfillBatchOptions::default(),
+            cache_key.as_str(),
         )
         .expect("second");
         assert_eq!(first, 6);
@@ -660,19 +851,24 @@ mod integration_tests {
         };
 
         let first_database = NciDatabase::open(&db_path).expect("first open");
-        let first_updates = backfill_single_package(
+        let cache_key = current_engine_cache_key();
+        let (first_updates, _) = backfill_single_package(
             first_database.connection_for_tests(),
             package_id,
+            TEST_PENDING_BACKFILL_VERSION,
             batch_options,
+            cache_key.as_str(),
         )
         .expect("first open");
         assert_eq!(first_updates, 8);
 
         let second_database = NciDatabase::open(&db_path).expect("second open");
-        let second_updates = backfill_single_package(
+        let (second_updates, _) = backfill_single_package(
             second_database.connection_for_tests(),
             package_id,
+            TEST_PENDING_BACKFILL_VERSION,
             batch_options,
+            cache_key.as_str(),
         )
         .expect("second open");
         assert_eq!(second_updates, 0);
@@ -695,7 +891,10 @@ mod integration_tests {
         seed_package_row(&database, "pkg-a", "1.0.0", 0);
 
         let updated = database
-            .foreground_backfill_for_packages(&[sample_package("pkg-a", "1.0.0")])
+            .foreground_backfill_for_packages(
+                &[sample_package("pkg-a", "1.0.0")],
+                current_engine_cache_key().as_str(),
+            )
             .expect("foreground");
         assert_eq!(updated.symbol_rows_updated, 0);
         assert_eq!(updated.packages_backfilled, 0);
@@ -723,7 +922,7 @@ mod integration_tests {
         seed_package_row(&database, "orphan", "1.0.0", 0);
 
         let updated = database
-            .foreground_backfill_for_packages(&[])
+            .foreground_backfill_for_packages(&[], current_engine_cache_key().as_str())
             .expect("foreground");
         assert_eq!(updated.symbol_rows_updated, 0);
         assert_eq!(updated.packages_backfilled, 0);
@@ -744,7 +943,9 @@ mod integration_tests {
         let temp = tempfile::tempdir().expect("tempdir");
         let database = NciDatabase::open(temp.path().join("fresh-count.sqlite")).expect("open");
         assert_eq!(
-            database.count_packages_pending_backfill().expect("count"),
+            database
+                .count_packages_pending_backfill(current_engine_cache_key().as_str())
+                .expect("count"),
             0
         );
         assert!(database.pending_backfill_version().expect("read").is_none());
@@ -764,6 +965,7 @@ mod integration_tests {
         let package_ids = package_ids_pending_in_set(
             database.connection_for_tests(),
             &[sample_package("done", "1.0.0")],
+            current_engine_cache_key().as_str(),
         )
         .expect("lookup");
         assert!(package_ids.is_empty());
@@ -786,7 +988,10 @@ mod integration_tests {
         );
 
         let updated = database
-            .drain_pending_package_backfill(BackfillDrainLimits::default())
+            .drain_pending_package_backfill(
+                BackfillDrainLimits::default(),
+                current_engine_cache_key().as_str(),
+            )
             .expect("drain");
         assert_eq!(updated, 0);
         assert!(
@@ -802,7 +1007,9 @@ mod integration_tests {
         let database = NciDatabase::open(temp.path().join("rev-zero.sqlite")).expect("open");
         seed_package_row(&database, "legacy", "1.0.0", 0);
         assert_eq!(
-            database.count_packages_pending_backfill().expect("count"),
+            database
+                .count_packages_pending_backfill(current_engine_cache_key().as_str())
+                .expect("count"),
             0
         );
     }
@@ -819,13 +1026,16 @@ mod integration_tests {
         .expect("pending");
         let package_id = seed_package_row(&database, "stale", "1.0.0", 0);
 
-        let updated = backfill_single_package(
+        let (updated, reached_pending) = backfill_single_package(
             database.connection_for_tests(),
             package_id,
+            UNREGISTERED_BACKFILL_VERSION,
             BackfillBatchOptions::default(),
+            current_engine_cache_key().as_str(),
         )
         .expect("backfill");
         assert_eq!(updated, 0);
+        assert!(!reached_pending);
 
         let revision: i64 = database
             .connection_for_tests()
@@ -836,6 +1046,297 @@ mod integration_tests {
             )
             .expect("revision");
         assert_eq!(revision, 0);
+    }
+
+    #[test]
+    fn foreground_backfill_skips_packages_with_stale_index_cache_key() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp.path().join("stale-cache-key.sqlite")).expect("open");
+        set_pending_backfill_for_tests(
+            database.connection_for_tests(),
+            TEST_PENDING_BACKFILL_VERSION,
+        )
+        .expect("pending");
+
+        database
+            .connection_for_tests()
+            .execute(
+                "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+                 VALUES ('stale-key-pkg', '1.0.0', 0, 0, 0, 0, 'stale-cache-key', 0)",
+                [],
+            )
+            .expect("insert stale-key package");
+
+        let scope = vec![sample_package("stale-key-pkg", "1.0.0")];
+        let result = database
+            .foreground_backfill_for_packages(&scope, current_engine_cache_key().as_str())
+            .expect("foreground");
+        assert_eq!(result.packages_backfilled, 0);
+        assert_eq!(result.symbol_rows_updated, 0);
+
+        let connection = database.connection_for_tests();
+        let revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE name = 'stale-key-pkg'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("revision");
+        assert_eq!(revision, 0);
+        assert_eq!(
+            database
+                .count_packages_pending_backfill(current_engine_cache_key().as_str())
+                .expect("count"),
+            0
+        );
+        assert!(
+            read_pending_backfill_version(connection)
+                .expect("read")
+                .is_none(),
+            "no matching-key packages need work; global pending is cleared"
+        );
+    }
+
+    #[test]
+    fn drain_clears_pending_when_only_stale_index_cache_key_packages_lag() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp.path().join("stale-drain-clear.sqlite")).expect("open");
+        set_pending_backfill_for_tests(
+            database.connection_for_tests(),
+            TEST_PENDING_BACKFILL_VERSION,
+        )
+        .expect("pending");
+        database
+            .connection_for_tests()
+            .execute(
+                "INSERT INTO packages (name, version, total_symbols, total_files, crawl_duration_ms, build_duration_ms, index_cache_key, backfill_revision)
+                 VALUES ('only-stale', '1.0.0', 0, 0, 0, 0, 'legacy-cache-key', 0)",
+                [],
+            )
+            .expect("insert");
+
+        let updated = database
+            .drain_pending_package_backfill(
+                BackfillDrainLimits::default(),
+                current_engine_cache_key().as_str(),
+            )
+            .expect("drain");
+        assert_eq!(updated, 0);
+        assert!(
+            read_pending_backfill_version(database.connection_for_tests())
+                .expect("read")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn chained_backfill_runs_all_registered_steps_up_to_pending_target() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("chain-full.sqlite")).expect("open");
+        set_pending_backfill_for_tests(database.connection_for_tests(), TEST_CHAIN_BACKFILL_V3)
+            .expect("pending");
+        let package_id = seed_symbols_for_package(&mut database, "chain-full", "1.0.0", 4);
+        database
+            .connection_for_tests()
+            .execute(
+                "UPDATE packages SET backfill_revision = ?1 WHERE package_id = ?2",
+                params![TEST_PENDING_BACKFILL_VERSION, package_id],
+            )
+            .expect("pretend legacy backfill step already applied");
+
+        let (updated, reached_pending) = backfill_single_package(
+            database.connection_for_tests(),
+            package_id,
+            TEST_CHAIN_BACKFILL_V3,
+            BackfillBatchOptions {
+                batch_size: 2,
+                pause_between_batches: Duration::ZERO,
+            },
+            current_engine_cache_key().as_str(),
+        )
+        .expect("chain");
+        assert_eq!(updated, 12);
+        assert!(reached_pending);
+
+        let connection = database.connection_for_tests();
+        let revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
+                [package_id],
+                |row| row.get(0),
+            )
+            .expect("revision");
+        assert_eq!(revision, TEST_CHAIN_BACKFILL_V3 as i64);
+
+        let symbol_space: String = connection
+            .query_row(
+                "SELECT symbol_space FROM symbols WHERE package_id = ?1 LIMIT 1",
+                [package_id],
+                |row| row.get(0),
+            )
+            .expect("symbol_space");
+        assert_eq!(symbol_space, "chain-v9103");
+    }
+
+    #[test]
+    fn chained_backfill_resumes_from_partial_package_revision() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database =
+            NciDatabase::open(temp.path().join("chain-resume.sqlite")).expect("open");
+        set_pending_backfill_for_tests(database.connection_for_tests(), TEST_CHAIN_BACKFILL_V3)
+            .expect("pending");
+        let package_id = seed_symbols_for_package(&mut database, "chain-resume", "1.0.0", 3);
+        database
+            .connection_for_tests()
+            .execute(
+                "UPDATE packages SET backfill_revision = ?1 WHERE package_id = ?2",
+                params![TEST_CHAIN_BACKFILL_V1, package_id],
+            )
+            .expect("partial revision");
+        database
+            .connection_for_tests()
+            .execute(
+                "UPDATE symbols SET symbol_space = 'chain-v9101' WHERE package_id = ?1",
+                [package_id],
+            )
+            .expect("partial symbols");
+
+        let (updated, reached_pending) = backfill_single_package(
+            database.connection_for_tests(),
+            package_id,
+            TEST_CHAIN_BACKFILL_V3,
+            BackfillBatchOptions {
+                batch_size: 2,
+                pause_between_batches: Duration::ZERO,
+            },
+            current_engine_cache_key().as_str(),
+        )
+        .expect("resume");
+        assert_eq!(updated, 6);
+        assert!(reached_pending);
+
+        let connection = database.connection_for_tests();
+        let revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
+                [package_id],
+                |row| row.get(0),
+            )
+            .expect("revision");
+        assert_eq!(revision, TEST_CHAIN_BACKFILL_V3 as i64);
+
+        let symbol_space: String = connection
+            .query_row(
+                "SELECT symbol_space FROM symbols WHERE package_id = ?1 LIMIT 1",
+                [package_id],
+                |row| row.get(0),
+            )
+            .expect("symbol_space");
+        assert_eq!(symbol_space, "chain-v9103");
+    }
+
+    #[test]
+    fn chained_backfill_stops_short_when_pending_exceeds_last_registered_step() {
+        const UNREGISTERED_PENDING_TARGET: u32 = 9_150;
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("chain-gap.sqlite")).expect("open");
+        set_pending_backfill_for_tests(
+            database.connection_for_tests(),
+            UNREGISTERED_PENDING_TARGET,
+        )
+        .expect("pending");
+        let package_id = seed_symbols_for_package(&mut database, "chain-gap", "1.0.0", 2);
+
+        let (updated, reached_pending) = backfill_single_package(
+            database.connection_for_tests(),
+            package_id,
+            UNREGISTERED_PENDING_TARGET,
+            BackfillBatchOptions {
+                pause_between_batches: Duration::ZERO,
+                ..Default::default()
+            },
+            current_engine_cache_key().as_str(),
+        )
+        .expect("gap");
+        assert_eq!(updated, 8);
+        assert!(!reached_pending);
+
+        let connection = database.connection_for_tests();
+        let revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
+                [package_id],
+                |row| row.get(0),
+            )
+            .expect("revision");
+        assert_eq!(revision, TEST_CHAIN_BACKFILL_V3 as i64);
+        assert!(
+            read_pending_backfill_version(connection)
+                .expect("read")
+                .is_some(),
+            "pending remains until target revision is reached"
+        );
+        assert_eq!(
+            database
+                .count_packages_pending_backfill(current_engine_cache_key().as_str())
+                .expect("count"),
+            1
+        );
+    }
+
+    #[test]
+    fn drain_chains_only_packages_behind_pending_target() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut database = NciDatabase::open(temp.path().join("chain-mixed.sqlite")).expect("open");
+        set_pending_backfill_for_tests(database.connection_for_tests(), TEST_CHAIN_BACKFILL_V3)
+            .expect("pending");
+
+        let stale_package_id = seed_symbols_for_package(&mut database, "stale-chain", "1.0.0", 3);
+        let current_package_id =
+            seed_package_row(&database, "current-chain", "1.0.0", TEST_CHAIN_BACKFILL_V3);
+
+        database
+            .drain_pending_package_backfill(
+                BackfillDrainLimits::default(),
+                current_engine_cache_key().as_str(),
+            )
+            .expect("drain");
+
+        let connection = database.connection_for_tests();
+        let stale_revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
+                [stale_package_id],
+                |row| row.get(0),
+            )
+            .expect("stale revision");
+        assert_eq!(stale_revision, TEST_CHAIN_BACKFILL_V3 as i64);
+
+        let stale_symbol_space: String = connection
+            .query_row(
+                "SELECT symbol_space FROM symbols WHERE package_id = ?1 LIMIT 1",
+                [stale_package_id],
+                |row| row.get(0),
+            )
+            .expect("stale symbol_space");
+        assert_eq!(stale_symbol_space, "chain-v9103");
+
+        let current_revision: i64 = connection
+            .query_row(
+                "SELECT backfill_revision FROM packages WHERE package_id = ?1",
+                [current_package_id],
+                |row| row.get(0),
+            )
+            .expect("current revision");
+        assert_eq!(current_revision, TEST_CHAIN_BACKFILL_V3 as i64);
+
+        assert!(
+            read_pending_backfill_version(connection)
+                .expect("read")
+                .is_none()
+        );
     }
 
     #[test]

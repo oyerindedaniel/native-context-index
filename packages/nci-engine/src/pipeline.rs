@@ -224,13 +224,14 @@ fn try_package_cache_hit(
     sqlite_path: &Path,
     hydrate_cache_hits: bool,
     engine_cache_key: &str,
+    pending_backfill_hint: Option<Option<u32>>,
 ) -> Option<IndexedGraph> {
     if cache::package_dir_is_symlink(package) {
         return None;
     }
     let indexed_from_cache = with_read_only_index_db(sqlite_path, |db| {
         let db = db?;
-        if !db.has_cached_package(package, engine_cache_key) {
+        if !db.has_cached_package(package, engine_cache_key, pending_backfill_hint) {
             trace!(
                 package = %package.name.as_ref(),
                 "package cache miss (not in sqlite)"
@@ -339,6 +340,7 @@ pub fn index_packages(
     let track_package_timing = on_package_done.is_some();
     let index_engine_cache_key =
         cache::index_engine_cache_key(&index_opts.dependency_stub_packages);
+    let mut pending_backfill_revision = index_opts.pending_backfill_revision;
     let crawl_stub_roots: Arc<HashSet<String>> = Arc::new(
         index_opts
             .dependency_stub_packages
@@ -388,11 +390,18 @@ pub fn index_packages(
             debug!(path = %path.display(), "package cache enabled");
             match NciDatabase::open_with_pragmas(&path, index_opts.storage_connection_pragmas) {
                 Ok(mut database) => {
+                    if pending_backfill_revision.is_none() {
+                        pending_backfill_revision = database.pending_backfill_version().ok();
+                    }
                     let phase_callback = index_opts.on_index_phase.clone();
-                    match database.count_packages_pending_backfill() {
+                    match database.count_packages_pending_backfill(index_engine_cache_key.as_str())
+                    {
                         Ok(pending_count) if pending_count > 0 => {
                             let packages_in_scope = database
-                                .count_packages_pending_in_scope(packages)
+                                .count_packages_pending_in_scope(
+                                    packages,
+                                    index_engine_cache_key.as_str(),
+                                )
                                 .unwrap_or(0);
                             if let Some(callback) = phase_callback.as_ref() {
                                 callback(IndexPhaseEvent::ForegroundBackfillStart {
@@ -407,7 +416,10 @@ pub fn index_packages(
                                 "foreground package backfill before cache probes"
                             );
                             let backfill_started = std::time::Instant::now();
-                            match database.foreground_backfill_for_packages(packages) {
+                            match database.foreground_backfill_for_packages(
+                                packages,
+                                index_engine_cache_key.as_str(),
+                            ) {
                                 Ok(backfill_result) => {
                                     if let Some(callback) = phase_callback.as_ref() {
                                         callback(IndexPhaseEvent::ForegroundBackfillDone {
@@ -637,6 +649,7 @@ pub fn index_packages(
                 path.as_path(),
                 hydrate,
                 index_engine_cache_key.as_str(),
+                pending_backfill_revision,
             )
         {
             let total_symbols = indexed_total_symbols(&indexed);
@@ -1059,7 +1072,7 @@ mod tests {
                 declared_dependencies: SharedVec::from([]),
             };
             assert!(
-                ro.has_cached_package(&info, cache_key.as_str()),
+                ro.has_cached_package(&info, cache_key.as_str(), None),
                 "expected {name} in sqlite after mixed parallel index"
             );
         }

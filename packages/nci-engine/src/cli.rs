@@ -12,8 +12,7 @@ use clap_complete::{Shell, generate};
 use dialoguer::{Confirm, Input};
 use serde::{Deserialize, Serialize};
 
-use nci_engine::cache::NCI_ENGINE_VERSION;
-use nci_engine::cache::nci_sqlite_path;
+use nci_engine::cache::{NCI_ENGINE_VERSION, index_engine_cache_key, nci_sqlite_path};
 use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
 use nci_engine::filter::{DepKindFilter, FilterConfig};
@@ -1700,16 +1699,20 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             let mut database =
                 NciDatabase::open_with_pragmas(&path, StorageConnectionPragmas::baseline())
                     .map_err(|err| err.to_string())?;
+            let engine_cache_key = index_engine_cache_key(&[]);
             let pending_before = database
-                .count_packages_pending_backfill()
+                .count_packages_pending_backfill(engine_cache_key.as_str())
                 .map_err(|err| err.to_string())?;
             let updated_rows = database
-                .drain_pending_package_backfill(BackfillDrainLimits {
-                    max_packages: *max_packages,
-                })
+                .drain_pending_package_backfill(
+                    BackfillDrainLimits {
+                        max_packages: *max_packages,
+                    },
+                    engine_cache_key.as_str(),
+                )
                 .map_err(|err| err.to_string())?;
             let pending_after = database
-                .count_packages_pending_backfill()
+                .count_packages_pending_backfill(engine_cache_key.as_str())
                 .map_err(|err| err.to_string())?;
             if let Some(tty_progress_spinner) = spinner {
                 tty_progress_spinner.finish();
