@@ -2526,3 +2526,23 @@ fn index_foreground_backfill_clears_pending_without_recrawl() {
         .expect("revision");
     assert!(package_revision >= TEST_PENDING_BACKFILL_VERSION as i64);
 }
+
+#[test]
+fn upgrade_help_is_available() {
+    nci_cmd()
+        .arg("upgrade")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--version"))
+        .stdout(predicate::str::contains("--check"));
+}
+
+#[test]
+fn upgrade_rejects_target_not_newer_than_current() {
+    nci_cmd()
+        .args(["upgrade", "--version", "0.1.0", "--dry-run"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not newer"));
+}

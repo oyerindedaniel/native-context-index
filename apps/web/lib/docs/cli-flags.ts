@@ -3,6 +3,7 @@ import type { FlagDescriptor } from "@/components/docs/widgets/flag-table";
 export const cliSubcommands = [
   "global",
   "init",
+  "upgrade",
   "index",
   "query find",
   "query symbol",
@@ -43,6 +44,33 @@ export const cliFlags: FlagDescriptor[] = [
     subcommand: "init",
     description:
       "Accept all defaults — write `nci.config.json` non-interactively.",
+  },
+  {
+    id: "upgrade-version",
+    long: "--version",
+    valuePlaceholder: "<VERSION>",
+    subcommand: "upgrade",
+    description:
+      "Target release (default: latest). Must be newer than the running engine.",
+  },
+  {
+    id: "upgrade-check",
+    long: "--check",
+    subcommand: "upgrade",
+    description:
+      "Print current vs latest; exit code 3 when an upgrade is available.",
+  },
+  {
+    id: "upgrade-dry-run",
+    long: "--dry-run",
+    subcommand: "upgrade",
+    description: "Show what would run without downloading or migrating.",
+  },
+  {
+    id: "upgrade-skip-db",
+    long: "--skip-db",
+    subcommand: "upgrade",
+    description: "Upgrade the binary only; skip `db migrate`.",
   },
   {
     id: "index-project-root",

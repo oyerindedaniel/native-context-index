@@ -40,6 +40,10 @@ export const metadata = metadataForDocsPath("/docs/reference/exit-codes");
       </TableCell>
     </TableRow>
     <TableRow>
+      <TableCell><code>3</code></TableCell>
+      <TableCell><code>nci upgrade --check</code> found a newer release.</TableCell>
+    </TableRow>
+    <TableRow>
       <TableCell><code>1</code></TableCell>
       <TableCell>Generic runtime failure — anything not covered above. The error message lives on stderr; on JSON-format commands it is also echoed inside the <code>&#123;&quot;ok&quot;:false,&quot;error&quot;:…&#125;</code> envelope.</TableCell>
     </TableRow>

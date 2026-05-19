@@ -28,7 +28,7 @@ const OG_IMAGE_WIDTH = 1200;
 const OG_IMAGE_HEIGHT = 630;
 
 export const DEFAULT_MARKETING_DESCRIPTION =
-  "Index TypeScript declarations from your node_modules into a local SQLite database. Query exact signatures, overloads, and dependency edges from the CLI or MCP.";
+  "Index TypeScript declarations from your node_modules. Query exact signatures, overloads, and dependency edges from the CLI or MCP.";
 
 export const DEFAULT_DOCS_DESCRIPTION =
   "Documentation for Native Context Index — install, index, query, MCP wiring, and engine reference.";

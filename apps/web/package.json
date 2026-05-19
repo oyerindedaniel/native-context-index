@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "sync-docs-metadata": "node ./scripts/sync-docs-metadata.mjs",
-    "prebuild": "pnpm run sync-docs-metadata",
+    "sync-install-sh": "node ./scripts/sync-install-sh.mjs",
+    "prebuild": "pnpm run sync-docs-metadata && pnpm run sync-install-sh",
+    "predev": "pnpm run sync-install-sh",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",

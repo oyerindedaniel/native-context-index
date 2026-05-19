@@ -19,7 +19,7 @@ export const metadata = metadataForDocsPath("/docs/installation");
 # Install NCI
 
 <PageLede>
-  Two install paths cover everything: the Node package (`@nativecontextindex/cli`) for app and library work, and a `cargo install` from source for hacking on the engine itself. Both leave you with one binary called `nci`.
+  Install via the Node package (`@nativecontextindex/cli`), the curl installer, or `cargo install` from source. All paths give you one `nci` binary on `PATH`.
 </PageLede>
 
 ## Node package (recommended)
@@ -71,6 +71,30 @@ The Node package ships a postinstall script (`packages/nci/scripts/postinstall.c
 - `NCI_BINARY=/abs/path/to/nci` — make the Node shim and `nci-mcp` defer to a specific binary at runtime.
 
 See [Environment variables](/docs/reference/env-vars) for the complete list.
+
+### Install without npm
+
+<TerminalRoot>
+  <TerminalCommand>curl -fsSL https://nativecontextindex.com/install.sh | sh</TerminalCommand>
+</TerminalRoot>
+
+Uses `npm install -g` when npm is on `PATH`; otherwise installs the native binary to `~/.local/bin` (add that directory to `PATH`). Pin a version with `NCI_VERSION=0.2.0`.
+
+### Upgrading
+
+<TerminalRoot>
+  <TerminalCommand>nci upgrade</TerminalCommand>
+</TerminalRoot>
+
+Installs the latest release, replaces the native binary, and runs **`db migrate`** on your configured database. If a migration defers symbol work, run **`nci db backfill`** or **`nci index`** afterward — upgrade does not run backfill automatically. Pin with `nci upgrade --version 0.2.0` (must be newer than `nci --version`).
+
+### Pinning an older version
+
+<TerminalRoot>
+  <TerminalCommand>npm install -g @nativecontextindex/cli@0.1.0</TerminalCommand>
+</TerminalRoot>
+
+There is no `nci downgrade` command. Installing an older npm version re-downloads the matching binary when `vendor/.nci-version` differs. If the database schema was migrated forward, an older engine may refuse to open it until you stay on the newer release or reset the database.
 
 ## From source (Cargo)
 

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
-import { createMarketingPageMetadata } from "@/lib/site-metadata";
+import {
+  createMarketingPageMetadata,
+  DEFAULT_MARKETING_DESCRIPTION,
+} from "@/lib/site-metadata";
 
 import { HeroSection } from "../components/home/hero/hero-section";
 import { HomeCliCinema } from "../components/home/home-cli-cinema";
@@ -12,8 +15,7 @@ import { SiteMarketingFooter } from "../components/marketing/site-marketing-foot
 
 export const metadata: Metadata = createMarketingPageMetadata({
   title: "Native Context Index",
-  description:
-    "Index TypeScript declarations from your node_modules into a local SQLite database. Query exact signatures, overloads, and dependency edges from the CLI or MCP.",
+  description: DEFAULT_MARKETING_DESCRIPTION,
   pathname: "/",
 });
 

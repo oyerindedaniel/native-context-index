@@ -84,7 +84,19 @@ export const metadata = metadataForDocsPath("/docs/reference/env-vars");
     </TableRow>
     <TableRow>
       <TableCell><code>NCI_DOWNLOAD_BASE_URL</code></TableCell>
-      <TableCell>Override the GitHub release base URL used to fetch the prebuilt binary. The script falls back to <code>repository.url</code> in <code>package.json</code> when this is unset.</TableCell>
+      <TableCell>Override the GitHub release base URL used to fetch the prebuilt binary (postinstall and <code>nci upgrade</code>).</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_GITHUB_REPO</code></TableCell>
+      <TableCell>Override the GitHub <code>owner/repo</code> used by <code>nci upgrade</code> and <code>install.sh</code> (default: <code>oyerindedaniel/native-context-index</code>).</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_VERSION</code></TableCell>
+      <TableCell>Pin a release for <code>install.sh</code> / <code>install-direct.cjs</code> (default: <code>latest</code>).</TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>NCI_INSTALL_DIR</code></TableCell>
+      <TableCell>Target directory for curl install without npm (default: <code>~/.local/bin</code>).</TableCell>
     </TableRow>
   </TableBody>
 </TableRoot>
@@ -92,6 +104,6 @@ export const metadata = metadataForDocsPath("/docs/reference/env-vars");
 <CalloutRoot variant="info">
   <CalloutTitle>Where these are wired.</CalloutTitle>
   <CalloutBody>
-    `NCI_CACHE_DIR`, `NCI_BANNER`, `NCI_PROGRESS` are read by the Rust CLI in `packages/nci-engine`. `NCI_BINARY` is read by the Node shim in `packages/nci-mcp` and `packages/nci`. `NCI_SKIP_DOWNLOAD` and `NCI_DOWNLOAD_BASE_URL` are read by `packages/nci/scripts/postinstall.cjs`. There are no other NCI environment variables in the codebase.
+    Rust CLI: `NCI_CACHE_DIR`, `NCI_BANNER`, `NCI_PROGRESS`, `NCI_GITHUB_REPO`, `NCI_DOWNLOAD_BASE_URL`. Node shim: `NCI_BINARY`. Postinstall and install scripts: `packages/nci/scripts/download-binary.cjs`.
   </CalloutBody>
 </CalloutRoot>

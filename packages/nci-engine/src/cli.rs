@@ -12,6 +12,7 @@ use clap_complete::{Shell, generate};
 use dialoguer::{Confirm, Input};
 use serde::{Deserialize, Serialize};
 
+use nci_engine::cache::NCI_ENGINE_VERSION;
 use nci_engine::cache::nci_sqlite_path;
 use nci_engine::config::{self, NciConfigFile};
 use nci_engine::constants::{DEFAULT_MAX_HOPS, max_hops_from_user_value};
@@ -22,9 +23,11 @@ use nci_engine::pipeline::{
 use nci_engine::resolver::normalize_dependency_stub_list;
 use nci_engine::scanner::{self, ScanError};
 use nci_engine::storage::{
-    BackfillDrainLimits, DatabaseStatusReport, NciDatabase, StorageConnectionPragmas, StorageError,
-    SymbolSearchFilters, SymbolSearchHit, verify_sqlite_file_header,
+    BackfillDrainLimits, DatabaseStatusReport, MigrationApplyReport, NciDatabase,
+    StorageConnectionPragmas, StorageError, SymbolSearchFilters, SymbolSearchHit,
+    verify_sqlite_file_header,
 };
+use nci_engine::upgrade::{self, UpgradeOptions};
 use serde_json::Value;
 
 const CLI_ABOUT: &str = "Native Context Index — index and query TypeScript declaration graphs";
@@ -44,6 +47,8 @@ pub enum CliExit {
     Success,
     /// Stable id not found for `query show` / `query snippet`, or unknown id for `query overloads`.
     QueryNotFound,
+    /// `nci upgrade --check` found a newer release.
+    UpgradeAvailable,
 }
 
 fn not_found_hint(id: &str) -> String {
@@ -379,6 +384,29 @@ enum Commands {
         about = "Print the absolute path of the running nci executable (e.g. for NCI_BINARY when using nci-mcp)"
     )]
     BinaryPath,
+    #[command(about = "Upgrade to a newer nci release (default: latest) and run db migrate")]
+    Upgrade {
+        #[arg(
+            long,
+            value_name = "VERSION",
+            help = "Target version (must be newer than current)"
+        )]
+        version: Option<String>,
+        #[arg(
+            long,
+            help = "Show current vs target; exit 1 if an upgrade is available"
+        )]
+        check: bool,
+        #[arg(long, help = "Print the plan without downloading or migrating")]
+        dry_run: bool,
+        #[arg(long, help = "Skip db migrate after the binary upgrade")]
+        skip_db: bool,
+        #[arg(
+            long,
+            help = "Download the release binary directly (do not run npm install -g)"
+        )]
+        force_binary: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -763,6 +791,20 @@ pub fn run() -> Result<CliExit, String> {
             Ok(CliExit::Success)
         }
         Some(Commands::BinaryPath) => run_binary_path().map(|_| CliExit::Success),
+        Some(Commands::Upgrade {
+            version,
+            check,
+            dry_run,
+            skip_db,
+            force_binary,
+        }) => run_upgrade(
+            &cli,
+            version.clone(),
+            *check,
+            *dry_run,
+            *skip_db,
+            *force_binary,
+        ),
     }
 }
 
@@ -956,6 +998,217 @@ fn open_database(
     let path = resolve_database_path(cli, file, config_dir)?;
     let db = open_database_at(&path)?;
     Ok((path, db))
+}
+
+struct MigrationRunResult {
+    path: PathBuf,
+    schema_version: u32,
+    migration_report: MigrationApplyReport,
+}
+
+fn apply_database_migrations(
+    cli: &Cli,
+    file: Option<&NciConfigFile>,
+    config_dir: &Path,
+) -> Result<MigrationRunResult, String> {
+    let path = resolve_database_path(cli, file, config_dir)?;
+    let pragmas = StorageConnectionPragmas::baseline();
+    let (database, migration_report) =
+        NciDatabase::open_with_migration_report(&path, pragmas).map_err(|err| err.to_string())?;
+    let schema_version = database
+        .stored_schema_version()
+        .map_err(|err| err.to_string())?;
+    Ok(MigrationRunResult {
+        path,
+        schema_version,
+        migration_report,
+    })
+}
+
+fn print_migration_report_plain(migration_result: &MigrationRunResult) {
+    let migration_report = &migration_result.migration_report;
+    println!("Database: {}", display_path(&migration_result.path));
+    println!(
+        "Schema: v{} → v{}",
+        migration_report.schema_version_before, migration_result.schema_version
+    );
+    if migration_report.applied_versions.is_empty() {
+        println!("Applied: (none — already up to date)");
+    } else {
+        println!(
+            "Applied: v{}",
+            migration_report
+                .applied_versions
+                .iter()
+                .map(|version| version.to_string())
+                .collect::<Vec<_>>()
+                .join(", v")
+        );
+    }
+    if migration_report.purged_all_packages {
+        println!("Indexed packages: purged (rebuild migration)");
+    }
+    if migration_report.deferred_backfill {
+        println!("Backfill: deferred to index / db backfill");
+    }
+}
+
+fn migration_report_json_data(
+    migration_result: &MigrationRunResult,
+    elapsed_ms: u128,
+) -> serde_json::Value {
+    let migration_report = &migration_result.migration_report;
+    serde_json::json!({
+        "path": migration_result.path,
+        "schema_version": migration_result.schema_version,
+        "schema_version_before": migration_report.schema_version_before,
+        "schema_version_after": migration_report.schema_version_after,
+        "applied_versions": migration_report.applied_versions,
+        "purged_all_packages": migration_report.purged_all_packages,
+        "deferred_backfill": migration_report.deferred_backfill,
+        "elapsed_ms": elapsed_ms,
+    })
+}
+
+fn run_upgrade(
+    cli: &Cli,
+    target_version: Option<String>,
+    check_only: bool,
+    dry_run: bool,
+    skip_database: bool,
+    force_binary: bool,
+) -> Result<CliExit, String> {
+    let context = resolve_command_context(None)?;
+    let file = context.file.as_ref();
+    let config_dir = context.config_dir.as_path();
+    let fmt = envelope_output_format(effective_format(cli, file)?);
+    let show_progress = should_print_progress(fmt, file)?;
+
+    let upgrade_options = UpgradeOptions {
+        target_version,
+        check_only,
+        dry_run,
+        force_binary,
+    };
+
+    if check_only || dry_run {
+        let plan = upgrade::resolve_upgrade_plan(&upgrade_options)?;
+        if check_only {
+            match fmt {
+                OutputFormat::Plain => {
+                    println!(
+                        "Current: v{NCI_ENGINE_VERSION} → available: v{}",
+                        plan.target_label
+                    );
+                    println!("Run `nci upgrade` to install v{}.", plan.target_label);
+                }
+                OutputFormat::Json | OutputFormat::Jsonl => {
+                    print_json(&serde_json::json!({
+                        "ok": true,
+                        "data": {
+                            "current_version": NCI_ENGINE_VERSION,
+                            "target_version": plan.target_label,
+                            "upgrade_available": true,
+                        }
+                    }))?;
+                }
+            }
+            return Ok(CliExit::UpgradeAvailable);
+        }
+        match fmt {
+            OutputFormat::Plain => {
+                println!(
+                    "Would upgrade v{NCI_ENGINE_VERSION} → v{}",
+                    plan.target_label
+                );
+                if !skip_database {
+                    println!("Would run db migrate on resolved database.");
+                }
+            }
+            OutputFormat::Json | OutputFormat::Jsonl => {
+                print_json(&serde_json::json!({
+                    "ok": true,
+                    "data": {
+                        "current_version": NCI_ENGINE_VERSION,
+                        "target_version": plan.target_label,
+                        "dry_run": true,
+                        "skip_db": skip_database,
+                    }
+                }))?;
+            }
+        }
+        return Ok(CliExit::Success);
+    }
+
+    let upgrade_started = Instant::now();
+    if show_progress {
+        emit_progress_line("upgrade", ProgressTone::Step, "resolving release");
+    }
+    let (plan, outcome) = upgrade::run_upgrade(&upgrade_options)?;
+    if show_progress {
+        emit_progress_line(
+            "upgrade",
+            ProgressTone::Step,
+            &format!("installed v{}", plan.target_label),
+        );
+    }
+
+    if fmt == OutputFormat::Plain {
+        if outcome.binary_updated || outcome.npm_package_updated {
+            emit_ui_line_stdout(ProgressTone::Done, "upgrade", "binary updated");
+        } else {
+            emit_ui_line_stdout(ProgressTone::Note, "upgrade", "binary already current");
+        }
+        println!("Engine: v{NCI_ENGINE_VERSION} → v{}", plan.target_label);
+        if outcome.npm_package_updated {
+            println!("npm: @nativecontextindex/cli@{}", plan.target_label);
+        }
+        if let Some(installed_path) = &outcome.installed_path {
+            println!("Binary: {}", display_path(installed_path));
+        }
+    }
+
+    let mut migration_result: Option<MigrationRunResult> = None;
+    if !skip_database {
+        if show_progress {
+            emit_progress_line("upgrade", ProgressTone::Step, "migrating database");
+        }
+        migration_result = Some(apply_database_migrations(cli, file, config_dir)?);
+    }
+
+    if show_progress {
+        emit_progress_line(
+            "upgrade",
+            ProgressTone::Done,
+            &format!("done +{}", format_elapsed(upgrade_started.elapsed())),
+        );
+    }
+
+    match fmt {
+        OutputFormat::Plain => {
+            if let Some(migration_result) = &migration_result {
+                print_migration_report_plain(migration_result);
+            }
+        }
+        OutputFormat::Json | OutputFormat::Jsonl => {
+            let mut data = serde_json::json!({
+                "current_version": NCI_ENGINE_VERSION,
+                "target_version": plan.target_label,
+                "binary_updated": outcome.binary_updated,
+                "npm_package_updated": outcome.npm_package_updated,
+                "installed_path": outcome.installed_path,
+            });
+            if let Some(migration_result) = &migration_result {
+                data["migration"] = migration_report_json_data(
+                    migration_result,
+                    upgrade_started.elapsed().as_millis(),
+                );
+            }
+            print_json(&serde_json::json!({ "ok": true, "data": data }))?;
+        }
+    }
+
+    Ok(CliExit::Success)
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<(), String> {
@@ -1380,7 +1633,6 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             if show_progress {
                 emit_progress_line("db migrate", ProgressTone::Step, "starting");
             }
-            let path = resolve_database_path(cli, file, config_dir)?;
             let spinner = if show_progress && io::stderr().is_terminal() {
                 TtyProgressSpinner::try_start()
             } else {
@@ -1389,16 +1641,10 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             if show_progress && spinner.is_none() {
                 emit_progress_line("db migrate", ProgressTone::Step, "applying migrations");
             }
-            let pragmas = StorageConnectionPragmas::baseline();
-            let (database, migration_report) =
-                NciDatabase::open_with_migration_report(&path, pragmas)
-                    .map_err(|err| err.to_string())?;
+            let migration_result = apply_database_migrations(cli, file, config_dir)?;
             if let Some(tty_progress_spinner) = spinner {
                 tty_progress_spinner.finish();
             }
-            let schema = database
-                .stored_schema_version()
-                .map_err(|err| err.to_string())?;
             if show_progress {
                 emit_progress_line(
                     "db migrate",
@@ -1409,44 +1655,15 @@ fn run_db(cli: &Cli, cmd: &DbCommands) -> Result<(), String> {
             match fmt {
                 OutputFormat::Plain => {
                     emit_ui_line_stdout(ProgressTone::Done, "db migrate", "migrations checked");
-                    println!("Database: {}", display_path(&path));
-                    println!(
-                        "Schema: v{} → v{}",
-                        migration_report.schema_version_before, schema
-                    );
-                    if migration_report.applied_versions.is_empty() {
-                        println!("Applied: (none — already up to date)");
-                    } else {
-                        println!(
-                            "Applied: v{}",
-                            migration_report
-                                .applied_versions
-                                .iter()
-                                .map(|version| version.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", v")
-                        );
-                    }
-                    if migration_report.purged_all_packages {
-                        println!("Indexed packages: purged (rebuild migration)");
-                    }
-                    if migration_report.deferred_backfill {
-                        println!("Backfill: deferred to index / db backfill");
-                    }
+                    print_migration_report_plain(&migration_result);
                 }
                 OutputFormat::Json | OutputFormat::Jsonl => {
                     print_json(&serde_json::json!({
                         "ok": true,
-                        "data": {
-                            "path": path,
-                            "schema_version": schema,
-                            "schema_version_before": migration_report.schema_version_before,
-                            "schema_version_after": migration_report.schema_version_after,
-                            "applied_versions": migration_report.applied_versions,
-                            "purged_all_packages": migration_report.purged_all_packages,
-                            "deferred_backfill": migration_report.deferred_backfill,
-                            "elapsed_ms": started.elapsed().as_millis(),
-                        }
+                        "data": migration_report_json_data(
+                            &migration_result,
+                            started.elapsed().as_millis(),
+                        ),
                     }))?;
                 }
             }

@@ -20,6 +20,7 @@ mod symbol_source_identity;
 #[cfg(test)]
 mod test_fixtures;
 pub mod types;
+pub mod upgrade;
 
 pub use cache::{
     INDEXER_OUTPUT_REVISION, NCI_ENGINE_VERSION, index_engine_cache_key, nci_sqlite_path,

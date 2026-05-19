@@ -6,7 +6,7 @@
 
 # @nativecontextindex/cli
 
-npm wrapper for the **Native Context Index** (`nci`) — indexes TypeScript declaration graphs from `node_modules` into SQLite for search and agent tooling.
+npm wrapper for the **Native Context Index** (`nci`) — indexes TypeScript declaration graphs from `node_modules` for search and agent tooling.
 
 ## Install
 
@@ -22,7 +22,11 @@ One-off without installing:
 npx @nativecontextindex/cli --help
 ```
 
-Other package managers (`pnpm`, `yarn`, `bun`) and platform notes: [Installation](https://nativecontextindex.com/docs/installation).
+Other package managers (`pnpm`, `yarn`, `bun`), curl install, and platform notes: [Installation](https://nativecontextindex.com/docs/installation).
+
+```bash
+curl -fsSL https://nativecontextindex.com/install.sh | sh
+```
 
 `postinstall` downloads a prebuilt native binary into `vendor/` (per platform). Override with **`NCI_BINARY`**.
 

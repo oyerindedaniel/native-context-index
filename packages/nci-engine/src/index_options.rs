@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use crate::constants::DEFAULT_MAX_HOPS;
 use crate::filter::FilterConfig;
+use crate::storage::{SavePackageMode, StorageConnectionPragmas};
 use crate::types::SharedString;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,8 +78,8 @@ pub struct IndexOptions {
     pub on_package_done: Option<Arc<dyn Fn(PackageProgress) + Send + Sync>>,
     pub on_index_phase: Option<Arc<dyn Fn(IndexPhaseEvent) + Send + Sync>>,
     pub index_timing_detail: bool,
-    pub save_package_mode: crate::storage::SavePackageMode,
-    pub storage_connection_pragmas: crate::storage::StorageConnectionPragmas,
+    pub save_package_mode: SavePackageMode,
+    pub storage_connection_pragmas: StorageConnectionPragmas,
 }
 
 impl Default for IndexOptions {
@@ -100,8 +101,8 @@ impl Default for IndexOptions {
             on_package_done: None,
             on_index_phase: None,
             index_timing_detail: false,
-            save_package_mode: crate::storage::SavePackageMode::default(),
-            storage_connection_pragmas: crate::storage::StorageConnectionPragmas::baseline(),
+            save_package_mode: SavePackageMode::default(),
+            storage_connection_pragmas: StorageConnectionPragmas::baseline(),
         }
     }
 }
