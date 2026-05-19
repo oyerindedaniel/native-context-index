@@ -42,6 +42,13 @@ export const metadata = metadataForDocsPath("/docs/reference/env-vars");
       <TableCell>Controls the progress display during indexing. Same values as <code>NCI_BANNER</code>.</TableCell>
     </TableRow>
     <TableRow>
+      <TableCell><code>NCI_SLOW_QUERY_MS</code></TableCell>
+      <TableCell><code>nci</code> (<code>query --format json</code>)</TableCell>
+      <TableCell>
+        Minimum <code>meta.durationMs</code> before <code>meta.suggestions</code> may appear on a low-yield query. Default: <code>750</code>. See [Query JSON meta](/docs/reference/query-envelope).
+      </TableCell>
+    </TableRow>
+    <TableRow>
       <TableCell><code>NCI_PROFILE</code></TableCell>
       <TableCell><code>nci</code> (when built with <code>phase-profile</code> feature)</TableCell>
       <TableCell><code>1</code> emits crawl phase timings to stderr. Off by default and unavailable in standard release builds.</TableCell>
@@ -104,6 +111,6 @@ export const metadata = metadataForDocsPath("/docs/reference/env-vars");
 <CalloutRoot variant="info">
   <CalloutTitle>Where these are wired.</CalloutTitle>
   <CalloutBody>
-    Rust CLI: `NCI_CACHE_DIR`, `NCI_BANNER`, `NCI_PROGRESS`, `NCI_GITHUB_REPO`, `NCI_DOWNLOAD_BASE_URL`. Node shim: `NCI_BINARY`. Postinstall and install scripts: `packages/nci/scripts/download-binary.cjs`.
+    `nci`: `NCI_CACHE_DIR`, `NCI_BANNER`, `NCI_PROGRESS`, `NCI_SLOW_QUERY_MS`. `nci upgrade`, postinstall, and `install.sh` (via `packages/nci/scripts/download-binary.cjs`): `NCI_GITHUB_REPO`, `NCI_DOWNLOAD_BASE_URL`. npm/MCP shim: `NCI_BINARY`. Set any of these in your shell (bash, zsh, PowerShell, etc.) before running the command.
   </CalloutBody>
 </CalloutRoot>

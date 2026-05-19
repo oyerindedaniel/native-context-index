@@ -836,6 +836,67 @@ fn query_evidence_returns_symbols_and_snippets_in_one_call() {
 }
 
 #[test]
+fn query_find_cost_is_moderate_on_tiny_index() {
+    let proj = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let db_path = cache.path().join("find-cost.sqlite");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .env("NCI_CACHE_DIR", cache.path())
+        .args(["init", "-y", "--database"])
+        .arg(&db_path)
+        .assert()
+        .success();
+
+    fs::create_dir_all(proj.path().join("node_modules")).unwrap();
+    write_pkg_with_evidence_surface(proj.path(), "find-cost-pkg", "1.0.0");
+
+    nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "index",
+            "--database",
+            db_path.to_str().unwrap(),
+            "package",
+            "find-cost-pkg",
+            "1.0.0",
+        ])
+        .assert()
+        .success();
+
+    let json_output = nci_cmd()
+        .current_dir(proj.path())
+        .args([
+            "query",
+            "--database",
+            db_path.to_str().unwrap(),
+            "--format",
+            "json",
+            "find",
+            "evidenceFn",
+            "--package",
+            "find-cost-pkg",
+            "-n",
+            "5",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let parsed: Value = serde_json::from_slice(&json_output).expect("valid json envelope");
+    assert_eq!(parsed["meta"]["query"], "find");
+    assert_eq!(parsed["meta"]["cost"], "moderate");
+    assert!(
+        parsed["meta"]["durationMs"].as_u64().is_some(),
+        "meta.durationMs missing: {}",
+        parsed["meta"]
+    );
+}
+
+#[test]
 fn query_evidence_appends_truncation_sentinel_when_limit_exceeded() {
     let proj = tempdir().unwrap();
     let cache = tempdir().unwrap();

@@ -1,0 +1,84 @@
+import { PageEyebrow, PageLede } from "@/components/docs/page-eyebrow";
+import { TableRoot, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell } from "@/components/docs/widgets/table";
+import { CalloutRoot, CalloutTitle, CalloutBody } from "@/components/docs/widgets/callout";
+
+import { metadataForDocsPath } from "@/lib/docs/page-metadata";
+
+export const metadata = metadataForDocsPath("/docs/reference/query-envelope");
+
+
+<PageEyebrow>Reference · Query JSON meta</PageEyebrow>
+
+# Query JSON `meta`
+
+<PageLede>
+  Every successful <code>nci query … --format json</code> response includes a <code>meta</code> object next to <code>data</code>. Several fields look like performance signals; they answer different questions. This page is the contract for agents and automation.
+</PageLede>
+
+See also [JSON output schemas](/docs/reference/json-schemas) for the top-level envelope and per-subcommand <code>data</code> shapes.
+
+## `meta.cost` — query tier (not latency)
+
+`meta.cost` is a **fixed label per subcommand**. It describes how “large” that query class is for agent workflow (bundle work vs a single lookup). It is **not** derived from `meta.durationMs`.
+
+<TableRoot>
+  <TableHeader>
+    <TableRow>
+      <TableHeaderCell>Subcommand</TableHeaderCell>
+      <TableHeaderCell>`meta.cost`</TableHeaderCell>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell><code>evidence</code></TableCell>
+      <TableCell><code>heavy</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell><code>find</code>, <code>symbols</code>, <code>active-package</code></TableCell>
+      <TableCell><code>moderate</code></TableCell>
+    </TableRow>
+    <TableRow>
+      <TableCell>All other query subcommands (<code>symbol</code>, <code>snippet</code>, <code>show</code>, …)</TableCell>
+      <TableCell><code>light</code></TableCell>
+    </TableRow>
+  </TableBody>
+</TableRoot>
+
+A fast <code>find</code> on a tiny index still returns <code>moderate</code>. A slow <code>evidence</code> call still returns <code>heavy</code> even when it finishes quickly. Use <code>durationMs</code> to ask whether **this run** was slow.
+
+## `meta.durationMs` — wall-clock time
+
+`durationMs` is measured for **this invocation** only (milliseconds from query start to JSON print). Use it to detect a slow run on your machine or database size.
+
+It does not change `meta.cost`.
+
+## `meta.suggestions` — slow and low-yield
+
+`suggestions` is optional. It appears only when **both** are true:
+
+1. **Slow:** <code>durationMs &gt;= 750</code> by default. Override with the <code>NCI_SLOW_QUERY_MS</code> environment variable (see [Environment variables](/docs/reference/env-vars)).
+2. **Low yield:** rules depend on the subcommand — for example zero hits on <code>find</code>, or <code>evidence</code> with no snippets / empty anchors.
+
+When <code>evidence</code> returns useful <code>data.snippets</code>, **no suggestions are attached** even if the call took longer than the slow threshold.
+
+Each suggestion is an object with <code>subcommand</code> and <code>example</code> (a copy-paste CLI line).
+
+## `meta.truncated` and the `<truncated>` sentinel
+
+Two related signals when results hit a cap:
+
+| Signal | Where | Meaning |
+| --- | --- | --- |
+| <code>meta.truncated</code> | <code>meta</code> | The query hit its row/limit cap. Extra fields vary by subcommand (<code>returned</code>, <code>limit</code>, <code>uniqueHitsReturned</code>, …). |
+| <code>&lt;truncated&gt;</code> | Last row of <code>data.symbols</code> (<code>evidence</code> only) | Sentinel hit: <code>id</code>, <code>name</code>, and <code>kindName</code> are the literal string <code>&lt;truncated&gt;</code>; other fields are empty. |
+
+**`find` / `symbol`:** <code>meta.truncated</code> is <code>true</code> when the number of rows returned equals <code>--limit</code> (there may be more hits).
+
+**`evidence`:** <code>meta.truncated</code> is <code>true</code> when deduplicated unique hits exceed <code>--limit</code>. The engine appends the sentinel row so clients can detect truncation from the symbol list without parsing only <code>meta</code>.
+
+<CalloutRoot variant="info">
+  <CalloutTitle>Always present on success.</CalloutTitle>
+  <CalloutBody>
+    Every successful query JSON response includes <code>meta.envelopeVersion</code> (currently <code>1</code>) and <code>meta.query</code> (the subcommand name). Assignment lives in <code>packages/nci-engine/src/cli.rs</code> (<code>query_cost_label</code>, <code>merge_timing_into_meta</code>, <code>build_query_suggestions</code>).
+  </CalloutBody>
+</CalloutRoot>

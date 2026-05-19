@@ -1,5 +1,6 @@
 //! Release download and install for `nci upgrade`.
 
+use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -153,8 +154,16 @@ struct InstallResult {
     path: PathBuf,
 }
 
+fn native_binary_filename() -> &'static str {
+    if env::consts::OS == "windows" {
+        "nci.exe"
+    } else {
+        "nci"
+    }
+}
+
 fn github_repo_slug() -> String {
-    std::env::var("NCI_GITHUB_REPO").unwrap_or_else(|_| DEFAULT_GITHUB_REPO.to_string())
+    env::var("NCI_GITHUB_REPO").unwrap_or_else(|_| DEFAULT_GITHUB_REPO.to_string())
 }
 
 fn http_agent() -> ureq::Agent {
@@ -212,7 +221,7 @@ fn platform_asset_name() -> Result<String, String> {
 }
 
 fn release_download_url(version: &str, asset_name: &str) -> String {
-    if let Ok(base) = std::env::var("NCI_DOWNLOAD_BASE_URL") {
+    if let Ok(base) = env::var("NCI_DOWNLOAD_BASE_URL") {
         return format!("{}/v{}/{}", base.trim_end_matches('/'), version, asset_name);
     }
     let owner_repo = github_repo_slug();
@@ -310,33 +319,23 @@ fn install_binary_at_path(dest: &Path, version: &str) -> Result<InstallResult, S
 
 fn install_binary_to_vendor(vendor_dir: &Path, version: &str) -> Result<InstallResult, String> {
     std::fs::create_dir_all(vendor_dir).map_err(|error| format!("create vendor dir: {error}"))?;
-    let dest_name = if std::env::consts::OS == "windows" {
-        "nci.exe"
-    } else {
-        "nci"
-    };
-    let dest = vendor_dir.join(dest_name);
+    let dest = vendor_dir.join(native_binary_filename());
     install_binary_at_path(&dest, version)
 }
 
 fn resolve_direct_install_target() -> Result<PathBuf, String> {
-    let current_exe = std::env::current_exe().map_err(|error| error.to_string())?;
+    let current_exe = env::current_exe().map_err(|error| error.to_string())?;
     let normalized = current_exe.canonicalize().unwrap_or(current_exe);
     if let Some(vendor_dir) = normalized.parent()
         && vendor_dir.ends_with("vendor")
     {
-        let dest_name = if std::env::consts::OS == "windows" {
-            "nci.exe"
-        } else {
-            "nci"
-        };
-        return Ok(vendor_dir.join(dest_name));
+        return Ok(vendor_dir.join(native_binary_filename()));
     }
     Ok(normalized)
 }
 
 fn find_npm_package_root_from_current_exe() -> Option<PathBuf> {
-    let current_exe = std::env::current_exe().ok()?;
+    let current_exe = env::current_exe().ok()?;
     let mut cursor = current_exe.parent()?;
     for _ in 0..12 {
         let package_json = cursor.join("package.json");

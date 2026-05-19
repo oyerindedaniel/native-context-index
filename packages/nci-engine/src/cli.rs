@@ -218,6 +218,16 @@ mod query_guidance_tests {
         };
         assert!(build_query_suggestions("find", 10, input).is_none());
     }
+
+    #[test]
+    fn query_cost_label_is_fixed_by_subcommand_not_duration() {
+        assert_eq!(query_cost_label("evidence"), "heavy");
+        assert_eq!(query_cost_label("find"), "moderate");
+        assert_eq!(query_cost_label("symbols"), "moderate");
+        assert_eq!(query_cost_label("active-package"), "moderate");
+        assert_eq!(query_cost_label("snippet"), "light");
+        assert_eq!(query_cost_label("symbol"), "light");
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

@@ -280,6 +280,14 @@ export const docsGroups: DocsGroup[] = [
           "Response shape for query, symbols, and source, plus the canonical error envelope.",
       },
       {
+        slug: "/docs/reference/query-envelope",
+        title: "Query JSON Meta",
+        eyebrow: "Tables",
+        groupId: "reference-tables",
+        summary:
+          "meta.cost (query tier), durationMs, suggestions threshold, and truncation markers on nci query --format json.",
+      },
+      {
         slug: "/docs/reference/mcp-methods",
         title: "MCP Method Registry",
         eyebrow: "Tables",
